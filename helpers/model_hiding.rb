@@ -36,6 +36,7 @@ class Clover < Roda
         ::ParseableResource => [:client_for_project],
         ::PaymentMethod => [:fraud?],
         ::PostgresEmber => [:[], :where],
+        ::PostgresEmberRateLimit => [:record, :refund],
         ::PostgresLogDestination => [:url_prefix],
         ::PostgresResource => [:default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask],
         ::PostgresServer => [:victoria_metrics_client, :restart_sensitive_params],

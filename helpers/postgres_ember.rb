@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Shared by the project-scoped and internal ember routes.
+# Shared by the project-scoped, anonymous and internal ember routes.
 #
 # These live here rather than beside one of those route files because route
 # files are autoloaded per hash branch: a method defined in the project branch
@@ -121,6 +121,53 @@ class Clover
     audit_log(ember, "claim")
     return ember.reload unless api?
     Serializers::PostgresEmber.serialize(ember.reload, include_credentials: true)
+  end
+
+  # The bearer token on this surface is the ember's own, not an account's,
+  # so it deliberately does not look like a personal access token.
+  def anonymous_postgres_ember_token
+    %r{\ABearer:?\s+(\S+)\z}i.match(env["HTTP_AUTHORIZATION"].to_s)&.captures&.first
+  end
+
+  def anonymous_postgres_ember_create
+    no_audit_log
+    # Same lookup the project surface uses, so the anonymous path cannot
+    # reach a location an ordinary caller could not.
+    location = Location.for_project(Config.ember_service_project_id)[name: "hetzner-fsn1"]
+    ip = request.ip
+
+    limit = Config.postgres_ember_anonymous_creates_per_ip_per_day
+    if PostgresEmberRateLimit.record(ip) > limit
+      fail CloverError.new(429, "RateLimitExceeded",
+        "This address has already created #{limit} embers today")
+    end
+
+    token = SecureRandom.urlsafe_base64(32)
+    begin
+      ember = PostgresEmberOperations.create(
+        project_id: Config.ember_service_project_id, location:, creator_ip: ip, claim_token: token,
+        pg_version: typecast_params.nonempty_str("pg_version") || "18",
+        database: typecast_params.nonempty_str("database") || "postgres",
+        expires_at: Time.now + Config.postgres_ember_unclaimed_ttl_seconds,
+      )
+    rescue EmberOperations::NoCapacity => e
+      # A create that did not happen should not spend the caller's allowance.
+      PostgresEmberRateLimit.refund(ip)
+      Clog.emit("anonymous ember create refused", {ip:, error: e.message})
+      fail CloverError.new(503, "NoCapacity", "No capacity for an ember right now, please try again")
+    end
+
+    response.status = 201
+    anonymous_postgres_ember_response(ember).merge(
+      token:,
+      claim_url: "#{Config.base_url}/postgres-ember/claim?token=#{token}",
+    )
+  end
+
+  # The token is shown once, at create, so everything after that is the
+  # ordinary representation plus the credentials the caller came for.
+  def anonymous_postgres_ember_response(ember)
+    Serializers::PostgresEmber.serialize(ember, include_credentials: true)
   end
 
   # The ember id is the first label of the SNI name, the only way a client
