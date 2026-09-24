@@ -688,6 +688,7 @@ Usage:
     ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
+    ember                              Manage PostgreSQL embers
     list                               List PostgreSQL databases
 
 Post Commands:
@@ -736,6 +737,87 @@ Post Commands:
 Post Options:
     -d, --dbname=name                override database name
     -U, --username=name              override username
+
+
+Manage PostgreSQL embers
+
+Usage:
+    ubi pg ember command [...]
+    ubi pg ember (ember-name | ember-id) post-command [...]
+
+Commands:
+    claim             Claim an anonymous PostgreSQL ember into this project
+    list              List PostgreSQL embers
+
+Post Commands:
+    create            Create a PostgreSQL ember
+    destroy           Destroy a PostgreSQL ember
+    pause             Pause a PostgreSQL ember
+    reset-password    Reset the superuser password for a PostgreSQL ember
+    resume            Resume a paused PostgreSQL ember
+    show              Show details for a PostgreSQL ember
+
+
+Claim an anonymous PostgreSQL ember into this project
+
+Usage:
+    ubi pg ember claim claim-token
+
+
+List PostgreSQL embers
+
+Usage:
+    ubi pg ember list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Create a PostgreSQL ember
+
+Usage:
+    ubi pg ember ember-name create [options]
+
+Examples:
+    ubi pg ember my-db create
+
+Options:
+    -l, --location=location          location to create the ember in
+    -v, --version=version            PostgreSQL version
+    -d, --dbname=name                name of the database to create
+
+
+Destroy a PostgreSQL ember
+
+Usage:
+    ubi pg ember (ember-name | ember-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Pause a PostgreSQL ember
+
+Usage:
+    ubi pg ember (ember-name | ember-id) pause
+
+
+Reset the superuser password for a PostgreSQL ember
+
+Usage:
+    ubi pg ember (ember-name | ember-id) reset-password
+
+
+Resume a paused PostgreSQL ember
+
+Usage:
+    ubi pg ember (ember-name | ember-id) resume
+
+
+Show details for a PostgreSQL ember
+
+Usage:
+    ubi pg ember (ember-name | ember-id) show
 
 
 List PostgreSQL databases

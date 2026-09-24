@@ -356,6 +356,76 @@ RSpec.describe Ubicloud do
     expect(request_query).to eq ""
   end
 
+  it "Postgres.ember accepts an id, a name, or a hash with either" do
+    expect(ubi.postgres.ember("ccrvgdaebzda3jn6nr1bgn40v2").id).to eq "ccrvgdaebzda3jn6nr1bgn40v2"
+    expect(ubi.postgres.ember("my-ember").name).to eq "my-ember"
+    expect(ubi.postgres.ember(id: "ccrvgdaebzda3jn6nr1bgn40v2").id).to eq "ccrvgdaebzda3jn6nr1bgn40v2"
+    expect(ubi.postgres.ember(name: "my-ember").name).to eq "my-ember"
+  end
+
+  it "Postgres.ember rejects a reference with a location in it" do
+    # An ember is addressed by name or id alone; where it lives is not part
+    # of its identity.
+    expect { ubi.postgres.ember("eu-central-h1/my-ember") }
+      .to raise_error(Ubicloud::Error, /invalid PostgreSQL ember id format/)
+  end
+
+  it "Postgres.ember rejects a hash with neither an id nor a name" do
+    expect { ubi.postgres.ember(location: "eu-central-h1") }
+      .to raise_error(Ubicloud::Error, /:id or :name/)
+  end
+
+  it "Postgres.ember rejects a value it cannot make sense of" do
+    expect { ubi.postgres.ember(1) }.to raise_error(Ubicloud::Error, /unsupported value/)
+  end
+
+  it "Postgres.claim_ember posts the token" do
+    path = nil
+    body = nil
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      path = env["PATH_INFO"]
+      body = env["rack.input"].read
+      [200, {"content-type" => "application/json"}, ['{"id": "ccrvgdaebzda3jn6nr1bgn40v2"}']]
+    end)
+
+    expect(ubi.postgres.claim_ember("tok").id).to eq "ccrvgdaebzda3jn6nr1bgn40v2"
+    expect(path).to end_with("/postgres-ember/claim")
+    expect(JSON.parse(body)).to eq({"claim_token" => "tok"})
+  end
+
+  it "PostgresEmber#pause, #resume and #reset_password post to their own paths" do
+    paths = []
+    allow(Clover).to receive(:call).and_invoke(proc do |env|
+      paths << env["PATH_INFO"]
+      [200, {"content-type" => "application/json"}, ['{"id": "ccrvgdaebzda3jn6nr1bgn40v2", "state": "running"}']]
+    end)
+
+    ember = ubi.postgres.ember("ccrvgdaebzda3jn6nr1bgn40v2")
+    expect(ember.pause.state).to eq "running"
+    ember.resume
+    ember.reset_password
+    expect(paths.map { it.split("/").last }).to eq %w[pause resume reset-password]
+  end
+
+  it "Postgres.create_ember leaves out the parameters it was not given" do
+    body = nil
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      body = env["rack.input"].read
+      [201, {"content-type" => "application/json"}, ['{"id": "ccrvgdaebzda3jn6nr1bgn40v2"}']]
+    end)
+
+    ubi.postgres.create_ember(name: "s")
+    expect(JSON.parse(body)).to eq({"name" => "s"})
+  end
+
+  it "Postgres.create_ember accepts the 201 a create answers with" do
+    expect(Clover).to receive(:call).and_invoke(proc do |_env|
+      [201, {"content-type" => "application/json"}, ['{"id": "ccrvgdaebzda3jn6nr1bgn40v2", "name": "s"}']]
+    end)
+
+    expect(ubi.postgres.create_ember(name: "s").id).to eq "ccrvgdaebzda3jn6nr1bgn40v2"
+  end
+
   it "Vm#serial_log passes refresh: true as a query parameter when requested" do
     vm = ubi.vm.new(location: "eu-central-h1", name: "test-vm")
     request_query = nil

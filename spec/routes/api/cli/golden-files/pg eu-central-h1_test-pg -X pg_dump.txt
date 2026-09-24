@@ -7,6 +7,7 @@ Usage:
     ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
+    ember                              Manage PostgreSQL embers
     list                               List PostgreSQL databases
 
 Post Commands:

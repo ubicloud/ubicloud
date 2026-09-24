@@ -257,6 +257,24 @@ module Ubicloud
       adapter.post(_path("/cert/remove-auth-user"), name:)
     end
 
+    # An ember is the other shape of the same product, so it is reached through
+    # here rather than through a top-level accessor of its own.
+    def self.ember(adapter, values)
+      PostgresEmber.new(adapter, values)
+    end
+
+    def self.embers(adapter)
+      PostgresEmber.list(adapter)
+    end
+
+    def self.create_ember(adapter, **params)
+      PostgresEmber.create(adapter, **params)
+    end
+
+    def self.claim_ember(adapter, claim_token)
+      PostgresEmber.claim(adapter, claim_token)
+    end
+
     private
 
     def _logs(**opts)

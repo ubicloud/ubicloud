@@ -57,6 +57,7 @@ module Ubicloud
       "ak" => InferenceApiKey,
       "kc" => KubernetesCluster,
       "m1" => MachineImage,
+      "cc" => PostgresEmber,
       "sk" => SshPublicKey,
     }.freeze
 
