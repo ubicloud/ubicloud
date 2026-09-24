@@ -1,0 +1,10 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# One end of the IPsec mesh between a location's gateway replicas and its ember
+# hosts; see EmberTunnelXfrm. The spec, keys and all, arrives on stdin.
+
+require_relative "../lib/ember_tunnel_xfrm"
+
+applied = EmberTunnelXfrm.new(JSON.parse($stdin.read)).apply
+puts JSON.generate({"ok" => true, "applied" => applied})

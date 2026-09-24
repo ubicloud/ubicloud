@@ -171,10 +171,32 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
     end
 
-    it "skips if there is no tunnel" do
+    it "drops every state when there is no tunnel" do
       expect(tunnel.src_nic).to receive(:src_ipsec_tunnels).and_return([])
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([])
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state deleteall")
+      sshable = tunnel.src_nic.vm.vm_host.sshable
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state", log: :on_error).and_return(states_data)
+      %w[0xe3333333 0xe2222222].each do |spi|
+        expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:7537:: dst 2a01:4f8:10a:128b:4919:: proto esp spi #{spi}")
+      end
+      %w[0x610a9eb5 0x059e11e6].each do |spi|
+        expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi #{spi}")
+      end
+      expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete early"})
+    end
+
+    # A Postgres gateway VM's namespace also carries the ember mesh's tunnels,
+    # which rotate on their own schedule.
+    it "leaves the ember mesh's states alone, whichever way it drops" do
+      ember_state = "src 2a01:4f8:10a:128b:7537:8000:: dst 2a01:4f8:120:9208::2
+proto esp spi 0x0c0ffee0 reqid #{EmberTunnel::REQID_RANGE.first + 42} mode tunnel
+replay-window 0
+"
+      expect(tunnel.src_nic).to receive(:src_ipsec_tunnels).and_return([])
+      expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([])
+      sshable = tunnel.src_nic.vm.vm_host.sshable
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state", log: :on_error).and_return(ember_state)
+      expect(sshable).not_to receive(:_cmd).with(/xfrm state delete/)
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete early"})
     end
 
