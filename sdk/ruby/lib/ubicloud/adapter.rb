@@ -54,7 +54,9 @@ module Ubicloud
       case code
       when 204
         nil
-      when 200, 202
+      # 201 is what a create answers with; the ember API was the first to
+      # use it and the SDK treated it as a failure.
+      when 200, 201, 202
         if headers["content-type"].include?("json")
           JSON.parse(body, symbolize_names: true)
         else

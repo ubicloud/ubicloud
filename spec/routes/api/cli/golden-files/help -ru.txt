@@ -72,6 +72,16 @@ ubi mi (location/mi-name | mi-id) set-latest version
 ubi mi (location/mi-name | mi-id) show [options]
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
+ubi pg ember command [...]
+ubi pg ember (ember-name | ember-id) post-command [...]
+ubi pg ember claim claim-token
+ubi pg ember list [options]
+ubi pg ember ember-name create [options]
+ubi pg ember (ember-name | ember-id) destroy [options]
+ubi pg ember (ember-name | ember-id) pause
+ubi pg ember (ember-name | ember-id) reset-password
+ubi pg ember (ember-name | ember-id) resume
+ubi pg ember (ember-name | ember-id) show
 ubi pg list [options]
 ubi pg (location/pg-name | pg-id) add-bearer-metric-destination url token [header_name=value [...]]
 ubi pg (location/pg-name | pg-id) add-cert-auth-user name
