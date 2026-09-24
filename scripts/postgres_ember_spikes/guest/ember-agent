@@ -1,0 +1,439 @@
+#!/usr/bin/env python3
+"""Spike implementation of the ember guest agent (design doc section 4.2).
+
+Listens on AF_VSOCK port 5000 and speaks newline-delimited JSON. Every command
+is driven by the host; the guest only ever answers. This is deliberately a
+stand-in for the real static Go binary: it exists to measure the restore path,
+not to ship.
+"""
+
+import array
+import fcntl
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+PORT = 5000
+PGBIN = "/usr/lib/postgresql/18/bin"
+PGDATA = "/data/pgdata"
+RUNDIR = "/run/ember"
+
+# <linux/random.h>
+RNDADDENTROPY = 0x40085203
+RNDRESEEDCRNG = 0x5207
+
+
+def log(*a):
+    print(*a, file=sys.stderr, flush=True)
+
+
+def ms(t0):
+    return round((time.monotonic() - t0) * 1000, 1)
+
+
+def run(argv, timeout=30, check=True):
+    p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    if check and p.returncode != 0:
+        raise CommandError(" ".join(argv), p.returncode, p.stdout + p.stderr)
+    return p
+
+
+class CommandError(Exception):
+    def __init__(self, cmd, rc, out):
+        super().__init__(f"{cmd} exited {rc}: {out.strip()[:500]}")
+
+
+class AgentError(Exception):
+    def __init__(self, code, detail):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+
+
+def reseed_rng(nonce):
+    """Mix a host-supplied nonce into the guest CRNG and force a reseed.
+
+    Restored clones share the snapshot's RNG state, so this must happen before
+    anything derives a secret (SCRAM salts, TLS keys, cancel keys).
+    """
+    extra = b""
+    try:
+        with open("/dev/hwrng", "rb") as f:
+            extra = f.read(64)
+    except OSError:
+        pass
+    pool = nonce + extra
+    with open("/dev/random", "wb") as f:
+        fd = f.fileno()
+        # struct rand_pool_info { int entropy_count; int buf_size; __u32 buf[]; }
+        buf = array.array("B", struct.pack("ii", len(pool) * 8, len(pool)) + pool)
+        fcntl.ioctl(fd, RNDADDENTROPY, buf, False)
+        fcntl.ioctl(fd, RNDRESEEDCRNG, 0)
+
+
+def cmd_hello(_req):
+    with open("/proc/sys/kernel/random/boot_id") as f:
+        boot_id = f.read().strip()
+    return {"agent": "spike-0.1", "boot_id": boot_id, "uptime_s": round(uptime(), 3)}
+
+
+def uptime():
+    with open("/proc/uptime") as f:
+        return float(f.read().split()[0])
+
+
+def cmd_post_restore(req):
+    t0 = time.monotonic()
+    nonce = bytes.fromhex(req["nonce_hex"])
+    reseed_rng(nonce)
+    drift = 0.0
+    if "unix_time_ms" in req:
+        want = req["unix_time_ms"] / 1000.0
+        drift = want - time.time()
+        if abs(drift) > 0.5:
+            time.clock_settime(time.CLOCK_REALTIME, want)
+    os.makedirs(RUNDIR, exist_ok=True)
+    if "ember_id" in req:
+        with open(f"{RUNDIR}/id", "w") as f:
+            f.write(req["ember_id"])
+    return {"drift_ms": round(drift * 1000, 1), "took_ms": ms(t0)}
+
+
+def find_device(device_id, deadline):
+    """Locate the hot-plugged disk.
+
+    Waiting for udev to publish /dev/disk/by-id/virtio-<id> costs ~70 ms after
+    the PCI hot-plug; the kernel exposes the same identifier as the block
+    device's serial as soon as it has probed the device, which is much sooner.
+    """
+    byid = f"/dev/disk/by-id/virtio-{device_id}"
+    while True:
+        for name in os.listdir("/sys/block"):
+            if not name.startswith("vd"):
+                continue
+            try:
+                with open(f"/sys/block/{name}/serial") as f:
+                    if f.read().strip() == device_id:
+                        return f"/dev/{name}"
+            except OSError:
+                continue
+        if os.path.exists(byid):
+            return byid
+        if time.monotonic() > deadline:
+            raise AgentError("device_timeout", f"no block device with serial {device_id}")
+        time.sleep(0.001)
+
+
+def cmd_attach(req):
+    t0 = time.monotonic()
+    mount = req.get("mount", "/data")
+    deadline = time.monotonic() + req.get("timeout_s", 5)
+    dev = find_device(req.get("device", "cldata"), deadline)
+    appeared = ms(t0)
+    os.makedirs(mount, exist_ok=True)
+    fsck_ran = False
+    fsck_rc = None
+    # An unclean detach can leave the filesystem inconsistent in a way that
+    # still mounts; waiting for mount to fail is not enough, so the host tells
+    # us when the previous shutdown was not clean and we check first.
+    if not req.get("clean_shutdown", True) and not os.path.ismount(mount):
+        fsck_ran = True
+        fsck_rc = run(["/sbin/fsck.ext4", "-fp", dev], timeout=600, check=False).returncode
+    if not os.path.ismount(mount):
+        try:
+            run(["mount", "-o", "noatime,nodev,nosuid", dev, mount], timeout=20)
+        except CommandError:
+            if not fsck_ran:
+                fsck_ran = True
+                fsck_rc = run(["/sbin/fsck.ext4", "-fp", dev], timeout=600, check=False).returncode
+            try:
+                run(["mount", "-o", "noatime,nodev,nosuid", dev, mount], timeout=20)
+            except CommandError as e:
+                raise AgentError("mount_failed", str(e))
+    if not os.path.exists(f"{PGDATA}/PG_VERSION"):
+        raise AgentError("mount_failed", f"{PGDATA}/PG_VERSION missing after mount")
+    return {"fsck_ran": fsck_ran, "fsck_rc": fsck_rc, "device_ms": appeared, "took_ms": ms(t0)}
+
+
+def write_pg_conf(settings, tls=False):
+    confd = f"{PGDATA}/conf.d"
+    os.makedirs(confd, exist_ok=True)
+    with open(f"{confd}/host.conf", "w") as f:
+        # ssl is turned on here rather than in the image, because PostgreSQL
+        # refuses to start with ssl=on and no certificate, and the certificate
+        # only arrives with pg_start.
+        if tls:
+            f.write("ssl = on\n")
+            f.write(f"ssl_cert_file = '{RUNDIR}/server.crt'\n")
+            f.write(f"ssl_key_file = '{RUNDIR}/server.key'\n")
+        for k, v in (settings or {}).items():
+            f.write(f"{k} = '{v}'\n")
+    os.chown(f"{confd}/host.conf", pg_uid(), pg_gid())
+
+
+_pg_ids = None
+
+
+def pg_uid():
+    return pg_ids()[0]
+
+
+def pg_gid():
+    return pg_ids()[1]
+
+
+def pg_ids():
+    global _pg_ids
+    if _pg_ids is None:
+        import pwd
+        e = pwd.getpwnam("postgres")
+        _pg_ids = (e.pw_uid, e.pw_gid)
+    return _pg_ids
+
+
+def install_tls(tls):
+    if not tls:
+        return
+    ensure_rundir()
+    for name, key in (("server.crt", "cert_pem"), ("server.key", "key_pem")):
+        path = f"{RUNDIR}/{name}"
+        with open(path, "w") as f:
+            f.write(tls[key])
+        os.chmod(path, 0o600)
+        os.chown(path, pg_uid(), pg_gid())
+
+
+def psql(sql):
+    run(["su", "-s", "/bin/sh", "postgres", "-c",
+         f"{PGBIN}/psql -X -q -v ON_ERROR_STOP=1 -d postgres -c \"{sql}\""], timeout=30)
+
+
+def ensure_rundir():
+    os.makedirs(RUNDIR, exist_ok=True)
+    os.chmod(RUNDIR, 0o755)
+    os.chown(RUNDIR, pg_uid(), pg_gid())
+
+
+PG_SOCKET = "/var/run/postgresql/.s.PGSQL.5432"
+
+
+def pg_ping():
+    """PQping over the unix socket: is the postmaster accepting connections?
+
+    postmaster.pid is not usable as a readiness signal here. A restored clone
+    reproduces the guest process table, so the new postmaster gets the same pid
+    as the one in the stale file left by the previous unclean pause, and with
+    second-granularity start times the two files can be byte-identical. This
+    asks the server directly instead, without spawning anything.
+    """
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(2)
+        s.connect(PG_SOCKET)
+    except OSError:
+        return False
+    try:
+        body = b"user\x00postgres\x00database\x00postgres\x00\x00"
+        msg = struct.pack(">ii", 8 + len(body), 196608) + body
+        s.sendall(msg)
+        tag = s.recv(1)
+        if tag == b"R":
+            # An authentication request means the server is up and answering.
+            return True
+        if tag == b"E":
+            rest = s.recv(4096)
+            # 57P03 cannot_connect_now: still starting up or in recovery.
+            return b"57P03" not in rest
+        return False
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+PING_INTERVAL_S = 0.010
+
+
+def wait_pg_ready(deadline):
+    """Wait for the postmaster to accept connections.
+
+    Poll gently. Once the postmaster is listening it forks a backend for every
+    connection, including the ones it is about to reject with 57P03 while it
+    finishes recovery, so a tight ping loop makes the guest fork hundreds of
+    processes during exactly the window we are trying to shorten. Waiting for
+    the socket to exist is free, so do that tightly and only ping on a timer.
+    """
+    while time.monotonic() < deadline:
+        if not os.path.exists(PG_SOCKET):
+            time.sleep(0.001)
+            continue
+        if pg_ping():
+            return True
+        time.sleep(PING_INTERVAL_S)
+    return False
+
+
+def cmd_pg_start(req):
+    t0 = time.monotonic()
+    ensure_rundir()
+    install_tls(req.get("tls"))
+    write_pg_conf(req.get("settings"), tls=bool(req.get("tls")))
+    try:
+        # -W: do not let pg_ctl wait. Its wait loop polls on a 100 ms timer,
+        # which shows up directly in resume latency; postmaster.pid carries the
+        # same readiness signal and can be polled far more finely.
+        run(["su", "-s", "/bin/sh", "postgres", "-c",
+             f"{PGBIN}/pg_ctl -D {PGDATA} -l {RUNDIR}/pg.log -W start"], timeout=40)
+        if not wait_pg_ready(time.monotonic() + 60):
+            raise CommandError("wait_pg_ready", 1, "postmaster never accepted connections")
+    except CommandError as e:
+        tail = ""
+        try:
+            with open(f"{RUNDIR}/pg.log") as f:
+                tail = f.read()[-2000:]
+        except OSError:
+            pass
+        raise AgentError("pg_start_failed", f"{e}\n{tail}")
+    started = ms(t0)
+    recovery = False
+    try:
+        with open(f"{RUNDIR}/pg.log") as f:
+            recovery = "redo" in f.read()
+    except OSError:
+        pass
+    if req.get("superuser_password"):
+        psql(f"ALTER ROLE postgres PASSWORD '{req['superuser_password']}'")
+    db = req.get("database")
+    if db and db != "postgres":
+        p = run(["su", "-s", "/bin/sh", "postgres", "-c",
+                 f"{PGBIN}/psql -X -tAq -d postgres -c \\\"SELECT 1 FROM pg_database WHERE datname='{db}'\\\""],
+                timeout=30, check=False)
+        if p.stdout.strip() != "1":
+            psql(f"CREATE DATABASE {db}")
+    return {"pg_start_ms": started, "recovery_ran": recovery, "took_ms": ms(t0)}
+
+
+def cmd_configure(req):
+    t0 = time.monotonic()
+    install_tls(req.get("tls"))
+    if req.get("settings") or req.get("tls"):
+        write_pg_conf(req.get("settings"), tls=bool(req.get("tls")))
+    if req.get("superuser_password"):
+        psql(f"ALTER ROLE postgres PASSWORD '{req['superuser_password']}'")
+    db = req.get("database")
+    if db and db != "postgres":
+        p = run(["su", "-s", "/bin/sh", "postgres", "-c",
+                 f"{PGBIN}/psql -X -tAq -d postgres -c \\\"SELECT 1 FROM pg_database WHERE datname='{db}'\\\""],
+                timeout=30, check=False)
+        if p.stdout.strip() != "1":
+            psql(f"CREATE DATABASE {db}")
+    run(["su", "-s", "/bin/sh", "postgres", "-c", f"{PGBIN}/pg_ctl -D {PGDATA} reload"], timeout=20, check=False)
+    return {"took_ms": ms(t0)}
+
+
+def cmd_pg_stop(_req):
+    t0 = time.monotonic()
+    clean = True
+    p = run(["su", "-s", "/bin/sh", "postgres", "-c",
+             f"{PGBIN}/pg_ctl -D {PGDATA} -m fast -w -t 20 stop"], timeout=40, check=False)
+    if p.returncode != 0:
+        if "not running" in (p.stdout + p.stderr):
+            return {"clean": True, "took_ms": ms(t0), "was_running": False}
+        clean = False
+        run(["su", "-s", "/bin/sh", "postgres", "-c",
+             f"{PGBIN}/pg_ctl -D {PGDATA} -m immediate -w -t 20 stop"], timeout=40, check=False)
+    return {"clean": clean, "took_ms": ms(t0), "was_running": True}
+
+
+def cmd_detach(req):
+    t0 = time.monotonic()
+    mount = req.get("mount", "/data")
+    os.sync()
+    if os.path.ismount(mount):
+        p = run(["umount", mount], timeout=30, check=False)
+        if p.returncode != 0:
+            raise AgentError("mount_failed", (p.stdout + p.stderr).strip())
+    return {"took_ms": ms(t0)}
+
+
+def cmd_status(_req):
+    out = {"pg_running": False, "data_bytes": None, "connections": None, "disk_used_bytes": None}
+    p = run([f"{PGBIN}/pg_isready", "-q"], timeout=10, check=False)
+    out["pg_running"] = p.returncode == 0
+    if out["pg_running"]:
+        q = run(["su", "-s", "/bin/sh", "postgres", "-c",
+                 f"{PGBIN}/psql -X -tAq -d postgres -c \\\"SELECT sum(pg_database_size(oid)), (SELECT count(*) FROM pg_stat_activity)  FROM pg_database\\\""],
+                timeout=20, check=False)
+        parts = q.stdout.strip().split("|")
+        if len(parts) == 2:
+            out["data_bytes"] = int(parts[0] or 0)
+            out["connections"] = int(parts[1] or 0)
+    if os.path.ismount("/data"):
+        st = os.statvfs("/data")
+        out["disk_used_bytes"] = (st.f_blocks - st.f_bfree) * st.f_frsize
+    return out
+
+
+def cmd_exec(req):
+    p = run(req["argv"], timeout=req.get("timeout_s", 60), check=False)
+    return {"rc": p.returncode, "stdout": p.stdout[-8000:], "stderr": p.stderr[-8000:]}
+
+
+HANDLERS = {
+    "hello": cmd_hello,
+    "post_restore": cmd_post_restore,
+    "attach": cmd_attach,
+    "pg_start": cmd_pg_start,
+    "configure": cmd_configure,
+    "pg_stop": cmd_pg_stop,
+    "detach": cmd_detach,
+    "status": cmd_status,
+    "exec": cmd_exec,
+}
+
+
+def serve_conn(conn):
+    with conn.makefile("rwb") as f:
+        for line in f:
+            if len(line) > 65536:
+                return
+            try:
+                req = json.loads(line)
+            except ValueError:
+                return
+            rid = req.get("id")
+            try:
+                body = HANDLERS[req["command"]](req)
+                resp = {"id": rid, "ok": True, **body}
+            except AgentError as e:
+                resp = {"id": rid, "ok": False, "error": e.code, "detail": e.detail}
+            except KeyError as e:
+                resp = {"id": rid, "ok": False, "error": "bad_request", "detail": str(e)}
+            except Exception as e:  # noqa: BLE001 - report anything to the host
+                resp = {"id": rid, "ok": False, "error": "internal", "detail": f"{type(e).__name__}: {e}"}
+            f.write((json.dumps(resp) + "\n").encode())
+            f.flush()
+
+
+def main():
+    s = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((socket.VMADDR_CID_ANY, PORT))
+    s.listen(8)
+    log(f"ember-agent listening on vsock:{PORT}")
+    while True:
+        conn, _ = s.accept()
+        try:
+            serve_conn(conn)
+        except OSError as e:
+            log("conn error", e)
+        finally:
+            conn.close()
+
+
+if __name__ == "__main__":
+    main()

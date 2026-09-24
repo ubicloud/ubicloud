@@ -1,0 +1,7 @@
+# These scripts run on an ember host, against the system Ruby that ships with
+# Ubuntu 24.04 (3.2), the same constraint rhizome has.
+inherit_from: ../../.rubocop.yml
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable

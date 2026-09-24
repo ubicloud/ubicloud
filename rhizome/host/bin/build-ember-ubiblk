@@ -1,0 +1,53 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/vhost_block_backend"
+require_relative "../../common/lib/util"
+require "fileutils"
+
+# TEMPORARY: until ubiblk releases the start_autofetch RPC, embers run a build
+# of its start_autofetch pull request (ubicloud/ubiblk#510), which an operator
+# compiles on a host with this and registers as a VhostBlockBackend. It is
+# installed as v0.5.99, a version no release has, so it sorts above v0.5.1
+# without replacing a real one. The steps are those of ubiblk's own release
+# workflow, built against glibc rather than musl.
+UBIBLK_VERSION = "v0.5.99"
+UBIBLK_COMMIT = "36f4d4a9b81ae367b2871345b11c769aa4be9256"
+UBIBLK_BINARIES = %w[vhost-backend init-metadata archive remote-stripe-server dump-metadata export-archive].freeze
+CARGO = "/root/.cargo/bin/cargo"
+
+def build_ubiblk(backend)
+  return if File.exist?(backend.bin_path)
+
+  r("apt-get", "update")
+  r("apt-get", "-y", "install", "git", "curl", "autoconf", "libtool", "nasm", "clang", "build-essential")
+  FileUtils.mkdir_p("/opt/src")
+  unless File.exist?("/usr/lib/libisal_crypto.so")
+    rm_if_exists("/opt/src/isa-l_crypto")
+    r("git", "clone", "--depth", "1", "--branch", "v2.25.0", "https://github.com/intel/isa-l_crypto", "/opt/src/isa-l_crypto")
+    r("bash", "-c", "cd /opt/src/isa-l_crypto && ./autogen.sh && ./configure --prefix=/usr --libdir=/usr/lib && make -j$(nproc) && make install")
+  end
+  unless File.exist?(CARGO)
+    r("bash", "-c", "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal")
+  end
+
+  rm_if_exists("/opt/src/ubiblk")
+  r("git", "clone", "https://github.com/ubicloud/ubiblk", "/opt/src/ubiblk")
+  r("git", "-C", "/opt/src/ubiblk", "fetch", "origin", "pull/510/head")
+  r("git", "-C", "/opt/src/ubiblk", "checkout", "--detach", UBIBLK_COMMIT)
+  r("env", "HOME=/root", CARGO, "build", "--release", "--manifest-path", "/opt/src/ubiblk/Cargo.toml")
+
+  # Into a staging directory first, so an interrupted install never leaves a
+  # directory that looks installed.
+  staging = "#{backend.dir}.tmp"
+  rm_if_exists(staging)
+  FileUtils.mkdir_p(staging)
+  UBIBLK_BINARIES.each { |bin| FileUtils.install(File.join("/opt/src/ubiblk/target/release", bin), staging, mode: 0o755) }
+  rm_if_exists(backend.dir)
+  File.rename(staging, backend.dir)
+end
+
+backend = VhostBlockBackend.new(UBIBLK_VERSION)
+build_ubiblk(backend)
+
+puts "ubiblk #{UBIBLK_VERSION} built"
