@@ -206,6 +206,8 @@ module Config
   override :postgres_ember_default_cpu_percent_limit, 50, int
   override :postgres_ember_volume_size_gib, 2, int
   override :postgres_ember_idle_timeout_seconds, 300, int
+  override :postgres_ember_unclaimed_ttl_seconds, 259200, int
+  override :postgres_ember_anonymous_creates_per_ip_per_day, 5, int
   # JWT secret for the gateway's calls to the control plane's internal API.
   optional :postgres_gateway_token_secret, string
   # Embers are reached as <ember ubid>.<suffix>, through one wildcard record and

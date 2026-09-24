@@ -34,6 +34,7 @@ class Clover < Roda
         ::PaymentMethod => [:fraud?],
         ::Ember => [:[], :where],
         ::PostgresEmber => [:[], :where],
+        ::PostgresEmberRateLimit => [:record, :refund],
         ::EmberTemplate => [:where],
         ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask, :partner_notification_flavors, :postgres_flavors],
         ::PostgresServer => [:victoria_metrics_client, :restart_sensitive_params],

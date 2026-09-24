@@ -1095,6 +1095,18 @@ class Clover < Roda
 
   route do |r|
     if api?
+      # Obtaining an ember needs no account, which is the point of the
+      # product, so that surface runs ahead of authentication: there is no
+      # personal access token to present. It carries a per-ember token of
+      # its own and is limited per source address instead. The branch always
+      # answers, so nothing below sees these paths.
+      if %r{\A/postgres-ember(/|\z)}.match?(r.path_info)
+        response.json = true
+        response.skip_content_security_policy!
+        before_main_hash_branches
+        r.hash_branches(:anonymous_prefix)
+      end
+
       unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
           response.content_type = :text
