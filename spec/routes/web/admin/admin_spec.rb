@@ -39,7 +39,7 @@ RSpec.describe CloverAdmin do
     fill_in "UBID, UUID, or prefix:term", with: account.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
-    expect(object_data).to eq(email: "user@example.com", name: "", status_id: "2", suspended_at: "")
+    expect(object_data).to eq(email: "user@example.com", name: "", project_limit: "10", status_id: "2", suspended_at: "")
 
     project = account.projects.first
     click_link project.name
@@ -63,7 +63,7 @@ RSpec.describe CloverAdmin do
     fill_in "UBID, UUID, or prefix:term", with: account.id
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
-    expect(object_data).to eq(email: "user@example.com", name: "", status_id: "2", suspended_at: "")
+    expect(object_data).to eq(email: "user@example.com", name: "", project_limit: "10", status_id: "2", suspended_at: "")
 
     fill_in "UBID, UUID, or prefix:term", with: "fed39539-ffe4-417d-9b8a-9a41ff7d4ad2"
     click_button "Show Object"
