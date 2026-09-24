@@ -958,16 +958,18 @@ end
 #  preferred_availability_zone_id  | text                     |
 #  required_availability_zone_id   | text                     |
 #  target_image_family             | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
+#  target_storage_configuration    | jsonb                    |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
-#  at_most_one_availability_zone_request | (preferred_availability_zone_id IS NULL OR required_availability_zone_id IS NULL)
-#  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
-#  target_image_family_check             | (target_image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
-#  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
-#  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
-#  valid_maintenance_windows_start_at    | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
+#  at_most_one_availability_zone_request  | (preferred_availability_zone_id IS NULL OR required_availability_zone_id IS NULL)
+#  hostname_version_check                 | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  target_image_family_check              | (target_image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
+#  target_storage_configuration_is_object | (target_storage_configuration IS NULL OR jsonb_typeof(target_storage_configuration) = 'object'::text)
+#  target_version_check                   | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  valid_maintenance_window_days_bitmask  | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
+#  valid_maintenance_windows_start_at     | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
 #  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)

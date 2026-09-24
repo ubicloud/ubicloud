@@ -34,6 +34,7 @@ class UBID
   # types
   TYPE_VM = "vm"
   TYPE_VM_STORAGE_VOLUME = "v1"
+  TYPE_NETWORK_VOLUME = "nv"
   TYPE_VM_HOST = "vh"
   TYPE_STORAGE_KEY_ENCRYPTION_KEY = "ke"
   TYPE_PROJECT = "pj"
