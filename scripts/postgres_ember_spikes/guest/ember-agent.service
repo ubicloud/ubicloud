@@ -1,0 +1,15 @@
+[Unit]
+Description=Ubicloud ember guest agent (vsock)
+DefaultDependencies=no
+After=local-fs.target systemd-tmpfiles-setup.service
+Before=basic.target
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ember-agent
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=basic.target
