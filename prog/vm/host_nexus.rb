@@ -75,9 +75,15 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def bootstrap_rhizome
     register_deadline("download_boot_images", 10 * 60)
-    hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
+    hop_check_ip_reachability if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
 
     push Prog::BootstrapRhizome, {"target_folder" => "host"}
+  end
+
+  label def check_ip_reachability
+    hop_prep if retval&.dig("msg") == "all ip addresses are reachable"
+
+    push Prog::CheckIpReachability
   end
 
   label def prep

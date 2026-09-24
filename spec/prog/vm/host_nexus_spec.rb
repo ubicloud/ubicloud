@@ -270,9 +270,20 @@ RSpec.describe Prog::Vm::HostNexus do
       }
     end
 
-    it "hops to prep once BootstrapRhizome has returned" do
+    it "hops to check_ip_reachability once BootstrapRhizome has returned" do
       nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
-      expect { nx.bootstrap_rhizome }.to hop("prep")
+      expect { nx.bootstrap_rhizome }.to hop("check_ip_reachability")
+    end
+  end
+
+  describe "#check_ip_reachability" do
+    it "pushes the ip reachability program" do
+      expect { nx.check_ip_reachability }.to hop("start", "CheckIpReachability")
+    end
+
+    it "hops to prep once CheckIpReachability has returned" do
+      nx.strand.retval = {"msg" => "all ip addresses are reachable"}
+      expect { nx.check_ip_reachability }.to hop("prep")
     end
   end
 
