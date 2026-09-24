@@ -37,8 +37,9 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   end
 
   label def drop_old_state
+    vm_name = nic.vm.inhost_name
     if nic.src_ipsec_tunnels.empty? && nic.dst_ipsec_tunnels.empty?
-      nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state deleteall", vm_name: nic.vm.inhost_name)
+      drop_states(vm_name, keep: [])
       pop "drop_old_state is complete early"
     end
 
@@ -49,19 +50,24 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       [tunnel.src_nic.rekey_payload["spi4"], tunnel.src_nic.rekey_payload["spi6"]]
     end.flatten
 
-    vm_name = nic.src_ipsec_tunnels.first.vm_name(nic)
+    drop_states(vm_name, keep: new_spis)
+    pop "drop_old_state is complete"
+  end
+
+  # Drop every ESP state in the namespace except the ones to keep. A Postgres
+  # gateway VM's namespace also holds the tunnels of the ember mesh, which
+  # rotate on their own schedule; their reqids come from a range reserved for
+  # them, so the states are told apart by reqid and left alone.
+  def drop_states(vm_name, keep:)
     state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state", vm_name:, log: :on_error)
 
-    # Extract SPIs along with src and dst from state data
-    states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+)/m)
+    # Extract SPIs along with src, dst and reqid from state data
+    states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+) reqid (\d+)/m)
 
-    # Identify which states to drop
-    states_to_drop = states.reject { |(_, _, spi)| new_spis.include?(spi) }
-    states_to_drop.each do |src, dst, spi|
+    states.each do |src, dst, spi, reqid|
+      next if keep.include?(spi) || EmberTunnel::REQID_RANGE.cover?(Integer(reqid))
       nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state delete src :src dst :dst proto esp spi :spi", vm_name:, src:, dst:, spi:)
     end
-
-    pop "drop_old_state is complete"
   end
 
   class Xfrm

@@ -21,6 +21,13 @@ class PostgresGateway < Sequel::Model
   def hostname_for(ember)
     ember.hostname(hostname_suffix)
   end
+
+  # The prefixes the ember hosts allow connections from: the guest half of each
+  # replica's address block, which is what the gateway speaks from inside the
+  # IPsec mesh. Only replicas that have joined the mesh are listed.
+  def source_prefixes
+    replicas.select(&:tunnel_keys).map { EmberTunnel.endpoint(it)[:inner] }
+  end
 end
 
 # Table: postgres_gateway
