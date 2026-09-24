@@ -1990,6 +1990,22 @@ RSpec.describe CloverAdmin do
     expect(account.reload.suspended_at).to be_nil
   end
 
+  it "supports setting the project limit of Accounts" do
+    account = create_account(with_project: false)
+    fill_in "UBID, UUID, or prefix:term", with: account.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(object_data[:project_limit]).to eq "10"
+
+    click_link "Set Project Limit"
+    fill_in "project_limit", with: "25"
+    click_button "Set Project Limit"
+    expect(page).to have_flash_notice("Set project limit")
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(account.reload.project_limit).to eq 25
+    expect(object_data[:project_limit]).to eq "25"
+  end
+
   it "supports resolving Pages" do
     p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
