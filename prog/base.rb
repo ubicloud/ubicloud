@@ -274,9 +274,13 @@ end
   #
   # If there are still active children:
   #
-  # * If fallthrough is given: returns nil
+  # * If fallthrough is true: returns nil
   # * If nap is given: naps for given time
   # * Otherwise, donates to run a child process
+  #
+  # fallthrough: :when_idle naps or donates while children are active,
+  # then returns nil once none remain, so a caller can wait for children
+  # and continue in place.
   def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand, prog: nil)
     dataset = strand.children_dataset
     dataset = dataset.where(prog:) if prog
@@ -312,6 +316,7 @@ end
       end
     end
 
+    fallthrough = false if fallthrough == :when_idle && !active_children.empty?
     unless fallthrough
       # Parent is not a leaf, nap for given time, or donate if no
       # nap time is given.

@@ -77,6 +77,11 @@ class Prog::Test < Prog::Base
     reap { pop({msg: "reap_exit_no_children"}) }
   end
 
+  label def reap_when_idle
+    reap(nap: 5, fallthrough: :when_idle)
+    pop({msg: "reap_when_idle"})
+  end
+
   label def reap_emit_reaped_children
     reaper = lambda do |child|
       Clog.emit("child exit", strand_exited: {strand: [child.exitval["msg"], child.ubid]})
