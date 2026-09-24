@@ -1,0 +1,50 @@
+<% @page_title = "Create PostgreSQL Ember"
+back = "#{@project.path}/postgres"
+action = "#{@project.path}/postgres-ember" %>
+
+<%== part(
+  "components/page_header",
+  title: @page_title,
+  back:,
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    ["Postgres Embers", back],
+    %w[Create #].freeze
+  ]
+) %>
+
+<% form(action:, method: :post) do %>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <div class="sm:col-span-3">
+              <%== part("components/form/text", name: "name", label: "Name", attributes: {placeholder: "my-ember"}) %>
+            </div>
+
+            <div class="sm:col-span-3">
+              <%== part("components/form/select", name: "location", label: "Location", options: @locations.map { [it.display_name, it.display_name] }) %>
+            </div>
+
+            <div class="sm:col-span-3">
+              <%== part("components/form/select", name: "pg_version", label: "PostgreSQL Version", options: @pg_versions.map { [it, it] }) %>
+            </div>
+
+            <div class="sm:col-span-3">
+              <%== part("components/form/text", name: "database", label: "Database Name", value: "postgres") %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= back %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: "Create") %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

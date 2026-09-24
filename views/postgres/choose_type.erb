@@ -1,0 +1,14 @@
+<% @page_title = "Create PostgreSQL Database" %>
+
+<%== part(
+  "components/page_header",
+  title: "Create PostgreSQL Database",
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    ["PostgreSQL Databases", "#{@project.path}/postgres"],
+    %w[Create #].freeze
+  ]
+) %>
+
+<%== render("postgres/type_cards") %>

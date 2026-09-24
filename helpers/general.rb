@@ -113,6 +113,7 @@ class Clover < Roda
     attach_vm
     cancel_storage_auto_scale
     connect
+    claim
     create
     create_backup_credentials
     create_cert
@@ -140,8 +141,10 @@ class Clover < Roda
     remove_cert_auth_user
     remove_member
     rename
+    pause
     reset_superuser_password
     restart
+    resume
     restore
     restrict
     retire

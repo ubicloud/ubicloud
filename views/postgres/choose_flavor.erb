@@ -1,0 +1,45 @@
+<% @page_title = "Create PostgreSQL Database" %>
+
+<%== part(
+  "components/page_header",
+  title: "Choose a PostgreSQL flavor",
+  back: "#{@project.path}/postgres/create",
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    ["PostgreSQL Databases", "#{@project.path}/postgres"],
+    %w[Create #].freeze
+  ]
+) %>
+
+<div class="grid gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
+    <% PostgresResource.postgres_flavors(@project).values.each do %>
+      <div class="rounded-lg shadow group relative bg-white p-6">
+        <div>
+          <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
+            <img src="/icons/pg-<%= it.brand.downcase %>.png" class="object-cover" alt="<%= it.brand.downcase %>">
+          </span>
+        </div>
+
+        <div class="mt-4">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a
+              href="<%= @project.path %>/postgres/create?type=dedicated&flavor=<%= it.name %>"
+              class="focus:outline-none"
+            >
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Create <%= it.title %>
+            </a>
+          </h3>
+
+          <p class="mt-2 text-sm text-gray-500"><%= it.description %></p>
+        </div>
+
+        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+          <%== part("components/icon", name: "hero-arrow-up-right") %>
+        </span>
+      </div>
+    <% end %>
+  </div>
+</div>

@@ -12,6 +12,91 @@ info:
 servers:
   - url: https://api.ubicloud.com
 paths:
+  /postgres-ember:
+    post:
+      operationId: createAnonymousEmber
+      summary: Create a Postgres Ember without an account
+      description: Needs no authentication. The response carries a token, shown only here, that authenticates the other calls on this path and claims the ember into a project. Limited per source address.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pg_version:
+                  type: string
+                database:
+                  type: string
+              additionalProperties: false
+      responses:
+        '201':
+          $ref: '#/components/responses/AnonymousPostgresEmber'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /postgres-ember/{postgres_ember_id}:
+    parameters:
+      - $ref: '#/components/parameters/postgres_ember_id'
+    get:
+      operationId: getAnonymousEmber
+      summary: Get an anonymous Postgres Ember
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+    delete:
+      operationId: deleteAnonymousEmber
+      summary: Delete an anonymous Postgres Ember
+      responses:
+        '204':
+          description: Ember is deleted
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /postgres-ember/{postgres_ember_id}/pause:
+    parameters:
+      - $ref: '#/components/parameters/postgres_ember_id'
+    post:
+      operationId: pauseAnonymousEmber
+      summary: Pause an anonymous Postgres Ember
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /postgres-ember/{postgres_ember_id}/reset-password:
+    parameters:
+      - $ref: '#/components/parameters/postgres_ember_id'
+    post:
+      operationId: resetAnonymousEmberPassword
+      summary: Reset an anonymous Postgres Ember superuser password
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /postgres-ember/{postgres_ember_id}/resume:
+    parameters:
+      - $ref: '#/components/parameters/postgres_ember_id'
+    post:
+      operationId: resumeAnonymousEmber
+      summary: Resume an anonymous Postgres Ember
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
   /project/{project_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2653,6 +2738,135 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/postgres-ember:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listEmbers
+      summary: List Postgres Embers
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmbers'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+    post:
+      operationId: createEmber
+      summary: Create a Postgres Ember
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: string
+                name:
+                  type: string
+                pg_version:
+                  type: string
+                database:
+                  type: string
+              additionalProperties: false
+      responses:
+        '201':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /project/{project_id}/postgres-ember/claim:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: claimEmber
+      summary: Claim an anonymous Postgres Ember into this project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                claim_token:
+                  type: string
+              additionalProperties: false
+              required:
+                - claim_token
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /project/{project_id}/postgres-ember/{postgres_ember_reference}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/postgres_ember_reference'
+    get:
+      operationId: getEmber
+      summary: Get Postgres Ember details
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+    delete:
+      operationId: deleteEmber
+      summary: Delete a Postgres Ember
+      responses:
+        '204':
+          description: Ember is deleted
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /project/{project_id}/postgres-ember/{postgres_ember_reference}/pause:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/postgres_ember_reference'
+    post:
+      operationId: pauseEmber
+      summary: Pause a Postgres Ember
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /project/{project_id}/postgres-ember/{postgres_ember_reference}/reset-password:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/postgres_ember_reference'
+    post:
+      operationId: resetEmberPassword
+      summary: Reset a Postgres Ember superuser password
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
+  /project/{project_id}/postgres-ember/{postgres_ember_reference}/resume:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/postgres_ember_reference'
+    post:
+      operationId: resumeEmber
+      summary: Resume a paused Postgres Ember
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresEmberWithCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Ember
   /project/{project_id}/private-location:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3052,6 +3266,25 @@ components:
       schema:
         type: integer
         default: 10
+    postgres_ember_id:
+      description: Ember ID
+      in: path
+      name: postgres_ember_id
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ubid'
+    postgres_ember_reference:
+      description: Ember ID or name
+      examples:
+        id:
+          value: sbn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: ember-name
+      in: path
+      name: postgres_ember_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     postgres_database_reference:
       description: Postgres database ID or name
       examples:
@@ -3141,6 +3374,88 @@ components:
       schema:
         $ref: '#/components/schemas/Reference'
   schemas:
+    PostgresEmber:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        location:
+          type: string
+        state:
+          type: string
+        pg_version:
+          type: string
+        database:
+          type: string
+        memory_mib:
+          type: integer
+        idle_timeout_seconds:
+          type: integer
+        created_at:
+          type: string
+        last_activity_at:
+          type: string
+        expires_at:
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - location
+        - state
+    PostgresEmberWithCredentials:
+      allOf:
+        - $ref: '#/components/schemas/PostgresEmber'
+        - type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+            user:
+              type: string
+            password:
+              type: string
+            connection_string:
+              type: string
+          additionalProperties: false
+          required:
+            - host
+            - port
+            - user
+            - password
+            - connection_string
+    AnonymousPostgresEmber:
+      allOf:
+        - $ref: '#/components/schemas/PostgresEmber'
+        - type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+            user:
+              type: string
+            password:
+              type: string
+            connection_string:
+              type: string
+            token:
+              description: Shown once. Authenticates the other calls on the anonymous path and claims this ember into a project.
+              type: string
+            claim_url:
+              type: string
+          additionalProperties: false
+          required:
+            - host
+            - port
+            - user
+            - password
+            - connection_string
+            - token
+            - claim_url
     MaintenanceWindowDay:
       type: string
       enum:
@@ -4196,6 +4511,10 @@ components:
       description: Resource ID or name
       type: string
       pattern: ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$
+    Ubid:
+      description: Resource ID
+      type: string
+      pattern: ^[a-tv-z0-9]{26}$
     Vm:
       type: object
       properties:
@@ -4461,6 +4780,35 @@ components:
         - option_tree
         - metadata
   responses:
+    PostgresEmbers:
+      description: A list of Postgres Embers
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresEmber'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresEmberWithCredentials:
+      description: A Postgres Ember, including how to connect to it
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresEmberWithCredentials'
+    AnonymousPostgresEmber:
+      description: A newly created anonymous Postgres Ember and its token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnonymousPostgresEmber'
     AuditLogs:
       description: A list of audit log entries
       content:
@@ -5190,5 +5538,7 @@ tags:
     name: GitHub
   - description: Audit Log Operations
     name: Audit Log
+  - description: Postgres Ember Operations
+    name: Ember
 security:
   - BearerAuth: []
