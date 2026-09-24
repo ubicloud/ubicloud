@@ -426,6 +426,10 @@ TIMER
       nap 60
     end
 
+    when_drain_embers_set? do
+      hop_drain_embers
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -446,6 +450,20 @@ TIMER
     fields = ["vendor_id", "cpu family", "model", "stepping"].map { cpuinfo[/^#{Regexp.escape(it)}\s*:\s*(.+)$/, 1].to_s.strip }
     vm_host.update(cpu_signature: "#{fields.join("-")}/#{Config.ember_ch_version}")
     hop_start_vms
+  end
+
+  # Stop placing embers here and pause the ones that are running. Pausing moves
+  # each volume to detached and frees the slot; the tenant's next connection
+  # resumes it wherever there is room.
+  label def drain_embers
+    decr_drain_embers
+    vm_host.update(allocation_state: "draining")
+
+    running = vm_host.embers_dataset.exclude(state: "paused").all
+    hop_wait if running.empty?
+
+    running.each(&:incr_pause)
+    nap 10
   end
 
   label def unavailable

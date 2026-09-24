@@ -28,7 +28,8 @@ class VmHost < Sequel::Model
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy, vhost_block_backends: :destroy, gpu_partitions: :destroy
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics, :patch
+  plugin SemaphoreMethods, :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics, :patch,
+    :drain_embers
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -606,7 +607,6 @@ end
 #  gpu_partition         | gpu_partition_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
 #  host_provider         | host_provider_id_fkey                 | (id) REFERENCES vm_host(id)
 #  pci_device            | pci_device_vm_host_id_fkey            | (vm_host_id) REFERENCES vm_host(id)
-#  postgres_gateway_host | postgres_gateway_host_id_fkey         | (id) REFERENCES vm_host(id) ON DELETE CASCADE
 #  remote_storage_server | remote_storage_server_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 #  spdk_installation     | spdk_installation_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
 #  storage_device        | storage_device_vm_host_id_fkey        | (vm_host_id) REFERENCES vm_host(id)
