@@ -314,6 +314,15 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
     end
 
+    it "automatically handles duplicate workflow runs" do
+      workflow_run
+      expect { send_webhook("workflow_run", workflow_run_payload(action: "requested")) }
+        .to change { Strand.count }.by(1)
+        .and not_change { GithubActiveWorkflowRun.count }
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
     it "uses pull request ref for cache_scope when the event is a pull_request" do
       send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", pull_requests: [{number: 42}])))
       expect(page.status_code).to eq(200)
