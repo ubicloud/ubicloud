@@ -100,6 +100,21 @@ RSpec.describe Prog::Base do
     }.from(false).to(true)
   end
 
+  it "naps while active children remain when fallthrough: :when_idle" do
+    parent = Strand.create(prog: "Test", label: "reap_when_idle")
+    Strand.create(parent_id: parent.id, prog: "Test", label: "napper")
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 5
+  end
+
+  it "falls through to the caller once no active children remain when fallthrough: :when_idle" do
+    parent = Strand.create(prog: "Test", label: "reap_when_idle")
+    child = Strand.create(parent_id: parent.id, prog: "Test", label: "napper", exitval: {"msg" => "done"})
+    expect(parent.unsynchronized_run).to be_a Prog::Base::Exit
+    expect(child).not_to exist
+  end
+
   it "failures when running child strand in reap affect try in child but not in parent" do
     parent = Strand.create(prog: "Test", label: "reaper")
     child = Strand.create(parent_id: parent.id, prog: "Test", label: "failer")
