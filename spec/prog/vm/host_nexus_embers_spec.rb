@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 # The ember half of Prog::Vm::HostNexus: bringing a host up to run embers and
-# nothing else.
+# nothing else, and draining it.
 RSpec.describe Prog::Vm::HostNexus do
   subject(:nx) { described_class.new(strand) }
 
@@ -63,6 +63,30 @@ RSpec.describe Prog::Vm::HostNexus do
       SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1.0", allocation_weight: 100)
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify v1.0")
       expect { nx.verify_spdk }.to hop("prep_embers")
+    end
+  end
+
+  describe "#wait" do
+    before { allow_any_instance_of(described_class).to receive(:hardware_reset_and_reboot_checks) }
+
+    it "hops to drain when asked" do
+      vm_host.incr_drain_embers
+      expect { nx.wait }.to hop("drain_embers")
+    end
+  end
+
+  describe "#drain_embers" do
+    it "stops accepting embers and pauses what is running" do
+      ember = create_ember(vm_host_id: vm_host.id, state: "running")
+      Strand.create_with_id(ember, prog: "Ember::Nexus", label: "wait")
+      expect { nx.drain_embers }.to nap(10)
+      expect(vm_host.reload.allocation_state).to eq("draining")
+      expect(ember.reload.pause_set?(cached: false)).to be true
+    end
+
+    it "goes back to waiting once nothing is left running" do
+      expect { nx.drain_embers }.to hop("wait")
+      expect(vm_host.reload.allocation_state).to eq("draining")
     end
   end
 end
