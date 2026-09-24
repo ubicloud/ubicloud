@@ -99,6 +99,8 @@ module Prog::Parseable; end
 
 module Prog::Postgres; end
 
+module Prog::Ember; end
+
 module Prog::Storage; end
 module Prog::Storage::RemoteStorageServer; end
 
