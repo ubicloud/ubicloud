@@ -1,0 +1,92 @@
+<% @page_title = @ember.name
+back = "#{@project.path}/ember"
+edit_perm = has_permission?("PostgresEmber:edit", @ember)
+delete_perm = has_permission?("PostgresEmber:delete", @ember)
+
+right_items = []
+right_items << part("components/delete_button", confirmation: @ember.name, url: path(@ember)) if delete_perm %>
+
+<%== part(
+  "components/page_header",
+  title: @ember.name,
+  back:,
+  right_items:,
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    ["Postgres Embers", back],
+    [@ember.name, "#"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/kv_data_card",
+    data: [
+      ["ID", @ember.ubid],
+      ["Name", @ember.name],
+      ["Location", @ember.location.display_name],
+      ["State", "state_label", {component: {state: @ember.display_state, color: @ember.display_color}}],
+      ["PostgreSQL Version", @ember.pg_version],
+      ["Database", @ember.database_name],
+      ["Memory", "#{@ember.memory_mib} MiB"],
+      ["Idle Timeout", "#{@ember.idle_timeout_seconds} seconds"],
+      ["Last Activity", @ember.last_activity_at.utc.strftime("%b %d, %Y %H:%M UTC")],
+      (["Expires", @ember.expires_at.utc.strftime("%b %d, %Y %H:%M UTC")] if @ember.expires_at)
+    ]
+  ) %>
+
+  <%== part(
+    "components/kv_data_card",
+    data: [
+      ["Host", @ember.hostname(@hostname_suffix), {copyable: true}],
+      ["Port", "5432"],
+      ["User", "postgres"],
+      ["Password", @ember.superuser_password, {copyable: true, revealable: true}],
+      ["Connection String", @ember.connection_string(@hostname_suffix), {copyable: true, revealable: true}]
+    ]
+  ) %>
+
+  <% if edit_perm %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6 flex items-center justify-between gap-4">
+        <div>
+          <% if @ember.paused? %>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Resume this ember</h3>
+
+            <p class="mt-1 text-sm text-gray-500">
+              Connecting to a paused ember resumes it on its own. This is here for when you would rather it were already
+              up.
+            </p>
+          <% else %>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Pause this ember</h3>
+
+            <p class="mt-1 text-sm text-gray-500">
+              The storage survives and the ember costs nothing while paused. It happens on its own after
+              <%= @ember.idle_timeout_seconds %> seconds without activity.
+            </p>
+          <% end %>
+        </div>
+
+        <% form(action: "#{path(@ember)}/#{@ember.paused? ? "resume" : "pause"}", method: :post) do %>
+          <%== part("components/form/submit_button", text: @ember.paused? ? "Resume" : "Pause") %>
+        <% end %>
+      </div>
+
+      <div class="px-4 py-5 sm:p-6 flex items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold leading-6 text-gray-900">Reset the superuser password</h3>
+
+          <p class="mt-1 text-sm text-gray-500">
+            A new password is generated and applied immediately. Open connections stay up; anything that reconnects
+            needs the new one.
+          </p>
+        </div>
+
+        <% form(action: "#{path(@ember)}/reset-password", method: :post) do %>
+          <%== part("components/form/submit_button", text: "Reset Password") %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

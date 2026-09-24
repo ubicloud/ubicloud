@@ -1,0 +1,47 @@
+<% @page_title = "Claim a Postgres Ember" %>
+
+<%== part(
+  "components/page_header",
+  title: @page_title,
+  breadcrumbs: [%w[Projects /project].freeze, ["Claim an Ember", "#"]]
+) %>
+
+<div class="grid gap-6">
+  <% if @projects.empty? %>
+    <%== part(
+      "components/empty_state",
+      icon: "hero-rocket-launch",
+      title: "No project to claim into",
+      description: "Create a project first, then open this link again.",
+      button_link: "/project",
+      button_title: "Create Project"
+    ) %>
+  <% else %>
+    <% form(action: "/postgres-ember/claim", method: :post) do %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+        <div class="px-4 py-5 sm:p-6">
+          <p class="text-sm text-gray-500">
+            Claiming moves this ember into one of your projects and stops it from expiring. The connection string stays
+            the same, so anything already using it keeps working, and the link you used to get here stops working.
+            Anyone who has the connection string keeps access until you reset the password.
+          </p>
+
+          <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <%== hidden_inputs(token: @claim_token) %>
+
+            <div class="sm:col-span-3">
+              <%== part("components/form/select", name: "project", label: "Project", options: @projects.map { [it.ubid, it.name] }) %>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 py-5 sm:p-6">
+          <div class="flex items-center justify-end gap-x-6">
+            <a href="/project" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+            <%== part("components/form/submit_button", text: "Claim") %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</div>
