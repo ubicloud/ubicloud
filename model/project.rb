@@ -233,6 +233,7 @@ class Project < Sequel::Model
       .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)
       .all.sum { it[:node_count] * Validation.validate_vm_size(it[:target_node_size], "x64").vcpus } || 0
     when "MachineImageVersion" then MachineImageVersion.where(machine_image_id: machine_images_dataset.select(:id)).count
+    when "PostgresEmberCount" then PostgresEmber.where(id: embers_dataset.select(:id)).count
     else
       raise "Unknown resource type: #{resource_type}"
     end

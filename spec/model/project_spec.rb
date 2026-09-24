@@ -240,6 +240,12 @@ RSpec.describe Project do
       MachineImageVersion.create(machine_image_id: mi.id, version: "1.1", actual_size_mib: 100)
     }.to change { project.current_resource_usage("MachineImageVersion") }.from(0).to(2)
 
+    expect(project.current_resource_usage("PostgresEmberCount")).to eq 0
+    expect {
+      create_postgres_ember(project_id: project.id, name: "ember-a")
+      create_postgres_ember(project_id: project.id, name: "ember-b")
+    }.to change { project.current_resource_usage("PostgresEmberCount") }.from(0).to(2)
+
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 
