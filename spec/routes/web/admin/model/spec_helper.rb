@@ -693,5 +693,17 @@ module AdminModelSpecHelper
       vm = create_vm
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 10, disk_index: 1)
     end
+
+    def create_network_volume
+      NetworkVolume.create(location_id: Location::HETZNER_FSN1_ID, size_gib: 64)
+    end
+
+    def create_aws_volume
+      AwsVolume.create_with_id(create_network_volume, volume_type: "gp3", provisioned_iops: 3000)
+    end
+
+    def create_gcp_volume
+      GcpVolume.create_with_id(create_network_volume, volume_type: "hyperdisk-balanced", provisioned_iops: 3000)
+    end
   end
 end

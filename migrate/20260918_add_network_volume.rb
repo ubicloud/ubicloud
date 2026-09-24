@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+Sequel.migration do
+  change do
+    create_table(:network_volume) do
+      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_ubid_uuid(699)") # nv ubid type
+      column :created_at, :timestamptz, null: false, default: Sequel::CURRENT_TIMESTAMP
+
+      foreign_key :location_id, :location, type: :uuid, null: false
+
+      column :provider_id, :text, collate: '"C"'
+
+      column :size_gib, :bigint, null: false
+      constraint(:network_volume_size_positive, Sequel.lit("size_gib > 0"))
+    end
+
+    create_table(:aws_volume) do
+      foreign_key :id, :network_volume, type: :uuid, primary_key: true, on_delete: :cascade
+      column :volume_type, :text, collate: '"C"', null: false
+      column :provisioned_iops, :integer
+      column :provisioned_throughput_mibps, :integer
+
+      constraint(:aws_volume_type_check, Sequel.lit("volume_type IN ('gp3', 'io2')"))
+      constraint(:aws_volume_iops_positive, Sequel.lit("provisioned_iops IS NULL OR provisioned_iops > 0"))
+      constraint(:aws_volume_throughput_positive, Sequel.lit("provisioned_throughput_mibps IS NULL OR provisioned_throughput_mibps > 0"))
+    end
+
+    create_table(:gcp_volume) do
+      foreign_key :id, :network_volume, type: :uuid, primary_key: true, on_delete: :cascade
+      column :volume_type, :text, collate: '"C"', null: false
+      column :provisioned_iops, :integer
+      column :provisioned_throughput_mibps, :integer
+
+      constraint(:gcp_volume_type_check, Sequel.lit("volume_type IN ('hyperdisk-balanced')"))
+      constraint(:gcp_volume_iops_positive, Sequel.lit("provisioned_iops IS NULL OR provisioned_iops > 0"))
+      constraint(:gcp_volume_throughput_positive, Sequel.lit("provisioned_throughput_mibps IS NULL OR provisioned_throughput_mibps > 0"))
+    end
+  end
+end
