@@ -569,13 +569,13 @@ class StorageVolume
     # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
     return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
 
-    FileUtils.rm_f(sp.data_encryption_key)
+    rm_if_exists(sp.data_encryption_key)
     sync_parent_dir(sp.data_encryption_key)
   end
 
   def retire_key_backup(old_kek)
     path = key_file_backup(old_kek)
-    FileUtils.rm_f(path)
+    rm_if_exists(path)
     sync_parent_dir(path)
   end
 
