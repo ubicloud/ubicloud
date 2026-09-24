@@ -11,6 +11,22 @@ class Clover < Roda
     end
   end
 
+  # The ember gateways authenticate to the internal API with a short-lived
+  # HS256 token, signed with the secret the control plane shares with them.
+  def valid_gateway_token?
+    secret = Config.postgres_gateway_token_secret
+    return false if secret.nil?
+    return false unless (header = request.env["HTTP_AUTHORIZATION"])
+
+    token = header.sub(%r{\ABearer:?\s+}, "")
+    begin
+      JWT.decode(token, secret, true, {algorithm: "HS256"})
+      true
+    rescue JWT::DecodeError
+      false
+    end
+  end
+
   def get_scope_from_github(runner, run_id)
     log_context = {runner_ubid: runner.ubid, repository_ubid: runner.repository.ubid, run_id:}
     if run_id.nil? || run_id.empty?

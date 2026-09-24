@@ -160,7 +160,7 @@ class Clover < Roda
   # simplecov:enable
 
   plugin :host_routing, scope_predicates: true do |hosts|
-    hosts.register :api, :web, :runtime, :admin
+    hosts.register :api, :web, :runtime, :admin, :internal
     hosts.default :web do |host|
       if host.start_with?("api.")
         :api
@@ -168,6 +168,9 @@ class Clover < Roda
         :admin
       elsif request.path_info == "/runtime" || request.path_info.start_with?("/runtime/")
         :runtime
+      elsif request.path_info.start_with?("/internal/")
+        # The ember gateways' private API. Not a session-bearing scope.
+        :internal
       end
     end
   end
@@ -224,7 +227,7 @@ class Clover < Roda
       message: "Sorry, we couldn’t find the resource you’re looking for.",
     }
 
-    if api? || request.accepts_json?
+    if api? || internal? || request.accepts_json?
       {error: @error}.to_json
     else
       view "error"
@@ -321,7 +324,7 @@ class Clover < Roda
 
     error = {code:, type:, message:, details:}
 
-    if runtime?
+    if runtime? || internal?
       error
     elsif api? || request.accepts_json? || !%w[GET POST].freeze.include?(request.request_method)
       {error:}
@@ -1113,6 +1116,18 @@ class Clover < Roda
       end
     elsif r.admin?
       r.run(CloverAdmin.app)
+    elsif r.internal?
+      response.json = true
+      response.skip_content_security_policy!
+
+      unless valid_gateway_token?
+        fail CloverError.new(401, "Unauthorized", "invalid or missing gateway token")
+      end
+
+      r.on "internal" do
+        before_main_hash_branches
+        r.hash_branches(:internal_prefix)
+      end
     else
       r.on "runtime" do
         response.json = true
