@@ -14,10 +14,6 @@ module ResourceMatchable
         (byoc.nil? || byoc == line_item[:byoc])
     end
 
-    def wildcard?
-      resource_id.nil? && resource_type.nil? && resource_family.nil? && location.nil? && byoc.nil?
-    end
-
     # Used for sorting credits, so that more specific credits are applied before
     # before more general credits.
     def broadness

@@ -134,17 +134,6 @@ RSpec.describe ResourceCredit do
     end
   end
 
-  describe "#wildcard?" do
-    it "is true when no matcher column is set" do
-      expect(described_class.new.wildcard?).to be(true)
-    end
-
-    it "is false when any matcher column is set" do
-      expect(described_class.new(resource_type: "VmVCpu").wildcard?).to be(false)
-      expect(described_class.new(byoc: false).wildcard?).to be(false)
-    end
-  end
-
   describe ".active_project_ids_ds" do
     it "includes projects with a positive, currently-active credit" do
       create({})
