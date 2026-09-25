@@ -1,0 +1,7 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/ip_reachability_check"
+
+ips = JSON.parse($stdin.read)
+puts({"unreachable" => IpReachabilityCheck.new(ips).run}.to_json)
