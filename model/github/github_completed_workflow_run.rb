@@ -3,6 +3,7 @@
 require_relative "../../model"
 
 class GithubCompletedWorkflowRun < Sequel::Model
+  plugin DailyPartitionMethods, partition_type: :date
 end
 
 # Table: github_completed_workflow_run
