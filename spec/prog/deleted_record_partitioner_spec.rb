@@ -11,8 +11,21 @@ RSpec.describe Prog::DeletedRecordPartitioner do
 
   let(:today) { Time.now.utc.to_date }
 
-  def clear_runway
-    DeletedRecord.partition_days.each { DeletedRecord.drop_partition(it) if it > today }
+  let(:models) { described_class::PARTITIONED_MODELS }
+
+  def clear_runway(*models)
+    models = described_class::PARTITIONED_MODELS if models.empty?
+    models.each do |model|
+      model.partition_days.each { model.drop_partition(it) if it > today }
+    end
+  end
+
+  def fill_runway
+    models.each { it.ensure_partitions(through: today + described_class::RUNWAY_DAYS) }
+  end
+
+  def runway_page(model)
+    Page.from_tag_parts("#{model.name}PartitionRunway")
   end
 
   describe "#wait" do
@@ -30,65 +43,114 @@ RSpec.describe Prog::DeletedRecordPartitioner do
   end
 
   describe "#check_runway" do
-    it "pages on a short runway" do
+    it "pages on a short runway for each partitioned table" do
       clear_runway
 
+      expect { prog.check_runway }.to hop("create_partitions").and change { Page.active.count }.from(0).to(3)
+      models.each do |model|
+        page = runway_page(model)
+        expect(page.summary).to eq "#{model.table_name} has only 0 days of partitions left"
+        expect(page.details["runway_days"]).to eq 0
+        expect(page.details["wanted_days"]).to eq described_class::RUNWAY_DAYS
+      end
+    end
+
+    it "pages only for the tables with a short runway" do
+      fill_runway
+      clear_runway(GithubCompletedWorkflowJob)
+
       expect { prog.check_runway }.to hop("create_partitions").and change { Page.active.count }.from(0).to(1)
-      page = Page.first
-      expect(page.summary).to eq "deleted_record has only 0 days of partitions left"
-      expect(page.details["runway_days"]).to eq 0
-      expect(page.details["wanted_days"]).to eq DeletedRecord::RUNWAY_DAYS
+      expect(runway_page(GithubCompletedWorkflowJob).summary).to eq "github_completed_workflow_job has only 0 days of partitions left"
     end
 
     it "does not page a full runway" do
-      DeletedRecord.ensure_partitions(through: today + DeletedRecord::RUNWAY_DAYS)
+      fill_runway
 
       expect { prog.check_runway }.to hop("create_partitions").and not_change { Page.active.count }.from(0)
     end
 
     it "does not page when no partition exists at all" do
-      DeletedRecord.partition_days.each { DeletedRecord.drop_partition(it) }
-      expect(DeletedRecord.partition_runway_days).to be_nil
+      models.each do |model|
+        model.partition_days.each { model.drop_partition(it) }
+        expect(model.partition_runway_days).to be_nil
+      end
 
       expect { prog.check_runway }.to hop("create_partitions").and not_change { Page.active.count }.from(0)
     end
 
-    it "resolves the page once the runway recovers" do
+    it "resolves the pages once the runway recovers" do
       clear_runway
       expect { prog.check_runway }.to hop("create_partitions")
-      page = Page.first
-      DeletedRecord.ensure_partitions(through: today + DeletedRecord::RUNWAY_DAYS)
+      page_ids = models.map { runway_page(it).id }
+      fill_runway
 
       expect { prog.check_runway }.to hop("create_partitions")
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq 1
+      expect(Semaphore.where(strand_id: page_ids, name: "resolve").count).to eq 3
     end
   end
 
   describe "#create_partitions" do
-    it "extends the runway to the wanted number of days" do
+    it "extends the runway of each table to the wanted number of days" do
       clear_runway
 
-      expect { prog.create_partitions }.to hop("wait")
-      expect(DeletedRecord.partition_runway_days).to eq DeletedRecord::RUNWAY_DAYS
-      expect(strand.stack.first["partitions_ensured"]).to be true
+      expect(Clog).to receive(:emit).with("created deleted_record partitions", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("created github_completed_workflow_run partitions", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("created github_completed_workflow_job partitions", instance_of(Hash)).and_call_original
+      expect { prog.create_partitions }.to hop("drop_partitions")
+      models.each { expect(it.partition_runway_days).to eq described_class::RUNWAY_DAYS }
     end
 
     it "leaves a full runway alone" do
-      DeletedRecord.ensure_partitions(through: today + DeletedRecord::RUNWAY_DAYS)
-      days = DeletedRecord.partition_days
+      fill_runway
+      days = models.map(&:partition_days)
 
-      expect { prog.create_partitions }.to hop("wait")
-      expect(DeletedRecord.partition_days).to eq days
+      expect(Clog).not_to receive(:emit)
+      expect { prog.create_partitions }.to hop("drop_partitions")
+      expect(models.map(&:partition_days)).to eq days
     end
   end
 
-  it "keeps the page when creating the partitions fails" do
+  describe "#drop_partitions" do
+    let(:dropped_models) { [GithubCompletedWorkflowRun, GithubCompletedWorkflowJob] }
+
+    it "drops completed github workflow partitions older than the retention period" do
+      expect(described_class::RETENTION_DAYS).to eq 44
+      expired = today - 45
+      retained = today - 44
+      dropped_models.each do |model|
+        model.create_partition(expired)
+        model.create_partition(retained)
+      end
+      DeletedRecord.create_partition(expired)
+
+      expect(Clog).to receive(:emit).with("dropped github_completed_workflow_run partitions", {github_completed_workflow_run_partitions_dropped: {days: [expired.to_s]}}).and_call_original
+      expect(Clog).to receive(:emit).with("dropped github_completed_workflow_job partitions", {github_completed_workflow_job_partitions_dropped: {days: [expired.to_s]}}).and_call_original
+      expect { prog.drop_partitions }.to hop("wait")
+      dropped_models.each do |model|
+        expect(model.partition_days).not_to include(expired)
+        expect(model.partition_days).to include(retained, today)
+      end
+      expect(DeletedRecord.partition_days).to include(expired)
+      expect(strand.stack.first["partitions_ensured"]).to be true
+    end
+
+    it "does nothing if no partitions have expired" do
+      days = models.map(&:partition_days)
+
+      expect(Clog).not_to receive(:emit)
+      expect { prog.drop_partitions }.to hop("wait")
+      expect(models.map(&:partition_days)).to eq days
+      expect(strand.stack.first["partitions_ensured"]).to be true
+    end
+  end
+
+  it "keeps the pages when creating the partitions fails" do
     clear_runway
     strand.update(label: "check_runway")
     expect(DeletedRecord).to receive(:ensure_partitions) do
       DB.run("INVALID SQL")
     end
-    expect { strand.run(10) }.to raise_error(Strand::RunError).and change { Page.active.count }.from(0).to(1)
+    expect { strand.run(10) }.to raise_error(Strand::RunError).and change { Page.active.count }.from(0).to(3)
     expect(strand.reload.label).to eq "create_partitions"
   end
 end
