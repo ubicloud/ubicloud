@@ -60,6 +60,8 @@ class PostgresResource < Sequel::Model
     representative_server.version
   end
 
+  RUNNING_STRAND_LABELS = %w[wait refresh_certificates wait_refresh_public_cert refresh_dns_record].freeze
+
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
@@ -69,7 +71,7 @@ class PostgresResource < Sequel::Model
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
     return "finalizing_restore" if server_strand_label == "wait_recovery_completion"
     return "restarting" if server_strand_label == "wait" && representative_server.restart_set?
-    return "running" if ["wait", "refresh_certificates", "wait_refresh_public_cert", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
+    return "running" if RUNNING_STRAND_LABELS.include?(strand.label) && !initial_provisioning_set?
 
     "creating"
   end
