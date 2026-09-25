@@ -90,7 +90,9 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
     start_transaction do
       required_runners = queued_labels.filter_map do |(actual_label, label), count|
-        idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
+        # Remove workflow_job: nil after all GithubRunner have job_id set if workflow_job set
+        idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil, job_id: nil).count
+
         # The calculation of the required_runner_count isn't atomic because it
         # requires multiple API calls and database queries. However, it will
         # eventually settle on the correct value. If we create more runners than

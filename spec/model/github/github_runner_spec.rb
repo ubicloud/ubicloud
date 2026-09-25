@@ -192,4 +192,26 @@ RSpec.describe GithubRunner do
       expect(github_runner.provision_spare_runner(force: true)).to be_a(described_class)
     }.to change(described_class, :count).from(1).to(2)
   end
+
+  describe "workflow job info accessors" do
+    let(:columns) { [:job_id, :run_id, :head_branch, :workflow_name, :job_name, :job_created_at, :job_started_at, :job_completed_at, :status, :conclusion] }
+
+    it "returns nil when neither the column nor workflow_job is set" do
+      expect(github_runner.workflow_job).to be_nil
+      expect(columns.map { github_runner.send(it) }).to all(be_nil)
+      expect(github_runner.has_workflow_job_info?).to be false
+    end
+
+    it "falls back to workflow_job when the column is not set" do
+      github_runner.update(workflow_job: {"id" => 1, "run_id" => 2, "head_branch" => "main", "workflow_name" => "CI", "name" => "test", "created_at" => "2026-09-01T10:00:00Z", "started_at" => "2026-09-01T10:01:00Z", "completed_at" => "2026-09-01T10:05:00Z", "status" => "completed", "conclusion" => "success"})
+      expect(github_runner.has_workflow_job_info?).to be true
+      expect(columns.map { github_runner.send(it) }).to eq([1, 2, "main", "CI", "test", Time.utc(2026, 9, 1, 10), Time.utc(2026, 9, 1, 10, 1), Time.utc(2026, 9, 1, 10, 5), "completed", "success"])
+    end
+
+    it "prefers the column over workflow_job" do
+      github_runner.update(job_id: 10, run_id: 20, head_branch: "dev", workflow_name: "Build", job_name: "lint", job_created_at: Time.utc(2026, 9, 2, 10), job_started_at: Time.utc(2026, 9, 2, 10, 1), job_completed_at: Time.utc(2026, 9, 2, 10, 4), status: "in_progress", conclusion: "failure", workflow_job: {"id" => 1, "run_id" => 2, "head_branch" => "main", "workflow_name" => "CI", "name" => "test", "created_at" => "2026-09-01T10:00:00Z", "started_at" => "2026-09-01T10:01:00Z", "completed_at" => "2026-09-01T10:05:00Z", "status" => "completed", "conclusion" => "success"})
+      github_runner.refresh
+      expect(columns.map { github_runner.send(it) }).to eq([10, 20, "dev", "Build", "lint", Time.utc(2026, 9, 2, 10), Time.utc(2026, 9, 2, 10, 1), Time.utc(2026, 9, 2, 10, 4), "in_progress", "failure"])
+    end
+  end
 end
