@@ -411,6 +411,15 @@ RSpec.configure do |config|
       end)
     end
 
+    # The location's gateway has peered with the host, so Postgres embers can
+    # be placed on it.
+    def make_gateway_reachable(vm_host)
+      gateway = PostgresGateway[location_id: vm_host.location_id] ||
+        PostgresGateway.create(location_id: vm_host.location_id, hostname_suffix: "pgc.test")
+      PostgresGatewayHost.create_with_id(vm_host.id, postgres_gateway_id: gateway.id, tunnel_pushed_at: Time.now)
+      vm_host
+    end
+
     def create_ember_pool(**args)
       defaults = {location_id: Location::HETZNER_FSN1_ID, workload: "postgres"}
       pool = EmberPool.create(**defaults.merge(args))

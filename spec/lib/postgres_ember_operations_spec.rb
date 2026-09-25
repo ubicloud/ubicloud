@@ -10,6 +10,7 @@ RSpec.describe PostgresEmberOperations do
 
   before do
     EmberTemplateHost.create(ember_template_id: template.id, vm_host_id: host.id, state: "ready")
+    make_gateway_reachable(host)
   end
 
   def started

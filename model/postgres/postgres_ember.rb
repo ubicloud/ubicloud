@@ -75,7 +75,10 @@ class PostgresEmber < Sequel::Model
 
   def self.blank_guest_config = {"superuser_password" => SecureRandom.urlsafe_base64(24)}
 
-  def self.placeable_hosts(hosts) = hosts
+  # Only hosts the gateways can reach: their end of the IPsec mesh is in place.
+  def self.placeable_hosts(hosts)
+    hosts.where(Sequel[:vm_host][:id] => PostgresGatewayHost.ready.select(:id))
+  end
 
   def guest_config
     {"superuser_password" => superuser_password, "database" => database_name}

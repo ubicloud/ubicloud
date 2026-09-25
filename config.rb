@@ -206,10 +206,23 @@ module Config
   override :postgres_ember_default_cpu_percent_limit, 50, int
   override :postgres_ember_volume_size_gib, 2, int
   override :postgres_ember_idle_timeout_seconds, 300, int
+  # JWT secret for the gateway's calls to the control plane's internal API.
+  optional :postgres_gateway_token_secret, string
+  # Embers are reached as <ember ubid>.<suffix>, through one wildcard record and
+  # one wildcard certificate that only the gateways hold. There is no location
+  # in the name: embers run in a single location.
+  override :postgres_gateway_hostname_suffix, "pgc.ubicloud.app", string
   # For a deployment with no wildcard DNS: the gateway's IP address, as ip or
   # ip:port. Connection strings then carry it as hostaddr, so clients dial it
   # directly and still send the ember's name for the gateway to route by.
   optional :postgres_gateway_address, string
+  override :postgres_gateway_replica_count, 2, int
+  override :postgres_gateway_release_tag, "postgres-gateway/v0.1.0", string
+  # Where to fetch the gateway tarball from, for a deployment that does not
+  # take its binaries from the ubicloud/postgres-gateway GitHub releases.
+  optional :postgres_gateway_binary_url, string
+  # Where the gateways reach the control plane's internal API.
+  optional :postgres_ember_internal_api_url, string
 
   # Pagerduty
   optional :pagerduty_key, string, clear: true
