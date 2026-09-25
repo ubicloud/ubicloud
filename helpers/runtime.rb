@@ -27,7 +27,7 @@ class Clover < Roda
       return
     end
     if (job = jobs.find { it[:runner_name] == runner.ubid })
-      runner.this.update(workflow_job: Sequel.pg_jsonb(job.to_h.except(:steps)))
+      update_github_runner_from_workflow_job(runner, JSON.parse(JSON.generate(job)))
       job[:head_branch]
     else
       Clog.emit("The workflow run does not have given runner", {runner_scope_failure: log_context})
