@@ -134,8 +134,9 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+        gce_image_name: "postgres-ubuntu-2604-arm64-20260218",
         arch: "arm64",
+        family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp")
@@ -151,8 +152,9 @@ RSpec.describe Prog::Test::PostgresFirewall do
         credentials_json: "{}")
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+        gce_image_name: "postgres-ubuntu-2604-arm64-20260218",
         arch: "arm64",
+        family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp")

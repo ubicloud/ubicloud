@@ -91,9 +91,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
-    it "defaults target_image_family to ubuntu-2204 for a top-level resource" do
+    it "defaults target_image_family to ubuntu-2604 for a top-level resource" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fam-default", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
-      expect(pg.target_image_family).to eq("ubuntu-2204")
+      expect(pg.target_image_family).to eq("ubuntu-2604")
     end
 
     it "threads an explicit target_image_family onto a top-level resource" do
