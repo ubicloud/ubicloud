@@ -1,7 +1,9 @@
 <%# locals: (obj:) %>
 
-<%== part("components/table",
-  title: "Workflow Job",
-  table_class: "workflow-job-table",
-  data: obj.workflow_job&.map { |k, v| {"Column" => k, "Value" => v} }
-) %>
+<% unless obj[:job_id] %>
+  <%== part("components/table",
+    title: "Workflow Job",
+    table_class: "workflow-job-table",
+    data: obj.workflow_job&.map { |k, v| {"Column" => k, "Value" => v} }
+  ) %>
+<% end %>
