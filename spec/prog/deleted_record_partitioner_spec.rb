@@ -78,14 +78,14 @@ RSpec.describe Prog::DeletedRecordPartitioner do
       expect { prog.check_runway }.to hop("create_partitions").and not_change { Page.active.count }.from(0)
     end
 
-    it "resolves the pages once the runway recovers" do
+    it "does not resolve existing pages, even if the runway has recovered" do
       clear_runway
       expect { prog.check_runway }.to hop("create_partitions")
       page_ids = models.map { runway_page(it).id }
       fill_runway
 
       expect { prog.check_runway }.to hop("create_partitions")
-      expect(Semaphore.where(strand_id: page_ids, name: "resolve").count).to eq 3
+      expect(Semaphore.where(strand_id: page_ids, name: "resolve").count).to eq 0
     end
   end
 
@@ -107,6 +107,25 @@ RSpec.describe Prog::DeletedRecordPartitioner do
       expect(Clog).not_to receive(:emit)
       expect { prog.create_partitions }.to hop("drop_partitions")
       expect(models.map(&:partition_days)).to eq days
+    end
+
+    it "resolves the runway pages once the partitions are created" do
+      clear_runway
+      expect { prog.check_runway }.to hop("create_partitions")
+      page_ids = models.map { runway_page(it).id }
+
+      expect { prog.create_partitions }.to hop("drop_partitions")
+      expect(Semaphore.where(strand_id: page_ids, name: "resolve").count).to eq 3
+    end
+
+    it "resolves runway pages when the runway was already full" do
+      clear_runway(GithubCompletedWorkflowRun)
+      expect { prog.check_runway }.to hop("create_partitions")
+      page_id = runway_page(GithubCompletedWorkflowRun).id
+      fill_runway
+
+      expect { prog.create_partitions }.to hop("drop_partitions")
+      expect(Semaphore.where(strand_id: page_id, name: "resolve").count).to eq 1
     end
   end
 
@@ -152,5 +171,6 @@ RSpec.describe Prog::DeletedRecordPartitioner do
     end
     expect { strand.run(10) }.to raise_error(Strand::RunError).and change { Page.active.count }.from(0).to(3)
     expect(strand.reload.label).to eq "create_partitions"
+    expect(Semaphore.where(strand_id: Page.active.select_map(:id), name: "resolve").count).to eq 0
   end
 end

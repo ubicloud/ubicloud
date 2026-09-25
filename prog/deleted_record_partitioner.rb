@@ -25,18 +25,15 @@ class Prog::DeletedRecordPartitioner < Prog::Base
 
   label def check_runway
     PARTITIONED_MODELS.each do |model|
-      tag = "#{model.name}PartitionRunway"
       runway = model.partition_runway_days
       if runway && runway < MIN_RUNWAY_DAYS
         Prog::PageNexus.assemble(
           "#{model.table_name} has only #{runway} days of partitions left",
-          [tag],
+          [page_tag(model)],
           strand.ubid,
           resource_id: strand.id,
           extra_data: {runway_days: runway, wanted_days: RUNWAY_DAYS},
         )
-      else
-        Page.from_tag_parts(tag)&.incr_resolve
       end
     end
 
@@ -48,6 +45,7 @@ class Prog::DeletedRecordPartitioner < Prog::Base
     PARTITIONED_MODELS.each do |model|
       created = model.ensure_partitions(through:)
       Clog.emit("created #{model.table_name} partitions", {"#{model.table_name}_partitions_created": {days: created.map(&:to_s)}}) unless created.empty?
+      Page.from_tag_parts(page_tag(model))&.incr_resolve
     end
 
     hop_drop_partitions
@@ -63,5 +61,9 @@ class Prog::DeletedRecordPartitioner < Prog::Base
 
     self.partitions_ensured = true
     hop_wait
+  end
+
+  def page_tag(model)
+    "#{model.name}PartitionRunway"
   end
 end
