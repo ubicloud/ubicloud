@@ -1987,6 +1987,15 @@ RSpec.describe CloverAdmin do
       .to eq ["id", "60587328050", "name", "ubicloud-standard-2", "status", "in_progress"]
   end
 
+  it "does not show workflow job for github runner as extra if job_id is set" do
+    workflow_job = {id: 60587328050, name: "ubicloud-standard-2", status: "in_progress"}
+    installation_id = GithubInstallation.create(installation_id: 123, name: "ubicloud", type: "User").id
+    runner = GithubRunner.create(repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-2", installation_id:, workflow_job:, job_id: 60587328050)
+    visit "/model/GithubRunner/#{runner.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner #{runner.ubid}"
+    expect(page.all(".workflow-job-table")).to be_empty
+  end
+
   it "allows browsing and searching GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
