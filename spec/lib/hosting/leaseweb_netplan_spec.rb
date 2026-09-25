@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Hosting::LeasewebNetplan do
-  def ip_info(ip_address, gateway = nil, source_host_ip: "216.22.50.197")
-    Hosting::LeasewebApis::IpInfo.new(ip_address:, source_host_ip:, gateway:)
+  def ip_info(ip_address, gateway = nil, source_host_ip: "216.22.50.197", segment: nil)
+    Hosting::LeasewebApis::IpInfo.new(ip_address:, source_host_ip:, gateway:, segment:)
   end
 
   let(:public_mac) { "8c:84:74:54:ea:d0" }
@@ -140,29 +140,41 @@ RSpec.describe Hosting::LeasewebNetplan do
     expect(netplan.to_h.dig("network", "ethernets", "public", "accept-ra")).to be false
   end
 
-  # Server 91478's extra IPv4s sit on a switched /29 behind their own gateway.
-  # The host claims each as a /32, so the segment never becomes a connected
-  # route. Its gateway resolves to the same router as the main one, so it must
-  # not add a second default route.
-  it "claims gatewayed non-main ipv4s as /32 without routing through their gateway" do
-    netplan = netplan_for(public_mac:, internal_mac: nil, internal_ip: nil, ip_infos: [
-      ip_info("23.105.171.112/32", "23.105.171.126", source_host_ip: "23.105.171.112"),
-      ip_info("23.105.176.3/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
-      ip_info("23.105.176.1/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
-      ip_info("23.105.176.2/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
-      ip_info("2607:f5b7:1:30:9::/112", "2607:f5b7:1:30::1", source_host_ip: "23.105.171.112"),
-    ])
+  describe "with switched segments" do
+    # Server 91478's switched /29, plus a second segment and a routed block.
+    let(:segment_netplan) do
+      netplan_for(public_mac:, internal_mac: nil, internal_ip: nil, ip_infos: [
+        ip_info("23.105.171.112/32", "23.105.171.126", source_host_ip: "23.105.171.112", segment: "23.105.171.64/26"),
+        ip_info("23.105.177.9/32", "23.105.177.14", source_host_ip: "23.105.171.112", segment: "23.105.177.8/29"),
+        ip_info("23.105.176.3/32", "23.105.176.6", source_host_ip: "23.105.171.112", segment: "23.105.176.0/29"),
+        ip_info("23.105.176.1/32", "23.105.176.6", source_host_ip: "23.105.171.112", segment: "23.105.176.0/29"),
+        ip_info("23.105.176.2/32", "23.105.176.6", source_host_ip: "23.105.171.112", segment: "23.105.176.0/29"),
+        ip_info("2607:f5b7:1:30:9::/112", "2607:f5b7:1:30::1", source_host_ip: "23.105.171.112"),
+        ip_info("216.22.15.64/26", source_host_ip: "23.105.171.112"),
+      ])
+    end
 
-    expect(netplan.addresses_by_mac).to eq(
-      public_mac => [
-        "23.105.171.112/32",
-        "23.105.176.1/32",
-        "23.105.176.2/32",
-        "23.105.176.3/32",
-        "2607:f5b7:1:30:9::2/112",
-      ],
-    )
-    expect(netplan.gateways).to eq ["23.105.171.126", "2607:f5b7:1:30::1"]
+    it "keeps segment members off the NIC for the VMs that hold them" do
+      expect(segment_netplan.addresses_by_mac).to eq(public_mac => ["23.105.171.112/32", "216.22.15.64/26", "2607:f5b7:1:30:9::2/112"])
+    end
+
+    it "sends each segment's outbound traffic through its own gateway and traffic to the host's VMs through the main table" do
+      expect(segment_netplan.to_h.dig("network", "ethernets", "public").slice("routes", "routing-policy")).to eq(
+        "routes" => [
+          {"to" => "default", "via" => "23.105.171.126", "metric" => 100, "on-link" => true},
+          {"to" => "default", "via" => "2607:f5b7:1:30::1", "metric" => 100, "on-link" => true},
+          {"to" => "default", "via" => "23.105.176.6", "on-link" => true, "table" => 100},
+          {"to" => "default", "via" => "23.105.177.14", "on-link" => true, "table" => 101},
+        ],
+        "routing-policy" => [
+          {"to" => "216.22.15.64/26", "table" => 254, "priority" => 1000},
+          {"to" => "23.105.176.0/29", "table" => 254, "priority" => 1000},
+          {"to" => "23.105.177.8/29", "table" => 254, "priority" => 1000},
+          {"from" => "23.105.176.0/29", "table" => 100, "priority" => 1001},
+          {"from" => "23.105.177.8/29", "table" => 101, "priority" => 1001},
+        ],
+      )
+    end
   end
 
   it "sorts multiple routed ipv4 blocks by network address" do

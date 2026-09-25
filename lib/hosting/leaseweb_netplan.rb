@@ -7,6 +7,10 @@ require "yaml"
 class Hosting::LeasewebNetplan
   ROUTE_METRIC = 100
   INTERNAL_MTU = 9000
+  MAIN_TABLE = 254
+  FIRST_SEGMENT_TABLE = 100
+  VM_RULE_PRIORITY = 1000
+  SEGMENT_RULE_PRIORITY = 1001
 
   # The host claims ::2 out of a connectivity prefix, whose gateway lives
   # outside it in the parent block, and ::1 out of a prefix routed to it.
@@ -44,16 +48,16 @@ class Hosting::LeasewebNetplan
     macs
   end
 
-  # One default route per family; a segment gateway resolves to the same router.
+  # One main table default route per family.
   def gateways
     [@main.gateway] + ipv6.filter_map(&:gateway)
   end
 
   private
 
-  # Main IP, switched-segment IPs, IPv4 blocks, then the host address per IPv6 prefix.
+  # Main IP, IPv4 blocks, then the host address per IPv6 prefix.
   def public_addresses
-    [@main.ip_address] + (ipv4_segment + ipv4_blocks).map(&:ip_address) + ipv6.map { host_address(it) }
+    [@main.ip_address] + ipv4_blocks.map(&:ip_address) + ipv6.map { host_address(it) }
   end
 
   def internal_addresses
@@ -69,7 +73,7 @@ class Hosting::LeasewebNetplan
   # accept-ra false: dhcp6 off still accepts router advertisements, which would
   # add a competing default route / SLAAC address; this file is the whole state.
   def public_ethernet
-    {
+    ethernet = {
       "match" => {"macaddress" => @public_mac},
       "dhcp4" => false,
       "dhcp6" => false,
@@ -78,20 +82,47 @@ class Hosting::LeasewebNetplan
       "routes" => routes,
       "nameservers" => {"search" => @search_domains, "addresses" => @nameservers},
     }
+    ethernet["routing-policy"] = routing_policy unless segments.empty?
+    ethernet
   end
 
   def routes
-    gateways.map do |gateway|
+    main_routes = gateways.map do |gateway|
       {"to" => "default", "via" => gateway, "metric" => ROUTE_METRIC, "on-link" => true}
     end
+    segment_routes = segments.map do |_, gateway, table|
+      {"to" => "default", "via" => gateway, "on-link" => true, "table" => table}
+    end
+    main_routes + segment_routes
+  end
+
+  # Traffic to this host's VMs keeps to the main table; everything else a
+  # segment's VMs send leaves through the segment's gateway.
+  def routing_policy
+    vm_rules = vm_networks.map { {"to" => it, "table" => MAIN_TABLE, "priority" => VM_RULE_PRIORITY} }
+    segment_rules = segments.map do |segment, _, table|
+      {"from" => segment, "table" => table, "priority" => SEGMENT_RULE_PRIORITY}
+    end
+    vm_rules + segment_rules
+  end
+
+  # Each switched segment with its gateway and a routing table of its own.
+  def segments
+    gateways_by_segment = ipv4_segment.to_h { [it.segment, it.gateway] }
+    gateways_by_segment.each_with_index.map do |(segment, gateway), index|
+      [segment, gateway, FIRST_SEGMENT_TABLE + index]
+    end
+  end
+
+  def vm_networks
+    sorted_ipv4(ipv4.reject(&:gateway)).map(&:ip_address) + segments.map(&:first)
   end
 
   def ipv4
     @ip_infos.reject { it.ip_address.include?(":") || it == @main }
   end
 
-  # Switched-segment members (gatewayed); pull_ips yields /32s so the host holds
-  # only these, not the whole segment.
+  # Switched-segment members (gatewayed): VM addresses the host answers ARP for by proxy.
   def ipv4_segment
     sorted_ipv4(ipv4.select(&:gateway))
   end

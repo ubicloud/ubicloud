@@ -100,8 +100,8 @@ RSpec.describe Hosting::LeasewebApis do
     ]
   end
 
-  def ip_info(ip_address, gateway)
-    described_class::IpInfo.new(ip_address:, source_host_ip: "216.22.50.197", gateway:)
+  def ip_info(ip_address, gateway, segment = nil)
+    described_class::IpInfo.new(ip_address:, source_host_ip: "216.22.50.197", gateway:, segment:)
   end
 
   describe "hardware_reset" do
@@ -276,7 +276,7 @@ RSpec.describe Hosting::LeasewebApis do
       stub_ips([rows.take(50), rows.drop(50)])
 
       expect(leaseweb_apis.pull_ips).to eq [
-        ip_info("216.22.50.197/32", "216.22.50.254"),
+        ip_info("216.22.50.197/32", "216.22.50.254", "216.22.50.192/26"),
         ip_info("2604:9a00:2100:a020:4::/112", "2604:9a00:2100:a020::1"),
         ip_info("2607:f5b7:3:104::/64", nil),
         ip_info("216.22.15.64/26", nil),
@@ -285,29 +285,26 @@ RSpec.describe Hosting::LeasewebApis do
 
     # Server 91478 delivers its extra IPv4s as a switched /29: the infra rows are
     # typed, and every row carries the segment's gateway.
-    it "keeps gatewayed non-main ipv4s as single addresses and drops typed infra rows" do
+    it "keeps gatewayed non-main ipv4s as single addresses on their segment and drops typed infra rows" do
       stub_ips([segment_ip_rows])
 
-      expect(leaseweb_apis.pull_ips.map { [it.ip_address, it.gateway] }).to eq [
-        ["23.105.171.112/32", "23.105.171.126"],
-        ["23.105.176.1/32", "23.105.176.6"],
-        ["23.105.176.2/32", "23.105.176.6"],
-        ["23.105.176.3/32", "23.105.176.6"],
-        ["2607:f5b7:1:30:9::/112", "2607:f5b7:1:30::1"],
+      expect(leaseweb_apis.pull_ips.map { [it.ip_address, it.gateway, it.segment] }).to eq [
+        ["23.105.171.112/32", "23.105.171.126", "23.105.171.64/26"],
+        ["23.105.176.1/32", "23.105.176.6", "23.105.176.0/29"],
+        ["23.105.176.2/32", "23.105.176.6", "23.105.176.0/29"],
+        ["23.105.176.3/32", "23.105.176.6", "23.105.176.0/29"],
+        ["2607:f5b7:1:30:9::/112", "2607:f5b7:1:30::1", nil],
       ]
     end
 
-    # The host claims every gatewayed IPv4 in netplan, so none of them may reach
-    # the VM pool. A routed block is what VMs draw from, and IPv6 never populates
-    # that pool.
-    it "marks gatewayed ipv4s host only and leaves routed blocks allocatable" do
+    it "marks only the main ip host only" do
       stub_ips([segment_ip_rows + [ip_row("216.22.15.64/26", prefix_length: 26)]])
 
       expect(leaseweb_apis.pull_ips.map { [it.ip_address, it.host_only?] }).to eq [
         ["23.105.171.112/32", true],
-        ["23.105.176.1/32", true],
-        ["23.105.176.2/32", true],
-        ["23.105.176.3/32", true],
+        ["23.105.176.1/32", false],
+        ["23.105.176.2/32", false],
+        ["23.105.176.3/32", false],
         ["2607:f5b7:1:30:9::/112", false],
         ["216.22.15.64/26", false],
       ]
