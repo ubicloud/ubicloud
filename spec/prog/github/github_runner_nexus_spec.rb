@@ -372,6 +372,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(ready_at: nil)
       expect(nx.update_billing_record).to be_nil
       expect(BillingRecord.count).to eq(0)
+      expect(runner.reload.completed_at).to be_nil
     end
 
     it "not updates billing record if the runner does not pick a job" do
@@ -388,6 +389,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
+      expect(runner.reload.completed_at).to eq(now)
     end
 
     it "bills from the job start when the runner waited for a job" do
