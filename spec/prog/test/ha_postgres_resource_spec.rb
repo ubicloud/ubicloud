@@ -92,8 +92,9 @@ RSpec.describe Prog::Test::HaPostgresResource do
       end
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+        gce_image_name: "postgres-ubuntu-2604-arm64-20260218",
         arch: "arm64",
+        family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp")
@@ -106,8 +107,9 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+        gce_image_name: "postgres-ubuntu-2604-arm64-20260218",
         arch: "arm64",
+        family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
       gcp_location = Location[provider: "gcp", project_id: nil, name: "gcp-us-central1"]
@@ -127,8 +129,9 @@ RSpec.describe Prog::Test::HaPostgresResource do
       end
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
+        gce_image_name: "postgres-ubuntu-2604-arm64-20260225",
         arch: "arm64",
+        family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard")
