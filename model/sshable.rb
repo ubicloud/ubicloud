@@ -228,6 +228,7 @@ class Sshable < Sequel::Model
     start = Time.now
     sess = start_fresh_session
     @connect_duration = Time.now - start
+    sess.transport.socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
 
     if (lock_name = maybe_ssh_session_lock_name)
