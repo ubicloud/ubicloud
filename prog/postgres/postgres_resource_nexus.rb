@@ -411,7 +411,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       current_vm_size = Option::POSTGRES_SIZE_OPTIONS[postgres_resource.vm_size]
       vm_family = current_vm_size.family
       vcpu_count = current_vm_size.vcpu_count
-      storage_size_gib = representative_server.storage_size_gib
+      storage_size_gib = representative_server.billed_storage_size_gib
       location = postgres_resource.location
 
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|

@@ -194,6 +194,11 @@ class PostgresSetup
     r "sudo", "systemctl", "enable", "--now", "disk-full-check@#{@version}.timer"
   end
 
+  # Runs between wal-g backup-fetch and pg_createcluster.
+  # Does nothing by default.
+  def after_backup_fetch
+  end
+
   def create_cluster
     # Use builtin collation for PG 17+
     if @version.to_i >= 17
@@ -203,3 +208,5 @@ class PostgresSetup
     end
   end
 end
+
+require_relative "override/postgres_setup"

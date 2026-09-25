@@ -86,12 +86,18 @@ class IoThrottle
     immune_pids = [postmaster_pid]
     children.each do |pid|
       cmdline = File.read("/proc/#{pid}/cmdline").tr("\0", " ")
-      immune_pids << pid if IMMUNE_PATTERNS.any? { |pattern| cmdline.include?(pattern) }
+      immune_pids << pid if immune_patterns.any? { |pattern| cmdline.include?(pattern) }
     rescue Errno::ENOENT
       # Process exited between enumeration and read
       nil
     end
     immune_pids
+  end
+
+  # Patterns matching the Postgres children throttling must leave alone, because
+  # throttling them would slow the very work that relieves the pressure.
+  def immune_patterns
+    IMMUNE_PATTERNS
   end
 
   def get_cgroup_pids(cgroup_path)
@@ -182,3 +188,5 @@ class IoThrottle
     immune_pids
   end
 end
+
+require_relative "override/io_throttle"

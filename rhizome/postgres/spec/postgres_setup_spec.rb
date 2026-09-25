@@ -94,6 +94,12 @@ RSpec.describe PostgresSetup do
     end
   end
 
+  describe "#after_backup_fetch" do
+    it "does nothing, so a restore works without deployment overrides" do
+      expect(pg_setup.after_backup_fetch).to be_nil
+    end
+  end
+
   describe "#create_cluster" do
     builtin = ["--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8"]
 
