@@ -83,13 +83,26 @@ class BootImage
   end
 
   def htcat_image(url, temp_path)
-    sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      inner = cmd("htcat -parallelism=12 -max-fragment-size=32 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
-      digest_out = r "bash -c :inner", inner: inner
-      sha256_sum = digest_out.split(" ").last
+      run_htcat(url, temp_path)
+      sha256_file(temp_path)
     end
-    sha256_sum
+  end
+
+  # No pipe. Piping htcat into tee makes the shell report tee's exit status, so
+  # htcat can fail or lose a fragment invisibly and the truncation arrives
+  # minutes later as "Invalid SHA256 sum." with no cause attached. A plain
+  # redirect makes htcat's exit status the command's own, and CommandFail
+  # carries htcat's stderr to the caller.
+  def run_htcat(url, temp_path)
+    inner = cmd("htcat -parallelism=12 -max-fragment-size=32 :url > :temp_path", url: url, temp_path: temp_path)
+    r "bash -c :inner", inner: inner
+  end
+
+  # Taken from the finished file rather than from the stream, so the digest
+  # describes what was written and not what passed through the pipe.
+  def sha256_file(path)
+    r("openssl", "dgst", "-sha256", path).split(" ").last
   end
 
   def verify_sha256sum(file_sha256sum, expected_sha256sum)
