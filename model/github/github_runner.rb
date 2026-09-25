@@ -56,11 +56,11 @@ class GithubRunner < Sequel::Model
   end
 
   def run_url
-    "#{repository_url}/actions/runs/#{workflow_job["run_id"]}"
+    "#{repository_url}/actions/runs/#{run_id}"
   end
 
   def job_url
-    "#{run_url}/job/#{workflow_job["id"]}"
+    "#{run_url}/job/#{job_id}"
   end
 
   def runner_url
@@ -68,7 +68,7 @@ class GithubRunner < Sequel::Model
   end
 
   def log_duration(message, duration)
-    values = {ubid:, label:, repository_name:, duration: duration.round(3), conclusion: workflow_job&.dig("conclusion")}
+    values = {ubid:, label:, repository_name:, duration: duration.round(3), conclusion:}
     if vm
       values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores, vcpus: vm.vcpus, boot_image: vm.vm_storage_volumes.first&.boot_image&.version || vm.boot_image)
       if (vhost_block_backend_version = vm.vm_storage_volumes.first&.vhost_block_backend&.version)
@@ -101,6 +101,70 @@ class GithubRunner < Sequel::Model
 
   def strand_label
     strand&.label
+  end
+
+  def has_workflow_job_info?
+    # Can be changed to only job_id after all GitHubRunner with
+    # with workflow_job set also have these other columns set
+    !!(job_id || workflow_job)
+  end
+
+  # Methods below are temporary and can be removed after all GitHubRunner
+  # with workflow_job set also have these other columns set
+
+  def job_id
+    super || (self.job_id = workflow_job&.[]("id"))
+  end
+
+  def run_id
+    super || (self.run_id = workflow_job&.[]("run_id"))
+  end
+
+  def head_branch
+    super || (self.head_branch = workflow_job&.[]("head_branch"))
+  end
+
+  def workflow_name
+    super || (self.workflow_name = workflow_job&.[]("workflow_name"))
+  end
+
+  def job_name
+    super || (self.job_name = workflow_job&.[]("name"))
+  end
+
+  def job_created_at
+    if (res = super)
+      return res
+    end
+
+    self.job_created_at = workflow_job&.[]("created_at")
+    super
+  end
+
+  def job_started_at
+    if (res = super)
+      return res
+    end
+
+    self.job_started_at = workflow_job&.[]("started_at")
+    super
+  end
+
+  def job_completed_at
+    if (res = super)
+      return res
+    end
+
+    self.job_completed_at = workflow_job&.[]("completed_at")
+    super
+  end
+
+  def status
+    super || (self.status = workflow_job&.[]("status"))
+  end
+
+  def conclusion
+    super || (self.conclusion = workflow_job&.[]("conclusion"))
   end
 end
 

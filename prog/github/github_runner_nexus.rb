@@ -150,7 +150,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   def update_billing_record
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
-    return unless github_runner.ready_at && github_runner.workflow_job
+    return unless github_runner.ready_at && github_runner.has_workflow_job_info?
 
     billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
@@ -811,7 +811,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # so we destroy the runner. We check if the runner is busy or not with
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
-    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10 && !busy?
+    if !github_runner.has_workflow_job_info? && Time.now > github_runner.ready_at + 5 * 60 + 10 && !busy?
       register_deadline(nil, 2 * 60 * 60)
       Clog.emit("The runner did not pick a job", github_runner)
       github_runner.incr_destroy
@@ -825,7 +825,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     vm_host = vm.vm_host
     # If the runner is not assigned any job or job is not successful, we log
     # journalctl output to debug if there was any problem with the runner script.
-    if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
+    case (conclusion = github_runner.conclusion)
+    when "success"
+      nil
+    else
       if vm_host
         serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
         vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid, log: :on_error)
@@ -876,7 +879,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           line.gsub!(/ host: \S+/, "")
           line
         end
-        Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
+        Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion:, vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
       end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
@@ -894,7 +897,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # when the job is completed. In certain situations, such as fraudulent activity,
     # we may need to bypass this verification and immediately remove the runner
     # using the semaphore.
-    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
+    unless github_runner.skip_deregistration_set? || github_runner.status == "completed"
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
