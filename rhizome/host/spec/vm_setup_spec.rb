@@ -226,7 +226,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/user-data", "::")
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/meta-data", "::")
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/network-config", "::")
-      allow(FileUtils).to receive(:rm_rf)
+      allow(vs).to receive(:rm_if_exists)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
     end
@@ -319,9 +319,9 @@ RSpec.describe VmSetup do
   describe "#purge" do
     it "can purge" do
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
-      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
-      expect(FileUtils).to receive(:rm_rf).with("/etc/systemd/system/test.service.d")
-      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service.d")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
@@ -841,7 +841,7 @@ NFTABLES_CONF
 
   describe "#block_ip4" do
     it "can block ip4" do
-      expect(FileUtils).to receive(:rm_f).with("/etc/nftables.d/test.conf")
+      expect(vs).to receive(:rm_if_exists).with("/etc/nftables.d/test.conf")
       expect(vs).to receive(:_run_command).with("systemctl reload nftables")
 
       vs.block_ip4
@@ -868,9 +868,9 @@ NFTABLES_CONF
 
   describe "#purge_without_network" do
     it "removes service files, reloads daemon, purges storage and hugepages" do
-      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
-      expect(FileUtils).to receive(:rm_rf).with("/etc/systemd/system/test.service.d")
-      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service.d")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
@@ -1382,7 +1382,7 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/user-data", "::")
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/meta-data", "::")
       expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/network-config", "::")
-      allow(FileUtils).to receive(:rm_rf)
+      allow(vs).to receive(:rm_if_exists)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
     end

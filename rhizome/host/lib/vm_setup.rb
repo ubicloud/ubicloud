@@ -136,7 +136,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def block_ip4
-    FileUtils.rm_f("/etc/nftables.d/#{@vm_name}.conf")
+    rm_if_exists("/etc/nftables.d/#{@vm_name}.conf")
     reload_nftables
   end
 
@@ -163,9 +163,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   def purge_without_network
     service = vp.systemd_service
-    FileUtils.rm_f(service)
-    FileUtils.rm_rf(service + ".d")
-    FileUtils.rm_f(vp.dnsmasq_service)
+    rm_if_exists(service)
+    rm_if_exists(service + ".d")
+    rm_if_exists(vp.dnsmasq_service)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -579,7 +579,7 @@ DNSMASQ_CONF
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
-    FileUtils.rm_rf(vp.cloudinit_img)
+    rm_if_exists(vp.cloudinit_img)
     r "mkdosfs", "-n", "CIDATA", "-C", vp.cloudinit_img, "128"
     r "mcopy", "-oi", vp.cloudinit_img, "-s", vp.user_data, "::"
     r "mcopy", "-oi", vp.cloudinit_img, "-s", vp.meta_data, "::"
