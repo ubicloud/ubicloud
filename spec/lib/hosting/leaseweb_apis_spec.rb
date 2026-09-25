@@ -297,17 +297,14 @@ RSpec.describe Hosting::LeasewebApis do
       ]
     end
 
-    # The host claims every gatewayed IPv4 in netplan, so none of them may reach
-    # the VM pool. A routed block is what VMs draw from, and IPv6 never populates
-    # that pool.
-    it "marks gatewayed ipv4s host only and leaves routed blocks allocatable" do
+    it "marks only the main ip host only" do
       stub_ips([segment_ip_rows + [ip_row("216.22.15.64/26", prefix_length: 26)]])
 
       expect(leaseweb_apis.pull_ips.map { [it.ip_address, it.host_only?] }).to eq [
         ["23.105.171.112/32", true],
-        ["23.105.176.1/32", true],
-        ["23.105.176.2/32", true],
-        ["23.105.176.3/32", true],
+        ["23.105.176.1/32", false],
+        ["23.105.176.2/32", false],
+        ["23.105.176.3/32", false],
         ["2607:f5b7:1:30:9::/112", false],
         ["216.22.15.64/26", false],
       ]

@@ -19,9 +19,9 @@ RSpec.describe Prog::SetupNftables do
       expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end
 
-    # A Leaseweb switched segment member is claimed by the host itself and no
-    # VM can take it, so nothing would ever add it to the allowed set and a
-    # block would strand it. The claim is its assigned_host_address row.
+    # An address the host claims, such as its main IP, is one no VM can take,
+    # so nothing would ever add it to the allowed set and a block would strand
+    # it. The claim is its assigned_host_address row.
     it "never blocks an address the host claims" do
       claimed = Address.create(cidr: "23.105.176.1/32", routed_to_host_id: vmh.id)
       AssignedHostAddress.create(host_id: vmh.id, ip: "23.105.176.1", address_id: claimed.id)
