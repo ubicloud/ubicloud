@@ -5,7 +5,12 @@ class Prog::Vm::HostNexus < Prog::Base
   frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false)
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, accepts_embers: false)
+    # A host runs embers or VMs, never both, and which is decided here.
+    if accepts_embers && VhostBlockBackend.new(version: vhost_block_backend_version).version_code < VmHostEmber::MIN_UBIBLK_VERSION_CODE
+      fail "embers need a newer ubiblk than #{vhost_block_backend_version}"
+    end
+
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -13,7 +18,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
       id = VmHost.generate_uuid
       Sshable.create_with_id(id, host: sshable_hostname)
-      vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
+      vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:, accepts_embers:)
 
       if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
         HostProvider.create do |hp|
@@ -140,7 +145,9 @@ class Prog::Vm::HostNexus < Prog::Base
       end
     end
 
-    reap(:setup_hugepages, reaper:)
+    # An ember host has no hugepages: embers take ordinary memory, and a host
+    # with none is one the VM allocator never places a VM on.
+    reap(vm_host.accepts_embers ? :setup_storage_backend : :setup_hugepages, reaper:)
   end
 
   label def setup_hugepages
@@ -201,6 +208,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     vm_host.update(last_boot_id: new_boot_id)
     hop_verify_spdk unless vm_host.spdk_installations_dataset.empty?
+    hop_prep_embers if vm_host.accepts_embers
     hop_verify_hugepages
   end
 
@@ -241,6 +249,7 @@ class Prog::Vm::HostNexus < Prog::Base
       sshable.cmd("sudo host/bin/setup-spdk verify :version", version:)
     }
 
+    hop_prep_embers if vm_host.accepts_embers
     hop_verify_hugepages
   end
 
@@ -418,6 +427,25 @@ TIMER
     end
 
     nap 6 * 60 * 60
+  end
+
+  # Ember setup, at bring-up and after every reboot: slot namespaces, taps and
+  # sysctls do not survive one. It creates the slot users, namespaces, taps
+  # and nftables, so that nothing on the create path has to.
+  label def prep_embers
+    vm_host.ember.cmd_json("sudo host/bin/ember setup")
+    hop_learn_ember_signature
+  end
+
+  # A template can only be restored on a host whose CPU matches the one it was
+  # built on, because x86 restore checks CPUID against the snapshot's host, so
+  # the signature has to be known before anything is placed here. It names the
+  # CPU and the hypervisor version.
+  label def learn_ember_signature
+    cpuinfo = sshable.cmd("cat /proc/cpuinfo")
+    fields = ["vendor_id", "cpu family", "model", "stepping"].map { cpuinfo[/^#{Regexp.escape(it)}\s*:\s*(.+)$/, 1].to_s.strip }
+    vm_host.update(cpu_signature: "#{fields.join("-")}/#{Config.ember_ch_version}")
+    hop_start_vms
   end
 
   label def unavailable
