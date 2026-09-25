@@ -16,6 +16,12 @@ RSpec.describe Sshable do
     )
   }
 
+  def ssh_session(**)
+    socket = instance_double(Socket, setsockopt: nil)
+    instance_double(Net::SSH::Connection::Session,
+      transport: instance_double(Net::SSH::Transport::Session, socket:), **)
+  end
+
   it "can encrypt and decrypt a field" do
     sa.save_changes
 
@@ -60,7 +66,7 @@ LOCK
         expect(sa).to receive(:maybe_ssh_session_lock_name).and_return("testlockname")
         sa.invalidate_cache_entry
         expect(Net::SSH).to receive(:start) do
-          instance_double(Net::SSH::Connection::Session, close: nil)
+          ssh_session(close: nil)
         end
       end
 
@@ -97,7 +103,7 @@ LOCK
 
     it "can cache SSH connections" do
       expect(Net::SSH).to receive(:start) do
-        instance_double(Net::SSH::Connection::Session, close: nil, closed?: false)
+        ssh_session(close: nil, closed?: false)
       end
 
       expect(Thread.current[:clover_ssh_cache]).to be_nil
@@ -111,14 +117,21 @@ LOCK
     end
 
     it "reconnects when the cached session was closed underneath it" do
-      closed_sess = instance_double(Net::SSH::Connection::Session, closed?: true)
-      fresh_sess = instance_double(Net::SSH::Connection::Session, closed?: false)
+      closed_sess = ssh_session(closed?: true)
+      fresh_sess = ssh_session(closed?: false)
       expect(Net::SSH).to receive(:start).and_return(closed_sess, fresh_sess)
 
       expect(sa.connect).to equal(closed_sess)
       expect(sa.connect).to equal(fresh_sess)
       expect(sa.connect).to equal(fresh_sess)
       expect(Thread.current[:clover_ssh_cache]).to eq({["test.localhost", "testuser"] => fresh_sess})
+    end
+
+    it "turns Nagle's algorithm off on a new session" do
+      sess = ssh_session(closed?: false)
+      expect(sess.transport.socket).to receive(:setsockopt).with(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+      expect(Net::SSH).to receive(:start).and_return(sess)
+      sa.connect
     end
 
     it "does not crash if a cache has never been made" do
@@ -128,7 +141,7 @@ LOCK
     end
 
     it "can invalidate a single cache entry" do
-      sess = instance_double(Net::SSH::Connection::Session, close: nil)
+      sess = ssh_session(close: nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
       expect {
@@ -137,7 +150,7 @@ LOCK
     end
 
     it "can reset caches when has cached connection" do
-      sess = instance_double(Net::SSH::Connection::Session, close: nil)
+      sess = ssh_session(close: nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
       expect {
@@ -151,6 +164,7 @@ LOCK
 
     it "can reset caches even if session fails while closing" do
       sess = Net::SSH::Connection::Session.allocate
+      allow(sess).to receive(:transport).and_return(ssh_session.transport)
       expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
