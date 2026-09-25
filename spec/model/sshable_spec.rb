@@ -103,7 +103,7 @@ LOCK
 
     it "can cache SSH connections" do
       expect(Net::SSH).to receive(:start) do
-        ssh_session(close: nil, closed?: false)
+        ssh_session(close: nil, closed?: false, process: true)
       end
 
       expect(Thread.current[:clover_ssh_cache]).to be_nil
@@ -118,7 +118,7 @@ LOCK
 
     it "reconnects when the cached session was closed underneath it" do
       closed_sess = ssh_session(closed?: true)
-      fresh_sess = ssh_session(closed?: false)
+      fresh_sess = ssh_session(closed?: false, process: true)
       expect(Net::SSH).to receive(:start).and_return(closed_sess, fresh_sess)
 
       expect(sa.connect).to equal(closed_sess)
@@ -132,6 +132,26 @@ LOCK
       expect(sess.transport.socket).to receive(:setsockopt).with(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
       expect(Net::SSH).to receive(:start).and_return(sess)
       sa.connect
+    end
+
+    it "reconnects when the server dropped the cached session while it sat idle" do
+      dropped = ssh_session(closed?: false)
+      fresh = ssh_session(closed?: false, process: true)
+      expect(Net::SSH).to receive(:start).and_return(dropped, fresh)
+      expect(dropped).to receive(:process).with(0).and_raise(Net::SSH::Disconnect, "connection closed by remote host")
+
+      expect(sa.connect).to equal(dropped)
+      expect(sa.connect).to equal(fresh)
+    end
+
+    it "reconnects when handling what was waiting closed the cached session" do
+      dropped = ssh_session(process: true)
+      expect(dropped).to receive(:closed?).and_return(false, true)
+      fresh = ssh_session(closed?: false)
+      expect(Net::SSH).to receive(:start).and_return(dropped, fresh)
+
+      expect(sa.connect).to equal(dropped)
+      expect(sa.connect).to equal(fresh)
     end
 
     it "does not crash if a cache has never been made" do
