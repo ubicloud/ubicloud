@@ -106,6 +106,23 @@ class Clover
     end
   end
 
+  def update_github_runner_from_workflow_job(runner, job)
+    runner.this.where(conclusion: nil).update(
+      job_id: job["id"],
+      run_id: job["run_id"],
+      run_attempt: job["run_attempt"],
+      head_branch: job["head_branch"],
+      workflow_name: job["workflow_name"],
+      job_name: job["name"],
+      job_created_at: job["created_at"],
+      job_started_at: job["started_at"],
+      job_completed_at: job["completed_at"],
+      status: job["status"],
+      conclusion: job["conclusion"],
+      workflow_job: Sequel.pg_jsonb(job.except("steps")),
+    )
+  end
+
   def handle_webhook_github_workflow_job(data)
     unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
@@ -173,16 +190,7 @@ class Clover
 
     return {error: {message: "Unregistered runner"}} unless runner
 
-    runner.this.update(
-      job_id: job["id"],
-      run_id: job["run_id"],
-      run_attempt: job["run_attempt"],
-      head_branch: job["head_branch"],
-      workflow_name: job["workflow_name"],
-      status: job["status"],
-      conclusion: job["conclusion"],
-      workflow_job: Sequel.pg_jsonb(job.except("steps")),
-    )
+    update_github_runner_from_workflow_job(runner, job)
 
     case action
     when "in_progress"
