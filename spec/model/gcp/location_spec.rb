@@ -189,7 +189,7 @@ RSpec.describe Location do
 
       it "fetches zones from GCP API when cache is empty" do
         location_credential_gcp
-        expect(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        expect(Google::Cloud::Compute::V1::Zones::Rest::Client).to receive(:new).and_return(zones_client)
 
         zone_a = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-a")
         zone_b = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-b")
@@ -211,13 +211,108 @@ RSpec.describe Location do
 
       it "handles empty zone list from GCP API" do
         location_credential_gcp
-        expect(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        expect(Google::Cloud::Compute::V1::Zones::Rest::Client).to receive(:new).and_return(zones_client)
         expect(zones_client).to receive(:list)
           .with(project: "test-project")
           .and_return([])
 
         azs = location.send(:gcp_azs)
         expect(azs).to be_empty
+      end
+    end
+
+    describe "#scheduled_maintenance_events" do
+      let(:compute_client) { instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client) }
+
+      def gce_instance(name:, on_host_maintenance: "TERMINATE", window_start_time: nil)
+        instance = Google::Cloud::Compute::V1::Instance.new(
+          name:,
+          scheduling: Google::Cloud::Compute::V1::Scheduling.new(on_host_maintenance:),
+        )
+        if window_start_time
+          instance.resource_status = Google::Cloud::Compute::V1::ResourceStatus.new(
+            upcoming_maintenance: Google::Cloud::Compute::V1::UpcomingMaintenance.new(
+              type: "SCHEDULED",
+              maintenance_status: "PENDING",
+              window_start_time:,
+            ),
+          )
+        end
+        instance
+      end
+
+      def stub_aggregated_list(instances, extra_scopes: [])
+        location_credential_gcp
+        expect(Google::Cloud::Compute::V1::Instances::Rest::Client).to receive(:new).and_return(compute_client)
+        expect(compute_client).to receive(:aggregated_list).with(
+          project: "test-project",
+          filter: "labels.ubicloud = \"#{Config.provider_resource_tag_value}\"",
+          return_partial_success: true,
+        ).and_return([
+          ["zones/us-central1-a", Google::Cloud::Compute::V1::InstancesScopedList.new(instances:)],
+          ["zones/us-central1-b", Google::Cloud::Compute::V1::InstancesScopedList.new],
+          *extra_scopes,
+        ])
+      end
+
+      it "maps TERMINATE instances with upcoming maintenance to the window start by vm id" do
+        vm = create_vm(location_id: location.id, name: "vmabc123")
+        stub_aggregated_list([
+          gce_instance(name: "vmabc123", window_start_time: "2026-08-30T09:00:00Z"),
+          gce_instance(name: "not-in-ubicloud", window_start_time: "2026-08-30T09:00:00Z"),
+        ])
+
+        events = location.scheduled_maintenance_events
+        expect(events.keys).to eq([vm.id])
+        expect(events[vm.id]).to eq(Time.parse("2026-08-30T09:00:00Z"))
+      end
+
+      it "ignores MIGRATE instances since live migration needs no failover" do
+        create_vm(location_id: location.id, name: "vmabc123")
+        stub_aggregated_list([
+          gce_instance(name: "vmabc123", on_host_maintenance: "MIGRATE", window_start_time: "2026-08-30T09:00:00Z"),
+        ])
+
+        expect(location.scheduled_maintenance_events).to eq({})
+      end
+
+      it "ignores instances without upcoming maintenance or a window start" do
+        create_vm(location_id: location.id, name: "vmabc123")
+        no_resource_status = gce_instance(name: "vmabc123")
+        no_upcoming_maintenance = gce_instance(name: "vmabc123")
+        no_upcoming_maintenance.resource_status = Google::Cloud::Compute::V1::ResourceStatus.new
+        empty_window_start = gce_instance(name: "vmabc123", window_start_time: "")
+        stub_aggregated_list([no_resource_status, no_upcoming_maintenance, empty_window_start])
+
+        expect(location.scheduled_maintenance_events).to eq({})
+      end
+
+      it "returns empty for gcp locations without a credential" do
+        expect(location.location_credential_gcp).to be_nil
+        expect(location.scheduled_maintenance_events).to eq({})
+      end
+
+      it "drops a name that matches more than one VM at this location and logs it" do
+        create_vm(location_id: location.id, name: "vmabc123")
+        create_vm(location_id: location.id, name: "vmabc123")
+        stub_aggregated_list([gce_instance(name: "vmabc123", window_start_time: "2026-08-30T09:00:00Z")])
+
+        expect(Clog).to receive(:emit).with("GCP maintenance event name collision across projects, skipping", anything).and_call_original
+        expect(location.scheduled_maintenance_events).to eq({})
+      end
+
+      it "skips an unreachable scope and logs it, without dropping other scopes' events" do
+        vm = create_vm(location_id: location.id, name: "vmabc123")
+        stub_aggregated_list(
+          [gce_instance(name: "vmabc123", window_start_time: "2026-08-30T09:00:00Z")],
+          extra_scopes: [["zones/us-east1-a", Google::Cloud::Compute::V1::InstancesScopedList.new(
+            warning: Google::Cloud::Compute::V1::Warning.new(code: "UNREACHABLE"),
+          )]],
+        )
+
+        expect(Clog).to receive(:emit).with("GCP aggregated_list scope unreachable, skipping", anything).and_call_original
+        events = location.scheduled_maintenance_events
+        expect(events).to eq({vm.id => Time.parse("2026-08-30T09:00:00Z")})
       end
     end
   end
