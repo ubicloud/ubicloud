@@ -181,6 +181,18 @@ class InvoiceGenerator
           end
         end
 
+        # Each project have 1250 minutes (2.5$) runner credit every month.
+        # Apply this before resource credits, so resource credits are not
+        # consumed for usage the free runner credit would cover.
+        github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
+        github_credit = [2.5, github_items.sum { it[:remaining] }, project_cost].min.round(3)
+        if github_credit > 0
+          project_content[:github_credit] = github_credit
+          credits_by_name["GitHub Runner Credit"] = github_credit
+          project_cost = project_content[:cost] = (project_cost - github_credit).round(3)
+          attribute_credit.call(github_items, github_credit, "GitHub Runner Credit")
+        end
+
         # Do not allow a resource credit to remove more than the cost of the resource
         # or remove more than the total cost.
         resource_credits.each do |rc|
@@ -193,16 +205,6 @@ class InvoiceGenerator
           project_cost = project_content[:cost] = (project_cost - consumed).round(3)
           resource_credit_consumptions.push([rc, consumed])
           attribute_credit.call(matches, consumed, rc.name)
-        end
-
-        # Each project have 1250 minutes (2.5$) runner credit every month
-        github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
-        github_credit = [2.5, github_items.sum { it[:remaining] }, project_content[:cost]].min
-        if github_credit > 0
-          project_content[:github_credit] = github_credit
-          credits_by_name["GitHub Runner Credit"] = (credits_by_name["GitHub Runner Credit"] || 0.0) + github_credit
-          project_content[:cost] -= github_credit
-          attribute_credit.call(github_items, github_credit.round(3), "GitHub Runner Credit")
         end
 
         # Each project have some free AI inference tokens every month
