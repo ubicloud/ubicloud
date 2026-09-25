@@ -12,7 +12,8 @@ evaluate the rule.
 
 GCP firewall policy rule priorities are non-negative integers where
 **lower number = higher precedence**. We use the range 0-65535 (the
-priority allocator caps every new rule at 65535) and partition it into
+Layer-3 allocator caps every new rule at `TAG_RULE_MAX_PRIORITY =
+65530`, staying below the VPC-wide deny band) and partition it into
 three bands (see [Priority Bands](#priority-bands)).
 
 ## Ubicloud Data Model
@@ -39,9 +40,10 @@ Two VMs in the same subnet normally have the same effective firewalls
 `firewalls_vms` binds a firewall directly to one of them.
 
 Each firewall has `firewall_rule` rows of `(cidr, protocol,
-port_range)`. The `cidr` may be IPv4 or IPv6. We do not distinguish
-families at the Ubicloud layer; both partition naturally at the GCP
-layer via the source CIDR.
+port_range)`. The `cidr` may be IPv4 or IPv6. The Ubicloud layer does
+not distinguish families, but the rule compiler does: a policy rule
+cannot mix families, so `build_tag_based_policy_rules` splits on
+`cidr.include?(":")`. See [Layer 3](#layer-3-per-firewall-ingress-priorities-10000).
 
 ## GCP Mapping
 
@@ -151,30 +153,47 @@ to **4000 subnets per project per location** are supported. Stored on
 
 ### Layer 3: Per-firewall INGRESS (priorities 10000+)
 
-Created by `VpcUpdateFirewallRules#sync_firewall_rules`. Each Ubicloud
+Created by `VpcUpdateFirewallRules#sync_tag_policy_rules`. Each Ubicloud
 `Firewall` object gets its own GCP secure tag
 (`ubicloud-fw-{fw.ubid}/active`) and one or more INGRESS allow rules
 targeting that tag.
 
 **Rule compilation** (`build_tag_based_policy_rules`): Ubicloud
-`FirewallRule` rows are grouped by `r.cidr.to_s`, so one GCP policy rule
-is emitted per distinct source CIDR in a firewall's rules. Every
-(protocol, port_range) pair sharing that CIDR collapses into the rule's
-`layer4_configs` list. Because `src_ip_ranges` accepts both IPv4 and
-IPv6, mixed-family source CIDRs naturally partition by family, one
-policy rule per CIDR.
+`FirewallRule` rows are grouped by address family and port profile
+(the CIDRs sharing a `(protocol, port_range)` set), and every CIDR in a
+group is packed into one rule's `src_ip_ranges`, chunked at
+`MAX_SOURCE_RANGES_PER_RULE = 256`. That chunk size is self-imposed;
+GCP's documented ceiling is 5000 source ranges per rule. The family
+split is a real API constraint: "Source IP address ranges must contain
+either IPv4 or IPv6 CIDRs, not a combination of both"
+([firewall policy rule components](https://cloud.google.com/firewall/docs/firewall-policies-rule-details)),
+so each group is family-pure.
 
-One firewall therefore takes as many priority slots as it has distinct
-source CIDRs. This is **not** the n/n+1 pattern used by Layer 2:
-firewalls have no fixed per-family shape, so no pairing makes sense.
+One firewall therefore takes one priority slot per (family, port
+profile, chunk) rather than one per CIDR. This is **not** the n/n+1
+pattern used by Layer 2: firewalls have no fixed per-family shape, so
+no pairing makes sense.
 
-**Priority allocation** (`sync_tag_policy_rules`): reads the current
-policy, collects the priority set used by **every** rule (not just this
-firewall's), and assigns the next free integer starting from
-`TAG_RULE_BASE_PRIORITY = 10000`. Priorities are not stored in the DB.
-Content-based diffing ignores priority, so rules are recreated only when
-`(cidr, protocols, ports)` actually change, not when priorities shift
-during unrelated additions or deletions.
+**Priority allocation** (`sync_tag_policy_rules`): collects the priority
+set used by **every** rule (not just this firewall's) and assigns the
+next free integer starting from `TAG_RULE_BASE_PRIORITY = 10000`.
+Priorities are not stored in the DB. The policy is read once per strand
+entry and shared by every firewall and the orphan cleanup; at most one
+phase mutates it before napping, so the snapshot cannot go stale.
+Content-based diffing ignores priority, so a packed rule is recreated
+only when its own `(src_ip_ranges, protocols, ports)` change - including
+when a CIDR moves between packed rules on a chunk-boundary shift, since
+that changes both rules' content even though no individual CIDR's own
+rules changed. Every desired rule is added before any stale rule is
+removed, so the live set stays a superset of old and new throughout.
+
+Both sides of that comparison are normalized through `NetAddr` first.
+GCP returns IPv6 ranges in RFC 5952 form, which compresses the longest
+zero run, while `NetAddr` compresses the first one; the two spellings
+diverge for some prefixes longer than /64 (`2001:db8:0:0:1::/80` against
+`2001:db8::1:0:0:0/80`). Comparing raw strings would leave such a rule
+permanently unmatched, so it would be re-added on every entry and the
+stale removes behind it would never run.
 
 **VM binding**: `UpdateFirewallRules#update_firewall_rules` ensures the
 VM is bound to every `active` tag for firewalls in its effective set
@@ -349,9 +368,9 @@ firewall attached in another VPC.
 `SubnetNexus#wait` propagates that bump to the subnet's `gcp_vpc` only
 (no per-VM fan-out for rule edits, since tag bindings don't change). On
 metal/AWS the same subnet-level bump fans out to VMs (no VPC consumer).
-The VPC's `VpcUpdateFirewallRules` calls `sync_firewall_rules(fw.rules,
-tag_value_name)`, which content-diffs desired vs. existing policy rules
-and applies the minimum edits. Priority numbers may shift; semantics
+The VPC's `VpcUpdateFirewallRules` calls `sync_tag_policy_rules` with the
+compiled rules for each firewall, which content-diffs desired vs.
+existing policy rules and applies the minimum edits. Priority numbers may shift; semantics
 don't, because evaluation is by `(target_tag, src_ip, layer4_configs)`,
 not by priority.
 
@@ -419,12 +438,33 @@ have actually committed before the strand crashed or the runtime
 restarted, so the retry attempt can see HTTP 409 (`AlreadyExistsError`)
 or operation status code 6 (`ALREADY_EXISTS`). `ensure_firewall_tag_key`
 and `ensure_tag_value` catch both and fall through to a list-based
-lookup to return the already-created name. `create_tag_policy_rule`
-applies the same idea for `InvalidArgumentError: same priorities`:
-re-read the policy, pick a new free slot past the colliding priority,
-and retry (up to 5 attempts) - per the code comment, this guards the
-edge case where a prior subnet `add_rule` LRO is still in flight when we
-read the policy.
+lookup to return the already-created name.
+
+Policy rule mutations use a different mechanism: `submit_policy_mutations`
+submits a phase's adds or removes without awaiting each LRO, stores the
+accepted operation names in the frame, and `poll_policy_mutations` drains
+them on the next entry before rediffing against the live policy. On
+`AlreadyExistsError`, an `InvalidArgumentError` matching "not ready" or
+"same priorities", or one of the transient server statuses
+(`UnavailableError`, `InternalError`, `DeadlineExceededError`), the
+remaining mutations in that phase defer to the next rediff instead of
+retrying in-loop and the entry exits with a clean nap. Any other
+`Google::Cloud::Error` raises only
+while nothing in the phase has been accepted yet, since there is nothing
+to lose by crashing; once one mutation is accepted the error defers
+instead so the accepted op names survive to be polled. This applies to
+the adds phase: removes call `delete_policy_rule`, which treats an
+already-gone priority as success and only propagates "not ready", so
+they reach the busy branch rather than the raise.
+
+An op that fails in its LRO pages and takes its firewall out of the rest
+of the convergence, so one firewall cannot starve the others; the entry
+then naps rather than popping, and the firewall is retried on the next
+pass. The page is left for an operator to resolve, since the retry
+converging is not on its own evidence that whatever GCP rejected has
+been dealt with. The exception is VPC teardown, which resolves the VPC's
+pages on its way out: a page naming a firewall in a VPC that no longer
+exists cannot be acted on.
 
 ### Orphan cleanup
 
