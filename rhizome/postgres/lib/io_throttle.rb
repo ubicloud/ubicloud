@@ -188,3 +188,5 @@ class IoThrottle
     immune_pids
   end
 end
+
+require_relative "override/io_throttle"

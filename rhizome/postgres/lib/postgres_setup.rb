@@ -208,3 +208,5 @@ class PostgresSetup
     end
   end
 end
+
+require_relative "override/postgres_setup"
