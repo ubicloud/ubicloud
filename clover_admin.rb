@@ -1857,6 +1857,45 @@ class CloverAdmin < Roda
       end
     end
 
+    r.on "base-machine-images" do
+      # Base machine images are the machine images owned by the machine images
+      # service project.
+      mi_ds = MachineImage.where(project_id: Config.machine_images_service_project_id)
+
+      r.get true do
+        @machine_images = mi_ds.eager(:latest_version).order(:name, :arch).all
+        view("base_machine_images")
+      end
+
+      r.on :ubid_uuid do |mi_id|
+        next unless (@machine_image = mi_ds.with_pk(mi_id))
+
+        r.get true do
+          @strands = Strand.where(prog: "MachineImage::CreateBaseVersion")
+            .where(Sequel.pg_jsonb_op(:stack).get(0).get_text("machine_image_id") => @machine_image.id)
+            .all
+          existing_versions = @machine_image.versions_dataset.select_map(:version)
+          catalog_versions = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig(@machine_image.name, @machine_image.arch)&.keys.to_a
+          @available_versions = (catalog_versions - existing_versions).sort
+          view("base_machine_image")
+        end
+
+        r.post "download-version" do
+          version = typecast_params.nonempty_str!("version")
+
+          begin
+            st = Prog::MachineImage::CreateBaseVersion.assemble(name: @machine_image.name, version:, location_id: @machine_image.location_id)
+          rescue MachineImageError => e
+            flash["error"] = e.message
+            r.redirect "/base-machine-images/#{@machine_image.ubid}"
+          end
+
+          flash["notice"] = "Started base machine image version build: #{st.ubid}"
+          r.redirect "/base-machine-images/#{@machine_image.ubid}"
+        end
+      end
+    end
+
     r.on "local-e2e" do
       strand_ds = Strand.where(Sequel.like(:prog, "Test::%"))
 
