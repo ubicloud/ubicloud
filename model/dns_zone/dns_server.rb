@@ -3,10 +3,59 @@
 require_relative "../../model"
 
 class DnsServer < Sequel::Model
+  one_to_one :strand, key: :id, read_only: true
   many_to_many :dns_zones, order: :name, read_only: true
   many_to_many :vms, remover: nil, clearer: nil, is_used: true
 
   plugin ResourceMethods
+  plugin SemaphoreMethods, :configure
+
+  # mod-stats is attached through the default template, so its counters
+  # are per zone with no global totals.
+  def knot_config
+    <<-CONF
+server:
+    rundir: "/run/knot"
+    user: "knot:knot"
+    listen: [ "0.0.0.0@53", "::@53" ]
+
+log:
+  - target: "syslog"
+    any: "info"
+
+database:
+    storage: "/var/lib/knot"
+
+mod-stats:
+  - id: "custom"
+    request-protocol: on
+    server-operation: on
+    query-type: on
+    response-code: on
+    query-size: on
+    reply-size: on
+    edns-presence: on
+
+acl:
+  - id: "allow_dynamic_updates"
+    address: "127.0.0.1/32"
+    action: "update"
+
+template:
+  - id: "default"
+    storage: "/var/lib/knot"
+    file: "%s.zone"
+    module: "mod-stats/custom"
+    acl: "allow_dynamic_updates"
+    zonefile-sync: "60"
+    zonefile-load: "difference"
+    journal-content: "all"
+
+
+zone:
+  #{dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
+    CONF
+  end
 
   def retire_vm(vm_id, force: false)
     DB.transaction do
@@ -14,6 +63,7 @@ class DnsServer < Sequel::Model
       deleted = DB[:dns_servers_vms].where(dns_server_id: id, vm_id:).delete
       raise "VM #{UBID.to_ubid(vm_id)} is not associated with DnsServer #{name}" if deleted.zero?
       Vm.incr_destroy(vm_id)
+      Page.from_tag_parts("DnsServerVmConfigure", vm_id)&.incr_resolve
     end
   end
 

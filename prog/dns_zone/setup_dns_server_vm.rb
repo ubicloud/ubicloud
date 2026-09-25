@@ -19,6 +19,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
     arch = arches.include?("x64") ? "x64" : arches.first
 
     DB.transaction do
+      Prog::DnsZone::DnsServerNexus.assemble(dns_server)
       private_subnet_id = if restrict_ssh_to_control_plane
         subnet_name = "dns-#{location.display_name}"
         subnet = project.private_subnets_dataset.first(location_id:, name: subnet_name)
@@ -116,40 +117,7 @@ sudo systemctl reboot
     nap 5 unless sshable.available?
 
     sshable.write_file("/etc/default/knot", "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
-
-    knot_config = <<-CONF
-server:
-    rundir: "/run/knot"
-    user: "knot:knot"
-    listen: [ "0.0.0.0@53", "::@53" ]
-
-log:
-  - target: "syslog"
-    any: "info"
-
-database:
-    storage: "/var/lib/knot"
-
-acl:
-  - id: "allow_dynamic_updates"
-    address: "127.0.0.1/32"
-    action: "update"
-
-template:
-  - id: "default"
-    storage: "/var/lib/knot"
-    file: "%s.zone"
-    acl: "allow_dynamic_updates"
-    zonefile-sync: "60"
-    zonefile-load: "difference"
-    journal-content: "all"
-
-
-zone:
-  #{ds.dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
-    CONF
-
-    sshable.write_file("/etc/knot/knot.conf", knot_config)
+    sshable.write_file("/etc/knot/knot.conf", ds.knot_config)
 
     hop_sync_zones
   end
