@@ -164,7 +164,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       "#{vm.family}-#{vm.vcpus}"
     end
     billed_vm_size += "-arm" if arch == "arm64"
-    github_runner.update(billed_vm_size:)
+    now = Time.now
+    github_runner.update(billed_vm_size:, completed_at: now)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
 
     resource_id, resource_label = if project.get_ff_github_billing_by_repository
@@ -180,7 +181,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     retries = 0
     begin
-      begin_time = Time.now.to_date.to_time
+      begin_time = now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
       duration = Time.now - billed_from
       used_amount = (duration / 60).ceil
