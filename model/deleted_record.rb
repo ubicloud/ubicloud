@@ -9,7 +9,7 @@ class DeletedRecord < Sequel::Model
   RUNWAY_DAYS = 14      # Create partitions through this many days from today
   MIN_RUNWAY_DAYS = 7   # Runway at which to page
 
-  PARTITION_NAME_REGEXP = /\Adeleted_record_(\d{4})_(\d{2})_(\d{2})\z/
+  plugin DailyPartitionMethods, partition_type: :timestamptz
 
   def self.find_by_id(id, model_name:, days: 5)
     DB[:deleted_record]
@@ -40,55 +40,6 @@ class DeletedRecord < Sequel::Model
       )
       .reverse(Sequel[:ip][:deleted_at])
       .all
-  end
-
-  def self.partition_name(day)
-    "deleted_record_#{day.strftime("%Y_%m_%d")}"
-  end
-
-  def self.partition_days
-    DB[Sequel[:pg_inherits].as(:i)]
-      .join(Sequel[:pg_class].as(:c), oid: Sequel[:i][:inhrelid])
-      .where(Sequel[:i][:inhparent] => Sequel.cast("deleted_record", :regclass))
-      .select_map(Sequel[:c][:relname])
-      .filter_map { PARTITION_NAME_REGEXP.match(it) }
-      .map! { Date.new(it[1].to_i, it[2].to_i, it[3].to_i) }
-      .sort!
-  end
-
-  def self.partition_runway_days
-    days = partition_days.to_set
-    return if days.empty?
-
-    (Time.now.utc.to_date..).take_while { days.include?(it) }.count - 1
-  end
-
-  def self.ensure_partitions(through:)
-    existing = partition_days.to_set
-    (Time.now.utc.to_date..through).reject { existing.include?(it) }.each { create_partition(it) }
-  end
-
-  def self.create_partition(day)
-    name = partition_name(day).to_sym
-    next_day = day + 1
-
-    DB.create_table(name) do
-      like :deleted_record, including: :all
-    end
-
-    DB.alter_table(:deleted_record) do
-      attach_partition name do
-        from Time.utc(day.year, day.month, day.day)
-        to Time.utc(next_day.year, next_day.month, next_day.day)
-      end
-    end
-  end
-
-  def self.drop_partition(day)
-    DB.transaction do
-      DB.run("SET LOCAL lock_timeout = '5s'")
-      DB.drop_table(partition_name(day))
-    end
   end
 end
 
