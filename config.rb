@@ -175,6 +175,9 @@ module Config
   override :api_metrics_report_enabled, false, bool
   override :api_metrics_store_dir, File.join(Dir.pwd, "var", "api_metrics"), string
 
+  # Rhizome
+  override :support_rhizome_overrides, false, bool
+
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string
 

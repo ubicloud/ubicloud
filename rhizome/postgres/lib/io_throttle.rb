@@ -182,3 +182,5 @@ class IoThrottle
     immune_pids
   end
 end
+
+Overrider.load(__FILE__)

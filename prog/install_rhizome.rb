@@ -11,6 +11,8 @@ class Prog::InstallRhizome < Prog::Base
   frame_accessor :rhizome_digest
 
   SKIP_VALIDATION = ["Gemfile.lock"]
+  OVERRIDER = "common/lib/overrider.rb"
+  OVERRIDER_ENABLED = "# frozen_string_literal: true\n\nrequire_relative \"overrider_enabled\"\n"
 
   label def start
     tar = StringIO.new
@@ -25,6 +27,11 @@ class Prog::InstallRhizome < Prog::Base
         stat = File.stat(full_path)
         if stat.directory?
           writer.mkdir(file, stat.mode)
+        elsif file == OVERRIDER && Config.support_rhizome_overrides
+          # Overrides load through this file, so an installation without them
+          # loads an empty one.
+          writer.add_file(file, stat.mode) { it.write(OVERRIDER_ENABLED) }
+          file_hash_map[file] = OpenSSL::Digest::SHA384.hexdigest(OVERRIDER_ENABLED)
         elsif stat.file?
           writer.add_file(file, stat.mode) do |tf|
             File.open(full_path, "rb") do
