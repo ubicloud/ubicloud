@@ -1800,9 +1800,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.destroy }.to nap(10)
     end
 
-    it "reaps a finished KEK rotation, then re-enters destroy" do
+    it "reaps a finished KEK rotation and continues destroying" do
+      vm.update(vm_host_id: nil)
+      expect(nx).to receive(:host).and_return(nil).at_least(:once)
       child = create_rotate_kek_strand(create_stale_kek_volume, finished: true)
-      expect { nx.destroy }.to hop("destroy")
+      expect { nx.destroy }.to hop("destroy_slice")
       expect(child).not_to exist
     end
   end
