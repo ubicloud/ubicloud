@@ -11,7 +11,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  frame_accessor :boot_bug_checked
+  frame_accessor :boot_bug_checked, :vm_family
 
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
@@ -914,6 +914,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if vm
       collect_final_telemetry if vm.allocated_at
+      self.vm_family = vm.family
       destroy_vm
     end
 
@@ -934,6 +935,43 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def wait_vm_destroy
     register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
+
+    if github_runner[:job_id] && github_runner.runner_id && github_runner.completed_at && (workflow_run = github_runner.active_workflow_run)
+      begin
+        DB.transaction(savepoint: true) do
+          GithubCompletedWorkflowJob.insert(
+            workflow_run_create_date: workflow_run.create_date,
+            label: github_runner.label,
+            actual_label: github_runner.actual_label || github_runner.label,
+            duration: (github_runner.completed_at - github_runner.ready_at).ceil,
+            runner_id: github_runner.id,
+            runner_vm_id: github_runner.vm_id,
+            vm_family: vm_family || github_runner.billed_vm_size.split("-", 2)[0],
+            **github_runner.values.slice(
+              :repository_id,
+              :job_id,
+              :installation_id,
+              :created_at,
+              :completed_at,
+              :run_id,
+              :run_attempt,
+              :head_branch,
+              :workflow_name,
+              :job_name,
+              :job_created_at,
+              :job_started_at,
+              :job_completed_at,
+              :ready_at,
+              :status,
+              :conclusion,
+              :billed_vm_size,
+            ),
+          )
+        end
+      rescue Sequel::DatabaseError => ex
+        Clog.emit("failed to insert completed github workflow job", Util.exception_to_hash(ex, into: {github_completed_workflow_job_insert_failure: {github_runner:}}))
+      end
+    end
 
     github_runner.destroy
     pop "github runner deleted"
