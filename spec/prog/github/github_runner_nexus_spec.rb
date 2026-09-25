@@ -1925,6 +1925,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to hop("wait_vm_destroy")
       expect(ps.destroy_set?).to be(true)
       expect(firewall).not_to exist
+      expect(nx.vm_family).to eq("standard")
+      expect(nx.strand.stack[0]["vm_family"]).to eq("standard")
     end
 
     it "keeps the private subnet the installation shares between its runners" do
@@ -2025,6 +2027,117 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner).to receive(:destroy)
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+    end
+
+    describe "recording the completed workflow job" do
+      let(:workflow_run_create_date) { Date.new(2026, 2, 4) }
+
+      let(:workflow_run) do
+        repository = GithubRepository.create(installation_id: installation.id, name: "test-repo")
+        GithubActiveWorkflowRun.create(installation_id: installation.id, repository_id: repository.id, create_date: workflow_run_create_date, repository_name: "test-repo", run_id: 456, run_attempt: 2, head_branch: "main", head_repository_full_name: "test-repo", event: "push", status: "in_progress", display_title: "CI", commit_message: "cm", actor_login: "al", cache_scope: "main")
+      end
+
+      before do
+        GithubCompletedWorkflowJob.create_partition(workflow_run_create_date)
+        runner.update(repository_id: workflow_run.repository_id, job_id: 789, run_id: 456, run_attempt: 2, head_branch: "main", workflow_name: "CI", job_name: "test", job_created_at: now + 5, job_started_at: now + 25, job_completed_at: now + 95, status: "completed", conclusion: "success", ready_at: now + 30, completed_at: now + 100.25, billed_vm_size: "standard-4")
+        expect(nx).to receive(:vm).and_return(nil).twice
+      end
+
+      def completed_jobs
+        GithubCompletedWorkflowJob.where(repository_id: workflow_run.repository_id)
+      end
+
+      it "inserts a completed workflow job before destroying the runner" do
+        runner.update(actual_label: "custom-label")
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(runner).not_to exist
+        expect(completed_jobs.all.map(&:values)).to eq([{
+          repository_id: workflow_run.repository_id,
+          job_id: 789,
+          workflow_run_create_date:,
+          installation_id: installation.id,
+          runner_id: runner.id,
+          runner_vm_id: runner.vm_id,
+          created_at: now,
+          completed_at: now + 100.25,
+          run_id: 456,
+          run_attempt: 2,
+          head_branch: "main",
+          workflow_name: "CI",
+          job_name: "test",
+          job_created_at: now + 5,
+          job_started_at: now + 25,
+          job_completed_at: now + 95,
+          ready_at: now + 30,
+          status: "completed",
+          conclusion: "success",
+          label: "ubicloud-standard-4",
+          actual_label: "custom-label",
+          billed_vm_size: "standard-4",
+          vm_family: "standard",
+          duration: 71, # (completed_at - ready_at).ceil
+        }])
+      end
+
+      it "uses the runner label if there is no actual label" do
+        runner.update(actual_label: nil)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.select_map(:actual_label)).to eq(["ubicloud-standard-4"])
+      end
+
+      it "uses the vm family stored in the frame if present" do
+        nx.vm_family = "premium"
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.select_map(:vm_family)).to eq(["premium"])
+      end
+
+      it "uses the vm family from the billed vm size if the frame does not have a vm family" do
+        runner.update(billed_vm_size: "premium-8-arm")
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.select_map(:vm_family)).to eq(["premium"])
+      end
+
+      it "does not insert a completed workflow job if the runner job_id column is not set, even if workflow_job has it" do
+        runner.update(job_id: nil)
+        expect(runner.workflow_job["id"]).to eq(123)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+      end
+
+      it "does not insert a completed workflow job if the runner was not registered" do
+        runner.update(runner_id: nil)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+      end
+
+      it "does not insert a completed workflow job if the runner did not complete" do
+        runner.update(completed_at: nil)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+      end
+
+      it "does not insert a completed workflow job if there is no active workflow run" do
+        runner.update(run_attempt: 1)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+      end
+
+      it "logs and still destroys the runner if inserting the completed workflow job fails" do
+        workflow_run.update(create_date: Date.today + 3)
+        expect(Clog).to receive(:emit).with("failed to insert completed github workflow job", instance_of(Hash)).and_call_original
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(runner).not_to exist
+        expect(completed_jobs.count).to eq(0)
+      end
     end
   end
 
