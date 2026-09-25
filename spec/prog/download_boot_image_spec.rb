@@ -217,6 +217,22 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
+    it "fetches the ember images from the images bucket, under the key the ember workflow uploads" do
+      allow(Config).to receive_messages(ubicloud_images_r2_bucket_name: "images-bucket", ubicloud_images_blob_storage_certs: nil)
+      url_presigner = instance_double(Aws::S3::Presigner)
+      s3_client = instance_double(Aws::S3::Client)
+      allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(url_presigner)
+      allow(Aws::S3::Client).to receive(:new).and_return(s3_client)
+      %w[postgres-cell-root-18 postgres-cell-pgdata-18].each do |image_name|
+        refresh_frame(dbi, new_values: {"image_name" => image_name, "version" => nil, "custom_url" => nil, "download_r2" => true})
+        dbi.instance_variable_set(:@url, nil)
+        dbi.instance_variable_set(:@version, nil)
+        expect(url_presigner).to receive(:presigned_url)
+          .with(:get_object, hash_including(key: "#{image_name}-x64-20260925.1.0.raw")).and_return("https://r2.example.com/x.raw")
+        expect(dbi.url).to eq("https://r2.example.com/x.raw")
+      end
+    end
+
     it "generates R2 presigned URL for github-runners images if a custom_url not provided" do
       version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
       allow(Config).to receive_messages(ubicloud_images_r2_bucket_name: "images-bucket", ubicloud_images_blob_storage_certs: nil)
