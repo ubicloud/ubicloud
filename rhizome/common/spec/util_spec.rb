@@ -214,8 +214,35 @@ RSpec.describe "util" do
     it "calls r with curl command and returns the sha256 hash" do
       url = "https://example.com/file.gz"
       path = "/tmp/file.gz"
-      expect(self).to receive(:_run_command).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
+      expect(self).to receive(:_run_command).with("bash -c set\\ -o\\ pipefail\\;\\ curl\\ --fail\\ --location\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
       expect(curl_file(url, path)).to eq("a" * 64)
+    end
+
+    # A string expectation alone could not catch the defect this covers: the
+    # pipeline's status was tee's, so a curl that died mid-stream exited 0 and
+    # the only thing that noticed was the caller's digest comparison, which
+    # then reported a checksum mismatch for a transfer that stopped early. So
+    # this runs the real shell -- bash, tee, process substitution and all --
+    # against a curl that writes a short body and exits 22, which is what a
+    # truncated transfer looks like from the outside.
+    it "fails by curl's own exit status when the fetch dies mid-stream" do
+      Dir.mktmpdir do |dir|
+        stub_curl = File.join(dir, "curl")
+        File.write(stub_curl, "#!/bin/bash\nprintf 'partial'\nexit 22\n")
+        File.chmod(0o755, stub_curl)
+        allow(self).to receive(:_run_command).and_wrap_original do |original, *command, **kw|
+          original.call(*command, _skip_command_checking: true, **kw)
+        end
+
+        path = File.join(dir, "file.gz")
+        original_path = ENV.fetch("PATH")
+        begin
+          ENV["PATH"] = "#{dir}:#{original_path}"
+          expect { curl_file("https://example.com/file.gz", path) }.to raise_error(CommandFail)
+        ensure
+          ENV["PATH"] = original_path
+        end
+      end
     end
   end
 
