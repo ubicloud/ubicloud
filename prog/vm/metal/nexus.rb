@@ -554,26 +554,31 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "deleting")
 
     unless host.nil?
-      if vm.gpu_partition
-        host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action: "delete_gpu_partition", vm_name:)
-      end
-
       begin
-        host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10, log: :on_error)
-      rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
-      end
+        if vm.gpu_partition
+          host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action: "delete_gpu_partition", vm_name:)
+        end
 
-      begin
-        host.sshable.cmd("sudo systemctl stop :vm_name-dnsmasq", vm_name:, log: :on_error)
-      rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
-      end
+        begin
+          host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10, log: :on_error)
+        rescue Sshable::SshError => ex
+          raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+        end
 
-      # If there is a load balancer setup, we want to keep the network setup in
-      # tact for a while
-      action = vm.load_balancer ? "delete_keep_net" : "delete"
-      host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, log: :on_error)
+        begin
+          host.sshable.cmd("sudo systemctl stop :vm_name-dnsmasq", vm_name:, log: :on_error)
+        rescue Sshable::SshError => ex
+          raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+        end
+
+        # If there is a load balancer setup, we want to keep the network setup in
+        # tact for a while
+        action = vm.load_balancer ? "delete_keep_net" : "delete"
+        host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, log: :on_error)
+      rescue Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS => ex
+        raise unless host&.allocation_state == "draining"
+        Clog.emit("Failed to destroy VM on host", {vm_destroy_on_host_failure: Util.exception_to_hash(ex, into: {vm: vm.ubid, vm_host: host.ubid})})
+      end
     end
 
     vm.vm_storage_volumes.each do |vol|
@@ -706,7 +711,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   def log_vm_stats
     return unless host
     stats = host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name:, timeout: 10, log: false)
-  rescue Sshable::SshError, JSON::ParserError => e
+  rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS, JSON::ParserError => e
     # Collecting VM stats is best effort during destroy, so we catch and log any
     # errors without preventing the destroy process. If there are bugs in vm-stats,
     # they should be also reproduced in E2E tests which will notify us.

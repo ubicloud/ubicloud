@@ -1,0 +1,18 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/stale_vm_cleaner"
+
+begin
+  params = JSON.parse($stdin.read)
+rescue JSON::ParserError
+  warn "expected a JSON object on stdin with expected_vms and expected_slices"
+  exit 1
+end
+
+cleaner = StaleVmCleaner.new(
+  expected_vm_names: Array(params["expected_vms"]),
+  expected_slice_names: Array(params["expected_slices"]),
+)
+puts JSON.generate(cleaner.clean)

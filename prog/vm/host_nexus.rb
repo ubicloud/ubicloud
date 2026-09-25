@@ -292,16 +292,28 @@ class Prog::Vm::HostNexus < Prog::Base
       fail "BUG: VmHost not in draining state" unless vm_host.allocation_state == "draining"
 
       unless vm_host.patch_set?
+        # Host is moving back to accepting after a graceful reboot; reconcile
+        # any VM/slice artifacts that leaked while it was draining/unreachable.
         vm_host.update(allocation_state: "accepting")
         decr_graceful_reboot
+        hop_cleanup_leaked_vms
       end
     end
 
     if vm_host.allocation_state == "unprepared"
       vm_host.update(allocation_state: "accepting")
       delete_from_stack("install_os", "default_boot_images", "vhost_block_backend_version")
+      hop_cleanup_leaked_vms
     end
 
+    hop_configure_metrics
+  end
+
+  # A host that went through a drain (so its VMs could be drained/deleted while
+  # it was unavailable) and is now back to accepting may carry stale VM artifacts
+  # on disk. Reconcile them with the live VM set.
+  label def cleanup_leaked_vms
+    bud Prog::Vm::HostCleanup, {"subject_id" => vm_host.id}
     hop_configure_metrics
   end
 
