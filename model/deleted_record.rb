@@ -6,8 +6,6 @@ class DeletedRecord < Sequel::Model
   no_primary_key
 
   RETENTION_DAYS = 35   # How long to keep deleted_record partitions before dropping them
-  RUNWAY_DAYS = 14      # Create partitions through this many days from today
-  MIN_RUNWAY_DAYS = 7   # Runway at which to page
 
   plugin DailyPartitionMethods, partition_type: :timestamptz
 

@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 
-# Keeps deleted_record's daily partitions ahead of today.
+# Keeps the daily partitions of deleted_record and the completed GitHub
+# workflow tables ahead of today, and drops expired completed GitHub
+# workflow partitions. Expired deleted_record partitions are archived
+# and dropped by DeletedRecordArchiver.
 class Prog::DeletedRecordPartitioner < Prog::Base
+  RUNWAY_DAYS = 14      # Create partitions through this many days from today
+  MIN_RUNWAY_DAYS = 7   # Runway at which to page
+  RETENTION_DAYS = 44   # Number of past partitions to keep for github completed workflow run/job
+
+  PARTITIONED_MODELS = [DeletedRecord, GithubCompletedWorkflowRun, GithubCompletedWorkflowJob].freeze
+
   frame_accessor :partitions_ensured
 
   label def wait
@@ -15,25 +24,42 @@ class Prog::DeletedRecordPartitioner < Prog::Base
   end
 
   label def check_runway
-    runway = DeletedRecord.partition_runway_days
-    if runway && runway < DeletedRecord::MIN_RUNWAY_DAYS
-      Prog::PageNexus.assemble(
-        "deleted_record has only #{runway} days of partitions left",
-        ["DeletedRecordPartitionRunway"],
-        strand.ubid,
-        resource_id: strand.id,
-        extra_data: {runway_days: runway, wanted_days: DeletedRecord::RUNWAY_DAYS},
-      )
-    else
-      Page.from_tag_parts("DeletedRecordPartitionRunway")&.incr_resolve
+    PARTITIONED_MODELS.each do |model|
+      tag = "#{model.name}PartitionRunway"
+      runway = model.partition_runway_days
+      if runway && runway < MIN_RUNWAY_DAYS
+        Prog::PageNexus.assemble(
+          "#{model.table_name} has only #{runway} days of partitions left",
+          [tag],
+          strand.ubid,
+          resource_id: strand.id,
+          extra_data: {runway_days: runway, wanted_days: RUNWAY_DAYS},
+        )
+      else
+        Page.from_tag_parts(tag)&.incr_resolve
+      end
     end
 
     hop_create_partitions
   end
 
   label def create_partitions
-    created = DeletedRecord.ensure_partitions(through: Time.now.utc.to_date + DeletedRecord::RUNWAY_DAYS)
-    Clog.emit("created deleted_record partitions", {deleted_record_partitions_created: {days: created.map(&:to_s)}}) unless created.empty?
+    through = Time.now.utc.to_date + RUNWAY_DAYS
+    PARTITIONED_MODELS.each do |model|
+      created = model.ensure_partitions(through:)
+      Clog.emit("created #{model.table_name} partitions", {"#{model.table_name}_partitions_created": {days: created.map(&:to_s)}}) unless created.empty?
+    end
+
+    hop_drop_partitions
+  end
+
+  label def drop_partitions
+    cutoff = Time.now.utc.to_date - RETENTION_DAYS
+    [GithubCompletedWorkflowRun, GithubCompletedWorkflowJob].each do |model|
+      expired = model.partition_days.select { it < cutoff }
+      expired.each { model.drop_partition(it) }
+      Clog.emit("dropped #{model.table_name} partitions", {"#{model.table_name}_partitions_dropped": {days: expired.map(&:to_s)}}) unless expired.empty?
+    end
 
     self.partitions_ensured = true
     hop_wait
