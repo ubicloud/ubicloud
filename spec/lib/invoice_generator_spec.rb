@@ -417,23 +417,68 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["cost"]).to eq(0)
   end
 
-  it "does not grant github runner credit beyond what a resource credit left remaining on the line item" do
+  it "applies github runner credit before a github-scoped resource credit" do
     github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     github_rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", github_runner.label_data["vm_size"], "global", false, BILLING_RATE_ACTIVE_AT)["unit_price"]
     github_cost = (5000 * github_rate).round(3)
-    ResourceCredit.create(project_id: p1.id, resource_type: "GitHubRunnerMinutes", amount: github_cost, active_from: Time.utc(2023, 5), name: "GitHub Minutes Credit")
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "GitHubRunnerMinutes", amount: github_cost, active_from: Time.utc(2023, 5), name: "GitHub Minutes Credit")
 
-    invoice = described_class.new(begin_time, end_time).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
     github_line_item = invoice["resources"].find { it["line_items"].first["resource_type"] == "GitHubRunnerMinutes" }["line_items"].first
+    consumed = (github_cost - 2.5).round(3)
 
-    expect(invoice).not_to have_key("github_credit")
-    expect(invoice["credits"].map { it["name"] }).not_to include("GitHub Runner Credit")
+    expect(invoice["github_credit"]).to eq(2.5)
+    expect(invoice["credits"]).to eq([
+      {"name" => "GitHub Runner Credit", "amount" => 2.5},
+      {"name" => "GitHub Minutes Credit", "amount" => consumed},
+    ])
     expect(invoice["credit"]).to eq(github_cost)
-    expect(github_line_item["credits"]).to eq([{"name" => "GitHub Minutes Credit", "amount" => github_cost}])
+    expect(github_line_item["credits"]).to eq([
+      {"name" => "GitHub Runner Credit", "amount" => 2.5},
+      {"name" => "GitHub Minutes Credit", "amount" => consumed},
+    ])
     expect(invoice["cost"]).to eq((invoice["subtotal"] - github_cost).round(3))
+    expect(resource_credit.reload.amount.to_f).to eq(2.5)
+  end
+
+  it "applies github runner credit before a wildcard resource credit" do
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    github_rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", github_runner.label_data["vm_size"], "global", false, BILLING_RATE_ACTIVE_AT)["unit_price"]
+    github_cost = (5000 * github_rate).round(3)
+    resource_credit = create_wildcard_credit(p1, 100)
+
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+    consumed = (github_cost - 2.5).round(3)
+
+    expect(invoice["github_credit"]).to eq(2.5)
+    expect(invoice["credits"]).to eq([
+      {"name" => "GitHub Runner Credit", "amount" => 2.5},
+      {"name" => "Test Credit", "amount" => consumed},
+    ])
+    expect(invoice["cost"]).to eq(0)
+    expect(resource_credit.reload.amount.to_f).to eq((100 - consumed).round(3))
+  end
+
+  it "does not consume a resource credit when github runner credit covers all github usage" do
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day), 100)
+
+    github_rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", github_runner.label_data["vm_size"], "global", false, BILLING_RATE_ACTIVE_AT)["unit_price"]
+    github_cost = (100 * github_rate).round(3)
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "GitHubRunnerMinutes", amount: 10, active_from: Time.utc(2023, 5), name: "GitHub Minutes Credit")
+
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+
+    expect(github_cost).to be < 2.5
+    expect(invoice["github_credit"]).to eq(github_cost)
+    expect(invoice["credits"]).to eq([{"name" => "GitHub Runner Credit", "amount" => github_cost}])
+    expect(invoice["cost"]).to eq(0)
+    expect(resource_credit.reload.amount.to_f).to eq(10)
   end
 
   it "handles inference quota when not used up" do
