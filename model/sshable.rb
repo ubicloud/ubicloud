@@ -220,7 +220,7 @@ class Sshable < Sequel::Model
     # Cache hit, unless the session was closed underneath us, e.g. by
     # the server terminating the connection. Then reconnect.
     if (sess = Thread.current[:clover_ssh_cache][[host, unix_user]])
-      return sess unless sess.closed?
+      return sess if live_session?(sess)
       invalidate_cache_entry
     end
 
@@ -246,6 +246,14 @@ LOCK
     end
 
     sess
+  end
+
+  def live_session?(sess)
+    return false if sess.closed?
+    sess.process(0)
+    !sess.closed?
+  rescue IOError, *SSH_CONNECTION_ERRORS
+    false
   end
 
   def start_fresh_session(&block)
