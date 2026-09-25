@@ -50,6 +50,41 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
   label def destroy
     decr_destroy
     nap(10 * 60) unless github_active_workflow_run.active_runners_dataset.empty?
+
+    unless github_active_workflow_run.completed_workflow_jobs_dataset.empty?
+      duration = if github_active_workflow_run.completed_at && github_active_workflow_run.run_started_at
+        (github_active_workflow_run.completed_at - github_active_workflow_run.run_started_at).ceil
+      end
+      begin
+        DB.transaction(savepoint: true) do
+          GithubCompletedWorkflowRun.insert(
+            duration:,
+            **github_active_workflow_run.values.slice(
+              :repository_id,
+              :run_id,
+              :run_attempt,
+              :create_date,
+              :installation_id,
+              :created_at,
+              :run_started_at,
+              :completed_at,
+              :head_branch,
+              :commit_hash,
+              :head_repository_full_name,
+              :event,
+              :status,
+              :conclusion,
+              :display_title,
+              :commit_message,
+              :actor_login,
+            ),
+          )
+        end
+      rescue Sequel::DatabaseError => ex
+        Clog.emit("failed to insert completed github workflow run", Util.exception_to_hash(ex, into: {github_completed_workflow_run_insert_failure: {github_active_workflow_run:}}))
+      end
+    end
+
     github_active_workflow_run.destroy
     pop("active workflow run finished")
   end

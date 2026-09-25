@@ -6,6 +6,7 @@ class GithubActiveWorkflowRun < Sequel::Model
   many_to_one :installation, class: :GithubInstallation, read_only: true
   many_to_one :repository, class: :GithubRepository, read_only: true
   one_to_many :active_runners, class: :GithubRunner, key: [:repository_id, :run_id, :run_attempt], primary_key: [:repository_id, :run_id, :run_attempt], order: :job_id, read_only: true
+  one_to_many :completed_workflow_jobs, class: :GithubCompletedWorkflowJob, key: [:workflow_run_create_date, :repository_id, :run_id, :run_attempt], primary_key: [:create_date, :repository_id, :run_id, :run_attempt], order: :job_id, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy

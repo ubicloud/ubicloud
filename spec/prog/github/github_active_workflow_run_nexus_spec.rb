@@ -13,10 +13,12 @@ RSpec.describe Prog::Github::GithubActiveWorkflowRunNexus do
       run_attempt: 1,
       head_branch: "main",
       create_date: Time.now.utc.to_date,
+      run_started_at: Time.now - 10,
       head_repository_full_name: "ubicloud/ubicloud",
       event: "push",
       status: "queued",
       display_title: "CI",
+      commit_hash: "32eb7222f4676683fcec5dca08dc1218168801d5",
       commit_message: "cm",
       actor_login: "al",
       cache_scope: "main",
@@ -174,14 +176,103 @@ RSpec.describe Prog::Github::GithubActiveWorkflowRunNexus do
   end
 
   describe "#destroy" do
+    let(:create_date) { Date.new(2026, 1, 15) }
+
+    before do
+      GithubCompletedWorkflowRun.create_partition(create_date)
+      GithubCompletedWorkflowJob.create_partition(create_date)
+      workflow_run.update(create_date:, created_at: Time.at(Time.now.to_i - 100), status: "completed", conclusion: "success")
+    end
+
+    def create_completed_job(job_id: 1, workflow_run_create_date: create_date, run_attempt: 1)
+      GithubCompletedWorkflowJob.insert(
+        repository_id: repository.id,
+        job_id:,
+        workflow_run_create_date:,
+        installation_id: installation.id,
+        runner_id: GithubRunner.generate_uuid,
+        runner_vm_id: Vm.generate_uuid,
+        completed_at: Time.now,
+        run_id: 111,
+        run_attempt:,
+        job_name: "test",
+        job_created_at: Time.now - 60,
+        job_started_at: Time.now - 50,
+        job_completed_at: Time.now - 5,
+        ready_at: Time.now - 55,
+        status: "completed",
+        label: "ubicloud",
+        actual_label: "ubicloud",
+        billed_vm_size: "standard-2",
+        vm_family: "standard",
+        duration: 50,
+      )
+    end
+
     it "naps if there are runners still associated with the workflow run" do
       GithubRunner.create(installation_id: installation.id, repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud", run_id: 111, run_attempt: 1)
       expect { nx.destroy }.to nap(10 * 60)
+      expect(GithubCompletedWorkflowRun.count).to eq(0)
+      expect(workflow_run).to exist
     end
 
-    it "destroys the workflow run and pops" do
+    it "does not insert a completed workflow run if the workflow run has no completed jobs" do
       expect { nx.destroy }.to exit({"msg" => "active workflow run finished"})
-      expect(GithubActiveWorkflowRun[workflow_run.id]).to be_nil
+      expect(workflow_run).not_to exist
+      expect(GithubCompletedWorkflowRun.count).to eq(0)
+    end
+
+    it "does not insert a completed workflow run if the only completed jobs are for a different run attempt or create date" do
+      GithubCompletedWorkflowJob.create_partition(create_date + 1)
+      create_completed_job(job_id: 1, run_attempt: 2)
+      create_completed_job(job_id: 2, workflow_run_create_date: create_date + 1)
+      expect { nx.destroy }.to exit({"msg" => "active workflow run finished"})
+      expect(workflow_run).not_to exist
+      expect(GithubCompletedWorkflowRun.count).to eq(0)
+    end
+
+    it "inserts a completed workflow run, destroys the workflow run, and pops" do
+      create_completed_job
+      workflow_run.update(completed_at: Time.now - 5)
+      workflow_run.reload
+      expect { nx.destroy }.to exit({"msg" => "active workflow run finished"})
+      expect(workflow_run).not_to exist
+
+      completed = GithubCompletedWorkflowRun.all
+      expect(completed.count).to eq(1)
+      values = completed.first.values
+      expect(values.except(:duration)).to eq(
+        repository_id: repository.id,
+        run_id: 111,
+        run_attempt: 1,
+        create_date:,
+        installation_id: installation.id,
+        created_at: workflow_run.created_at,
+        run_started_at: workflow_run.run_started_at,
+        completed_at: workflow_run.completed_at,
+        head_branch: "main",
+        head_repository_full_name: "ubicloud/ubicloud",
+        event: "push",
+        status: "completed",
+        conclusion: "success",
+        display_title: "CI",
+        commit_hash: "32eb7222f4676683fcec5dca08dc1218168801d5",
+        commit_message: "cm",
+        actor_login: "al",
+      )
+      expect(values[:duration]).to eq((values[:completed_at] - workflow_run[:run_started_at]).ceil)
+      expect(values[:duration]).to be_within(1).of(5)
+    end
+
+    it "logs and still destroys the workflow run if inserting the completed workflow run fails" do
+      workflow_run.update(create_date: Date.today + 3)
+      GithubCompletedWorkflowJob.create_partition(Date.today + 3)
+      create_completed_job(workflow_run_create_date: Date.today + 3)
+      expect(Clog).to receive(:emit).with("failed to insert completed github workflow run", instance_of(Hash)).and_call_original
+
+      expect { nx.destroy }.to exit({"msg" => "active workflow run finished"})
+      expect(workflow_run).not_to exist
+      expect(GithubCompletedWorkflowRun.count).to eq(0)
     end
   end
 end
