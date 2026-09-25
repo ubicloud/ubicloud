@@ -3,9 +3,8 @@
 require "excon"
 class Hosting::LeasewebApis < Hosting::ProviderApis
   IpInfo = Data.define(:ip_address, :source_host_ip, :gateway) do
-    # A gatewayed IPv4 sits on a switched segment the host must claim (no VM may
-    # take it); a gateway-less IPv4 is a block routed here that VMs draw from.
-    def host_only? = !gateway.nil? && !ip_address.include?(":")
+    # VMs draw from every IPv4 but the main one, routed or switched.
+    def host_only? = ip_address == "#{source_host_ip}/32"
 
     # A gatewayed IPv6 prefix exists so the host can reach its router; VMs
     # never draw from it and the control plane does not track it.

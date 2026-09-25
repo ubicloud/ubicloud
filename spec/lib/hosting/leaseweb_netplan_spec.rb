@@ -140,28 +140,17 @@ RSpec.describe Hosting::LeasewebNetplan do
     expect(netplan.to_h.dig("network", "ethernets", "public", "accept-ra")).to be false
   end
 
-  # Server 91478's extra IPv4s sit on a switched /29 behind their own gateway.
-  # The host claims each as a /32, so the segment never becomes a connected
-  # route. Its gateway resolves to the same router as the main one, so it must
-  # not add a second default route.
-  it "claims gatewayed non-main ipv4s as /32 without routing through their gateway" do
+  # Server 91478's switched /29: VMs hold its members, and its gateway resolves
+  # to the same router MAC as the main one, so it adds no default route.
+  it "keeps switched segment members off the NIC without routing through their gateway" do
     netplan = netplan_for(public_mac:, internal_mac: nil, internal_ip: nil, ip_infos: [
       ip_info("23.105.171.112/32", "23.105.171.126", source_host_ip: "23.105.171.112"),
-      ip_info("23.105.176.3/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
       ip_info("23.105.176.1/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
       ip_info("23.105.176.2/32", "23.105.176.6", source_host_ip: "23.105.171.112"),
       ip_info("2607:f5b7:1:30:9::/112", "2607:f5b7:1:30::1", source_host_ip: "23.105.171.112"),
     ])
 
-    expect(netplan.addresses_by_mac).to eq(
-      public_mac => [
-        "23.105.171.112/32",
-        "23.105.176.1/32",
-        "23.105.176.2/32",
-        "23.105.176.3/32",
-        "2607:f5b7:1:30:9::2/112",
-      ],
-    )
+    expect(netplan.addresses_by_mac).to eq(public_mac => ["23.105.171.112/32", "2607:f5b7:1:30:9::2/112"])
     expect(netplan.gateways).to eq ["23.105.171.126", "2607:f5b7:1:30::1"]
   end
 

@@ -51,9 +51,9 @@ class Hosting::LeasewebNetplan
 
   private
 
-  # Main IP, switched-segment IPs, IPv4 blocks, then the host address per IPv6 prefix.
+  # Main IP, IPv4 blocks, then the host address per IPv6 prefix.
   def public_addresses
-    [@main.ip_address] + (ipv4_segment + ipv4_blocks).map(&:ip_address) + ipv6.map { host_address(it) }
+    [@main.ip_address] + ipv4_blocks.map(&:ip_address) + ipv6.map { host_address(it) }
   end
 
   def internal_addresses
@@ -88,12 +88,6 @@ class Hosting::LeasewebNetplan
 
   def ipv4
     @ip_infos.reject { it.ip_address.include?(":") || it == @main }
-  end
-
-  # Switched-segment members (gatewayed); pull_ips yields /32s so the host holds
-  # only these, not the whole segment.
-  def ipv4_segment
-    sorted_ipv4(ipv4.select(&:gateway))
   end
 
   # A block of one or two addresses is a standalone VM address Leaseweb
