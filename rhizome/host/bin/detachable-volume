@@ -1,0 +1,26 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/detachable_volume"
+require "json"
+
+command, id = ARGV
+unless %w[start stop delete].include?(command) && id
+  warn "usage: detachable-volume start|stop|delete <volume-id>"
+  exit 1
+end
+
+case command
+when "start"
+  params = JSON.parse($stdin.read)
+  volume = DetachableVolume.new(id, ubiblk_version: params.fetch("ubiblk_version"))
+  volume.ensure_started(kek: params.fetch("kek"), unix_user: params.fetch("unix_user"), device_id: params.fetch("device_id"), slice: params["slice"],
+    size_gib: params.fetch("size_gib"), wrapped_xts: params.fetch("wrapped_xts"), source: params.fetch("source"))
+  puts JSON.generate({"vhost_sock" => volume.vhost_sock})
+when "stop"
+  DetachableVolume.new(id).stop
+  puts JSON.generate({"stopped" => true})
+when "delete"
+  DetachableVolume.new(id).destroy
+  puts JSON.generate({"deleted" => true})
+end
