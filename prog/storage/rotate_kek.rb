@@ -16,7 +16,7 @@ class Prog::Storage::RotateKek < Prog::Base
       key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: vm_storage_volume.device_id)
       vm_storage_volume.update(key_encryption_key_2_id: key_encryption_key.id)
 
-      Strand.create_with_id(vm_storage_volume, prog: "Storage::RotateKek", label: "back_up_key", parent_id:)
+      Strand.create(prog: "Storage::RotateKek", label: "back_up_key", parent_id:, stack: [{"subject_id" => vm_storage_volume.id}])
     end
   end
 
