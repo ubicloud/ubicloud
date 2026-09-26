@@ -1176,6 +1176,11 @@ RSpec.describe PostgresServer do
     expect(postgres_server.storage_device_paths).to eq(["/dev/nvme1n1", "/dev/nvme2n1"])
   end
 
+  it "uses the default open_session_failure_page_threshold for AWS" do
+    location.update(provider: "aws")
+    expect(postgres_server.open_session_failure_page_threshold).to eq(MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
+  end
+
   it "returns the right storage_device_paths for Hetzner" do
     VmStorageVolume.create(vm:, disk_index: 0, boot: true, size_gib: 64)
     vsv = VmStorageVolume.create(vm:, disk_index: 1, boot: false, size_gib: 1024)

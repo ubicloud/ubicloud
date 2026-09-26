@@ -16,6 +16,10 @@ class PostgresServer < Sequel::Model
       [vm.vm_storage_volumes.find { it.boot == false }.device_path]
     end
 
+    def metal_open_session_failure_page_threshold
+      MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+    end
+
     def metal_attach_s3_policy_if_needed
       # nothing
     end

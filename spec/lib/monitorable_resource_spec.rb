@@ -127,6 +127,28 @@ RSpec.describe MonitorableResource do
         expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).to be_nil
       end
 
+      it "waits for the resource's own threshold before paging" do
+        allow(postgres_server).to receive(:open_session_failure_page_threshold).and_return(described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD * 2)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_raise(IOError).exactly(3).times
+        expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)
+
+        allow(Time).to receive(:now).and_return(now + described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD + 1)
+        expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)
+        expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).to be_nil
+
+        allow(Time).to receive(:now).and_return(now + described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD * 2 + 1)
+        expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)
+        expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).not_to be_nil
+      end
+
+      it "uses the default threshold for resources that do not override it" do
+        expect(vm_host).to receive(:init_health_monitor_session).and_raise(IOError).twice
+        expect { r_without_event_loop.open_resource_session }.to raise_error(IOError)
+        allow(Time).to receive(:now).and_return(now + described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD + 1)
+        expect { r_without_event_loop.open_resource_session }.to raise_error(IOError)
+        expect(Page.from_tag_parts("SshableUnreachable", vm_host.id)).not_to be_nil
+      end
+
       it "does not page if resource opts out via page_on_sshable_failure?" do
         allow(postgres_server).to receive(:page_on_sshable_failure?).and_return(false)
         expect(postgres_server).to receive(:init_health_monitor_session).and_raise(IOError).twice
