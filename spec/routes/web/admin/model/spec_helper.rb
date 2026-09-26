@@ -98,6 +98,13 @@ module AdminModelSpecHelper
       ConnectedSubnet.create(subnet_id_1: subnet_ids[0], subnet_id_2: subnet_ids[1])
     end
 
+    def create_detachable_volume
+      project = Project.create(name: "test-project")
+      kek = create_storage_key_encryption_key
+      DetachableVolume.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, size_gib: 2,
+        key_encryption_key_1_id: kek.id, wrapped_xts: "wrapped-xts", source_image: "ubuntu-noble")
+    end
+
     def create_discount_code
       DiscountCode.create(code: "TEST123", credit_amount: 10, expires_at: Time.now + 86400)
     end

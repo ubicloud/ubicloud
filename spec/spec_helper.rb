@@ -378,6 +378,17 @@ RSpec.configure do |config|
       metal
     end
 
+    def create_detachable_volume(**args)
+      kek = StorageKeyEncryptionKey.create_random(auth_data: "detachable-volume")
+      defaults = {location_id: Location::HETZNER_FSN1_ID, source_image: "ubuntu-noble", size_gib: 2,
+                  key_encryption_key_1_id: kek.id, wrapped_xts: DetachableVolume.wrap_xts(kek)}
+      args = defaults.merge(args)
+      args[:project_id] ||= Project.create(name: "detachable-volume-project").id
+      volume = DetachableVolume.create(**args)
+      Strand.create_with_id(volume, prog: "Storage::DetachableVolumeNexus", label: "wait")
+      volume
+    end
+
     def create_vm_host_slice(**args)
       args = {name: "testslice", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0}.merge!(args)
       args[:vm_host_id] ||= create_vm_host.id
