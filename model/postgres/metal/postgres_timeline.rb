@@ -2,6 +2,8 @@
 
 class PostgresTimeline < Sequel::Model
   module Metal
+    MINIO_MAX_CHUNK_SIZE = 16 * 1024 * 1024
+
     private
 
     def metal_generate_walg_config(version, server)
@@ -13,6 +15,7 @@ AWS_SECRET_ACCESS_KEY=#{secret_key}
       end
       config = <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
+WALG_S3_MAX_PART_SIZE=#{MINIO_MAX_CHUNK_SIZE}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 #{walg_credentials}
 AWS_REGION=us-east-1
