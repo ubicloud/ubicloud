@@ -36,6 +36,7 @@ RSpec.describe PostgresTimeline do
 
     walg_config = <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+WALG_S3_MAX_PART_SIZE=16777216
 AWS_ENDPOINT=https://blob-endpoint
 AWS_ACCESS_KEY_ID=dummy-access-key
 AWS_SECRET_ACCESS_KEY=dummy-secret-key
@@ -74,6 +75,7 @@ PGDATA=/dat/16/data
 
     walg_config = <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+WALG_S3_MAX_PART_SIZE=16777216
 AWS_ENDPOINT=https://blob-endpoint
 
 AWS_REGION=us-east-1
