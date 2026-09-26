@@ -2,10 +2,10 @@
 
 require "excon"
 class Hosting::LeasewebApis < Hosting::ProviderApis
-  IpInfo = Data.define(:ip_address, :source_host_ip, :gateway) do
-    # A gatewayed IPv4 sits on a switched segment the host must claim (no VM may
-    # take it); a gateway-less IPv4 is a block routed here that VMs draw from.
-    def host_only? = !gateway.nil? && !ip_address.include?(":")
+  # segment is the switched network a gatewayed IPv4 sits on.
+  IpInfo = Data.define(:ip_address, :source_host_ip, :gateway, :segment) do
+    # VMs draw from every IPv4 but the main one, routed or switched.
+    def host_only? = ip_address == "#{source_host_ip}/32"
 
     # A gatewayed IPv6 prefix exists so the host can reach its router; VMs
     # never draw from it and the control plane does not track it.
@@ -93,17 +93,19 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
 
       if address.include?(":")
         net = NetAddr::IPv6Net.new(NetAddr.parse_ip(address), NetAddr::Mask128.new(prefix))
-        IpInfo.new(net.to_s, main_ip4, gateway)
-      elsif row["mainIp"] || gateway
-        IpInfo.new("#{address}/32", main_ip4, gateway)
+        IpInfo.new(net.to_s, main_ip4, gateway, nil)
       else
         net = NetAddr::IPv4Net.new(NetAddr.parse_ip(address), NetAddr::Mask32.new(prefix))
-        blocks << net.to_s
-        nil
+        if row["mainIp"] || gateway
+          IpInfo.new("#{address}/32", main_ip4, gateway, net.to_s)
+        else
+          blocks << net.to_s
+          nil
+        end
       end
     end
 
-    singles + blocks.uniq.map { IpInfo.new(it, main_ip4, nil) }
+    singles + blocks.uniq.map { IpInfo.new(it, main_ip4, nil, nil) }
   end
 
   def pull_inventory
