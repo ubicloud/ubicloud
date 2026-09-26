@@ -2,11 +2,26 @@
 
 class PostgresServer < Sequel::Model
   module Gcp
+    # Firewall policy reconciliation on a dedicated VPC can keep a server
+    # unreachable past the default threshold, so wait twice as long.
+    DEDICATED_VPC_OPEN_SESSION_FAILURE_PAGE_THRESHOLD = 10 * 60
+
     private
 
     def gcp_add_provider_configs(configs)
       # No GCP-specific Postgres configs needed initially
       nil
+    end
+
+    # Via the vm, not the resource: the resource row is deleted before its
+    # servers finish destroying, and they stay monitored until then.
+    def gcp_open_session_failure_page_threshold
+      private_subnet = vm.private_subnets.first
+      if private_subnet.gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
+        DEDICATED_VPC_OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+      else
+        MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+      end
     end
 
     def gcp_refresh_walg_blob_storage_credentials

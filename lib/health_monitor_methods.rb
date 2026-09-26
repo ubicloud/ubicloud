@@ -16,4 +16,8 @@ module HealthMonitorMethods
   def page_on_sshable_failure?
     true
   end
+
+  def open_session_failure_page_threshold
+    MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+  end
 end

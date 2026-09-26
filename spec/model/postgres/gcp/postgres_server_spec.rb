@@ -79,6 +79,37 @@ RSpec.describe PostgresServer do
       end
     end
 
+    describe "#open_session_failure_page_threshold" do
+      let(:private_subnet) {
+        PrivateSubnet.create(
+          name: "gcp-pg-subnet", project:, location:,
+          net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64",
+        )
+      }
+
+      before do
+        Nic.create(
+          vm_id: vm.id, private_subnet_id: private_subnet.id, name: "gcp-pg-nic", state: "active",
+          private_ipv4: "10.0.0.5", private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", mac: "00:00:00:00:00:00",
+          encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        )
+      end
+
+      it "is the default when the subnet has no VPC" do
+        expect(postgres_server.open_session_failure_page_threshold).to eq(MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
+      end
+
+      it "is the default when the subnet's VPC is shared" do
+        GcpVpc.create(project_id: project.id, location_id: location.id, name: "shared-vpc").add_private_subnet(private_subnet)
+        expect(postgres_server.open_session_failure_page_threshold).to eq(MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
+      end
+
+      it "is twice the default when the subnet has a dedicated VPC" do
+        GcpVpc.create(project_id: project.id, location_id: location.id, name: "dedicated-vpc", dedicated_for_subnet_id: private_subnet.id).add_private_subnet(private_subnet)
+        expect(postgres_server.open_session_failure_page_threshold).to eq(2 * MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
+      end
+    end
+
     describe "#refresh_walg_blob_storage_credentials" do
       before { Sshable.create_with_id(vm) }
 

@@ -15,6 +15,10 @@ class PostgresServer < Sequel::Model
       # nothing
     end
 
+    def aws_open_session_failure_page_threshold
+      MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+    end
+
     def aws_storage_device_paths
       # Sort whole block devices by size and drop the smallest (EBS boot, fixed
       # at 16 GiB). Remaining devices are instance-store NVMes — the disks we

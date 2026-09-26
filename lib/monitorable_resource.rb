@@ -155,7 +155,7 @@ class MonitorableResource
     @open_session_failure_started_at ||= Time.now
     return if @open_session_failure_paged
     elapsed = Time.now - @open_session_failure_started_at
-    return if elapsed < OPEN_SESSION_FAILURE_PAGE_THRESHOLD
+    return if elapsed < @resource.open_session_failure_page_threshold
 
     Prog::PageNexus.assemble(
       "#{@resource.ubid} sshable unreachable for #{elapsed.to_i}s",
