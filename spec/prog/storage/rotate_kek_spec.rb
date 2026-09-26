@@ -4,7 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Storage::RotateKek do
   subject(:prog) {
-    described_class.new(Strand.create_with_id(volume, prog: "Storage::RotateKek", label: "back_up_key"))
+    described_class.new(Strand.create(prog: "Storage::RotateKek", label: "back_up_key", stack: [{"subject_id" => volume.id}]))
   }
 
   let(:storage_device) {
@@ -31,14 +31,15 @@ RSpec.describe Prog::Storage::RotateKek do
         key_encryption_key_1_id: key_1_id, key_encryption_key_2_id: key_2_id, **args)
     end
 
-    it "mints a second key bound to the device and starts a strand at back_up_key" do
+    it "mints a second key bound to the device and starts a strand of its own at back_up_key" do
       vol = create_volume(key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "somedata").id)
 
       strand = nil
       expect { strand = described_class.assemble(vol.id) }.to change(StorageKeyEncryptionKey, :count).by(1)
       expect(strand.prog).to eq("Storage::RotateKek")
       expect(strand.label).to eq("back_up_key")
-      expect(strand.id).to eq(vol.id)
+      expect(strand.id).not_to eq(vol.id)
+      expect(described_class.new(strand).vm_storage_volume.id).to eq(vol.id)
       expect(vol.reload.key_encryption_key_2.auth_data).to eq(vol.device_id)
     end
 
