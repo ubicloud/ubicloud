@@ -436,6 +436,15 @@ RSpec.configure do |config|
       ember
     end
 
+    # Returns the PostgresEmber; its Ember is reachable through #ember. Keys that
+    # belong to the Postgres row are peeled off and the rest go to the ember.
+    def create_postgres_ember(**args)
+      pg_keys = [:pg_version, :database_name, :superuser_password, :claim_token_digest,
+        :claimed_at, :creator_ip]
+      pg = {superuser_password: "ember-secret"}.merge(args.slice(*pg_keys))
+      PostgresEmber.create_with_id(create_ember(**args.except(*pg_keys)).id, **pg)
+    end
+
     # Answer host/bin/ember on whichever host is asked, with what the block returns.
     # The block gets the command, its keywords (the id placeholder among them)
     # and the host's Sshable. The code under test loads hosts afresh, so this

@@ -202,6 +202,15 @@ module Config
   # template.
   override :ember_blank_max_age_seconds, 21600, int
 
+  # Postgres Embers
+  override :postgres_ember_default_cpu_percent_limit, 50, int
+  override :postgres_ember_volume_size_gib, 2, int
+  override :postgres_ember_idle_timeout_seconds, 300, int
+  # For a deployment with no wildcard DNS: the gateway's IP address, as ip or
+  # ip:port. Connection strings then carry it as hostaddr, so clients dial it
+  # directly and still send the ember's name for the gateway to route by.
+  optional :postgres_gateway_address, string
+
   # Pagerduty
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string
