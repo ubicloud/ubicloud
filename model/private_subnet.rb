@@ -229,6 +229,7 @@ end
 #  nic                                | nic_private_subnet_id_fkey                                | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic                                | nic_rekey_coordinator_id_fkey                             | (rekey_coordinator_id) REFERENCES private_subnet(id)
 #  parseable_resource                 | parseable_resource_private_subnet_id_fkey                 | (private_subnet_id) REFERENCES private_subnet(id)
+#  postgres_gateway                   | postgres_gateway_private_subnet_id_fkey                   | (private_subnet_id) REFERENCES private_subnet(id)
 #  postgres_resource                  | postgres_resource_private_subnet_id_fkey                  | (private_subnet_id) REFERENCES private_subnet(id)
 #  private_link_service               | private_link_service_private_subnet_fkey                  | (private_subnet_id, project_id, location_id) REFERENCES private_subnet(id, project_id, location_id)
 #  private_subnet_aws_resource        | private_subnet_aws_resource_id_fkey                       | (id) REFERENCES private_subnet(id)

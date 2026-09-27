@@ -282,3 +282,4 @@ end
 #  kubernetes_cluster   | kubernetes_cluster_services_lb_id_fkey     | (services_lb_id) REFERENCES load_balancer(id)
 #  load_balancer_port   | load_balancer_port_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  load_balancers_vms   | load_balancers_vms_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
+#  postgres_gateway     | postgres_gateway_load_balancer_id_fkey     | (load_balancer_id) REFERENCES load_balancer(id)
