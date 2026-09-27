@@ -48,15 +48,24 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       })
       network_interface_id = network_interface_response.network_interface.network_interface_id
     rescue Aws::EC2::Errors::InvalidIPAddressInUse
-      network_interfaces = client.describe_network_interfaces({
+      private_ip = nic.private_ipv4.network.to_s
+      network_interface = client.describe_network_interfaces({
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
-          {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
-          {name: "status", values: ["available"]},
+          {name: "addresses.private-ip-address", values: [private_ip]},
+          {name: "tag:Name", values: [nic.name]},
         ],
-      }).network_interfaces
-      fail "No available network interface found for IP #{nic.private_ipv4.network}" if network_interfaces.empty?
-      network_interface_id = network_interfaces[0].network_interface_id
+      }).network_interfaces.first
+
+      unless network_interface
+        new_ip = Prog::Vnet::NicNexus.allocate_ipv4_from_aws_subnet(private_subnet, nic.nic_aws_resource.aws_subnet)
+        Clog.emit("NIC private IP is taken by another network interface, reallocating", {nic_ip_reallocated: {nic: nic.ubid, from: private_ip, to: new_ip}})
+        nic.update(private_ipv4: new_ip)
+        nap 0
+      end
+
+      nap 1 unless network_interface.status == "available"
+      network_interface_id = network_interface.network_interface_id
     end
     nic.nic_aws_resource.update(network_interface_id:)
 
