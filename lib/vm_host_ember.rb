@@ -39,6 +39,20 @@ class VmHostEmber
     ip6_block.nth(slot + 2).to_s
   end
 
+  # The warm pool's blanks waiting on this host: volumes here that nothing
+  # owns yet. An ember's volume belongs to it from the start.
+  def blank_volumes_dataset
+    DetachableVolume.where(vm_host_id: vm_host.id, owner_id: nil)
+  end
+
+  def blank_slots = blank_volumes_dataset.count
+
+  # Slots neither an ember nor a blank holds. An ember keeps its host only
+  # while it holds a slot there; pausing clears it.
+  def free_slots
+    max_slots - vm_host.embers_dataset.count - blank_slots
+  end
+
   # Runs a host/bin/ember command. What the host needs to know about itself
   # travels with every call rather than living in a file on the host, the way
   # a VM's settings reach setup-vm.

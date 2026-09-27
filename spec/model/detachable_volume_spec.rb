@@ -13,6 +13,10 @@ RSpec.describe DetachableVolume do
     expect(volume.vm_host_id).to be_nil
   end
 
+  it "only belongs to the kinds of owner it knows" do
+    expect { volume.update(owner_id: volume.project_id) }.to raise_error(Sequel::ValidationFailed, /owner_id/)
+  end
+
   describe "#record_host" do
     let(:host) { create_vm_host }
 

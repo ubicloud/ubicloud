@@ -7,6 +7,7 @@ module PolymorphicForeignKeyChecker
     [:applied_action_tag, :action_id],
     [:applied_object_tag, :object_id],
     [:applied_subject_tag, :subject_id],
+    [:detachable_volume, :owner_id],
     [:github_runner, :vm_id],
     [:page_root_resource, :root_resource_id],
     [:postgres_resource, :project_id, :parent_id],
