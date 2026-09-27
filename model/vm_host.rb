@@ -606,6 +606,7 @@ end
 #  gpu_partition         | gpu_partition_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
 #  host_provider         | host_provider_id_fkey                 | (id) REFERENCES vm_host(id)
 #  pci_device            | pci_device_vm_host_id_fkey            | (vm_host_id) REFERENCES vm_host(id)
+#  postgres_gateway_host | postgres_gateway_host_id_fkey         | (id) REFERENCES vm_host(id) ON DELETE CASCADE
 #  remote_storage_server | remote_storage_server_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 #  spdk_installation     | spdk_installation_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
 #  storage_device        | storage_device_vm_host_id_fkey        | (vm_host_id) REFERENCES vm_host(id)

@@ -28,6 +28,13 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
       expect(v.wrapped_xts).not_to be_nil
       expect(v.strand.label).to eq("wait")
     end
+
+    it "can be given an owner up front" do
+      owner_id = Ember.generate_ubid.to_uuid
+      v = described_class.assemble(project_id: Project.create(name: "p").id, location_id: Location::HETZNER_FSN1_ID,
+        size_gib: 2, source_image: "seed-image", owner_id:)
+      expect(v.owner_id).to eq(owner_id)
+    end
   end
 
   describe "#wait" do

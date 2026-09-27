@@ -429,6 +429,28 @@ RSpec.configure do |config|
       ember
     end
 
+    # Answer host/bin/ember on whichever host is asked, with what the block returns.
+    # The block gets the command, its keywords (the id placeholder among them)
+    # and the host's Sshable. The code under test loads hosts afresh, so this
+    # stubs the class rather than one object.
+    def on_ember_command
+      allow_any_instance_of(Sshable).to receive(:cmd_json) do |sshable, cmd, **kw|
+        stdin = JSON.parse(kw.fetch(:stdin))
+        expect(stdin.delete("host")).to eq(VmHost[sshable.id].ember.host_config)
+        yield(cmd.delete_prefix("sudo host/bin/ember ").split.first, kw.merge(stdin: stdin.to_json), sshable)
+      end
+    end
+
+    # What host/bin/ember prints and exits 1 with for a failure the caller acts on.
+    def ember_command_failure(error)
+      Sshable::SshError.new("sudo host/bin/ember", {"error" => error, "detail" => error}.to_json, "", 1, nil)
+    end
+
+    # A host/bin/ember command that failed without saying why.
+    def ember_command_crash(stderr = "failed")
+      Sshable::SshError.new("sudo host/bin/ember", "", stderr, 1, nil)
+    end
+
     def create_detachable_volume(**args)
       kek = StorageKeyEncryptionKey.create_random(auth_data: "detachable-volume")
       defaults = {location_id: Location::HETZNER_FSN1_ID, source_image: "ubuntu-noble", size_gib: 2,
