@@ -211,17 +211,25 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.test_node_dns }.to hop("test_lsblk")
     end
 
-    it "fails when a node name resolves to a different address" do
+    it "naps until the deadline when a node name resolves to a different address before it" do
       refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i + 60})
+      expect_resolve("ahostsv4", "cp-node", "10.39.0.5")
+      expect_connect("10.39.0.5", 0)
+      expect_resolve("ahostsv6", "cp-node", "::ffff:10.39.0.5")
+      expect { kubernetes_test.test_node_dns }.to nap(59..60)
+    end
+
+    it "fails when a node name still resolves to a different address after the deadline" do
+      refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i - 1})
       expect_resolve("ahostsv4", "cp-node", "178.63.152.196")
       expect { kubernetes_test.test_node_dns }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq "cp-node resolved to \"178.63.152.196\" from a pod, expected 10.39.0.5"
     end
 
-    it "naps when a node name does not resolve yet before the deadline" do
+    it "naps until the deadline when a node name does not resolve yet before it" do
       refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i + 60})
       expect_resolve("ahostsv4", "cp-node", "")
-      expect { kubernetes_test.test_node_dns }.to nap(5)
+      expect { kubernetes_test.test_node_dns }.to nap(59..60)
     end
 
     it "fails when a node name still does not resolve after the deadline" do

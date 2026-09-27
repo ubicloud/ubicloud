@@ -80,7 +80,8 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
         command = NetSsh.command("getent :database :name | awk '{print $1; exit}'", database:, name: node.name)
         resolved_ip = client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
         if resolved_ip != expected_ip
-          nap 5 if resolved_ip.empty? && Time.now.to_i < node_dns_deadline
+          remaining = node_dns_deadline - Time.now.to_i
+          nap remaining if remaining > 0
           self.fail_message = "#{node.name} resolved to #{resolved_ip.inspect} from a pod, expected #{expected_ip}"
           hop_destroy_kubernetes
         end
