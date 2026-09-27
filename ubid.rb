@@ -120,6 +120,7 @@ class UBID
   TYPE_RUN_COMMAND = "rc"
   TYPE_DETACHABLE_VOLUME = "dv"
   TYPE_EMBER = "cc"
+  TYPE_EMBER_POOL = "cp"
   TYPE_EMBER_TEMPLATE = "ct"
 
   # Common entropy-based type for everything else

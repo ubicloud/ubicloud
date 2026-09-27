@@ -24,6 +24,14 @@ class DetachableVolume < Sequel::Model
     end
   end
 
+  def assign_owner(owner)
+    fail ArgumentError, "a volume cannot belong to #{owner.ubid}" unless OWNER_TYPES.include?(owner.ubid[..1])
+    unless DetachableVolume.where(id:).where(Sequel[owner_id: nil] | {owner_id: owner.id}).update(owner_id: owner.id) == 1
+      fail "#{ubid} already belongs to #{UBID.to_ubid(refresh.owner_id)}"
+    end
+    refresh
+  end
+
   def record_host(host:, caught_up:)
     update(vm_host_id: host.id)
     incr_catch_up unless caught_up

@@ -32,7 +32,7 @@ module EmberOperations
   # believing it did not.
   PAUSE_TIMEOUT = 90
 
-  # Bring a brand new ember up.
+  # Bring a brand new ember up, preferring a warm blank.
   #
   # The workload row is created inside the same transaction by the block, so
   # that an ember never exists for a moment with nothing to run. Returns the
@@ -67,7 +67,7 @@ module EmberOperations
       created
     end
 
-    start_on_a_host(ember, template)
+    start_on_a_host(ember, template, may_claim_blank: true)
     ember
   end
 
@@ -109,7 +109,7 @@ module EmberOperations
 
   # Try each candidate host in turn. A host-level failure is not the request's
   # failure: the next host may well work.
-  def start_on_a_host(ember, template)
+  def start_on_a_host(ember, template, may_claim_blank: false)
     volume = ember.detachable_volume
     # A volume already laid out on a host would come up empty anywhere else,
     # so only the hosts it can start on are candidates.
@@ -118,10 +118,11 @@ module EmberOperations
     errors << "#{volume.vm_host.ubid}, which holds its volume, cannot take it" if candidates.empty? && volume.vm_host
 
     candidates.first(PLACEMENT_ATTEMPTS).each do |host|
-      result = try_host(ember, host, errors)
+      result = try_host(ember, host, errors, may_claim_blank:)
       next unless result
 
       DB.transaction do
+        adopt_claimed_volume(ember, result["volume_id"])
         ember.update(state: "running", vm_host_id: host.id,
           slot: result["slot"], ip6: result["ip6"], state_changed_at: Time.now,
           last_started_at: Time.now, last_activity_at: Time.now)
@@ -136,7 +137,28 @@ module EmberOperations
     raise NoCapacity, "could not place #{ember.ubid}: #{errors.join("; ")}"
   end
 
-  def try_host(ember, host, errors)
+  # Claiming a blank hands the ember the blank's volume instead of the one
+  # it was created with. Both are the control plane's, so this is a swap of
+  # one row for another rather than a loss of track: the volume that was never
+  # attached to anything goes away.
+  def adopt_claimed_volume(ember, volume_ubid)
+    # Anything that is not one of our ubids is a volume this control plane
+    # never created -- a blank left over from an older version of host/bin/ember,
+    # say -- and adopting it is not possible.
+    id = volume_ubid && UBID.to_uuid(volume_ubid.to_s)
+    return if id.nil?
+    claimed = DetachableVolume[id]
+    unused = ember.detachable_volume
+    return if claimed.nil? || claimed.id == unused.id
+
+    Strand.where(id: unused.id).destroy
+    unused.destroy
+    claimed.update(project_id: ember.project_id)
+    claimed.assign_owner(ember)
+    ember.associations.delete(:detachable_volume)
+  end
+
+  def try_host(ember, host, errors, may_claim_blank: false)
     volume = ember.detachable_volume
     payload = {
       "ember_id" => ember.ubid,
@@ -152,6 +174,18 @@ module EmberOperations
       "guest" => ember.guest_config,
     }
 
+    # Only an ember that has never held data may take a blank: claiming one
+    # keeps the blank's volume, so a resume that claimed would hand the tenant
+    # somebody else's empty database instead of their own data.
+    if may_claim_blank && host.ember.blank_slots.positive?
+      begin
+        return host.ember.cmd_json("sudo host/bin/ember claim-blank", stdin: payload, timeout: HOST_TIMEOUT)
+      rescue Sshable::SshError => e
+        # Another create took the last blank since it was counted. Restoring
+        # is the same ember, just slower.
+        raise unless ember_command_error(e) == "slot_exhausted"
+      end
+    end
     host.ember.cmd_json("sudo host/bin/ember create", stdin: payload, timeout: HOST_TIMEOUT)
   rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => e
     # A failed call is not necessarily a failed operation: the host may well
@@ -166,6 +200,8 @@ module EmberOperations
   rescue JSON::ParserError, TypeError
     {}
   end
+
+  def ember_command_error(error) = ember_command_report(error)["error"]
 
   # Why a host call failed, as far as the host said.
   def failure_detail(error)

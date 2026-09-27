@@ -53,6 +53,61 @@ RSpec.describe EmberOperations do
       expect(ember.name).to eq("ember-#{ember.ubid[2, 10]}")
     end
 
+    it "claims a warm blank when the host has one, rather than restoring" do
+      make_host_ready(blank: 2)
+      commands = []
+      on_ember_command { |cmd|
+        commands << cmd
+        started
+      }
+
+      expect(create_ember_op.state).to eq("running")
+      expect(commands).to eq(["claim-blank"])
+    end
+
+    it "restores when the last blank went to somebody else in the meantime" do
+      make_host_ready(blank: 1)
+      commands = []
+      on_ember_command { |cmd|
+        commands << cmd
+        raise ember_command_failure("slot_exhausted") if cmd == "claim-blank"
+        started
+      }
+
+      expect(create_ember_op.state).to eq("running")
+      expect(commands).to eq(["claim-blank", "create"])
+    end
+
+    it "does not fall back to a restore when the claim failed for another reason" do
+      make_host_ready(blank: 1)
+      commands = []
+      on_ember_command { |cmd|
+        commands << cmd
+        raise Sshable::SshError.new("sudo host/bin/ember", "", "boom", 1, nil)
+      }
+
+      expect { create_ember_op }.to raise_error(described_class::NoCapacity, /boom/)
+      expect(commands).to eq(["claim-blank"])
+    end
+
+    it "keeps its own volume when the claimed one is not a row it can find" do
+      make_host_ready(blank: 1)
+      on_ember_command { started.merge("volume_id" => Ember.generate_ubid.to_s) }
+      ember = create_ember_op
+      expect(ember.detachable_volume).not_to be_nil
+    end
+
+    it "takes on the claimed blank's volume and drops the one it made" do
+      make_host_ready
+      blank_volume = add_ember_blanks(host, 1).first
+      on_ember_command { started.merge("volume_id" => blank_volume.ubid) }
+
+      ember = create_ember_op
+      expect(ember.reload.detachable_volume.id).to eq(blank_volume.id)
+      expect(blank_volume.reload.project_id).to eq(project.id)
+      expect(DetachableVolume.count).to eq(1)
+    end
+
     it "passes the volume's stripe source through, and the guest payload untouched" do
       on_ember_command { |_, kw|
         payload = JSON.parse(kw[:stdin])

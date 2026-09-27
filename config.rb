@@ -192,10 +192,15 @@ module Config
   optional :machine_images_service_project_id, uuid
 
   # Embers
+  optional :ember_service_project_id, uuid
   override :ember_ch_version, "53.0", string
   # 384 MiB measured as the smallest template that survives an index build
   # over a couple of million rows; 256 MiB does not.
   override :ember_default_memory_mib, 384, int
+  override :ember_pool_target, 4, int
+  # Blanks older than this are recycled so none is ever running a retired
+  # template.
+  override :ember_blank_max_age_seconds, 21600, int
 
   # Pagerduty
   optional :pagerduty_key, string, clear: true

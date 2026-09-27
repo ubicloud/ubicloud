@@ -411,6 +411,13 @@ RSpec.configure do |config|
       end)
     end
 
+    def create_ember_pool(**args)
+      defaults = {location_id: Location::HETZNER_FSN1_ID, workload: "postgres"}
+      pool = EmberPool.create(**defaults.merge(args))
+      Strand.create_with_id(pool, prog: "Ember::Pool", label: "wait")
+      pool
+    end
+
     def create_ember_template(**args)
       defaults = {location_id: Location::HETZNER_FSN1_ID, arch: "x64",
                   cpu_signature: "AuthenticAMD-25-97-2/53.0", workload: "postgres", version: "18",
