@@ -39,12 +39,17 @@ end
 #  psk                         | text                     | NOT NULL
 #  psk_identity                | text                     | NOT NULL
 #  port                        | integer                  | NOT NULL
-#  source_vm_storage_volume_id | uuid                     | NOT NULL
+#  source_vm_storage_volume_id | uuid                     |
 #  vm_host_id                  | uuid                     | NOT NULL
+#  source_detachable_volume_id | uuid                     |
 # Indexes:
-#  remote_storage_server_pkey                 | PRIMARY KEY btree (id)
-#  remote_storage_server_vm_host_id_port_uidx | UNIQUE btree (vm_host_id, port)
+#  remote_storage_server_pkey                            | PRIMARY KEY btree (id)
+#  remote_storage_server_source_detachable_volume_id_key | UNIQUE btree (source_detachable_volume_id)
+#  remote_storage_server_vm_host_id_port_uidx            | UNIQUE btree (vm_host_id, port)
+# Check constraints:
+#  remote_storage_server_single_source | (((source_vm_storage_volume_id IS NOT NULL)::integer + (source_detachable_volume_id IS NOT NULL)::integer) = 1)
 # Foreign key constraints:
+#  remote_storage_server_source_detachable_volume_id_fkey | (source_detachable_volume_id) REFERENCES detachable_volume(id)
 #  remote_storage_server_source_vm_storage_volume_id_fkey | (source_vm_storage_volume_id) REFERENCES vm_storage_volume(id)
 #  remote_storage_server_vm_host_id_fkey                  | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
