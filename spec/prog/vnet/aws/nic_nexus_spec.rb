@@ -98,17 +98,36 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
           {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
-          {name: "status", values: ["available"]},
+          {name: "tag:Name", values: [nic.name]},
         ],
       }).and_call_original
       expect { nx.create_network_interface }.to hop("assign_ipv6_address")
       expect(nic.nic_aws_resource.reload.network_interface_id).to eq("eni-existing123")
     end
 
-    it "fails when IP is in use but no available network interface found" do
+    it "naps when IP is in use by its own network interface that is not available yet" do
+      expect(client).to receive(:create_network_interface).and_raise(Aws::EC2::Errors::InvalidIPAddressInUse.new(nil, "The IP address '10.0.0.1' is already in use."))
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-existing123", status: "pending"}])
+      expect { nx.create_network_interface }.to nap(1)
+    end
+
+    it "reallocates the private IP when it is in use by a network interface created for something else" do
+      aws_subnet = AwsSubnet.first(private_subnet_aws_resource_id: nic.private_subnet.private_subnet_aws_resource.id, subnet_id: "subnet-0123456789abcdefg")
+      nic.nic_aws_resource.update(aws_subnet_id: aws_subnet.id)
+      old_ip = nic.private_ipv4.network.to_s
       expect(client).to receive(:create_network_interface).and_raise(Aws::EC2::Errors::InvalidIPAddressInUse.new(nil, "The IP address '10.0.0.1' is already in use."))
       client.stub_responses(:describe_network_interfaces, network_interfaces: [])
-      expect { nx.create_network_interface }.to raise_error(RuntimeError, /No available network interface found for IP/)
+      logged = nil
+      expect(Clog).to receive(:emit).with("NIC private IP is taken by another network interface, reallocating", instance_of(Hash)).and_wrap_original do |original, message, metadata|
+        logged = metadata.dup
+        original.call(message, metadata)
+      end
+      expect { nx.create_network_interface }.to nap(0)
+      new_ip = nic.reload.private_ipv4
+      expect(logged).to eq({nic_ip_reallocated: {nic: nic.ubid, from: old_ip, to: new_ip.to_s}})
+      expect(new_ip.network.to_s).not_to eq(old_ip)
+      expect(new_ip.netmask.prefix_len).to eq(32)
+      expect(NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s).contains(new_ip.network)).to be(true)
     end
   end
 
