@@ -286,6 +286,11 @@ class VmHost < Sequel::Model
     update(accepts_slices: false)
   end
 
+  # The ember side of a host brought up to run embers, nil on any other.
+  def ember
+    @ember ||= VmHostEmber.new(self) if accepts_embers
+  end
+
   def set_server_name
     provider.api.set_server_name(ubid)
   end
