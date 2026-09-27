@@ -23,6 +23,7 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints, read_only: true
   one_to_many :kubernetes_clusters, read_only: true
   one_to_many :machine_images, read_only: true
+  one_to_many :embers, read_only: true
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
@@ -372,6 +373,7 @@ end
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  detachable_volume         | detachable_volume_project_id_fkey         | (project_id) REFERENCES project(id)
 #  dns_zone                  | dns_zone_project_id_fkey                  | (project_id) REFERENCES project(id)
+#  ember                     | ember_project_id_fkey                     | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  gcp_vpc                   | gcp_vpc_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)

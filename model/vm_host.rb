@@ -20,6 +20,8 @@ class VmHost < Sequel::Model
   one_to_many :cpus, class: :VmHostCpu, read_only: true
   many_to_one :location, read_only: true
   one_to_many :gpu_partitions, read_only: true
+  one_to_many :embers, read_only: true
+  one_to_many :ember_template_hosts, read_only: true
 
   many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
 
@@ -272,6 +274,37 @@ class VmHost < Sequel::Model
   # The ember side of a host brought up to run embers, nil on any other.
   def ember
     @ember ||= VmHostEmber.new(self) if accepts_embers
+  end
+
+  # Hosts brought up to run embers.
+  def self.ember_enabled(location_id: nil)
+    ds = where(accepts_embers: true)
+    location_id ? ds.where(location_id:) : ds
+  end
+
+  # Those of them that are taking embers: not drained, and not given up on by
+  # the monitor, which sends a host it cannot reach to unavailable.
+  def self.ember_accepting(location_id: nil)
+    ember_enabled(location_id:)
+      .where(allocation_state: "accepting")
+      .exclude(id: DB[:strand].where(label: "unavailable").select(:id))
+      .exclude(id: DB[:semaphore].where(name: "checkup").select(:strand_id))
+  end
+
+  # Hosts that could take an ember using this template, best first.
+  #
+  # Ordered by blanks available, then free slots: claiming a blank is a
+  # password change rather than a restore, so a host with one waiting is worth
+  # several with free slots.
+  def self.ember_candidates_for(template)
+    ready = EmberTemplateHost
+      .where(ember_template_id: template.id, state: "ready")
+      .select(:vm_host_id)
+
+    candidates = ember_accepting(location_id: template.location_id)
+      .where(id: ready, cpu_signature: template.cpu_signature)
+    Ember.workload_class(template.workload).placeable_hosts(candidates).all
+      .sort_by { [-it.ember.blank_slots, -it.ember.free_slots] }
   end
 
   def set_server_name
@@ -568,6 +601,8 @@ end
 #  assigned_host_address | assigned_host_address_host_id_fkey    | (host_id) REFERENCES vm_host(id)
 #  boot_image            | boot_image_vm_host_id_fkey            | (vm_host_id) REFERENCES vm_host(id)
 #  detachable_volume     | detachable_volume_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
+#  ember                 | ember_vm_host_id_fkey                 | (vm_host_id) REFERENCES vm_host(id)
+#  ember_template_host   | ember_template_host_vm_host_id_fkey   | (vm_host_id) REFERENCES vm_host(id)
 #  gpu_partition         | gpu_partition_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
 #  host_provider         | host_provider_id_fkey                 | (id) REFERENCES vm_host(id)
 #  pci_device            | pci_device_vm_host_id_fkey            | (vm_host_id) REFERENCES vm_host(id)

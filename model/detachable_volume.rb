@@ -15,6 +15,15 @@ class DetachableVolume < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :catch_up
 
+  OWNER_TYPES = [UBID::TYPE_EMBER].freeze
+
+  def validate
+    super
+    if owner_id && !OWNER_TYPES.include?(UBID.to_ubid(owner_id)[..1])
+      errors.add(:owner_id, "is not something a volume can belong to")
+    end
+  end
+
   def record_host(host:, caught_up:)
     update(vm_host_id: host.id)
     incr_catch_up unless caught_up
@@ -72,8 +81,10 @@ end
 #  key_encryption_key_2_id | uuid                     |
 #  wrapped_xts             | text                     | NOT NULL
 #  source_image            | text                     | NOT NULL
+#  owner_id                | uuid                     |
 # Indexes:
 #  detachable_volume_pkey           | PRIMARY KEY btree (id)
+#  detachable_volume_owner_id_idx   | btree (owner_id)
 #  detachable_volume_vm_host_id_idx | btree (vm_host_id)
 # Foreign key constraints:
 #  detachable_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)

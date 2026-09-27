@@ -389,6 +389,46 @@ RSpec.configure do |config|
       vm_host
     end
 
+    # Blanks waiting on a host: the warm pool's volumes there that no ember
+    # owns yet.
+    def add_ember_blanks(vm_host, count)
+      Array.new(count) { create_detachable_volume(vm_host_id: vm_host.id) }
+    end
+
+    # A workload to exercise the ember layer with and no real one: it places
+    # anywhere and has nothing to configure.
+    def stub_ember_workload
+      stub_const("FakeEmber", Class.new do
+        def self.default_volume_size_gib = 2
+
+        def self.default_cpu_percent_limit = 50
+
+        def self.default_idle_timeout_seconds = 300
+
+        def self.blank_guest_config = {}
+
+        def self.placeable_hosts(hosts) = hosts
+      end)
+    end
+
+    def create_ember_template(**args)
+      defaults = {location_id: Location::HETZNER_FSN1_ID, arch: "x64",
+                  cpu_signature: "AuthenticAMD-25-97-2/53.0", workload: "postgres", version: "18",
+                  root_image: "cell-root-18", data_image: "cell-pgdata-18",
+                  ch_version: "53.0", state: "ready"}
+      EmberTemplate.create(**defaults.merge(args))
+    end
+
+    def create_ember(**args)
+      defaults = {location_id: Location::HETZNER_FSN1_ID, name: "test-ember"}
+      args = defaults.merge(args)
+      args[:project_id] ||= Project.create(name: "ember-project").id
+      args[:ember_template_id] ||= create_ember_template.id
+      ember = Ember.create(**args)
+      create_detachable_volume(project_id: ember.project_id, owner_id: ember.id)
+      ember
+    end
+
     def create_detachable_volume(**args)
       kek = StorageKeyEncryptionKey.create_random(auth_data: "detachable-volume")
       defaults = {location_id: Location::HETZNER_FSN1_ID, source_image: "ubuntu-noble", size_gib: 2,

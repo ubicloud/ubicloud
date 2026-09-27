@@ -40,6 +40,21 @@ RSpec.describe VmHostEmber do
     end
   end
 
+  describe "slot accounting" do
+    it "counts the pool's volumes waiting here as blanks" do
+      add_ember_blanks(host, 2)
+      create_detachable_volume(vm_host_id: host.id, owner_id: create_ember.id)
+      expect(ember.blank_slots).to eq(2)
+    end
+
+    it "leaves free what neither an ember nor a blank holds" do
+      add_ember_blanks(host, 2)
+      create_ember(vm_host_id: host.id, state: "running")
+      create_ember(state: "paused")
+      expect(ember.free_slots).to eq(ember.max_slots - 3)
+    end
+  end
+
   describe "#ubiblk_version" do
     it "picks the newest ubiblk on the host that is new enough" do
       VhostBlockBackend.create(vm_host_id: host.id, version: "v0.5.99", allocation_weight: 0)
