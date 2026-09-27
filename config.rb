@@ -191,6 +191,12 @@ module Config
   override :machine_image_max_size_gib, 40, int
   optional :machine_images_service_project_id, uuid
 
+  # Embers
+  override :ember_ch_version, "53.0", string
+  # 384 MiB measured as the smallest template that survives an index build
+  # over a couple of million rows; 256 MiB does not.
+  override :ember_default_memory_mib, 384, int
+
   # Pagerduty
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string

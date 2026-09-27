@@ -378,6 +378,17 @@ RSpec.configure do |config|
       metal
     end
 
+    # A host brought up to run embers: 64 GiB of memory, which sets
+    # VmHostEmber#max_slots, and a ubiblk embers can run on.
+    def create_ember_host(vm_host: create_vm_host, **args)
+      defaults = {accepts_embers: true, cpu_signature: "AuthenticAMD-25-97-2/53.0", total_mem_gib: 64,
+                  total_hugepages_1g: 0, used_hugepages_1g: 0}
+      defaults[:net6] = "fd00:#{SecureRandom.hex(2)}::/64" unless vm_host.net6
+      vm_host.update(defaults.merge(args))
+      VhostBlockBackend.create(vm_host_id: vm_host.id, version: "v0.5.1", allocation_weight: 0)
+      vm_host
+    end
+
     def create_detachable_volume(**args)
       kek = StorageKeyEncryptionKey.create_random(auth_data: "detachable-volume")
       defaults = {location_id: Location::HETZNER_FSN1_ID, source_image: "ubuntu-noble", size_gib: 2,
