@@ -3,11 +3,11 @@
 class Prog::Storage::DetachableVolumeNexus < Prog::Base
   subject_is :detachable_volume
 
-  def self.assemble(project_id:, location_id:, size_gib:, source_image:)
+  def self.assemble(project_id:, location_id:, size_gib:, source_image:, owner_id: nil)
     DB.transaction do
       ubid = DetachableVolume.generate_ubid
       kek = StorageKeyEncryptionKey.create_random(auth_data: ubid.to_s)
-      volume = DetachableVolume.create_with_id(ubid.to_uuid, project_id:, location_id:, size_gib:, source_image:,
+      volume = DetachableVolume.create_with_id(ubid.to_uuid, project_id:, location_id:, size_gib:, source_image:, owner_id:,
         key_encryption_key_1_id: kek.id)
       Strand.create_with_id(volume, prog: "Storage::DetachableVolumeNexus", label: "wait")
       volume
