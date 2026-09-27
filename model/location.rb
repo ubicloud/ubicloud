@@ -123,6 +123,7 @@ end
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  network_volume            | network_volume_location_id_fkey            | (location_id) REFERENCES location(id)
 #  parseable_resource        | parseable_resource_location_id_fkey        | (location_id) REFERENCES location(id)
+#  postgres_gateway          | postgres_gateway_location_id_fkey          | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)
 #  private_subnet            | private_subnet_location_id_fkey            | (location_id) REFERENCES location(id)

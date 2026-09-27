@@ -339,6 +339,7 @@ end
 #  nic                         | nic_vm_id_fkey                                       | (vm_id) REFERENCES vm(id)
 #  parseable_server            | parseable_server_vm_id_fkey                          | (vm_id) REFERENCES vm(id)
 #  pci_device                  | pci_device_vm_id_fkey                                | (vm_id) REFERENCES vm(id)
+#  postgres_gateway_replica    | postgres_gateway_replica_vm_id_fkey                  | (vm_id) REFERENCES vm(id)
 #  postgres_server             | postgres_server_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
 #  run_command                 | run_command_vm_id_fkey                               | (vm_id) REFERENCES vm(id) ON DELETE CASCADE
 #  victoria_metrics_server     | victoria_metrics_server_vm_id_fkey                   | (vm_id) REFERENCES vm(id)

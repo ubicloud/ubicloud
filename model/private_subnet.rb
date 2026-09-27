@@ -203,6 +203,7 @@ end
 #  nic                         | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic                         | nic_rekey_coordinator_id_fkey                    | (rekey_coordinator_id) REFERENCES private_subnet(id)
 #  parseable_resource          | parseable_resource_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
+#  postgres_gateway            | postgres_gateway_private_subnet_id_fkey          | (private_subnet_id) REFERENCES private_subnet(id)
 #  postgres_resource           | postgres_resource_private_subnet_id_fkey         | (private_subnet_id) REFERENCES private_subnet(id)
 #  private_subnet_aws_resource | private_subnet_aws_resource_id_fkey              | (id) REFERENCES private_subnet(id)
 #  private_subnet_gcp_vpc      | private_subnet_gcp_vpc_private_subnet_id_fkey    | (private_subnet_id) REFERENCES private_subnet(id) ON DELETE CASCADE
