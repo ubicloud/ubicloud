@@ -109,3 +109,5 @@ end
 #  ember_location_id_fkey       | (location_id) REFERENCES location(id)
 #  ember_project_id_fkey        | (project_id) REFERENCES project(id)
 #  ember_vm_host_id_fkey        | (vm_host_id) REFERENCES vm_host(id)
+# Referenced By:
+#  postgres_ember | postgres_ember_id_fkey | (id) REFERENCES ember(id) ON DELETE CASCADE
