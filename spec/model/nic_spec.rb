@@ -27,4 +27,15 @@ RSpec.describe Nic do
       expect(nic.ubid_to_tap_name).to eq "nc09797qbp"
     end
   end
+
+  describe "private_ipv4 uniqueness" do
+    let(:subnet) { PrivateSubnet.create(net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id) }
+
+    it "rejects a second nic with the same private_ipv4 in the same subnet" do
+      described_class.create(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", private_subnet_id: subnet.id, name: "nic-a", state: "initializing")
+      expect {
+        described_class.create(private_ipv6: "fd10:9b0b:6b4b:8fbb::1/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:56", private_subnet_id: subnet.id, name: "nic-b", state: "initializing")
+      }.to raise_error(Sequel::ValidationFailed, "private_subnet_id and private_ipv4 is already taken")
+    end
+  end
 end
