@@ -124,6 +124,7 @@ class UBID
   # TYPE_POSTGRES_WAL_LISTENER = "w1"
   # TYPE_POSTGRES_VPC_ENDPOINT = "ve"
   TYPE_EMBER = "cc"
+  TYPE_EMBER_POOL = "cp"
   TYPE_EMBER_TEMPLATE = "ct"
 
   # Common entropy-based type for everything else

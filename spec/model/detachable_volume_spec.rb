@@ -17,6 +17,33 @@ RSpec.describe DetachableVolume do
     expect { volume.update(owner_id: volume.project_id) }.to raise_error(Sequel::ValidationFailed, /owner_id/)
   end
 
+  describe "#assign_owner" do
+    let(:ember) { create_ember }
+
+    it "belongs to nothing at first" do
+      expect(volume.owner_id).to be_nil
+    end
+
+    it "can be given to an owner" do
+      volume.assign_owner(ember)
+      expect(volume.owner_id).to eq(ember.id)
+    end
+
+    it "can be given to the owner it already has" do
+      volume.assign_owner(ember)
+      expect { volume.assign_owner(ember) }.not_to raise_error
+    end
+
+    it "does not change hands while another owner has it" do
+      volume.assign_owner(create_ember(name: "other-ember"))
+      expect { volume.assign_owner(ember) }.to raise_error(RuntimeError, /already belongs to cc/)
+    end
+
+    it "refuses an owner of a kind it cannot belong to" do
+      expect { volume.assign_owner(volume.project) }.to raise_error(ArgumentError, /cannot belong to pj/)
+    end
+  end
+
   describe "#record_host" do
     let(:host) { create_vm_host }
 
