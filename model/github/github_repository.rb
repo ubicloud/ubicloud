@@ -20,7 +20,9 @@ class GithubRepository < Sequel::Model
     10_737_418_240 # 10GB
   end
 
-  alias_method :bucket_name, :ubid
+  def bucket_name
+    Config.is_e2e ? "e2e-#{ubid}" : ubid
+  end
 
   def repository_name
     name.split("/", 2).last

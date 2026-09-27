@@ -1,0 +1,36 @@
+name: Cleanup GitHub cache E2E resources
+description: Age-based sweep of the Cloudflare API tokens and R2 buckets the e2e suite's GitHub runner tests left behind.
+inputs:
+  endpoint:
+    description: S3 endpoint of the R2 account that holds the GitHub cache buckets.
+    required: true
+  region:
+    description: Region to pass to the aws CLI; R2 takes "auto".
+    required: false
+    default: auto
+  access-key-id:
+    description: R2 admin access key.
+    required: true
+  secret-access-key:
+    description: R2 admin secret key.
+    required: true
+  api-key:
+    description: Cloudflare API token that can list and delete the account's API tokens.
+    required: true
+  dry-run:
+    description: Set to 1 to report what would be deleted without deleting anything.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        R2_ENDPOINT: ${{ inputs.endpoint }}
+        AWS_DEFAULT_REGION: ${{ inputs.region || 'auto' }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.secret-access-key }}
+        CLOUDFLARE_API_KEY: ${{ inputs.api-key }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      # Runs on the system ruby; no Bundler or gems, like the aws and gcp sweeps.
+      run: ruby "$GITHUB_ACTION_PATH/cleanup.rb"

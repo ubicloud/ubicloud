@@ -89,6 +89,14 @@ RSpec.describe GithubRepository do
       expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))
     end
 
+    it "prefixes the bucket and token names with e2e in e2e runs" do
+      allow(Config).to receive(:is_e2e).and_return(true)
+      expect(blob_storage_client).to receive(:create_bucket).with(hash_including(bucket: "e2e-#{github_repository.ubid}"))
+      expect(cloudflare_client).to receive(:create_token).with("e2e-#{github_repository.ubid}-token", instance_of(Array)).and_return(["test-key", "test-secret"])
+      github_repository.setup_blob_storage
+      expect(github_repository.reload.access_key).to eq("test-key")
+    end
+
     it "succeeds if the bucket already exists and access key does not exist" do
       expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
       expect(blob_storage_client).to receive(:create_bucket).and_raise(Aws::S3::Errors::BucketAlreadyOwnedByYou.new(nil, nil))
