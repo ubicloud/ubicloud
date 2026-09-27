@@ -444,6 +444,27 @@ jobs:
       with:
         credentials-base64: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
 
+  cleanup-github-cache:
+    needs: [setup, e2e]
+    if: always() && needs.setup.outputs.has_github_runner == 'true'
+    runs-on: ubicloud-standard-2
+    environment: E2E-metal
+    timeout-minutes: 10
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Cleanup GitHub cache resources
+      uses: ./.github/actions/github-cache-cleanup-e2e
+      with:
+        endpoint: ${{ secrets.GH_CACHE_BLOB_STORAGE_ENDPOINT }}
+        region: ${{ secrets.GH_CACHE_BLOB_STORAGE_REGION }}
+        access-key-id: ${{ secrets.GH_CACHE_BLOB_STORAGE_ACCESS_KEY }}
+        secret-access-key: ${{ secrets.GH_CACHE_BLOB_STORAGE_SECRET_KEY }}
+        api-key: ${{ secrets.GH_CACHE_BLOB_STORAGE_API_KEY }}
+
   cleanup-machine-images:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'metal') && vars.E2E_PAUSE_METAL != 'true'
