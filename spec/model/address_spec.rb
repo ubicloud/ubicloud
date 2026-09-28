@@ -35,31 +35,12 @@ RSpec.describe Address do
   end
 
   describe "leaseweb" do
-    # Leaseweb routes whole blocks to the host, so assemble pulls them from the
-    # API rather than deriving one address from the sshable host.
     def assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_PROVIDER_NAME)
       allow(Config).to receive_messages(
         leaseweb_connection_string: "https://api.leaseweb.com",
         leaseweb_api_key: "key123",
         leaseweb_eu_api_key: "eu-key",
       )
-      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1/ips").with(query: {limit: 50, offset: 0})
-        .to_return(status: 200, body: JSON.generate(
-          ips: [{ip: "1.2.3.4/24", prefixLength: 24, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "1.2.3.254"}],
-          _metadata: {totalCount: 1},
-        ))
-      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1")
-        .to_return(status: 200, body: JSON.generate(
-          location: {site: "AMS-01", suite: "8", rack: "9200"},
-          rack: {capacity: "10G"},
-          specs: {
-            chassis: "HPE RL300",
-            cpu: {type: "Ampere Altra Max M128-30", quantity: 2},
-            ram: {size: 512, unit: "GB"},
-            hdd: [{size: 3.84, unit: "TB", amount: 2, type: "NVME"}],
-          },
-          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "483.62", currency: "EUR"},
-        ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/1").to_return(status: 204)
       Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name:, server_identifier: "1").subject
     end

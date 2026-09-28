@@ -6,16 +6,6 @@ RSpec.describe Prog::Vm::HostNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:st) { described_class.assemble("192.168.0.1") }
-  let(:hetzner_ips) {
-    [
-      ["127.0.0.1/32", "127.0.0.1"],
-      ["30.30.30.32/29", "127.0.0.1"],
-      ["2a01:4f8:10a:128b::/64", "127.0.0.1"],
-    ].map {
-      Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2)
-    }
-  }
-
   let(:vm_host) { nx.vm_host }
   let(:sshable) { nx.sshable }
 
@@ -42,27 +32,122 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.provider).to be_nil
     end
 
-    it "creates addresses properly and sets the server name for a hetzner host" do
-      api = instance_double(Hosting::HetznerApis)
-      allow(Hosting::ProviderApis).to receive(:for).and_return(api)
-      expect(api).to receive(:pull_ips).and_return(hetzner_ips)
-      expect(api).to receive(:pull_data_center).and_return("fsn1-dc14")
-      expect(api).to receive(:pull_inventory).and_return(server_model: "AX102")
-      expect(api).to receive(:set_server_name).and_return(nil)
+    it "sets the server name and leaves the other provider api pulls to the strand for a hetzner host" do
+      rename = stub_request(:post, "https://robot-ws.your-server.de/server/1").to_return(status: 200, body: "{}")
       st = described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
-      expect(st).to be_a Strand
+      expect(rename.with(body: {server_name: st.subject.ubid})).to have_been_requested.once
       expect(st.label).to eq("start")
-      expect(st.subject.inventory.server_model).to eq "AX102"
-      expect(st.subject.assigned_subnets.count).to eq(3)
-      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
-
-      expect(st.subject.assigned_host_addresses.count).to eq(1)
-      expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
       expect(st.subject.provider_name).to eq(HostProvider::HETZNER_PROVIDER_NAME)
-      expect(st.subject.data_center).to eq("fsn1-dc14")
+      expect(st.subject.assigned_subnets).to eq []
+      expect(st.subject.data_center).to be_nil
+      expect(st.subject.inventory).to be_nil
     end
 
-    it "creates addresses from the leaseweb api" do
+    it "fails for a server identifier the provider does not know" do
+      stub_request(:post, "https://robot-ws.your-server.de/server/1").to_return(status: 404, body: "{}")
+      expect {
+        described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
+      }.to raise_error(Excon::Error::NotFound)
+    end
+
+    it "does not set the server name in development" do
+      expect(Config).to receive(:development?).and_return(true)
+      st = described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
+      expect(st.label).to eq("start")
+    end
+
+    it "stores vhost_block_backend settings in stack" do
+      st = described_class.assemble("127.0.0.1", vhost_block_backend_version: "v0.2.2")
+      expect(st.stack.first["vhost_block_backend_version"]).to eq("v0.2.2")
+
+      st = described_class.assemble("1.2.3.4")
+      expect(st.stack.first["vhost_block_backend_version"]).to eq(Config.vhost_block_backend_version)
+    end
+
+    it "stores install_os in stack" do
+      st = described_class.assemble("127.0.0.1")
+      expect(st.stack.first["install_os"]).to be false
+
+      st = described_class.assemble("1.2.3.4", install_os: true)
+      expect(st.stack.first["install_os"]).to be true
+    end
+  end
+
+  def assemble_hetzner_host(**)
+    stub_request(:post, "https://robot-ws.your-server.de/server/1").to_return(status: 200, body: "{}")
+    described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1", **)
+  end
+
+  def stub_hetzner_server(dc: "fsn1-dc14")
+    stub_request(:get, "https://robot-ws.your-server.de/server/1").to_return(status: 200, body: JSON.generate(server: {dc:, product: "AX102"}))
+  end
+
+  describe "#create_addresses" do
+    let(:st) { assemble_hetzner_host }
+
+    before do
+      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.generate([{ip: {ip: "127.0.0.1", server_ip: "127.0.0.1"}}]))
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.generate([
+        {subnet: {ip: "30.30.30.32", mask: 29, server_ip: "127.0.0.1"}},
+        {subnet: {ip: "2a01:4f8:10a:128b::", mask: 64, server_ip: "127.0.0.1"}},
+      ]))
+      stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 404)
+    end
+
+    it "creates the addresses from the provider api, sets a deadline, and hops to pull_server_info" do
+      expect { nx.create_addresses }.to hop("pull_server_info")
+      expect(vm_host.assigned_subnets_dataset.select_map(:cidr).map(&:to_s).sort).to eq ["127.0.0.1/32", "2a01:4f8:10a:128b::/64", "30.30.30.32/29"]
+      expect(vm_host.assigned_host_addresses_dataset.select_map(:ip).map(&:to_s)).to eq ["127.0.0.1/32"]
+      expect(nx.strand.stack.first["deadline_target"]).to eq("setup_ssh_keys")
+    end
+
+    it "does not create the addresses again when run again" do
+      counts = -> { [Address.count, AssignedHostAddress.count, DB[:ipv4_address].count] }
+      expect { nx.create_addresses }.to hop("pull_server_info")
+      expect(counts.call).to eq [3, 1, 8]
+      expect { described_class.new(Strand[st.id]).create_addresses }.to hop("pull_server_info")
+      expect(counts.call).to eq [3, 1, 8]
+    end
+  end
+
+  describe "#pull_server_info" do
+    let(:st) { assemble_hetzner_host }
+
+    it "sets the data center, creates the inventory, and hops to setup_ssh_keys" do
+      stub_hetzner_server
+      expect { nx.pull_server_info }.to hop("setup_ssh_keys")
+      expect(vm_host.reload.data_center).to eq "fsn1-dc14"
+      expect(vm_host.inventory.server_model).to eq "AX102"
+    end
+
+    it "updates the data center and keeps the existing inventory when run again" do
+      VmHostInventory.create(server_model: "AX102", monthly_price: 100, currency: "EUR") { it.id = vm_host.id }
+      stub_hetzner_server(dc: "fsn1-dc15")
+      expect { nx.pull_server_info }.to hop("setup_ssh_keys")
+      expect(vm_host.reload.data_center).to eq "fsn1-dc15"
+      expect(vm_host.inventory).to have_attributes(server_model: "AX102", monthly_price: 100, currency: "EUR")
+    end
+
+    context "when installing the OS" do
+      let(:st) { assemble_hetzner_host(install_os: true) }
+
+      it "hops to install_host_os" do
+        stub_hetzner_server
+        expect { nx.pull_server_info }.to hop("install_host_os")
+      end
+    end
+  end
+
+  describe "leaseweb provider labels" do
+    def run_provider_labels(st)
+      nx = described_class.new(st)
+      expect { nx.start }.to hop("create_addresses")
+      expect { nx.create_addresses }.to hop("pull_server_info")
+      expect { nx.pull_server_info }.to hop("setup_ssh_keys")
+      st.subject.reload
+    end
+
+    it "creates addresses and inventory from the leaseweb api" do
       allow(Config).to receive_messages(
         leaseweb_connection_string: "https://api.leaseweb.com",
         leaseweb_api_key: "key123",
@@ -89,10 +174,10 @@ RSpec.describe Prog::Vm::HostNexus do
         ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/123").to_return(status: 204)
 
-      st = described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123")
-      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
-      expect(st.subject.data_center).to eq("AMS-01-8-9200")
-      expect(st.subject.inventory).to have_attributes(
+      vmh = run_provider_labels(described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123"))
+      expect(vmh.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
+      expect(vmh.data_center).to eq("AMS-01-8-9200")
+      expect(vmh.inventory).to have_attributes(
         server_model: "HPE RL300",
         cpu: "2x Ampere Altra Max M128-30",
         memory: "512GB",
@@ -102,9 +187,9 @@ RSpec.describe Prog::Vm::HostNexus do
         monthly_price: BigDecimal("512.34"),
         currency: "EUR",
       )
-      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"])
+      expect(vmh.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"])
       # Only the gatewayed main IP is claimed; the routed block and prefix are VM space.
-      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["216.22.50.197/32"]
+      expect(vmh.assigned_host_addresses.map { it.ip.to_s }).to eq ["216.22.50.197/32"]
       # The block's network and broadcast addresses stay out of the VM pool.
       expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
     end
@@ -134,49 +219,20 @@ RSpec.describe Prog::Vm::HostNexus do
         ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/456").with(**eu).to_return(status: 204)
 
-      st = described_class.assemble("212.95.60.214", provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME, server_identifier: "456")
-      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
-      expect(st.subject.data_center).to eq("FRA-10-2-11")
-      expect(st.subject.inventory.monthly_price).to eq(BigDecimal("441.00"))
-      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["212.95.60.214/32"]
+      vmh = run_provider_labels(described_class.assemble("212.95.60.214", provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME, server_identifier: "456"))
+      expect(vmh.provider_name).to eq(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
+      expect(vmh.data_center).to eq("FRA-10-2-11")
+      expect(vmh.inventory.monthly_price).to eq(BigDecimal("441.00"))
+      expect(vmh.assigned_host_addresses.map { it.ip.to_s }).to eq ["212.95.60.214/32"]
     end
-
-    it "does not set the server name in development" do
-      expect(Config).to receive(:development?).and_return(true)
-      api = instance_double(Hosting::HetznerApis)
-      allow(Hosting::ProviderApis).to receive(:for).and_return(api)
-      expect(api).to receive(:pull_ips).and_return(hetzner_ips)
-      expect(api).to receive(:pull_data_center).and_return("fsn1-dc14")
-      expect(api).to receive(:pull_inventory).and_return(server_model: "AX102")
-      expect(api).not_to receive(:set_server_name)
-
-      described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
-    end
-
-    it "stores vhost_block_backend settings in stack" do
-      st = described_class.assemble("127.0.0.1", vhost_block_backend_version: "v0.2.2")
-      expect(st.stack.first["vhost_block_backend_version"]).to eq("v0.2.2")
-
-      st = described_class.assemble("1.2.3.4")
-      expect(st.stack.first["vhost_block_backend_version"]).to eq(Config.vhost_block_backend_version)
-    end
-
-    it "stores install_os in stack" do
-      st = described_class.assemble("127.0.0.1")
-      expect(st.stack.first["install_os"]).to be false
-
-      st = described_class.assemble("1.2.3.4", install_os: true)
-      expect(st.stack.first["install_os"]).to be true
-    end
-  end
-
-  def assemble_hetzner_host(**)
-    api = instance_double(Hosting::HetznerApis, pull_ips: nil, pull_data_center: "fsn1-dc14", pull_inventory: {server_model: "AX102"}, set_server_name: nil)
-    allow(Hosting::ProviderApis).to receive(:for).and_return(api)
-    described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1", **)
   end
 
   describe "#start" do
+    it "hops to create_addresses for a host with a provider" do
+      nx = described_class.new(assemble_hetzner_host(install_os: true))
+      expect { nx.start }.to hop("create_addresses")
+    end
+
     it "hops to install_host_os when assembled with install_os" do
       st = described_class.assemble("192.168.0.2", install_os: true)
       expect { described_class.new(st).start }.to hop("install_host_os")
@@ -192,6 +248,13 @@ RSpec.describe Prog::Vm::HostNexus do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
       expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs")
       expect(nx.strand.stack.first["deadline_target"]).to eq("setup_ssh_keys")
+    end
+
+    it "extends the shorter setup_ssh_keys deadline set by create_addresses" do
+      nx = described_class.new(assemble_hetzner_host(install_os: true))
+      nx.register_deadline("setup_ssh_keys", 10 * 60)
+      expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs")
+      expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
     end
 
     it "hops to setup_ssh_keys without installing when the host is not on Hetzner" do
