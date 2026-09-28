@@ -4,8 +4,11 @@ require_relative "../../common/lib/util"
 require_relative "vhost_block_backend"
 require_relative "kek_pipe"
 require_relative "key_rotation"
+require_relative "remote_storage_server"
 require "fileutils"
+require "json"
 require "perfect_toml"
+require "socket"
 
 class DetachableVolume
   include KekPipe
@@ -128,6 +131,7 @@ class DetachableVolume
       "xts-key" => wrapped_secret(wrapped_xts),
       "kek" => {"encoding" => "base64", "source" => {"file" => kek_pipe_path}},
     }
+    secrets["remote-psk"] = wrapped_secret(source["wrapped_psk"]) if source && source["type"] == "remote"
     write_file(secrets_conf, unix_user, PerfectTOML.generate({"secrets" => secrets}))
     write_file(source_conf, unix_user, stripe_source_toml(source)) if source
   end
@@ -176,10 +180,25 @@ class DetachableVolume
     FileUtils.chown(unix_user, unix_user, path)
   end
 
+  def write_config_file(path, content)
+    safe_write_to_file(path, perm: 0o600) do |f|
+      f.write(content)
+      fsync_or_fail(f)
+    end
+  end
+
   def stripe_source_toml(source)
     stripe_source = case source["type"]
     when "new", "raw"
       {"type" => "raw", "image_path" => File.join(IMAGE_ROOT, "#{source["image"]}.raw"), "copy_on_read" => true}
+    when "remote"
+      {
+        "type" => "remote",
+        "address" => source["address"],
+        "autofetch" => source.fetch("autofetch"),
+        "connections" => 16,
+        "psk" => {"identity" => source["psk_identity"], "secret" => {"ref" => "remote-psk"}},
+      }
     else
       fail "unsupported stripe source #{source["type"]}"
     end
@@ -208,4 +227,58 @@ class DetachableVolume
   end
 
   def key_rotation = KeyRotation.new(secrets_conf, :config_v2)
+
+  def status
+    return {"present" => false, "stripes" => {}, "caught_up" => true} unless exist?
+    counts = stripes
+    {"present" => true, "stripes" => counts, "caught_up" => caught_up?(counts)}
+  end
+
+  def stripes
+    rpc("status").dig("status", "stripes") || {}
+  end
+
+  def caught_up?(counts = nil)
+    return true unless remote_source?
+    counts ||= stripes
+    return false if counts.empty?
+    counts["fetched"].to_i >= counts["source"].to_i
+  end
+
+  def rpc(command)
+    line = UNIXSocket.open(rpc_sock) do |socket|
+      socket.write(JSON.generate({"command" => command}) + "\n")
+      socket.gets
+    end
+    JSON.parse(line.to_s)
+  rescue SystemCallError, JSON::ParserError
+    {}
+  end
+
+  def remote_source?
+    File.exist?(source_conf) && PerfectTOML.load_file(source_conf).dig("stripe_source", "type") == "remote"
+  end
+
+  def serve(port:, psk:, psk_identity:, kek:, server_version:)
+    server = VhostBlockBackend.new(server_version)
+    fail "remote-stripe-server requires vhost block backend v0.5.0 or later" unless server.supports_remote_stripe_server?
+
+    stop
+    run_with_kek_pipe([server.remote_stripe_server_path, "-f", main_conf, "--listen-config", "/dev/stdin"],
+      kek_pipe: kek_pipe_path, kek_content: kek, env: {"RUST_LOG" => "info"},
+      stdin: RemoteStorageServer.listen_config(port, psk, psk_identity))
+  end
+
+  def drop_source
+    return unless File.exist?(source_conf)
+
+    main = PerfectTOML.load_file(main_conf)
+    main["include"].delete(File.basename(source_conf))
+    write_config_file(main_conf, PerfectTOML.generate(main))
+    secrets = PerfectTOML.load_file(secrets_conf)
+    secrets.fetch("secrets").delete("remote-psk")
+    write_config_file(secrets_conf, PerfectTOML.generate(secrets))
+    rm_if_exists(source_conf)
+    sync_parent_dir(source_conf)
+  end
 end
