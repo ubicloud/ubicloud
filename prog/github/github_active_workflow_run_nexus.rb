@@ -21,9 +21,30 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
   end
 
   label def start
-    remaining_seconds = github_active_workflow_run.created_at + MAX_SECONDS - Time.now
-    hop_destroy if remaining_seconds < 0
-    nap(remaining_seconds.round + 60)
+    hop_destroy if Time.now > github_active_workflow_run.created_at + MAX_SECONDS
+
+    run = github_active_workflow_run
+    begin
+      data = run.installation.client.get("repos/#{run.repository_name}/actions/runs/#{run.run_id}/attempts/#{run.run_attempt}")
+    rescue Octokit::ClientError => ex
+      hop_destroy if ex.response_status == 404
+      Clog.emit("Could not fetch the workflow run", {workflow_run_poll_failure: Util.exception_to_hash(ex, into: {run_ubid: run.ubid, repository_ubid: run.repository.ubid, run_id: run.run_id, run_attempt: run.run_attempt})})
+    rescue Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError => ex
+      Clog.emit("Could not fetch the workflow run", {workflow_run_poll_failure: Util.exception_to_hash(ex, into: {run_ubid: run.ubid, repository_ubid: run.repository.ubid, run_id: run.run_id, run_attempt: run.run_attempt})})
+    else
+      conclusion = data[:conclusion]
+      status = data[:status]
+      h = {status:, conclusion:}
+      if status == "completed" && conclusion != "action_required"
+        run.this.update(**h, completed_at: data[:updated_at])
+        hop_destroy
+      elsif run.status != status || run.conclusion != conclusion
+        run.conclusion = conclusion
+        run.this.update(h)
+      end
+    end
+
+    nap(60 * 60 * ((run.conclusion == "action_required") ? 24 : 1))
   end
 
   label def destroy

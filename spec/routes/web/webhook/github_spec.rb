@@ -341,6 +341,7 @@ RSpec.describe Clover, "github" do
       expect(workflow_run.create_date).to eq(today)
       expect(workflow_run.run_started_at).to eq(Time.utc(today.year, today.month, today.day, 10, 20, 40))
       expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+      expect(workflow_run.repository.default_branch).to eq("main")
     end
 
     it "stores the conclusion when the requested workflow run requires approval" do
