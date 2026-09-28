@@ -34,7 +34,7 @@ class RemoteStorageServer
     !@source_backend.config_v2?
   end
 
-  def listen_config(port, psk, psk_identity)
+  def self.listen_config(port, psk, psk_identity)
     # The use of allow_inline_plaintext_secrets here is safe, because the listen config
     # is never stored in the file system, it is passed over stdin to the remote_stripe_server.
     PerfectTOML.generate({
@@ -79,6 +79,6 @@ class RemoteStorageServer
       kek_pipe: @sp.kek_pipe,
       kek_content: kek_payload(kek_material),
       env: {"RUST_LOG" => "info"},
-      stdin: listen_config(port, psk, psk_identity))
+      stdin: self.class.listen_config(port, psk, psk_identity))
   end
 end
