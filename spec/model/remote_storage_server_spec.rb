@@ -37,4 +37,15 @@ RSpec.describe RemoteStorageServer do
     expect(rss.vm_host.sshable).to receive(:_cmd).with("sudo stat -c %s #{expected_disk_file}").and_return("42949672960\n")
     expect(rss.source_disk_file_size).to eq(42949672960)
   end
+
+  it "keeps the host it serves a detachable volume from, wherever the volume goes" do
+    host = create_vm_host
+    volume = create_detachable_volume(vm_host_id: host.id)
+    server = described_class.create(source_detachable_volume_id: volume.id, vm_host_id: host.id,
+      psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 5501)
+    volume.update(vm_host_id: create_vm_host.id)
+    expect(server.reload.source_detachable_volume.id).to eq(volume.id)
+    expect(server.vm_host.id).to eq(host.id)
+    expect(server.address).to eq("#{host.sshable.host}:5501")
+  end
 end

@@ -39,32 +39,99 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
       volume.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
+
+    it "waits for a volume that is still fetching" do
+      volume.incr_catch_up
+      expect { nx.wait }.to hop("wait_catch_up")
+      expect(Semaphore.where(strand_id: volume.id).select_map(:name)).to eq([])
+    end
+  end
+
+  describe "#wait_catch_up" do
+    it "keeps waiting while stripes are outstanding" do
+      expect_host_command("status", {"stripes" => {"fetched" => 10, "source" => 1536}, "caught_up" => false})
+      expect { nx.wait_catch_up }.to nap(5)
+    end
+
+    it "goes back to waiting once the volume has caught up" do
+      expect_host_command("status", {"stripes" => {"fetched" => 1536, "source" => 1536}, "caught_up" => true})
+      expect { nx.wait_catch_up }.to hop("wait")
+    end
+
+    it "forgets the source and releases the server once everything is local" do
+      server = RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id,
+        psk: "psk", psk_identity: "id", port: 5500)
+      Strand.create_with_id(server, prog: "Storage::RemoteStorageServer::Nexus", label: "wait")
+
+      expect_host_command("status", {"stripes" => {"fetched" => 5, "source" => 5}, "caught_up" => true}).ordered
+      expect_host_command("drop-source", {"dropped" => true}).ordered
+      expect { nx.wait_catch_up }.to hop("wait")
+      expect(server.reload.destroy_set?(cached: false)).to be true
+    end
+
+    it "keeps waiting when the host does not say it is caught up" do
+      expect_host_command("status")
+      expect { nx.wait_catch_up }.to nap(5)
+    end
+
+    it "leaves a host that cannot be reached to the strand's retries" do
+      expect(nx.detachable_volume.vm_host.sshable).to receive(:_cmd).and_raise(host_failure)
+      expect { nx.wait_catch_up }.to raise_error(Sshable::SshError)
+    end
   end
 
   describe "#destroy" do
+    it "stops serving a move first" do
+      server = RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id,
+        psk: "psk", psk_identity: "id", port: 5500)
+      Strand.create_with_id(server, prog: "Storage::RemoteStorageServer::Nexus", label: "wait")
+      expect { nx.destroy }.to hop("wait_remote_storage_server_destroyed")
+      expect(server.reload.destroy_set?(cached: false)).to be true
+    end
+
     it "waits for a key rotation to finish" do
       volume.update(key_encryption_key_2_id: StorageKeyEncryptionKey.create_random(auth_data: "k2").id)
       expect { nx.destroy }.to nap(5)
     end
 
+    it "moves on straight away when nothing serves it" do
+      volume.incr_destroy
+      expect { nx.destroy }.to hop("wait_remote_storage_server_destroyed")
+      expect(Semaphore.where(strand_id: volume.id).select_map(:name)).to eq([])
+    end
+  end
+
+  describe "#wait_remote_storage_server_destroyed" do
+    it "waits while a server still reads from the volume" do
+      server = RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id,
+        psk: "psk", psk_identity: "id", port: 5500)
+      Strand.create_with_id(server, prog: "Storage::RemoteStorageServer::Nexus", label: "destroy")
+      expect { nx.wait_remote_storage_server_destroyed }.to nap(5)
+    end
+
+    it "deletes the volume once no server reads from it" do
+      expect { nx.wait_remote_storage_server_destroyed }.to hop("delete_from_host")
+    end
+  end
+
+  describe "#delete_from_host" do
     it "removes the local copy, the row and the keys" do
       kek = volume.key_encryption_key_1
-      volume.incr_destroy
       expect_host_command("delete", {"deleted" => true})
-      expect { nx.destroy }.to exit({"msg" => "detachable volume destroyed"})
+      expect { nx.delete_from_host }.to exit({"msg" => "detachable volume destroyed"})
       expect(volume).not_to exist
       expect(kek).not_to exist
     end
 
     it "leaves a host that cannot be reached to the strand's retries, keeping the row" do
       expect(nx.detachable_volume.vm_host.sshable).to receive(:_cmd).and_raise(host_failure)
-      expect { nx.destroy }.to raise_error(Sshable::SshError)
+      expect { nx.delete_from_host }.to raise_error(Sshable::SshError)
       expect(volume).to exist
     end
 
     it "does not call the host when there is nothing there" do
       volume.update(vm_host_id: nil)
-      expect { nx.destroy }.to exit({"msg" => "detachable volume destroyed"})
+      expect { nx.delete_from_host }.to exit({"msg" => "detachable volume destroyed"})
       expect(volume).not_to exist
     end
   end
