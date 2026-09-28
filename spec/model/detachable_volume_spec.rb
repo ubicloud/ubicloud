@@ -26,6 +26,11 @@ RSpec.describe DetachableVolume do
     it "hands out the KEK and the wrapped data key" do
       expect(volume.key_material).to eq({"kek" => volume.key_encryption_key_1.key, "wrapped_xts" => volume.wrapped_xts})
     end
+
+    it "is refused while the key is being rotated, so nothing starts on the old one" do
+      volume.update(key_encryption_key_2_id: StorageKeyEncryptionKey.create_random(auth_data: "k2").id)
+      expect { volume.key_material }.to raise_error(RuntimeError, "#{volume.ubid} is having its key rotated")
+    end
   end
 
   describe "#stripe_source_for" do

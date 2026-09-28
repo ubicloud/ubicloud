@@ -23,6 +23,7 @@ class DetachableVolume < Sequel::Model
   end
 
   def key_material
+    fail "#{ubid} is having its key rotated" if key_encryption_key_2_id
     {"kek" => key_encryption_key_1.key, "wrapped_xts" => wrapped_xts}
   end
 

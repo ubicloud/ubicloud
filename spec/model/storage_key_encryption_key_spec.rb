@@ -66,4 +66,16 @@ RSpec.describe StorageKeyEncryptionKey do
       }.to raise_error RuntimeError, "currently only aes-256-gcm is supported"
     end
   end
+
+  describe "#decrypt" do
+    let(:kek) { described_class.create_random(auth_data: "unused_auth_data") }
+
+    it "reads back what #encrypt wrote" do
+      expect(kek.decrypt(kek.encrypt("secret message", "xts-key"), "xts-key")).to eq("secret message")
+    end
+
+    it "refuses the wrong auth_data" do
+      expect { kek.decrypt(kek.encrypt("secret message", "xts-key"), "other") }.to raise_error(OpenSSL::Cipher::CipherError)
+    end
+  end
 end
