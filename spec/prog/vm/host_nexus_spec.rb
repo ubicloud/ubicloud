@@ -69,12 +69,13 @@ RSpec.describe Prog::Vm::HostNexus do
       )
       rows = [
         {ip: "216.22.50.197/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "216.22.50.254"},
-        {ip: "216.22.15.64/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
-        {ip: "216.22.15.65/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+        *(64..127).map { {ip: "216.22.15.#{it}/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""} },
         {ip: "2607:f5b7:3:104::_64/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
       ]
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
-        .to_return(status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length}))
+        .to_return(status: 200, body: JSON.generate(ips: rows.take(50), _metadata: {totalCount: rows.length}))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 50})
+        .to_return(status: 200, body: JSON.generate(ips: rows.drop(50), _metadata: {totalCount: rows.length}))
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123")
         .to_return(status: 200, body: JSON.generate(
           location: {site: "AMS-01", suite: "8", rack: "9200"},

@@ -206,11 +206,11 @@ class VmHost < Sequel::Model
         end
 
         adr = Address.create(cidr: ip_addr, routed_to_host_id: id)
-        # A claimed address joins the host's set; a routed one opens its VM pool.
+        # A claimed address joins the host's set; a block opens its VM pool.
         if ip_record.host_only?
           AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id)
         else
-          adr.populate_ipv4_addresses
+          adr.populate_ipv4_addresses(reserved: ip_record.reserved)
         end
       end
     end

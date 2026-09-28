@@ -2,10 +2,16 @@
 
 require "excon"
 class Hosting::LeasewebApis < Hosting::ProviderApis
-  IpInfo = Data.define(:ip_address, :source_host_ip, :gateway) do
-    # A gatewayed IPv4 sits on a switched segment the host must claim (no VM may
-    # take it); a gateway-less IPv4 is a block routed here that VMs draw from.
-    def host_only? = !gateway.nil? && !ip_address.include?(":")
+  # reserved names the addresses of an IPv4 block no VM may take: its network
+  # and broadcast addresses, and on a switched segment the router and gateway
+  # addresses Leaseweb lists under their own types.
+  IpInfo = Data.define(:ip_address, :source_host_ip, :gateway, :reserved) do
+    def initialize(ip_address:, source_host_ip:, gateway:, reserved: []) = super
+
+    # Only the main IP is the host's own. Every other IPv4 is a block VMs draw
+    # from, whether Leaseweb routes it to the main IP or switches it onto a
+    # segment of its own beside the host.
+    def host_only? = ip_address == "#{source_host_ip}/32"
 
     # A gatewayed IPv6 prefix exists so the host can reach its router; VMs
     # never draw from it and the control plane does not track it.
@@ -75,7 +81,7 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     )
   end
 
-  # NORMAL_IP excludes the segment's NETWORK/GATEWAY/BROADCAST/ROUTER rows;
+  # NORMAL_IP excludes a segment's NETWORK/GATEWAY/BROADCAST/ROUTER rows;
   # PUBLIC excludes the REMOTE_MANAGEMENT (IPMI) address.
   def pull_ips
     rows = fetch_ips.select { it["networkType"] == "PUBLIC" && it["type"] == "NORMAL_IP" }
@@ -84,9 +90,10 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     fail "leaseweb server #{@provider.server_identifier} has a main ip without a gateway" unless presence(main_row["gateway"])
     main_ip4 = parse_ip(main_row).first
 
-    # Gateway-less IPv4s collapse into one Address per routed block; the rest
-    # stand alone as /32s.
-    blocks = []
+    # Every other IPv4 collapses into one Address per block, whether Leaseweb
+    # routes the block to the main IP (no gateway on any row) or switches it
+    # onto its own segment (the segment's gateway on every row).
+    blocks = {}
     singles = rows.filter_map do |row|
       address, prefix = parse_ip(row)
       gateway = presence(row["gateway"])
@@ -94,16 +101,17 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
       if address.include?(":")
         net = NetAddr::IPv6Net.new(NetAddr.parse_ip(address), NetAddr::Mask128.new(prefix))
         IpInfo.new(net.to_s, main_ip4, gateway)
-      elsif row["mainIp"] || gateway
+      elsif row["mainIp"]
         IpInfo.new("#{address}/32", main_ip4, gateway)
       else
         net = NetAddr::IPv4Net.new(NetAddr.parse_ip(address), NetAddr::Mask32.new(prefix))
-        blocks << net.to_s
+        block = (blocks[net.to_s] ||= {net:, gateway:, members: []})
+        block[:members] << address
         nil
       end
     end
 
-    singles + blocks.uniq.map { IpInfo.new(it, main_ip4, nil) }
+    singles + blocks.map { |cidr, block| IpInfo.new(cidr, main_ip4, block[:gateway], reserved_addresses(block[:net], block[:members])) }
   end
 
   def pull_inventory
@@ -134,6 +142,18 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
 
   def presence(value)
     value if value.is_a?(String) && !value.empty?
+  end
+
+  # A block's network and broadcast addresses are unusable, as is any address
+  # of it Leaseweb does not list as a NORMAL_IP: a segment's router and gateway
+  # rows carry their own types. A block of one or two addresses is not a block
+  # but a standalone address routed here, so it has no network or broadcast
+  # address to drop.
+  def reserved_addresses(net, members)
+    addresses = Array.new(net.len) { net.nth(it).to_s }
+    reserved = addresses - members
+    reserved |= [addresses.first, addresses.last] if net.len > 2
+    reserved
   end
 
   # Leaseweb's "ip" field carries a trailing block suffix ("216.22.15.64/26"),

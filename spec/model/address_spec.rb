@@ -34,60 +34,11 @@ RSpec.describe Address do
     expect(DB[:ipv4_address]).to be_empty
   end
 
-  describe "leaseweb" do
-    # Leaseweb routes whole blocks to the host, so assemble pulls them from the
-    # API rather than deriving one address from the sshable host.
-    def assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_PROVIDER_NAME)
-      allow(Config).to receive_messages(
-        leaseweb_connection_string: "https://api.leaseweb.com",
-        leaseweb_api_key: "key123",
-        leaseweb_eu_api_key: "eu-key",
-      )
-      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1/ips").with(query: {limit: 50, offset: 0})
-        .to_return(status: 200, body: JSON.generate(
-          ips: [{ip: "1.2.3.4/24", prefixLength: 24, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "1.2.3.254"}],
-          _metadata: {totalCount: 1},
-        ))
-      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1")
-        .to_return(status: 200, body: JSON.generate(
-          location: {site: "AMS-01", suite: "8", rack: "9200"},
-          rack: {capacity: "10G"},
-          specs: {
-            chassis: "HPE RL300",
-            cpu: {type: "Ampere Altra Max M128-30", quantity: 2},
-            ram: {size: 512, unit: "GB"},
-            hdd: [{size: 3.84, unit: "TB", amount: 2, type: "NVME"}],
-          },
-          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "483.62", currency: "EUR"},
-        ))
-      stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/1").to_return(status: 204)
-      Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name:, server_identifier: "1").subject
-    end
-
-    it "drops network and broadcast for the eu org too" do
-      vm_host = assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME)
-      described_class.create(cidr: "0.0.0.0/30", vm_host:).populate_ipv4_addresses
-      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
-    end
-
-    it "populates ipv4_address table with addresses in cidr without first and last" do
-      vm_host = assemble_leaseweb_host
-      described_class.create(cidr: "0.0.0.0/30", vm_host:).populate_ipv4_addresses
-      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
-    end
-
-    # A /32 Leaseweb routes here is not a block: dropping a network and a
-    # broadcast address would leave nothing behind.
-    it "keeps the only address of a standalone ip" do
-      vm_host = assemble_leaseweb_host
-      described_class.create(cidr: "5.6.7.8/32", vm_host:).populate_ipv4_addresses
-      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[5.6.7.8]
-    end
-
-    it "keeps both addresses of a two address block" do
-      vm_host = assemble_leaseweb_host
-      described_class.create(cidr: "5.6.7.8/31", vm_host:).populate_ipv4_addresses
-      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[5.6.7.8 5.6.7.9]
-    end
+  # The provider names the addresses of a block it reserves, such as its
+  # network and broadcast address; the pool never offers them to a VM.
+  it "leaves reserved addresses out of the pool" do
+    vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
+    described_class.create(cidr: "0.0.0.0/30", vm_host:).populate_ipv4_addresses(reserved: ["0.0.0.0", "0.0.0.3"])
+    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
   end
 end

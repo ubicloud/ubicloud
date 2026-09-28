@@ -103,6 +103,9 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     def host_only? = ip_address == "#{source_host_ip}/32"
 
     def host_connectivity? = false
+
+    # Hetzner routes a block whole, so every address of it is a VM's to take.
+    def reserved = []
   end
 
   # Finds IP addresses that match with the host's IP address. An important
