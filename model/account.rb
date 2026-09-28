@@ -72,17 +72,19 @@ end
 
 # Table: accounts
 # Columns:
-#  id           | uuid                     | PRIMARY KEY
-#  status_id    | integer                  | NOT NULL DEFAULT 1
-#  email        | citext                   | NOT NULL
-#  name         | text                     |
-#  created_at   | timestamp with time zone | NOT NULL DEFAULT now()
-#  suspended_at | timestamp with time zone |
+#  id            | uuid                     | PRIMARY KEY
+#  status_id     | integer                  | NOT NULL DEFAULT 1
+#  email         | citext                   | NOT NULL
+#  name          | text                     |
+#  created_at    | timestamp with time zone | NOT NULL DEFAULT now()
+#  suspended_at  | timestamp with time zone |
+#  project_limit | integer                  | NOT NULL DEFAULT 10
 # Indexes:
 #  accounts_pkey        | PRIMARY KEY btree (id)
 #  accounts_email_index | UNIQUE btree (email) WHERE status_id = ANY (ARRAY[1, 2])
 # Check constraints:
-#  valid_email | (email ~ '^[^,;@ \r\n]+@[^,@; \r\n]+\.[^,@; \r\n]+$'::citext)
+#  project_limit_positive | (project_limit > 0)
+#  valid_email            | (email ~ '^[^,;@ \r\n]+@[^,@; \r\n]+\.[^,@; \r\n]+$'::citext)
 # Foreign key constraints:
 #  accounts_status_id_fkey | (status_id) REFERENCES account_statuses(id)
 # Referenced By:
