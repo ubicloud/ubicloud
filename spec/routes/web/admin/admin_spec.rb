@@ -2126,6 +2126,42 @@ RSpec.describe CloverAdmin do
     expect(rc.active_from).to eq Time.utc(t.year, t.month)
   end
 
+  it "supports updating name of ResourceCredit" do
+    p = Project.create(name: "Default")
+    rc = ResourceCredit.create(project_id: p.id, name: "Old name", amount: 10, active_from: Time.utc(2026, 1))
+
+    fill_in "UBID, UUID, or prefix:term", with: rc.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - ResourceCredit #{rc.ubid}"
+
+    click_link "Update Name"
+    expect(page).to have_field("name", with: "Old name")
+    fill_in "name", with: "New name"
+    click_button "Update Name"
+
+    expect(page).to have_flash_notice("Updated name")
+    expect(page.title).to eq "Ubicloud Admin - ResourceCredit #{rc.ubid}"
+    expect(rc.reload.name).to eq "New name"
+  end
+
+  it "supports updating name of ResourceDiscount" do
+    p = Project.create(name: "Default")
+    rd = ResourceDiscount.create(project_id: p.id, name: "Old name", discount_percent: 10, active_from: Time.utc(2026, 1))
+
+    fill_in "UBID, UUID, or prefix:term", with: rd.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - ResourceDiscount #{rd.ubid}"
+
+    click_link "Update Name"
+    expect(page).to have_field("name", with: "Old name")
+    fill_in "name", with: "New name"
+    click_button "Update Name"
+
+    expect(page).to have_flash_notice("Updated name")
+    expect(page.title).to eq "Ubicloud Admin - ResourceDiscount #{rd.ubid}"
+    expect(rd.reload.name).to eq "New name"
+  end
+
   it "supports setting feature flags of Project" do
     p = Project.create(name: "Default")
 
