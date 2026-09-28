@@ -481,6 +481,7 @@ namespace :linter do
   desc "Run golangci-lint"
   task :go do
     sh "golangci-lint run cli/ubi.go"
+    sh "cd runner-metrics && golangci-lint run"
   end
 
   desc "Validate, lint, format OpenAPI YAML file"
