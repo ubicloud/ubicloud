@@ -105,16 +105,17 @@ input[type=submit] {
 .rollout-form > div {
   margin-top: 12px;
 }
-/* Stacked text/number/select fields: label above a full-width control */
+/* Stacked text/number/select/textarea fields: label above a full-width control */
 .rollout-form > div:has(> input[type=text]),
 .rollout-form > div:has(> input[type=number]),
-.rollout-form > div:has(> select) {
+.rollout-form > div:has(> select),
+.rollout-form > div:has(> textarea) {
   display: flex;
   flex-direction: column;
   gap: 4px;
 
   > label { font-weight: 600; }
-  > input, > select { width: 100%; box-sizing: border-box; }
+  > input, > select, > textarea { width: 100%; box-sizing: border-box; }
 }
 /* Checkbox and radio rows: control inline with its label */
 .rollout-form > div:has(> input[type=checkbox]),

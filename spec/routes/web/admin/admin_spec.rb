@@ -2949,19 +2949,21 @@ RSpec.describe CloverAdmin do
 
   describe "setup-vm-host" do
     before do
-      click_link "Setup VM Host"
+      click_link "Setup VM Hosts"
     end
 
-    def stub_hetzner_api(host, server_identifier)
-      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([{"ip" => {"ip" => host, "server_ip" => host}}]))
+    def stub_hetzner_api(*hosts)
+      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump(hosts.map { |host, _| {"ip" => {"ip" => host, "server_ip" => host}} }))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([]))
       stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([]))
-      stub_request(:get, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: JSON.generate(server: {dc: "fsn1-dc14", product: "AX102"}))
-      stub_request(:post, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: "{}")
+      hosts.each do |_, server_identifier|
+        stub_request(:get, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: JSON.generate(server: {dc: "fsn1-dc14", product: "AX102"}))
+        stub_request(:post, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: "{}")
+      end
     end
 
     it "shows unprepared hosts" do
-      expect(page.title).to eq "Ubicloud Admin - Setup VM Host"
+      expect(page.title).to eq "Ubicloud Admin - Setup VM Hosts"
       expect(page).to have_content("No data available for Unprepared VM Hosts")
 
       location_options = find_by_id("location_id").all("option").map(&:text)
@@ -2984,16 +2986,15 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows setting up a vm host" do
-      stub_hetzner_api("1.2.3.4", "12345")
+      stub_hetzner_api(["1.2.3.4", "12345"])
 
-      fill_in "IP Address", with: "1.2.3.4"
+      fill_in "Hosts", with: "12345,1.2.3.4"
       select "hetzner-fsn1", from: "Location"
       select "hetzner", from: "Provider"
-      fill_in "Server ID", with: "12345"
       check "ubuntu-jammy"
       check "github-ubuntu-2404"
       check "Install OS"
-      click_button "Setup VM Host"
+      click_button "Setup VM Hosts"
 
       st = Strand.first(prog: "Vm::HostNexus")
       vmh = VmHost[st.id]
@@ -3017,15 +3018,14 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows setting up a vm host without boot images or OS install" do
-      stub_hetzner_api("1.2.3.5", "54321")
+      stub_hetzner_api(["1.2.3.5", "54321"])
 
-      fill_in "IP Address", with: "1.2.3.5"
+      fill_in "Hosts", with: "54321,1.2.3.5"
       select "hetzner-fsn1", from: "Location"
       select "premium", from: "Family"
       select "hetzner", from: "Provider"
-      fill_in "Server ID", with: "54321"
       fill_in "Vhost Block Backend Version", with: "v0.2.2"
-      click_button "Setup VM Host"
+      click_button "Setup VM Hosts"
 
       st = Strand.first(prog: "Vm::HostNexus")
       expect(page).to have_flash_notice("VM host setup started: #{st.ubid} (hetzner 54321)")
@@ -3037,13 +3037,40 @@ RSpec.describe CloverAdmin do
       expect(frame["install_os"]).to be false
     end
 
-    it "raises error for an unparseable IP address" do
-      fill_in "IP Address", with: "not-an-ip"
+    it "allows setting up multiple vm hosts" do
+      stub_hetzner_api(["1.2.3.4", "12345"], ["1.2.3.5", "54321"])
+
+      fill_in "Hosts", with: "12345,1.2.3.4\n\n 54321 , 1.2.3.5 \n"
       select "hetzner-fsn1", from: "Location"
       select "hetzner", from: "Provider"
-      fill_in "Server ID", with: "12345"
+      click_button "Setup VM Hosts"
 
-      expect { click_button "Setup VM Host" }.to raise_error(CloverError, "invalid IP address")
+      vmh1 = VmHost.first(sshable: Sshable.where(host: "1.2.3.4"))
+      vmh2 = VmHost.first(sshable: Sshable.where(host: "1.2.3.5"))
+      expect(page).to have_flash_notice("VM host setup started: #{vmh1.ubid} (hetzner 12345), #{vmh2.ubid} (hetzner 54321)")
+      expect(vmh1.provider.server_identifier).to eq "12345"
+      expect(vmh2.provider.server_identifier).to eq "54321"
+    end
+
+    it "raises error for an address that is not IPv4" do
+      %w[not-an-ip 2a01::1].each do |host|
+        visit "/setup-vm-host"
+        fill_in "Hosts", with: "12345,#{host}"
+        select "hetzner-fsn1", from: "Location"
+        select "hetzner", from: "Provider"
+        expect { click_button "Setup VM Hosts" }.to raise_error(CloverError, "invalid IPv4 address: #{host}")
+      end
+      expect(VmHost.count).to eq 0
+    end
+
+    it "raises error for a malformed host line" do
+      ["1.2.3.4", ",1.2.3.4", "12345,1.2.3.4,extra"].each do |line|
+        visit "/setup-vm-host"
+        fill_in "Hosts", with: "12345,1.2.3.5\n#{line}"
+        select "hetzner-fsn1", from: "Location"
+        select "hetzner", from: "Provider"
+        expect { click_button "Setup VM Hosts" }.to raise_error(CloverError, "invalid host line: #{line}")
+      end
       expect(VmHost.count).to eq 0
     end
   end
