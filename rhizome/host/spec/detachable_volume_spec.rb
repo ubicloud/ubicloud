@@ -254,6 +254,51 @@ RSpec.describe DetachableVolume do
     end
   end
 
+  describe "#key_rotation" do
+    around do |example|
+      Dir.mktmpdir do |dir|
+        @dir = dir
+        example.run
+      end
+    end
+
+    let(:old_kek) { {"key" => Base64.strict_encode64("o" * 32)} }
+    let(:new_kek) { {"key" => Base64.strict_encode64("n" * 32)} }
+
+    def wrap(kek, name, plaintext)
+      Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek["key"]), name, plaintext))
+    end
+
+    before do
+      volume.instance_variable_set(:@dir, @dir)
+      allow(FileUtils).to receive(:chown)
+      volume.write_configs(source: {"type" => "new", "image" => "seed"},
+        wrapped_xts: wrap(old_kek, "xts-key", "x" * 64), device_id: "cldata", unix_user: "user0")
+    end
+
+    it "rotates the config-v2 secrets file, without an owner" do
+      rotation = volume.key_rotation
+      expect(rotation.path).to eq(volume.secrets_conf)
+      expect(rotation.file_format).to eq(:config_v2)
+      expect(rotation.user).to be_nil
+    end
+
+    it "re-wraps every secret with the new key, keeping a backup until it is retired" do
+      rotation = volume.key_rotation
+      rotation.backup(old_kek)
+      expect(File.stat(rotation.backup_path(old_kek)).mode & 0o777).to eq(0o600)
+
+      rotation.rotate(old_kek, new_kek)
+      expect(rotation.secrets_v2(volume.secrets_conf, new_kek)).to eq({"xts-key" => "x" * 64})
+      expect { rotation.secrets_v2(volume.secrets_conf, old_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
+      expect(File).not_to exist("#{volume.secrets_conf}.new")
+      expect(File).to exist(rotation.backup_path(old_kek))
+
+      rotation.retire_backup(old_kek)
+      expect(File).not_to exist(rotation.backup_path(old_kek))
+    end
+  end
+
   describe "#init_metadata" do
     it "runs ubiblk's initialiser as the volume's user, with the KEK on a pipe" do
       expect(volume).to receive(:run_with_kek_pipe).with(
