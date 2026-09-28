@@ -1898,21 +1898,36 @@ class CloverAdmin < Roda
       end
 
       r.post do
-        host, family, provider_name, server_identifier, vhost_block_backend_version =
-          typecast_params.nonempty_str!(%w[host family provider_name server_identifier vhost_block_backend_version].freeze)
+        hosts_input, family, provider_name, vhost_block_backend_version =
+          typecast_params.nonempty_str!(%w[hosts family provider_name vhost_block_backend_version].freeze)
         location_id = typecast_params.ubid_uuid!("location_id")
         default_boot_images = typecast_params.array(:nonempty_str, "default_boot_images") || []
         install_os = typecast_params.bool("install_os") || false
 
-        begin
-          NetAddr.parse_ip(host)
-        rescue NetAddr::ValidationError
-          fail CloverError.new(400, "InvalidRequest", "invalid IP address")
+        hosts = hosts_input.lines.map(&:strip).reject(&:empty?).map do |line|
+          unless /\A(?<server_identifier>[^,\s]+)\s*,\s*(?<host>[^,\s]+)\z/ =~ line
+            fail CloverError.new(400, "InvalidRequest", "invalid host line: #{line}")
+          end
+
+          begin
+            NetAddr::IPv4.parse(host)
+          rescue NetAddr::ValidationError
+            fail CloverError.new(400, "InvalidRequest", "invalid IPv4 address: #{host}")
+          end
+
+          [server_identifier, host]
         end
 
-        st = Prog::Vm::HostNexus.assemble(host, location_id:, family:, provider_name:,
-          server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:)
-        flash["notice"] = "VM host setup started: #{st.ubid} (#{provider_name} #{server_identifier})"
+        started = DB.ignore_duplicate_queries do
+          DB.transaction do
+            hosts.map do |server_identifier, host|
+              st = Prog::Vm::HostNexus.assemble(host, location_id:, family:, provider_name:,
+                server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:)
+              "#{st.ubid} (#{provider_name} #{server_identifier})"
+            end
+          end
+        end
+        flash["notice"] = "VM host setup started: #{started.join(", ")}"
         r.redirect
       end
     end
