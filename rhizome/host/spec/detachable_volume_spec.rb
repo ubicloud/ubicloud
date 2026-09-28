@@ -187,6 +187,11 @@ RSpec.describe DetachableVolume do
       expect(volume).to be_caught_up
     end
 
+    it "turns on catch-up once whatever uses the volume is serving" do
+      _, request = serve("{}\n") { volume.start_autofetch }
+      expect(JSON.parse(request)).to eq({"command" => "start_autofetch"})
+    end
+
     it "says nothing when the socket is not there" do
       expect(volume.stripes).to eq({})
     end

@@ -7,6 +7,10 @@ module EmberConfig
   GUEST_ROUTER_IP4 = "10.255.255.1"
 
   VM_ROOT = "/vm"
+  EMBER_ROOT = "/var/storage/ember"
+  TEMPLATE_ROOT = "#{EMBER_ROOT}/templates"
+  IMAGE_ROOT = "/var/storage/images"
+  STATE_DIR = "/var/lib/ember"
 
   def self.slot_name(index)
     format("emslot%04d", index)
@@ -14,5 +18,9 @@ module EmberConfig
 
   def self.slot_dir(index)
     File.join(VM_ROOT, slot_name(index))
+  end
+
+  def self.template_dir(template_id)
+    File.join(TEMPLATE_ROOT, template_id)
   end
 end

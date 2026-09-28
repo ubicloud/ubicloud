@@ -107,4 +107,8 @@ class DetachableVolume < StorageVolume
     File.exist?(sp.vhost_backend_stripe_source_config) &&
       PerfectTOML.load_file(sp.vhost_backend_stripe_source_config).dig("stripe_source", "type") == "remote"
   end
+
+  def start_autofetch
+    rpc("start_autofetch")
+  end
 end

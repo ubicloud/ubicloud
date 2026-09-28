@@ -11,4 +11,8 @@ RSpec.describe EmberConfig do
   it "gives each slot a directory under the VM root" do
     expect(described_class.slot_dir(3)).to eq("/vm/emslot0003")
   end
+
+  it "keeps templates together under one root" do
+    expect(described_class.template_dir("ct1")).to eq("/var/storage/ember/templates/ct1")
+  end
 end
