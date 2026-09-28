@@ -15,11 +15,15 @@ class Prog::SetupHugepages < Prog::Base
 
     # Platforms with large kernel or driver preallocations keep less usable
     # memory than physical memory implies; clamp against measured
-    # MemAvailable so the reservation cannot starve the host OS.
+    # MemAvailable so the reservation cannot starve the host OS. With
+    # hugetlb_free_vmemmap=on, the kernel returns 16380 KiB of struct page
+    # memory per 1G page once the pages are reserved at boot, so add it back
+    # to the measurement taken before the reservation exists.
     host_meminfo = sshable.cmd("cat /proc/meminfo")
     available_memory_match = host_meminfo.match(/^MemAvailable:\s+(\d+) kB$/)
     fail "Couldn't extract available memory" unless available_memory_match
-    available_limit = Integer(available_memory_match.captures.first) / 1048576 - 4
+    vmemmap_kib = hugepage_cnt * 16380
+    available_limit = (Integer(available_memory_match.captures.first) + vmemmap_kib) / 1048576 - 4
     if available_limit < hugepage_cnt
       Clog.emit("hugepage count clamped to available memory", {hugepage_clamp: {formula_count: hugepage_cnt, clamped_count: available_limit}})
       hugepage_cnt = available_limit
