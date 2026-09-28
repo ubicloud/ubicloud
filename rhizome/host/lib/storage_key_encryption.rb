@@ -95,4 +95,13 @@ class StorageKeyEncryption
     decipher.auth_tag = auth_tag
     decipher.update(encrypted_key[0]) + decipher.final
   end
+
+  def wrap_key_b64(key_hex)
+    Base64.strict_encode64(wrap_key([key_hex].pack("H*")).join)
+  end
+
+  def unwrap_key_b64(wrapped_b64)
+    blob = Base64.decode64(wrapped_b64)
+    unwrap_key([blob[0...-16], blob[-16..]]).unpack1("H*")
+  end
 end
