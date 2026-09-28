@@ -118,21 +118,39 @@ input[type=submit] {
   > input, > select, > textarea { width: 100%; box-sizing: border-box; }
 }
 /* Checkbox and radio rows: control inline with its label */
-.rollout-form > div:has(> input[type=checkbox]),
-.rollout-form .rollout-radioset,
-.rollout-form .rollout-checkboxset {
+.rollout-form > div:not(.rollout-checkboxset):has(> input[type=checkbox]),
+.rollout-form .rollout-radioset {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.rollout-form .rollout-radioset,
-.rollout-form .rollout-checkboxset {
+.rollout-form .rollout-radioset {
   gap: 4px 12px;
   flex-wrap: wrap;
 }
-.rollout-form .rollout-checkboxset > span.label {
-  flex-basis: 100%;
-  font-weight: 600;
+/* Checkbox sets: aligned columns of checkbox + label pairs */
+.rollout-form .rollout-checkboxset {
+  display: grid;
+  grid-template-columns: repeat(2, auto minmax(0, 1fr));
+  align-items: center;
+  gap: 6px;
+
+  > span.label {
+    grid-column: 1 / -1;
+    font-weight: 600;
+  }
+  > input { margin: 0; }
+  > label {
+    padding-right: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (min-width: 900px) {
+  .rollout-form .rollout-checkboxset {
+    grid-template-columns: repeat(4, auto minmax(0, 1fr));
+  }
 }
 .rollout-form input[type=submit] {
   margin-top: 16px;
