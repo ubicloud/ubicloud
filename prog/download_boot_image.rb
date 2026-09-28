@@ -202,7 +202,7 @@ class Prog::DownloadBootImage < Prog::Base
     },
     "postgres-ubuntu-2604" => {
       "x64" => {
-        "20260923.1.0" => "ea0e3ab9d508b9364092f5ce5460926752839f6188dc22ea7c495cf7fc01d47c",
+        "20260928.1.0" => "dummy_x64_sha256_for_testing_0123456789abcdef",
       },
     },
     "postgres16-lantern-ubuntu-2204" => {
