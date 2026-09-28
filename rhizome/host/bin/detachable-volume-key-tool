@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/detachable_volume"
+
+unless ARGV.length == 2
+  warn "usage: detachable-volume-key-tool volume-id action"
+  exit 1
+end
+
+volume_id, action = ARGV
+keys = JSON.parse($stdin.read)
+rotation = DetachableVolume.new(volume_id).key_rotation
+old_key = keys.fetch("old_key")
+
+case action
+when "backup"
+  rotation.backup(old_key)
+when "rotate"
+  rotation.rotate(old_key, keys.fetch("new_key"))
+when "retire-backup"
+  rotation.retire_backup(old_key)
+else
+  warn "invalid action: #{action}"
+  exit 1
+end

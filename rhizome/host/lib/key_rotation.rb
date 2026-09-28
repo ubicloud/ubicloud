@@ -26,7 +26,7 @@ class KeyRotation
     end
   end
 
-  def initialize(path, file_format, user, stale_spdk_key: nil)
+  def initialize(path, file_format, user = nil, stale_spdk_key: nil)
     fail "unknown key file format: #{file_format}" unless FORMATS.include?(file_format)
 
     @path = path

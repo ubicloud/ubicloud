@@ -3,6 +3,7 @@
 require_relative "../../common/lib/util"
 require_relative "vhost_block_backend"
 require_relative "kek_pipe"
+require_relative "key_rotation"
 require "fileutils"
 require "perfect_toml"
 
@@ -205,4 +206,6 @@ class DetachableVolume
     FileUtils.rm_f("/etc/systemd/system/#{unit}")
     FileUtils.rm_rf(@dir)
   end
+
+  def key_rotation = KeyRotation.new(secrets_conf, :config_v2)
 end
