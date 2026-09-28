@@ -868,6 +868,9 @@ NFTABLES_CONF
 
   describe "#purge_without_network" do
     it "removes service files, reloads daemon, purges storage and hugepages" do
+      expect(File).to receive(:exist?).with("/etc/systemd/system/test-metrics.service").and_return(false)
+      expect(FileUtils).to receive(:rm_r).with("/etc/systemd/system/test-metrics.service.tmp.lock")
+      expect(FileUtils).to receive(:rm_r).with("/vm/test/metrics")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service.d")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
@@ -1034,6 +1037,7 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "fd48:666c:a296:ce4b:2cc6::/79", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "nctest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd00:0b1c:100d:5AFE:CE::", "dev", "nctest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd00:0b1c:100d:53::", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd00:0b1c:100d:57a7::", "dev", "nctest")
       vs.setup_taps_6(gua, nics, "10.0.0.2")
     end
   end
