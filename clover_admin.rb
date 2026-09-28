@@ -789,6 +789,18 @@ class CloverAdmin < Roda
       end
     end
 
+    [ResourceCredit, ResourceDiscount].each do |klass|
+      model klass do
+        action "update_name", "Update Name" do
+          flash "Updated name"
+          param :name, typecast: :nonempty_str!, value: :name.to_proc
+          run do |obj, name|
+            obj.update(name:)
+          end
+        end
+      end
+    end
+
     model Strand do
       action "subject", "Subject" do
         type :direct
