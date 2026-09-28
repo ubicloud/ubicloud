@@ -15,7 +15,10 @@ class Prog::SetupHugepages < Prog::Base
 
     # Platforms with large kernel or driver preallocations keep less usable
     # memory than physical memory implies; clamp against measured
-    # MemAvailable so the reservation cannot starve the host OS.
+    # MemAvailable so the reservation cannot starve the host OS. Drop caches
+    # first, since the prep progs that just finished leave page cache and slab
+    # that MemAvailable does not fully count as available.
+    sshable.cmd("sudo sh -c 'sync && echo 3 > /proc/sys/vm/drop_caches'")
     host_meminfo = sshable.cmd("cat /proc/meminfo")
     available_memory_match = host_meminfo.match(/^MemAvailable:\s+(\d+) kB$/)
     fail "Couldn't extract available memory" unless available_memory_match
