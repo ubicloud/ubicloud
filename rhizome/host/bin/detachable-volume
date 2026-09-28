@@ -5,8 +5,8 @@ require_relative "../lib/detachable_volume"
 require "json"
 
 command, id = ARGV
-unless %w[start stop delete].include?(command) && id
-  warn "usage: detachable-volume start|stop|delete <volume-id>"
+unless %w[start stop status delete serve drop-source].include?(command) && id
+  warn "usage: detachable-volume start|stop|status|delete|serve|drop-source <volume-id>"
   exit 1
 end
 
@@ -16,11 +16,22 @@ when "start"
   volume = DetachableVolume.new(id, ubiblk_version: params.fetch("ubiblk_version"))
   volume.ensure_started(kek: params.fetch("kek"), unix_user: params.fetch("unix_user"), device_id: params.fetch("device_id"), slice: params["slice"],
     size_gib: params.fetch("size_gib"), wrapped_xts: params.fetch("wrapped_xts"), source: params.fetch("source"))
-  puts JSON.generate({"vhost_sock" => volume.vhost_sock})
+  puts JSON.generate({"vhost_sock" => volume.vhost_sock, "caught_up" => volume.caught_up?})
 when "stop"
-  DetachableVolume.new(id).stop
-  puts JSON.generate({"stopped" => true})
+  volume = DetachableVolume.new(id)
+  caught_up = volume.caught_up?
+  volume.stop
+  puts JSON.generate({"caught_up" => caught_up})
+when "status"
+  puts JSON.generate(DetachableVolume.new(id).status)
 when "delete"
   DetachableVolume.new(id).destroy
   puts JSON.generate({"deleted" => true})
+when "serve"
+  params = JSON.parse($stdin.read)
+  DetachableVolume.new(id).serve(port: params.fetch("port"), psk: params.fetch("psk"), psk_identity: params.fetch("psk_identity"),
+    kek: params.fetch("kek"), server_version: params.fetch("server_version"))
+when "drop-source"
+  DetachableVolume.new(id).drop_source
+  puts JSON.generate({"dropped" => true})
 end

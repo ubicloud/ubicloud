@@ -122,9 +122,46 @@ RSpec.describe DetachableVolume do
       end
     end
 
+    it "pulls from another host, fetching in the background only when asked to" do
+      toml = volume.stripe_source_toml({"type" => "remote", "address" => "[fd00::2]:9000", "psk_identity" => "rs1", "autofetch" => false})
+      expect(PerfectTOML.parse(toml)).to eq({"stripe_source" => {
+        "type" => "remote",
+        "address" => "[fd00::2]:9000",
+        "autofetch" => false,
+        "connections" => 16,
+        "psk" => {"identity" => "rs1", "secret" => {"ref" => "remote-psk"}},
+      }})
+    end
+
     it "refuses a source it does not know" do
       expect { volume.stripe_source_toml({"type" => "magic"}) }
         .to raise_error(RuntimeError, "unsupported stripe source magic")
+    end
+  end
+
+  describe "#write_configs" do
+    around { |example|
+      Dir.mktmpdir { |dir|
+        @dir = dir
+        example.run
+      }
+    }
+
+    before do
+      volume.instance_variable_set(:@dir, @dir)
+      allow(FileUtils).to receive(:chown)
+    end
+
+    it "carries the pre-shared key for a remote source" do
+      volume.write_configs(source: {"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "wrapped_psk" => "psk", "autofetch" => true},
+        wrapped_xts: "w", device_id: "cldata", unix_user: "user0")
+      expect(PerfectTOML.load_file(volume.secrets_conf).dig("secrets", "remote-psk"))
+        .to eq({"encoding" => "base64", "source" => {"inline" => "psk"}, "encrypted_by" => {"ref" => "kek"}})
+    end
+
+    it "carries nothing extra for a local source" do
+      volume.write_configs(source: {"type" => "new", "image" => "seed"}, wrapped_xts: "w", device_id: "cldata", unix_user: "user0")
+      expect(PerfectTOML.load_file(volume.secrets_conf)["secrets"].keys).to eq(["xts-key", "kek"])
     end
   end
 
@@ -254,6 +291,157 @@ RSpec.describe DetachableVolume do
     end
   end
 
+  describe "the ubiblk control socket" do
+    around { |example|
+      Dir.mktmpdir { |dir|
+        @dir = dir
+        example.run
+      }
+    }
+
+    def serve(reply)
+      volume.instance_variable_set(:@dir, @dir)
+      path = volume.rpc_sock
+      server = UNIXServer.new(path)
+      request = nil
+      thread = Thread.new do
+        conn = server.accept
+        request = conn.gets
+        conn.write(reply)
+        conn.close
+      end
+      result = yield
+      thread.join(5)
+      server.close
+      [result, request]
+    end
+
+    it "asks for the stripe counts" do
+      result, request = serve(JSON.generate({"status" => {"stripes" => {"fetched" => 4, "source" => 8}}}) + "\n") {
+        volume.stripes
+      }
+      expect(JSON.parse(request)).to eq({"command" => "status"})
+      expect(result).to eq({"fetched" => 4, "source" => 8})
+    end
+
+    it "reports whether the volume is here, how far it has fetched, and whether that is done" do
+      expect(volume).to receive_messages(exist?: true, remote_source?: true)
+      serve(%({"status":{"stripes":{"fetched":3,"source":8}}}\n)) {
+        expect(volume.status).to eq({"present" => true, "stripes" => {"fetched" => 3, "source" => 8}, "caught_up" => false})
+      }
+    end
+
+    it "reports a volume that is not here without asking its backend" do
+      expect(volume).not_to receive(:rpc)
+      expect(volume.status).to eq({"present" => false, "stripes" => {}, "caught_up" => true})
+    end
+
+    it "is caught up once everything has been fetched from another host" do
+      expect(volume).to receive_messages(remote_source?: true, stripes: {"fetched" => 8, "source" => 8})
+      expect(volume).to be_caught_up
+    end
+
+    it "is not caught up while stripes from another host are outstanding" do
+      expect(volume).to receive_messages(remote_source?: true, stripes: {"fetched" => 1, "source" => 8})
+      expect(volume).not_to be_caught_up
+    end
+
+    it "is not caught up when the backend cannot say, as when it is stopped" do
+      expect(volume).to receive_messages(remote_source?: true, stripes: {})
+      expect(volume).not_to be_caught_up
+    end
+
+    it "is caught up when seeded from an image, however little of it has been read" do
+      expect(volume).to receive(:remote_source?).and_return(false)
+      expect(volume).not_to receive(:stripes)
+      expect(volume).to be_caught_up
+    end
+
+    it "says nothing when the socket is not there" do
+      volume.instance_variable_set(:@dir, @dir)
+      expect(volume.stripes).to eq({})
+    end
+
+    it "says nothing when the backend answers with something that is not JSON" do
+      result, = serve("not json\n") { volume.rpc("status") }
+      expect(result).to eq({})
+    end
+  end
+
+  describe "#remote_source?" do
+    around do |example|
+      Dir.mktmpdir do |dir|
+        @dir = dir
+        example.run
+      end
+    end
+
+    before { allow(volume).to receive(:source_conf).and_return(File.join(@dir, "source.conf")) }
+
+    it "is true for a volume that reads through to another host" do
+      File.write(volume.source_conf, volume.stripe_source_toml({"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "autofetch" => true}))
+      expect(volume.remote_source?).to be true
+    end
+
+    it "is false for one seeded from an image, and for one with no source at all" do
+      expect(volume.remote_source?).to be false
+      File.write(volume.source_conf, volume.stripe_source_toml({"type" => "new", "image" => "seed"}))
+      expect(volume.remote_source?).to be false
+    end
+  end
+
+  describe "#serve" do
+    it "stops the backend and runs ubiblk's remote stripe server on the volume, with the KEK through its pipe" do
+      expect(volume).to receive(:stop).ordered
+      expect(volume).to receive(:run_with_kek_pipe).ordered { |cmd, kek_pipe:, kek_content:, env:, stdin:|
+        expect(cmd).to eq(["/opt/vhost-block-backend/v0.5.1/remote-stripe-server", "-f", volume.main_conf, "--listen-config", "/dev/stdin"])
+        expect(kek_pipe).to eq(volume.kek_pipe_path)
+        expect(kek_content).to eq(kek)
+        expect(env).to eq({"RUST_LOG" => "info"})
+        expect(stdin).to include(%(address = "0.0.0.0:5500"), %(identity = "rs1"))
+      }
+      volume.serve(port: 5500, psk: "cHNr", psk_identity: "rs1", kek: kek, server_version: "v0.5.1")
+    end
+
+    it "needs a ubiblk with the remote stripe server" do
+      expect { volume.serve(port: 5500, psk: "cHNr", psk_identity: "rs1", kek: kek, server_version: "v0.4.2") }
+        .to raise_error(RuntimeError, "remote-stripe-server requires vhost block backend v0.5.0 or later")
+    end
+  end
+
+  describe "#drop_source" do
+    around do |example|
+      Dir.mktmpdir do |dir|
+        @dir = dir
+        example.run
+      end
+    end
+
+    before do
+      volume.instance_variable_set(:@dir, @dir)
+      allow(FileUtils).to receive(:chown)
+      allow(volume).to receive(:init_metadata)
+    end
+
+    it "forgets the host it caught up from, keeping everything else" do
+      volume.create(source: {"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "wrapped_psk" => "cHNr", "autofetch" => true},
+        size_gib: 1, kek: kek, wrapped_xts: "eHRz", device_id: "cldata", unix_user: "user0")
+      volume.drop_source
+      main = PerfectTOML.load_file(volume.main_conf)
+      expect(main["include"]).to eq(["vhost-backend-secrets.conf"])
+      expect(main.dig("device", "metadata_path")).to eq(volume.metadata_file)
+      expect(File).not_to exist(volume.source_conf)
+      secrets = PerfectTOML.load_file(volume.secrets_conf)["secrets"]
+      expect(secrets.keys).to contain_exactly("xts-key", "kek")
+      expect(secrets.dig("xts-key", "source", "inline")).to eq("eHRz")
+    end
+
+    it "leaves a volume with no source alone" do
+      volume.create(source: nil, size_gib: 1, kek: kek, wrapped_xts: "eHRz", device_id: "cldata", unix_user: "user0")
+      expect { volume.drop_source }.not_to change { File.read(volume.main_conf) }
+    end
+  end
+
   describe "#key_rotation" do
     around do |example|
       Dir.mktmpdir do |dir|
@@ -272,7 +460,7 @@ RSpec.describe DetachableVolume do
     before do
       volume.instance_variable_set(:@dir, @dir)
       allow(FileUtils).to receive(:chown)
-      volume.write_configs(source: {"type" => "new", "image" => "seed"},
+      volume.write_configs(source: {"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "wrapped_psk" => wrap(old_kek, "remote-psk", "psk"), "autofetch" => true},
         wrapped_xts: wrap(old_kek, "xts-key", "x" * 64), device_id: "cldata", unix_user: "user0")
     end
 
@@ -289,7 +477,7 @@ RSpec.describe DetachableVolume do
       expect(File.stat(rotation.backup_path(old_kek)).mode & 0o777).to eq(0o600)
 
       rotation.rotate(old_kek, new_kek)
-      expect(rotation.secrets_v2(volume.secrets_conf, new_kek)).to eq({"xts-key" => "x" * 64})
+      expect(rotation.secrets_v2(volume.secrets_conf, new_kek)).to eq({"xts-key" => "x" * 64, "remote-psk" => "psk"})
       expect { rotation.secrets_v2(volume.secrets_conf, old_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
       expect(File).not_to exist("#{volume.secrets_conf}.new")
       expect(File).to exist(rotation.backup_path(old_kek))
