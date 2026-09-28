@@ -42,6 +42,11 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
   end
 
   describe "#destroy" do
+    it "waits for a key rotation to finish" do
+      volume.update(key_encryption_key_2_id: StorageKeyEncryptionKey.create_random(auth_data: "k2").id)
+      expect { nx.destroy }.to nap(5)
+    end
+
     it "removes the local copy, the row and the keys" do
       kek = volume.key_encryption_key_1
       volume.incr_destroy

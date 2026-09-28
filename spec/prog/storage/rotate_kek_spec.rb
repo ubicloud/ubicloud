@@ -31,7 +31,7 @@ RSpec.describe Prog::Storage::RotateKek do
         key_encryption_key_1_id: key_1_id, key_encryption_key_2_id: key_2_id, **args)
     end
 
-    it "mints a second key bound to the device and starts a strand of its own at back_up_key" do
+    it "mints a second key labelled with the volume's id and starts a strand of its own at back_up_key" do
       vol = create_volume(key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "somedata").id)
 
       strand = nil
@@ -39,8 +39,8 @@ RSpec.describe Prog::Storage::RotateKek do
       expect(strand.prog).to eq("Storage::RotateKek")
       expect(strand.label).to eq("back_up_key")
       expect(strand.id).not_to eq(vol.id)
-      expect(described_class.new(strand).vm_storage_volume.id).to eq(vol.id)
-      expect(vol.reload.key_encryption_key_2.auth_data).to eq(vol.device_id)
+      expect(described_class.new(strand).volume.id).to eq(vol.id)
+      expect(vol.reload.key_encryption_key_2.auth_data).to eq(vol.ubid)
     end
 
     it "sets the strand's parent when a parent_id is given" do
@@ -94,6 +94,58 @@ RSpec.describe Prog::Storage::RotateKek do
       expect(volume.reload.key_encryption_key_1_id).to eq(new_kek.id)
       expect(volume.key_encryption_key_2_id).to be_nil
       expect(current_kek).not_to exist
+    end
+  end
+
+  describe "a detachable volume" do
+    let(:host) { create_vm_host }
+    let(:dv) {
+      Prog::Storage::DetachableVolumeNexus.assemble(project_id: Project.create(name: "p").id,
+        location_id: Location::HETZNER_FSN1_ID, size_gib: 2, source_image: "seed-image")
+    }
+    let(:rotation) { described_class.new(described_class.assemble(dv.id)) }
+
+    it "labels the second key with the volume's id, like its first, and rotates on a strand beside the volume's own" do
+      strand = described_class.assemble(dv.id)
+      expect(strand.id).not_to eq(dv.id)
+      expect([dv.reload.key_encryption_key_1.auth_data, dv.key_encryption_key_2.auth_data]).to eq([dv.ubid, dv.ubid])
+      expect(described_class.new(strand).volume.id).to eq(dv.id)
+    end
+
+    describe "laid out on a host" do
+      before { dv.update(vm_host_id: host.id) }
+
+      it "backs up, re-wraps and retires the key on the host through host/bin/detachable-volume-key-tool" do
+        old_key = dv.key_encryption_key_1.secret_key_material_hash
+        sshable = rotation.volume.vm_host.sshable
+        new_key = dv.reload.key_encryption_key_2.secret_key_material_hash
+        [["backup", {old_key:}], ["rotate", {old_key:, new_key:}], ["retire-backup", {old_key:}]].each do |action, stdin|
+          expect(sshable).to receive(:_cmd).with("sudo host/bin/detachable-volume-key-tool #{dv.ubid} #{action}",
+            stdin: JSON.generate(stdin)).ordered
+        end
+        expect { rotation.back_up_key }.to hop("rotate")
+        expect { rotation.rotate }.to hop("retire_old_key")
+        expect { rotation.retire_old_key }.to exit({"msg" => "key rotated successfully"})
+      end
+    end
+
+    it "re-wraps the data key in the row with the new key and drops the old one" do
+      old_kek = dv.key_encryption_key_1
+      data_key = old_kek.decrypt(dv.wrapped_xts, "xts-key")
+      rotation
+      new_kek = dv.reload.key_encryption_key_2
+
+      expect { rotation.retire_old_key }.to exit({"msg" => "key rotated successfully"})
+      dv.reload
+      expect(dv.key_encryption_key_1_id).to eq(new_kek.id)
+      expect(dv.key_encryption_key_2_id).to be_nil
+      expect(new_kek.decrypt(dv.wrapped_xts, "xts-key")).to eq(data_key)
+      expect(old_kek).not_to exist
+    end
+
+    it "has nothing to do on a host for a volume that was never laid out" do
+      expect(rotation.volume.vm_host).to be_nil
+      expect { rotation.back_up_key }.to hop("rotate")
     end
   end
 end
