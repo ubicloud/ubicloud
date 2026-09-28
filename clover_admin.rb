@@ -487,6 +487,14 @@ class CloverAdmin < Roda
         flash "Account unsuspended"
         run(&:unsuspend)
       end
+
+      action "set_project_limit", "Set Project Limit" do
+        flash "Set project limit"
+        param :project_limit, typecast: :pos_int!, type: "number", attr: {min: 1}
+        run do |obj, project_limit|
+          obj.update(project_limit:)
+        end
+      end
     end
 
     model BootImage do
