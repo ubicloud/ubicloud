@@ -499,8 +499,8 @@ RSpec.describe InvoiceGenerator do
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     expect(free_inference_tokens).to eq(500000)
     expect(billing_rate).to eq(0.0000000500)
-    expect(invoice["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate)
-    expect(invoice["cost"]).to eq((600000 - free_inference_tokens) * billing_rate)
+    expect(invoice["free_inference_tokens_credit"]).to eq((free_inference_tokens * billing_rate).round(3))
+    expect(invoice["cost"]).to eq(((600000 - free_inference_tokens) * billing_rate).round(3))
   end
 
   it "handles inference quota and project credit together" do
@@ -512,7 +512,7 @@ RSpec.describe InvoiceGenerator do
 
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
-    free_inference_tokens_credit = free_inference_tokens * billing_rate
+    free_inference_tokens_credit = (free_inference_tokens * billing_rate).round(3)
     expect(before["free_inference_tokens_credit"]).to eq(free_inference_tokens_credit)
     expect(before["discount"]).to eq(0)
     expect(before["credit"]).to eq(free_inference_tokens_credit.round(3))
@@ -534,27 +534,71 @@ RSpec.describe InvoiceGenerator do
     billing_rate2 = BillingRate.from_resource_properties("InferenceTokens", ie2.model_name, "global")["unit_price"]
     expect(billing_rate1).to eq(0.0000000500)
     expect(billing_rate2).to eq(0.0000002000)
-    expect(invoice["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate2)
+    expect(invoice["free_inference_tokens_credit"]).to eq((free_inference_tokens * billing_rate2).round(3))
     expect(invoice["cost"]).to eq((800000 - free_inference_tokens) * billing_rate2 + 100000 * billing_rate1)
     expect(invoice["resources"].count).to eq(2)
   end
 
-  it "does not grant free inference token credit beyond what a resource credit left remaining on the line item" do
+  it "applies free inference tokens credit before an inference-scoped resource credit" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 1000000)
+
+    billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
+    inference_cost = (1000000 * billing_rate).round(3)
+    free_credit = (FreeQuota.free_quotas["inference-tokens"]["value"] * billing_rate).round(3)
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: inference_cost, active_from: Time.utc(2023, 5), name: "Inference Tokens Credit")
+
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+    inference_line_item = invoice["resources"].find { it["line_items"].first["resource_type"] == "InferenceTokens" }["line_items"].first
+    consumed = (inference_cost - free_credit).round(3)
+
+    expect(invoice["free_inference_tokens_credit"]).to eq(free_credit)
+    expect(invoice["credits"]).to eq([
+      {"name" => "Free Inference Tokens", "amount" => free_credit},
+      {"name" => "Inference Tokens Credit", "amount" => consumed},
+    ])
+    expect(invoice["credit"]).to eq(inference_cost)
+    expect(inference_line_item["credits"]).to eq([
+      {"name" => "Free Inference Tokens", "amount" => free_credit},
+      {"name" => "Inference Tokens Credit", "amount" => consumed},
+    ])
+    expect(invoice["cost"]).to eq((invoice["subtotal"] - inference_cost).round(3))
+    expect(resource_credit.reload.amount.to_f).to eq(free_credit)
+  end
+
+  it "applies free inference tokens credit before a wildcard resource credit" do
+    generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 1000000)
+
+    billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
+    inference_cost = (1000000 * billing_rate).round(3)
+    free_credit = (FreeQuota.free_quotas["inference-tokens"]["value"] * billing_rate).round(3)
+    resource_credit = create_wildcard_credit(p1, 100)
+
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+    consumed = (inference_cost - free_credit).round(3)
+
+    expect(invoice["free_inference_tokens_credit"]).to eq(free_credit)
+    expect(invoice["credits"]).to eq([
+      {"name" => "Free Inference Tokens", "amount" => free_credit},
+      {"name" => "Test Credit", "amount" => consumed},
+    ])
+    expect(invoice["cost"]).to eq(0)
+    expect(resource_credit.reload.amount.to_f).to eq((100 - consumed).round(3))
+  end
+
+  it "does not consume a resource credit when free inference tokens credit covers all inference usage" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
 
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     inference_cost = (100000 * billing_rate).round(3)
-    ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: inference_cost, active_from: Time.utc(2023, 5), name: "Inference Tokens Credit")
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: 10, active_from: Time.utc(2023, 5), name: "Inference Tokens Credit")
 
-    invoice = described_class.new(begin_time, end_time).run.first.content
-    inference_line_item = invoice["resources"].find { it["line_items"].first["resource_type"] == "InferenceTokens" }["line_items"].first
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
-    expect(invoice).not_to have_key("free_inference_tokens_credit")
-    expect(invoice["credits"].map { it["name"] }).not_to include("Free Inference Tokens")
-    expect(invoice["credit"]).to eq(inference_cost)
-    expect(inference_line_item["credits"]).to eq([{"name" => "Inference Tokens Credit", "amount" => inference_cost}])
-    expect(invoice["cost"]).to eq((invoice["subtotal"] - inference_cost).round(3))
+    expect(invoice["free_inference_tokens_credit"]).to eq(inference_cost)
+    expect(invoice["credits"]).to eq([{"name" => "Free Inference Tokens", "amount" => inference_cost}])
+    expect(invoice["cost"]).to eq(0)
+    expect(resource_credit.reload.amount.to_f).to eq(10)
   end
 
   context "with resource discounts" do

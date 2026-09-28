@@ -162,7 +162,7 @@ class InvoiceGenerator
 
         project_content[:discount] = discounts_by_name.values.sum.round(3)
         project_content[:discounts] = discounts_by_name.map { |name, amount| {name:, amount: amount.round(3)} }
-        project_cost = project_content[:cost] = (project_content[:subtotal] - project_content[:discount]).round(3)
+        project_content[:cost] = (project_content[:subtotal] - project_content[:discount]).round(3)
 
         credits_by_name = {}
         resource_credit_consumptions = []
@@ -185,30 +185,18 @@ class InvoiceGenerator
         # Apply this before resource credits, so resource credits are not
         # consumed for usage the free runner credit would cover.
         github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
-        github_credit = [2.5, github_items.sum { it[:remaining] }, project_cost].min.round(3)
+        github_credit = [2.5, github_items.sum { it[:remaining] }, project_content[:cost]].min.round(3)
         if github_credit > 0
           project_content[:github_credit] = github_credit
           credits_by_name["GitHub Runner Credit"] = github_credit
-          project_cost = project_content[:cost] = (project_cost - github_credit).round(3)
+          project_content[:cost] = (project_content[:cost] - github_credit).round(3)
           attribute_credit.call(github_items, github_credit, "GitHub Runner Credit")
-        end
-
-        # Do not allow a resource credit to remove more than the cost of the resource
-        # or remove more than the total cost.
-        resource_credits.each do |rc|
-          matches = credit_items.select { rc.matches?(it) }
-          base = matches.sum { it[:remaining] }.clamp(nil, project_cost)
-          consumed = base.clamp(nil, rc.amount.to_f).clamp(nil, project_cost).round(3)
-          next if consumed <= 0
-
-          credits_by_name[rc.name] = (credits_by_name[rc.name] || 0.0) + consumed
-          project_cost = project_content[:cost] = (project_cost - consumed).round(3)
-          resource_credit_consumptions.push([rc, consumed])
-          attribute_credit.call(matches, consumed, rc.name)
         end
 
         # Each project have some free AI inference tokens every month
         # Free AI tokens WILL be shown on the portal billing page as a separate credit.
+        # Apply this before resource credits, so resource credits are not
+        # consumed for usage the free inference tokens would cover.
         free_inference_tokens_remaining = FreeQuota.free_quotas["inference-tokens"]["value"]
         free_inference_tokens_credit = 0.0
         project_content[:resources]
@@ -221,12 +209,26 @@ class InvoiceGenerator
             free_inference_tokens_credit += used_amount * li[:unit_price]
           end
         inference_items = credit_items.select { it[:resource_type] == "InferenceTokens" }
-        free_inference_tokens_credit = [free_inference_tokens_credit, inference_items.sum { it[:remaining] }, project_content[:cost]].min
+        free_inference_tokens_credit = [free_inference_tokens_credit, inference_items.sum { it[:remaining] }, project_content[:cost]].min.round(3)
         if free_inference_tokens_credit > 0
           project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
-          credits_by_name["Free Inference Tokens"] = (credits_by_name["Free Inference Tokens"] || 0.0) + free_inference_tokens_credit
-          project_content[:cost] -= free_inference_tokens_credit
-          attribute_credit.call(inference_items, free_inference_tokens_credit.round(3), "Free Inference Tokens")
+          credits_by_name["Free Inference Tokens"] = free_inference_tokens_credit
+          project_content[:cost] = (project_content[:cost] - free_inference_tokens_credit).round(3)
+          attribute_credit.call(inference_items, free_inference_tokens_credit, "Free Inference Tokens")
+        end
+
+        # Do not allow a resource credit to remove more than the cost of the resource
+        # or remove more than the total cost.
+        resource_credits.each do |rc|
+          matches = credit_items.select { rc.matches?(it) }
+          base = matches.sum { it[:remaining] }.clamp(nil, project_content[:cost])
+          consumed = base.clamp(nil, rc.amount.to_f).clamp(nil, project_content[:cost]).round(3)
+          next if consumed <= 0
+
+          credits_by_name[rc.name] = (credits_by_name[rc.name] || 0.0) + consumed
+          project_content[:cost] = (project_content[:cost] - consumed).round(3)
+          resource_credit_consumptions.push([rc, consumed])
+          attribute_credit.call(matches, consumed, rc.name)
         end
 
         project_content[:credit] = credits_by_name.values.sum.round(3)
