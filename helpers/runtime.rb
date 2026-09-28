@@ -11,14 +11,18 @@ class Clover < Roda
     end
   end
 
+  def github_runner_convert_cache_scope(cache_scope)
+    cache_scope.empty? ? nil : cache_scope
+  end
+
   def github_runner_cache_scope(runner, run_id: nil, emit_workflow_error: true)
     if (cache_scope = runner.cache_scope)
-      return cache_scope
+      return github_runner_convert_cache_scope(cache_scope)
     end
 
     if (cache_scope = runner.active_workflow_run&.cache_scope)
       runner.this.update(cache_scope:)
-      return cache_scope
+      return github_runner_convert_cache_scope(cache_scope)
     end
 
     unless runner.run_id
@@ -42,7 +46,7 @@ class Clover < Roda
         runner.reload
         if (cache_scope = runner.active_workflow_run&.cache_scope)
           runner.this.update(cache_scope:)
-          return cache_scope
+          return github_runner_convert_cache_scope(cache_scope)
         end
       else
         Clog.emit("The workflow run does not have given runner", {runner_scope_failure: log_context})
@@ -65,6 +69,6 @@ class Clover < Roda
 
     cache_scope = runner.cache_scope = github_workflow_run_cache_scope(run, repository_name: runner.repository_name, run_id: runner.run_id, head_branch: runner.head_branch)
     runner.this.update(cache_scope:)
-    cache_scope
+    github_runner_convert_cache_scope(cache_scope)
   end
 end

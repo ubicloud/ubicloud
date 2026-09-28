@@ -323,6 +323,40 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "No workflow job data available")
       end
 
+      it "stores an empty cache scope and fails if the workflow run has no head branch" do
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        runner.update(workflow_job: {run_id: 555}, installation_id: installation.id)
+        expect(client).to receive(:workflow_run).once.and_return({event: "push"})
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+        expect(last_response).to have_runtime_error(400, "No workflow job data available")
+        expect(runner.reload.cache_scope).to eq("")
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+        expect(last_response).to have_runtime_error(400, "No workflow job data available")
+      end
+
+      it "fails without issuing API request to github if the runner has an empty cache scope" do
+        runner.update(cache_scope: "", installation_id: installation.id)
+        expect(Github).not_to receive(:installation_client)
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(400, "No workflow job data available")
+      end
+
+      it "stores an empty cache scope and fails if the associated workflow run has an empty cache scope" do
+        workflow_run.update(cache_scope: "")
+        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
+        expect(Github).not_to receive(:installation_client)
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(400, "No workflow job data available")
+        expect(runner.reload.cache_scope).to eq("")
+      end
+
       it "returns presigned urls and upload id for the reserved cache" do
         runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
