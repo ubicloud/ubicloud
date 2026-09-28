@@ -147,13 +147,14 @@ RSpec.describe MonitorableResource do
 
   describe "#check_pulse" do
     it "does not create thread if session is nil or resource does not need event loop" do
+      r_w_event_loop
+      r_without_event_loop.instance_variable_set(:@session, {})
       expect(Thread).not_to receive(:new)
 
       # session is nil
       r_w_event_loop.check_pulse
 
       # resource does not need event loop
-      r_without_event_loop.instance_variable_set(:@session, {})
       r_without_event_loop.check_pulse
     end
 
