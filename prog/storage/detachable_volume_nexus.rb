@@ -24,6 +24,7 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
 
   label def destroy
     register_deadline(nil, 10 * 60)
+    nap 5 if detachable_volume.key_encryption_key_2_id
     decr_destroy
 
     if (host = detachable_volume.vm_host)
