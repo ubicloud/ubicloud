@@ -281,4 +281,8 @@ class DetachableVolume
     rm_if_exists(source_conf)
     sync_parent_dir(source_conf)
   end
+
+  def start_autofetch
+    rpc("start_autofetch")
+  end
 end

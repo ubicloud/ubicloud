@@ -1,0 +1,68 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/ember_manager"
+require "json"
+
+def fail_with(error, exception)
+  puts JSON.generate({"error" => error, "detail" => exception.message})
+  exit 1
+end
+
+command = ARGV.shift
+begin
+  if command == "run-template-build"
+    template_id = ARGV.fetch(0)
+    EmberManager.for_template_build(template_id).run_template_build(template_id)
+    exit
+  end
+
+  params = JSON.parse($stdin.read)
+  host = params.fetch("host")
+  manager = EmberManager.new(max_slots: host.fetch("max_slots"), ip6_block: host.fetch("ip6_block"),
+    ch_version: host.fetch("ch_version"), ubiblk_version: host.fetch("ubiblk_version"))
+
+  result = case command
+  when "setup" then manager.setup
+  when "create"
+    volume = params.fetch("volume")
+    manager.create(ember_id: params.fetch("ember_id"), generation: params.fetch("generation"), template_id: params.fetch("template_id"),
+      workload: params.fetch("workload"), volume_id: volume.fetch("id"), size_gib: volume.fetch("size_gib"), kek: volume.fetch("kek"),
+      wrapped_xts: volume.fetch("wrapped_xts"), source: volume.fetch("source"), guest_config: params.fetch("guest"),
+      cpu_percent_limit: params.fetch("cpu_percent_limit"))
+  when "claim-blank"
+    manager.claim_blank(ember_id: params.fetch("ember_id"), generation: params.fetch("generation"), template_id: params.fetch("template_id"),
+      workload: params.fetch("workload"), guest_config: params.fetch("guest"))
+  when "create-blank"
+    volume = params.fetch("volume")
+    manager.create_blank(template_id: params.fetch("template_id"), workload: params.fetch("workload"), volume_id: volume.fetch("id"),
+      size_gib: volume.fetch("size_gib"), kek: volume.fetch("kek"), wrapped_xts: volume.fetch("wrapped_xts"),
+      source: volume.fetch("source"), guest_config: params.fetch("guest"), cpu_percent_limit: params.fetch("cpu_percent_limit"))
+  when "pause" then manager.pause(ARGV.fetch(0), generation: params.fetch("generation"))
+  when "configure"
+    manager.configure(ARGV.fetch(0), generation: params.fetch("generation"), workload: params.fetch("workload"),
+      guest_config: params.fetch("guest"))
+  when "destroy"
+    manager.destroy(ARGV.fetch(0), generation: params["generation"], delete_volume: params.fetch("delete_volume", false))
+  when "describe" then manager.describe(ARGV.fetch(0))
+  when "list" then manager.list
+  when "build-template"
+    manager.build_template(ARGV.fetch(0), root_image: params.fetch("root_image"), memory_mib: params.fetch("memory_mib"),
+      vcpus: params.fetch("vcpus"), ch_version: params.fetch("ch_version"))
+  when "template-status" then manager.template_status(ARGV.fetch(0))
+  when "delete-template" then manager.delete_template(ARGV.fetch(0))
+  when "ingress-sources" then manager.apply_ingress_sources(params.fetch("ingress_sources"))
+  else
+    warn "usage: host/bin/ember <command> [id] < payload"
+    exit 1
+  end
+  puts JSON.generate(result)
+rescue EmberManager::StaleGeneration => e
+  fail_with("stale_generation", e)
+rescue EmberManager::SlotExhausted => e
+  fail_with("slot_exhausted", e)
+rescue EmberManager::NotFound => e
+  fail_with("not_found", e)
+rescue JSON::ParserError => e
+  fail_with("bad_request", e)
+end
