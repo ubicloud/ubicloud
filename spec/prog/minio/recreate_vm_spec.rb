@@ -174,10 +174,9 @@ RSpec.describe Prog::Minio::RecreateVm do
       expect { nx.wait_vm }.to nap(5)
     end
 
-    it "pins the net threads of the new vm and hops to bootstrap_rhizome if the vm is ready" do
+    it "hops to bootstrap_rhizome if the vm is ready" do
       vm.strand.update(label: "wait")
       expect { nx.wait_vm }.to hop("bootstrap_rhizome")
-      expect(Semaphore.where(strand_id: minio_server.id, name: "pin_net_threads").count).to eq(1)
     end
   end
 
@@ -272,9 +271,25 @@ RSpec.describe Prog::Minio::RecreateVm do
       expect(minio_server.initial_provisioning_set?).to be true
     end
 
-    it "clears initial_provisioning and exits if the server is online" do
+    it "pins the net threads and hops to wait_net_threads_pinned if the server is online" do
       stub_info([{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok", healing: true}]}])
-      expect { nx.wait_online }.to exit({"msg" => "minio server vm is recreated"})
+      expect { nx.wait_online }.to hop("wait_net_threads_pinned")
+      expect(Semaphore.where(strand_id: minio_server.id, name: "pin_net_threads").count).to eq 1
+      expect(minio_server.initial_provisioning_set?(cached: false)).to be true
+    end
+  end
+
+  describe "#wait_net_threads_pinned" do
+    before { minio_server.incr_initial_provisioning }
+
+    it "naps while the pin has not succeeded" do
+      minio_server.incr_pin_net_threads
+      expect { nx.wait_net_threads_pinned }.to nap(10)
+      expect(minio_server.initial_provisioning_set?(cached: false)).to be true
+    end
+
+    it "clears initial_provisioning and exits once the pin succeeded" do
+      expect { nx.wait_net_threads_pinned }.to exit({"msg" => "minio server vm is recreated"})
       expect(minio_server.initial_provisioning_set?(cached: false)).to be false
     end
   end

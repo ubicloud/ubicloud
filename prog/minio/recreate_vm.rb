@@ -86,7 +86,6 @@ class Prog::Minio::RecreateVm < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
 
-    minio_server.incr_pin_net_threads
     hop_bootstrap_rhizome
   end
 
@@ -134,6 +133,17 @@ class Prog::Minio::RecreateVm < Prog::Base
   label def wait_online
     server_data = minio_server.server_data
     nap 10 unless server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
+
+    minio_server.incr_pin_net_threads
+    hop_wait_net_threads_pinned
+  end
+
+  # MinioServerNexus clears the semaphore in the same transaction that runs the
+  # pin, so a set semaphore means the pin has not succeeded yet. Waiting for it
+  # here spends the deadline registered in start, which pages, rather than
+  # leaving the nexus to retry a failing command unnoticed.
+  label def wait_net_threads_pinned
+    nap 10 if minio_server.pin_net_threads_set?(cached: false)
 
     minio_server.decr_initial_provisioning
     pop "minio server vm is recreated"
