@@ -108,6 +108,8 @@ class Hosting::LeasewebNetplan
 
   def host_address(ip_info)
     net = NetAddr::IPv6Net.parse(ip_info.ip_address)
+    return ip_info.ip_address if net.netmask.prefix_len == 128
+
     offset = ip_info.gateway ? CONNECTIVITY_HOST_OFFSET : ROUTED_HOST_OFFSET
     "#{net.nth(offset)}/#{net.netmask.prefix_len}"
   end

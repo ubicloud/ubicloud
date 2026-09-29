@@ -93,6 +93,24 @@ RSpec.describe Hosting::LeasewebNetplan do
     )
   end
 
+  it "holds a /128 connectivity address as is" do
+    netplan = netplan_for(public_mac:, internal_mac: nil, internal_ip: nil, ip_infos: [
+      ip_info("216.22.11.72/32", "216.22.11.126", source_host_ip: "216.22.11.72"),
+      ip_info("2607:f5b7:1:5e::/112", source_host_ip: "216.22.11.72"),
+      ip_info("2607:f5b7:1:148:6::/128", "2607:f5b7:1:148::1", source_host_ip: "216.22.11.72"),
+      ip_info("216.22.37.128/26", source_host_ip: "216.22.11.72"),
+    ])
+
+    expect(netplan.addresses_by_mac).to eq(
+      public_mac => [
+        "216.22.11.72/32",
+        "216.22.37.128/26",
+        "2607:f5b7:1:5e::1/112",
+        "2607:f5b7:1:148:6::/128",
+      ],
+    )
+  end
+
   it "routes by default through the main ipv4 gateway and the ipv6 gateway only" do
     expect(netplan.gateways).to eq ["216.22.50.254", "2604:9a00:2100:a020::1"]
   end
