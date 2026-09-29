@@ -75,6 +75,17 @@ class PostgresTimeline < Sequel::Model
     @backups = []
   end
 
+  # Where the newest completed backup ended and the WAL timeline it ended on.
+  def latest_completed_backup(sshable)
+    newest = sshable.cmd_json("sudo -u postgres /usr/bin/wal-g backup-list --detail --json --config /etc/postgresql/wal-g.env")&.max_by { it["start_time"].to_s }
+    return unless newest && (finish_lsn = newest["finish_lsn"])
+
+    {lsn: PostgresServer.int2lsn(finish_lsn), wal_timeline_id: newest["backup_name"].to_s[/\Abase_([0-9A-F]{8})/, 1]&.to_i(16)}
+  rescue JSON::ParserError, Sshable::SshError => ex
+    Clog.emit("Could not read the wal-g backup list", Util.exception_to_hash(ex, into: {ubid:}))
+    nil
+  end
+
   def latest_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { it.last_modified < target }
     fail "BUG: no backup found" unless backup
