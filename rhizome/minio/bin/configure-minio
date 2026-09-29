@@ -26,6 +26,12 @@ safe_write_to_file("/etc/default/minio", minio_config)
 safe_write_to_file("/etc/hosts", hosts)
 r "sudo chown -R minio-user:minio-user /etc/default/minio"
 
+# MinIO reuses pooled connections for the shard reads a heal issues, and each of
+# those goes idle between reads. Letting the kernel reset the congestion window
+# to its initial value every time held a heal to a few MB/s per connection.
+safe_write_to_file("/etc/sysctl.d/70-minio.conf", "net.ipv4.tcp_slow_start_after_idle=0\n")
+r "sudo sysctl --quiet --load /etc/sysctl.d/70-minio.conf"
+
 if cert && cert_key && !cert.empty? && !cert_key.empty?
   r "sudo mkdir -p /home/minio-user/.minio/certs/CAs"
   safe_write_to_file("/home/minio-user/.minio/certs/public.crt", cert)
