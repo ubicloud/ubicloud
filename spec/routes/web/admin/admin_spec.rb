@@ -1738,6 +1738,26 @@ RSpec.describe CloverAdmin do
     expect(vm.arch).to eq vmh.arch
     expect(vm.ip4_enabled).to be true
     expect(Strand[vm.id].stack.first["force_host_id"]).to eq vmh.id
+    expect(vm.vm_storage_volumes.map(&:size_gib)).to eq [40]
+  end
+
+  it "supports force creating a VM with a custom storage size on a VmHost" do
+    vmh = create_vm_host
+    BootImage.create(vm_host_id: vmh.id, name: "github-ubuntu-2404", version: "1", size_gib: 75, activated_at: Time.now)
+    project = Project.create(name: "force-vm-project")
+
+    visit "/model/VmHost/#{vmh.ubid}/force_create_vm"
+    fill_in "project_id", with: project.ubid
+    fill_in "public_key", with: "ssh-ed25519 key"
+    fill_in "name", with: "forced-vm"
+    select "standard-2", from: "size"
+    select "github-ubuntu-2404", from: "boot_image"
+    fill_in "storage_size_gib", with: "75"
+    click_button "Force Create VM"
+    expect(page).to have_flash_notice("VM creation scheduled")
+
+    vm = Vm[name: "forced-vm"]
+    expect(vm.vm_storage_volumes.map(&:size_gib)).to eq [75]
   end
 
   it "offers burstable sizes for force-create VM only when host accepts slices" do

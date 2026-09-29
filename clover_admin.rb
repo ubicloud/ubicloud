@@ -1007,8 +1007,15 @@ class CloverAdmin < Roda
           options: ->(obj) do
             obj.boot_images_dataset.exclude(activated_at: nil).distinct.select_order_map(:name)
           end
-        run do |obj, project_id, public_key, name, size, boot_image|
-          Prog::Vm::Nexus.assemble(public_key, project_id, name:, size:, boot_image:,
+        param :storage_size_gib,
+          typecast: :pos_int,
+          type: "number",
+          required: nil,
+          attr: {min: 1},
+          placeholder: "blank for VM size default"
+        run do |obj, project_id, public_key, name, size, boot_image, storage_size_gib|
+          storage_volumes = [{size_gib: storage_size_gib}] if storage_size_gib
+          Prog::Vm::Nexus.assemble(public_key, project_id, name:, size:, boot_image:, storage_volumes:,
             location_id: obj.location_id, arch: obj.arch, force_host_id: obj.id, enable_ip4: true)
         end
       end
