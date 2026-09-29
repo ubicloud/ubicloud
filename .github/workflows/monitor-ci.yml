@@ -50,7 +50,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Clover
-      uses: ./.github/actions/setup-clover
+      uses: $/.github/actions/setup-clover
 
     - name: Run monitor smoke test
       run: bundle exec rake monitor_smoke_test

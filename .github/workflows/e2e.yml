@@ -139,7 +139,7 @@ jobs:
         wait-minutes: 0
 
     - name: Set up Clover
-      uses: ./.github/actions/setup-clover
+      uses: $/.github/actions/setup-clover
       with:
         setup-node: true
 
@@ -415,7 +415,7 @@ jobs:
         persist-credentials: false
 
     - name: Cleanup AWS resources
-      uses: ./.github/actions/aws-cleanup-e2e
+      uses: $/.github/actions/aws-cleanup-e2e
       with:
         access-key-id: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         secret-access-key: ${{ secrets.E2E_AWS_SECRET_KEY }}
@@ -440,7 +440,7 @@ jobs:
         name: e2e-gcp-${{ github.run_id }}-logs
 
     - name: Cleanup GCP resources
-      uses: ./.github/actions/gcp-cleanup-e2e
+      uses: $/.github/actions/gcp-cleanup-e2e
       with:
         credentials-base64: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
 
@@ -457,7 +457,7 @@ jobs:
         persist-credentials: false
 
     - name: Cleanup GitHub cache resources
-      uses: ./.github/actions/github-cache-cleanup-e2e
+      uses: $/.github/actions/github-cache-cleanup-e2e
       with:
         endpoint: ${{ secrets.GH_CACHE_BLOB_STORAGE_ENDPOINT }}
         region: ${{ secrets.GH_CACHE_BLOB_STORAGE_REGION }}

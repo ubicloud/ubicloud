@@ -27,7 +27,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Clover
-      uses: ./.github/actions/setup-clover
+      uses: $/.github/actions/setup-clover
       with:
         setup-node: true
 
