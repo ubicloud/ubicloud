@@ -81,6 +81,7 @@ MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
 MINIO_SERVER_URL="https://minio-cluster-name.minio.ubicloud.com:9000"
 MINIO_STORAGE_CLASS_STANDARD="EC:0"
+MINIO_HEAL_DRIVE_WORKERS="32"
 ECHO
       minio_hosts = <<ECHO
 ::1 ip6-localhost ip6-loopback
