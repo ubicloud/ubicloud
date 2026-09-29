@@ -544,6 +544,8 @@ end
 #  location_id        | uuid                     | NOT NULL
 #  family             | text                     | NOT NULL
 #  score_offset       | double precision         | NOT NULL DEFAULT 0
+#  accepts_embers     | boolean                  | NOT NULL DEFAULT false
+#  cpu_signature      | text                     |
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
