@@ -565,6 +565,8 @@ end
 #  project_id         | uuid                     |
 #  csum_guard_enabled | boolean                  | NOT NULL DEFAULT false
 #  ipv6_disabled      | boolean                  | NOT NULL DEFAULT false
+#  accepts_embers     | boolean                  | NOT NULL DEFAULT false
+#  cpu_signature      | text                     |
 # Indexes:
 #  vm_host_pkey             | PRIMARY KEY btree (id)
 #  vm_host_ip6_key          | UNIQUE btree (ip6)
