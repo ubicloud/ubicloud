@@ -126,10 +126,7 @@ RSpec.describe Prog::Base do
   it "keeps children array state in sync even in consecutive-run mode" do
     parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
     child = Strand.create(parent_id: parent.id, prog: "Test", label: "napper")
-    prg = parent.load
-    expect(parent).to receive(:load).twice.and_return(prg)
 
-    expect(prg).to receive(:nap).and_throw(:prog_return, Prog::Base::Nap.new(1))
     expect(parent.run(10)).to be_a Prog::Base::Nap
     expect(parent.associations).to be_empty
 
@@ -234,9 +231,9 @@ RSpec.describe Prog::Base do
   end
 
   it "calls before_run if it is available" do
-    st = Strand.create(prog: "Prog::Vm::Aws::Nexus", label: "wait")
-    prg = instance_double(Prog::Vm::Aws::Nexus)
-    expect(st).to receive(:load).and_return(prg)
+    st = Strand.create(prog: "Vm::Aws::Nexus", label: "wait")
+    prg = Prog::Vm::Aws::Nexus.new(st, false)
+    expect(Prog::Vm::Aws::Nexus).to receive(:new).with(st, false).and_return(prg)
     expect(prg).to receive(:before_run)
     expect(prg).to receive(:wait).and_throw(:prog_return, Prog::Base::Nap.new(30))
     st.unsynchronized_run
