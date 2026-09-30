@@ -82,7 +82,9 @@ class GcpInstanceAvailabilityGenerator
       {
         "name" => "#{family}-#{vcpu}",
         "vcpus" => vcpu,
-        "memory_gib" => vcpu * config[:mem_ratio],
+        # Same whole-GiB derivation as Option's size tables: c4 ratios are
+        # fractional (3.75 and 7.75), and memory_gib is an Integer everywhere.
+        "memory_gib" => (vcpu * config[:mem_ratio]).floor,
         # dup: the same frozen array is shared by every location offering this
         # size, and YAML.dump emits anchors and aliases for repeated objects.
         "storage_size_options" => Option::GCP_STORAGE_SIZE_OPTIONS.fetch(family).fetch(vcpu).dup,
