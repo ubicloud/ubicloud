@@ -490,8 +490,8 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
-    it "uses an AWS-assigned public IP instead of an EIP when the nic does not use an eip" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+    it "lets AWS create the network interface and assign its addresses when the nic does not use an eip" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created", private_ip_address: "10.0.0.23"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
       vm.user_nic.nic_aws_resource.update(use_eip: false, create_network_interface: false)
       vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-12345678")
@@ -500,7 +500,6 @@ RSpec.describe Prog::Vm::Aws::Nexus do
           {
             device_index: 0,
             subnet_id: "subnet-12345678",
-            private_ip_address: vm.user_nic.private_ipv4.network.to_s,
             groups: ["sg-12345678"],
             associate_public_ip_address: true,
             ipv_6_address_count: 1,
@@ -511,6 +510,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect { nx.create_instance }.to hop("wait_instance_created")
       # The launch-created interface id is recorded so later labels can look it up.
       expect(vm.user_nic.nic_aws_resource.reload.network_interface_id).to eq("eni-aws-created")
+      expect(vm.user_nic.reload.private_ipv4.to_s).to eq("10.0.0.23/32")
     end
 
     it "naps until instance profile not propagated yet" do
