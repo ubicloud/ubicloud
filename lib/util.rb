@@ -46,6 +46,9 @@ module Util
     if issuer_cert.nil?
       issuer_cert = cert
       issuer_key = key
+    else
+      # Distinguish roots with matching names during rotation.
+      extensions += ["authorityKeyIdentifier=keyid:always"]
     end
 
     # Set certificate details

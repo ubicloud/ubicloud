@@ -72,6 +72,20 @@ RSpec.describe Util do
     end
   end
 
+  describe "#create_certificate" do
+    it "verifies with roots sharing a name in either bundle order" do
+      roots = Array.new(2) { described_class.create_root_certificate(common_name: "test CA", duration: 60 * 60 * 24 * 365) }
+      root_cert, root_cert_key = roots.last
+      cert, _ = described_class.create_certificate(subject: "/CN=server", duration: 60 * 60 * 24 * 30, issuer_cert: OpenSSL::X509::Certificate.new(root_cert), issuer_key: OpenSSL::PKey::EC.new(root_cert_key))
+
+      [roots, roots.reverse].each do |bundle|
+        store = OpenSSL::X509::Store.new
+        bundle.each { |root, _| store.add_cert(OpenSSL::X509::Certificate.new(root)) }
+        expect(store.verify(cert)).to be true
+      end
+    end
+  end
+
   describe "#parse_key" do
     it "can parse an elliptic key" do
       expect(described_class.parse_key(Clec::Cert::EC_KEY_PEM)).to be_instance_of OpenSSL::PKey::EC
