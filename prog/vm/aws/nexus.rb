@@ -129,8 +129,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     instance_market_options = nil
     if is_runner?
-      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      runcmd << "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
