@@ -114,18 +114,49 @@ end
     end
   end
 
-  def run
-    DB.transaction(savepoint: true) do
-      yield SemSnap.use(strand.id) { |snap|
-        @snap = snap
+  def run(&)
+    if transaction_around_run?
+      DB.transaction(savepoint: true) do
+        yield SemSnap.use(strand.id) { |snap|
+          @snap = snap
 
-        catch(:prog_return) do
-          before_run
-          public_send(strand.label)
-          nil
+          catch(:prog_return) do
+            before_run
+            public_send(strand.label)
+            nil
+          end
+        }
+      end
+    else
+      @snap = SemSnap.new(strand.id, deferred: true)
+
+      prog_return = catch(:prog_return) do
+        before_run
+        nil
+      end
+
+      prog_return ||= catch(:prog_return) { public_send(strand.label) }
+
+      DB.transaction(savepoint: true) do
+        if prog_return.is_a?(Proc)
+          prog_return = catch(:prog_return) do
+            prog_return.call
+            nil
+          end
         end
-      }
+
+        @snap.apply
+        yield prog_return
+      end
     end
+  end
+
+  def transaction_around_run?
+    true
+  end
+
+  def start_transaction(&block)
+    throw :prog_return, block
   end
 
   def before_run

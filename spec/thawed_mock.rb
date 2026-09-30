@@ -46,7 +46,7 @@ module ThawedMock
   allow_mocking(Time, :now)
 
   # Database
-  allow_mocking(DB, :[], :get, :copy_table)
+  allow_mocking(DB, :[], :get, :copy_table, :transaction)
 
   # Models
   allow_mocking(Account, :[])
@@ -139,6 +139,7 @@ module ThawedMock
   allow_mocking(Scheduling::Allocator::VmHostCpuAllocation, :new)
   allow_mocking(Scheduling::Allocator::VmHostAllocation, :new)
   allow_mocking(Serializers::Vm, :serialize_internal)
+  allow_mocking(SemSnap, :new)
   allow_mocking(SshKey, :generate)
   allow_mocking(StripeClient, :checkout, :customers, :payment_intents, :payment_methods, :setup_intents)
   allow_mocking(ThreadPrinter, :puts, :run)

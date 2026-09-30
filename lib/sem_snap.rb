@@ -53,14 +53,14 @@ class SemSnap
     end
   end
 
-  private
-
   def apply
     return if @defer_delete.empty?
 
     Semaphore.where(strand_id: @strand_id, id: @defer_delete).delete
     @defer_delete.clear
   end
+
+  private
 
   def add_semaphore_instance_to_snapshot(sem)
     @extant[sem.name.intern] << sem.id
