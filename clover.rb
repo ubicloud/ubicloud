@@ -1194,7 +1194,7 @@ class Clover < Roda
     r.rodauth
     rodauth.require_authentication
 
-    if api? && r.path_info != "/cli"
+    if api? && r.path_info != "/cli" && r.path_info != "/mcp"
       # Validate request against OpenAPI schema, after authenticating
       # (which is thought to be cheaper)
       begin
