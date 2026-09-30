@@ -164,6 +164,10 @@ module AdminModelSpecHelper
       GithubRepository.create(installation_id: installation.id, name: "test-repo")
     end
 
+    def create_github_repository_bucket_pool
+      GithubRepositoryBucketPool.create(access_key: "test-access-key", secret_key: "test-secret-key")
+    end
+
     def create_github_runner
       installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
       GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
