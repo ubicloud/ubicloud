@@ -96,10 +96,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     else
       # Concurrent runners of the installation wait here, so only the first one creates the subnet.
       installation.lock!
-      unless (ps = installation.private_subnets_dataset.first(location_id:))
+      destroying_subnet_ids = Semaphore.where(name: ["destroy", "destroying"]).select(:strand_id)
+      unless (ps = installation.private_subnets_dataset.where(location_id:).exclude(Sequel[:private_subnet][:id] => destroying_subnet_ids).first)
         ps = Prog::Vnet::SubnetNexus.assemble(
           Config.github_runner_service_project_id,
-          name: installation.ubid.to_s,
           location_id:,
           allow_only_ssh: true,
           ipv4_range: "10.#{SecureRandom.random_number(1..255)}.0.0/16",

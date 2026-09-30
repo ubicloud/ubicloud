@@ -249,7 +249,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       picked_vm = nx.pick_vm
       ps = picked_vm.private_subnets.first
       expect(installation.private_subnets.map(&:id)).to eq([ps.id])
-      expect(ps).to have_attributes(name: installation.ubid.to_s, location_id: location.id, project_id: vm.project_id)
+      expect(ps).to have_attributes(location_id: location.id, project_id: vm.project_id)
       expect(ps.net4.to_s).to eq("10.42.0.0/16")
       expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.42.0.0/20", "10.42.16.0/20"])
       expect(AwsSubnet[picked_vm.nics.first.strand.stack.first["aws_subnet_id"]].az_suffix).to eq("b")
@@ -271,6 +271,24 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       picked_vm = nil
       expect { picked_vm = nx.pick_vm }.not_to change(PrivateSubnet, :count)
       expect(picked_vm.private_subnets.map(&:id)).to eq([ps.id])
+    end
+
+    it "creates a new private subnet for alien vms while the one of the installation is being destroyed" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      destroyed_ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      installation.add_private_subnet(destroyed_ps)
+      destroyed_ps.incr_destroy
+      destroying_ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      installation.add_private_subnet(destroying_ps)
+      destroying_ps.incr_destroying
+
+      ps = nx.pick_vm.private_subnets.first
+      expect(installation.private_subnets_dataset.select_order_map(Sequel[:private_subnet][:id])).to eq([destroyed_ps.id, destroying_ps.id, ps.id].sort)
     end
   end
 
