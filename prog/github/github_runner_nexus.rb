@@ -78,7 +78,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         alternative_families = ["m8g", "m7g"]
       end
       # eu-central-1a is usually give capacity errors
-      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
+      preferred_azs << Location[location_id].azs.reject { it.az == "a" }.sample
     end
 
     if location_id == Location::GITHUB_RUNNERS_ID && rand * 100 < Config.github_actions_ch_53_percent

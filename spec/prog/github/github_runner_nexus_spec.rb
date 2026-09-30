@@ -209,6 +209,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
     end
+
+    it "places alien vms outside availability zone a" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "euc1-az2")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az3")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      aws_subnet = picked_vm.private_subnets.first.private_subnet_aws_resource.aws_subnets.first
+      expect(aws_subnet.az_suffix).to eq("b")
+    end
   end
 
   describe ".update_billing_record" do
