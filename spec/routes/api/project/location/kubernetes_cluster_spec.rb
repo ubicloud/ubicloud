@@ -331,7 +331,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           kn.strand.update(label: "wait")
           [kn.name, kn.ubid].each do |identifier|
             new_count = rand(1..10)
-            kn.strand.load.decr_scale_worker_count
+            kn.strand.prog_class.new(kn.strand).decr_scale_worker_count
             post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}/resize", {node_count: new_count}.to_json
 
             expect(last_response.status).to eq(200)

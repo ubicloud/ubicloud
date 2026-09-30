@@ -12,7 +12,11 @@ class Prog::Base
   # simplecov:enable
 
   def initialize(strand, snap = nil)
-    @snap = snap || SemSnap.new(strand.id)
+    @snap = if snap == false
+      nil
+    else
+      snap || SemSnap.new(strand.id)
+    end
     @strand = strand
     @subject_id = frame.dig("subject_id") || @strand.id
   end
@@ -43,7 +47,7 @@ class Prog::Base
   # Searches the stack for the Prog that caused execution of the code,
   # which can be useful in logging from nested method calls.
   def self.current_prog
-    caller_locations.reverse_each { return it.label if it.label.start_with?("Prog::") }
+    caller_locations.reverse_each { return it.label if it.label.start_with?("Prog::") && it.label != "Prog::Base#run" }
     nil
   end
 
@@ -107,6 +111,20 @@ end
       define_method :"hop_#{label}" do
         dynamic_hop label
       end
+    end
+  end
+
+  def run
+    DB.transaction(savepoint: true) do
+      yield SemSnap.use(strand.id) { |snap|
+        @snap = snap
+
+        catch(:prog_return) do
+          before_run
+          public_send(strand.label)
+          nil
+        end
+      }
     end
   end
 
