@@ -10,6 +10,16 @@ class GithubActiveWorkflowRun < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
+
+  def completed?
+    false
+  end
+
+  def duration
+    if run_started_at && completed_at
+      (completed_at - run_started_at).ceil
+    end
+  end
 end
 
 # Table: github_active_workflow_run

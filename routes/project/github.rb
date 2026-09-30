@@ -177,9 +177,60 @@ class Clover
             installation.repositories_dataset.with_pk(repository_id)
           end
           check_found_object(repository)
+          @repository = repository
 
           r.get api? do
             Serializers::GithubRepository.serialize(repository, installation:)
+          end
+
+          r.get web?, "runs" do
+            limit = 25
+            run_id, run_attempt = typecast_params.pos_int(%w[run_id run_attempt].freeze)
+            today = Time.now.utc.to_date
+            oldest_date = today - 42
+
+            @runs = if (date = typecast_params.date("date"))
+              date = date.clamp(oldest_date, today)
+              []
+            else
+              date = today
+              ds = repository.active_workflow_runs_dataset.limit(limit + 1)
+              if run_id && run_attempt
+                ds = ds.where(Sequel[%i[run_id run_attempt].freeze] <= [run_id, run_attempt])
+                run_id = run_attempt = nil
+              end
+              ds.all
+            end
+
+            num_active_runs = @runs.length
+            if num_active_runs <= limit
+              earliest_search_date = [date - 6, oldest_date].max
+              ds = repository
+                .completed_workflow_runs_dataset
+                .where(create_date: earliest_search_date..date)
+                .limit(limit + 1 - num_active_runs)
+
+              if run_id && run_attempt
+                ds = ds.where(Sequel[%i[create_date run_id run_attempt].freeze] <= [date, run_id, run_attempt])
+              end
+
+              @runs.concat(ds.all)
+            end
+
+            if @runs.length > limit
+              next_run = @runs.pop
+              @older_runs_params = {
+                "run_id" => next_run.run_id,
+                "run_attempt" => next_run.run_attempt,
+              }
+              @older_runs_params["date"] = next_run.create_date if next_run.completed?
+            elsif earliest_search_date > oldest_date
+              @older_runs_params = {"date" => date - 7}
+            end
+
+            @empty_date_range = [earliest_search_date, date] if @runs.empty?
+
+            view "github/runs"
           end
 
           r.on "cache" do

@@ -508,4 +508,165 @@ RSpec.describe Clover, "github" do
       expect(st).to be_nil
     end
   end
+
+  describe "runs" do
+    let(:runs_path) { "#{project.path}/github/#{installation.ubid}/repository/#{repository.ubid}/runs" }
+
+    def create_active_run(run_id, run_attempt: 1, **)
+      GithubActiveWorkflowRun.create(
+        installation_id: installation.id,
+        repository_id: repository.id,
+        repository_name: repository.name,
+        create_date: Time.now.utc.to_date,
+        run_id:,
+        run_attempt:,
+        event: "push",
+        status: "queued",
+        display_title: "Active #{run_id}-#{run_attempt}",
+        actor_login: "octocat",
+        cache_scope: "main",
+        **,
+      )
+    end
+
+    def create_completed_run(run_id, create_date: Time.now.utc.to_date, run_attempt: 1, **)
+      GithubCompletedWorkflowRun.create_partition(create_date) unless GithubCompletedWorkflowRun.partition_days.include?(create_date)
+      now = Time.now
+      GithubCompletedWorkflowRun.insert(
+        repository_id: repository.id,
+        run_id:,
+        run_attempt:,
+        create_date:,
+        installation_id: installation.id,
+        created_at: now,
+        run_started_at: now,
+        completed_at: now,
+        event: "push",
+        status: "completed",
+        conclusion: "success",
+        display_title: "Completed #{run_id}-#{run_attempt}",
+        actor_login: "octocat",
+        duration: 90,
+        **,
+      )
+    end
+
+    def run_ids
+      page.all("#workflow-runs tbody tr").map { it[:id] }
+    end
+
+    it "shows empty state with the searched date range if there are no matching runs" do
+      today = Time.now.utc.to_date
+      create_completed_run(300, create_date: today - 20)
+
+      visit runs_path
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq "Ubicloud - Workflow Runs"
+      expect(page).to have_content "No workflow runs were created between #{today - 6} and #{today} (UTC)."
+      expect(page).to have_no_css ".auto-refresh"
+
+      click_link "Older Runs"
+      expect(page).to have_current_path("#{runs_path}?date=#{today - 7}")
+      expect(page).to have_content "No workflow runs were created between #{today - 13} and #{today - 7} (UTC)."
+
+      click_link "Older Runs"
+      expect(page).to have_current_path("#{runs_path}?date=#{today - 14}")
+      expect(run_ids).to eq %w[run-300-1]
+      expect(page).to have_link "Older Runs", href: "?date=#{today - 21}"
+
+      visit "#{runs_path}?date=#{today - 36}"
+      expect(page).to have_content "No workflow runs were created between #{today - 42} and #{today - 36} (UTC)."
+      expect(page).to have_no_content "Older Runs"
+
+      visit "#{runs_path}?date=#{today - 100}"
+      expect(page).to have_content "No workflow runs were created between #{today - 42} and #{today - 42} (UTC)."
+      expect(page).to have_no_content "Older Runs"
+    end
+
+    it "shows details of active and completed workflow runs" do
+      now = Time.now
+      create_active_run(1006, created_at: now - 65)
+      create_active_run(1005, run_attempt: 2, status: "in_progress", run_started_at: now - 125, head_branch: "feature", head_repository_full_name: "contributor/test-repo", commit_hash: "a" * 40, commit_message: "Active 1005-2\n\nDetails", event: "pull_request", actor_login: "alice")
+      create_active_run(1004, status: "completed", conclusion: "success", run_started_at: now - 100, completed_at: now - 10, head_branch: "main", head_repository_full_name: repository.name)
+      create_active_run(1003, status: "completed", conclusion: nil, completed_at: now - 10, commit_hash: "b" * 40, commit_message: "")
+      create_completed_run(503, conclusion: "failure", head_branch: "main", commit_hash: "c" * 40, commit_message: "Fix bug\n\nLonger description")
+      create_completed_run(502, conclusion: "action_required", run_started_at: nil, duration: nil)
+      create_completed_run(501, conclusion: "cancelled", commit_hash: "d" * 40)
+
+      visit runs_path
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_css ".auto-refresh"
+      expect(run_ids).to eq %w[run-1006-1 run-1005-2 run-1004-1 run-1003-1 run-503-1 run-502-1 run-501-1]
+      expect(page).to have_link "Older Runs", href: "?date=#{Time.now.utc.to_date - 7}"
+
+      row = find_by_id("run-1006-1")
+      expect(row).to have_content "Queued"
+      expect(row).to have_content(/Queued for 1m \d+s/)
+      expect(row).to have_content "Created 1 minutes ago"
+      expect(row).to have_no_css "a.font-mono"
+
+      row = find_by_id("run-1005-2")
+      expect(row).to have_content "pull_request by alice"
+      expect(row).to have_link "alice", href: "https://github.com/alice"
+      expect(row).to have_content "In progress"
+      expect(row).to have_content "contributor:feature"
+      expect(row).to have_link "aaaaaaa", href: "https://github.com/contributor/test-repo/commit/#{"a" * 40}"
+      expect(row).to have_no_content "Details"
+      expect(row).to have_content(/Running for 2m \d+s/)
+      expect(row).to have_content "Started 2 minutes ago"
+
+      row = find_by_id("run-1004-1")
+      expect(row).to have_content "Success"
+      expect(row).to have_content "Took 1m 30s"
+      expect(row).to have_no_content "contributor"
+
+      row = find_by_id("run-1003-1")
+      expect(row).to have_content "Completed"
+      expect(row).to have_link "bbbbbbb", href: "https://github.com/#{repository.name}/commit/#{"b" * 40}"
+      expect(row).to have_no_content "Took"
+      expect(row).to have_content "Created just now"
+
+      row = find_by_id("run-503-1")
+      expect(row).to have_content "Failure"
+      expect(row).to have_content "ccccccc Fix bug"
+      expect(row).to have_no_content "Longer description"
+      expect(row).to have_content "Took 1m 30s"
+
+      row = find_by_id("run-502-1")
+      expect(row).to have_content "Action required"
+      expect(row).to have_no_content "Took"
+      expect(row).to have_content "Created just now"
+
+      row = find_by_id("run-501-1")
+      expect(row).to have_content "Cancelled"
+      expect(row).to have_link "ddddddd"
+    end
+
+    it "paginates through active and completed workflow runs" do
+      today = Time.now.utc.to_date
+      (1002..1026).each { create_active_run(it) }
+      create_active_run(1001, run_attempt: 2)
+      create_active_run(1001)
+      (500..529).each { create_completed_run(it) }
+      create_completed_run(400, create_date: today - 10)
+
+      visit runs_path
+      expect(run_ids).to eq((1002..1026).reverse_each.map { "run-#{it}-1" })
+
+      click_link "Older Runs"
+      expect(page).to have_current_path("#{runs_path}?run_id=1001&run_attempt=2")
+      expect(run_ids).to eq(%w[run-1001-2 run-1001-1] + (507..529).reverse_each.map { "run-#{it}-1" })
+
+      click_link "Older Runs"
+      expect(page).to have_current_path("#{runs_path}?run_id=506&run_attempt=1&date=#{today}")
+      expect(run_ids).to eq((500..506).reverse_each.map { "run-#{it}-1" })
+
+      click_link "Older Runs"
+      expect(page).to have_current_path("#{runs_path}?date=#{today - 7}")
+      expect(run_ids).to eq %w[run-400-1]
+      expect(page).to have_link "Older Runs", href: "?date=#{today - 14}"
+      expect(page).to have_no_css ".auto-refresh"
+    end
+  end
 end

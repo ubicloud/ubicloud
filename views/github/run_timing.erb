@@ -1,0 +1,27 @@
+<%# locals: (run:, now:, compact: false) %>
+
+<% duration_text = if !run.completed? && !run.completed_at
+     if run.status == "in_progress"
+       "Running for #{format_time_diff(run.run_started_at, now)}"
+     else
+       "Queued for #{format_time_diff(run.created_at, now)}"
+     end
+   elsif (duration = run.duration)
+     "Took #{format_time_diff(0, duration)}"
+   end
+   started_at = run.run_started_at || run.created_at %>
+
+<% if duration_text %>
+  <div class="<%= compact ? "inline font-medium text-gray-700" : "text-gray-900" %>"><%= duration_text %></div>
+
+  <% if compact %>
+    |
+  <% end %>
+<% end %>
+
+<div
+  class="<%= compact ? "inline" : "mt-1 text-xs" %>"
+  title="<%= started_at.getutc.strftime("%Y-%m-%d %H:%M:%S UTC") %>"
+>
+  <%= run.run_started_at ? "Started" : "Created" %> <%= humanize_time(started_at) %>
+</div>
