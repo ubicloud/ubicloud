@@ -44,7 +44,7 @@ end
 #  private_subnet_id    | uuid                     | NOT NULL
 #  mac                  | macaddr                  |
 #  created_at           | timestamp with time zone | NOT NULL DEFAULT now()
-#  private_ipv4         | cidr                     | NOT NULL
+#  private_ipv4         | cidr                     |
 #  private_ipv6         | cidr                     | NOT NULL
 #  vm_id                | uuid                     |
 #  encryption_key       | text                     |
