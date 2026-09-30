@@ -209,8 +209,16 @@ RSpec.describe Clover, "OIDC auth" do
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
-  describe "with group_prefix configured" do
-    before { oidc_provider.update(group_prefix: "org-") }
+  it "ignores groups when group_prefix is set but groups_claim isn't" do
+    oidc_provider.update(group_prefix: "org-")
+    stub_token_endpoint(id_token: {groups: %w[eng].freeze})
+    initiate_oidc_login
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
+    expect(a_request(:get, userinfo_url)).not_to have_been_made
+  end
+
+  describe "with group_prefix and groups_claim configured" do
+    before { oidc_provider.update(group_prefix: "org-", groups_claim: "groups") }
 
     it "extracts groups from id_token without calling userinfo endpoint" do
       stub_token_endpoint(id_token: {groups: %w[eng ops].freeze})
@@ -236,6 +244,44 @@ RSpec.describe Clover, "OIDC auth" do
       expect(page.title).to eq("Ubicloud - Default Dashboard")
       visit "/oidc-groups"
       expect(page.body).to eq "org-foo,org-bar"
+    end
+
+    it "accepts a single group sent as a string rather than an array" do
+      stub_token_endpoint(id_token: {groups: "eng"})
+      initiate_oidc_login
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-eng"
+    end
+
+    it "keeps groups from an id_token without email after fetching userinfo" do
+      stub_token_endpoint(id_token: {email: nil, groups: %w[eng].freeze})
+      stub_userinfo_endpoint
+      initiate_oidc_login
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-eng"
+    end
+
+    describe "with a custom groups_claim" do
+      before { oidc_provider.update(groups_claim: "myapp:groups") }
+
+      it "extracts groups from the configured id_token claim" do
+        stub_token_endpoint(id_token: {"myapp:groups": %w[eng].freeze, groups: %w[other].freeze})
+        initiate_oidc_login
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        visit "/oidc-groups"
+        expect(page.body).to eq "org-eng"
+      end
+
+      it "extracts groups from the configured userinfo claim" do
+        stub_token_endpoint
+        stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "email" => "user@example.com", "myapp:groups" => %w[foo].freeze})
+        initiate_oidc_login
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        visit "/oidc-groups"
+        expect(page.body).to eq "org-foo"
+      end
     end
   end
 

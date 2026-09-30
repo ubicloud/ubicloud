@@ -91,6 +91,7 @@ end
 #  registration_access_token | text    |
 #  group_prefix              | text    |
 #  pkce_supported            | boolean | NOT NULL DEFAULT false
+#  groups_claim              | text    |
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
 # Referenced By:
