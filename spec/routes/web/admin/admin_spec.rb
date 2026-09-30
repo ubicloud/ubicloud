@@ -1731,6 +1731,15 @@ RSpec.describe CloverAdmin do
     ]
   end
 
+  it "shows count of precreated github repository buckets on presigned certs page" do
+    click_link "Presigned Certs Info"
+    expect(page.all("table.github-repository-buckets tbody td").map(&:text)).to eq ["github_repository_bucket_pool", "0"]
+
+    2.times { GithubRepositoryBucketPool.create(access_key: "ak-#{it}", secret_key: "sk-#{it}") }
+    page.refresh
+    expect(page.all("table.github-repository-buckets tbody td").map(&:text)).to eq ["github_repository_bucket_pool", "2"]
+  end
+
   it "supports force creating a VM on a VmHost" do
     vmh = create_vm_host
     BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
