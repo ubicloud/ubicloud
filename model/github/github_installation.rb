@@ -8,6 +8,7 @@ class GithubInstallation < Sequel::Model
   one_to_many :repositories, key: :installation_id, class: :GithubRepository, read_only: true, is_used: true
   one_to_many :custom_labels, class: :GithubCustomLabel, key: :installation_id, read_only: true
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry, read_only: true
+  many_to_many :private_subnets, join_table: :github_installation_private_subnet, remover: nil, clearer: nil
 
   plugin :association_dependencies, custom_labels: :destroy
 
@@ -42,6 +43,13 @@ class GithubInstallation < Sequel::Model
 
   def client(**)
     Github.installation_client(installation_id, **)
+  end
+
+  def incr_destroy_private_subnets
+    private_subnets.each do |subnet|
+      subnet.firewalls.each(&:destroy)
+      subnet.incr_destroy
+    end
   end
 
   def cache_storage_gib

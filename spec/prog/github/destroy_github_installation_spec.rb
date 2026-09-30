@@ -104,11 +104,31 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
+    it "destroys the private subnets of the installation and their firewalls" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, allow_only_ssh: true).subject
+      github_installation.add_private_subnet(ps)
+      firewall = ps.firewalls.first
+      other_ps = Prog::Vnet::SubnetNexus.assemble(project.id, allow_only_ssh: true).subject
+      other_firewall = other_ps.firewalls.first
+
+      expect { dgi.wait_resource_destroy }.to hop("wait_private_subnets_destroy")
+      expect(ps.destroy_set?).to be(true)
+      expect(firewall.exists?).to be(false)
+      expect(other_ps.destroy_set?).to be(false)
+      expect(other_firewall.exists?).to be(true)
+    end
+  end
+
+  describe "#wait_private_subnets_destroy" do
+    it "naps if not all private subnets destroyed" do
+      github_installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(project.id).subject)
+      expect { dgi.wait_private_subnets_destroy }.to nap(10)
+    end
+
     it "deletes resource and pops" do
-      # No repositories or runners - installation can be destroyed
       installation_id = github_installation.id
       GithubCustomLabel.create(installation_id:, name: "custom-label", alias_for: "ubicloud-standard-2")
-      expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
+      expect { dgi.wait_private_subnets_destroy }.to exit({"msg" => "github installation destroyed"})
       expect(GithubInstallation[installation_id]).to be_nil
     end
   end

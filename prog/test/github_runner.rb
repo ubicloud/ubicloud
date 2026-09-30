@@ -160,6 +160,13 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    installation = GithubInstallation.first(project_id: customer_project_id)
+    installation.incr_destroy_private_subnets
+    unless installation.private_subnets_dataset.empty?
+      Clog.emit("Waiting private subnets to be destroyed")
+      nap 15
+    end
+
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
     if (project = Project[customer_project_id])

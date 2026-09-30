@@ -769,6 +769,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if vm
       vm.private_subnets.each do |subnet|
+        next if installation.private_subnets_dataset.with_pk(subnet.id)
+
         subnet.firewalls.map(&:destroy)
         subnet.incr_destroy
       end
