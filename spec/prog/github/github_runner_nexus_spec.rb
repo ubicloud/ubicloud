@@ -221,6 +221,57 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       aws_subnet = picked_vm.private_subnets.first.private_subnet_aws_resource.aws_subnets.first
       expect(aws_subnet.az_suffix).to eq("b")
     end
+
+    it "creates a private subnet for each alien vm unless the project shares a VPC between them" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject)
+
+      ps = nx.pick_vm.private_subnets.first
+      expect(installation.private_subnets_dataset.with_pk(ps.id)).to be_nil
+      expect(ps.net4.netmask.prefix_len).to eq(28)
+    end
+
+    it "creates a private subnet for the alien vms of the installation" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "euc1-az2")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az3")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      allow(SecureRandom).to receive(:random_number).and_call_original
+      expect(SecureRandom).to receive(:random_number).with(1..255).and_return(42)
+
+      picked_vm = nx.pick_vm
+      ps = picked_vm.private_subnets.first
+      expect(installation.private_subnets.map(&:id)).to eq([ps.id])
+      expect(ps).to have_attributes(name: installation.ubid.to_s, location_id: location.id, project_id: vm.project_id)
+      expect(ps.net4.to_s).to eq("10.42.0.0/16")
+      expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.42.0.0/20", "10.42.16.0/20"])
+      expect(AwsSubnet[picked_vm.nics.first.strand.stack.first["aws_subnet_id"]].az_suffix).to eq("b")
+    end
+
+    it "places alien vms in the private subnet of the installation in the location" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      other_installation = GithubInstallation.create(installation_id: 456, project_id: project.id, name: "other", type: "Organization")
+      other_installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject)
+      installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(vm.project_id).subject)
+      ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      installation.add_private_subnet(ps)
+
+      picked_vm = nil
+      expect { picked_vm = nx.pick_vm }.not_to change(PrivateSubnet, :count)
+      expect(picked_vm.private_subnets.map(&:id)).to eq([ps.id])
+    end
   end
 
   describe ".update_billing_record" do

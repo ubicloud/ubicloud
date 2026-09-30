@@ -85,13 +85,29 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ch_version = "53.0"
     end
 
-    ps = Prog::Vnet::SubnetNexus.assemble(
-      Config.github_runner_service_project_id,
-      location_id:,
-      allow_only_ssh: true,
-      ipv4_range_size: 28,
-      preferred_azs:,
-    ).subject
+    if location_id == Location::GITHUB_RUNNERS_ID || !project.get_ff_aws_alien_runners_shared_vpc
+      ps = Prog::Vnet::SubnetNexus.assemble(
+        Config.github_runner_service_project_id,
+        location_id:,
+        allow_only_ssh: true,
+        ipv4_range_size: 28,
+        preferred_azs:,
+      ).subject
+    else
+      # Concurrent runners of the installation wait here, so only the first one creates the subnet.
+      installation.lock!
+      unless (ps = installation.private_subnets_dataset.first(location_id:))
+        ps = Prog::Vnet::SubnetNexus.assemble(
+          Config.github_runner_service_project_id,
+          name: installation.ubid.to_s,
+          location_id:,
+          allow_only_ssh: true,
+          ipv4_range: "10.#{SecureRandom.random_number(1..255)}.0.0/16",
+          aws_subnet_ipv4_range_size: 20,
+        ).subject
+        installation.add_private_subnet(ps)
+      end
+    end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
@@ -106,6 +122,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       arch:,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
+      availability_zone: preferred_azs.first&.az,
       alternative_families:,
       use_eip: false,
       waiting_strand_id: strand.id,
