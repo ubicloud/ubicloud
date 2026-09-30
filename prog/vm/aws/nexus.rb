@@ -259,7 +259,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
     availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(PrivateSubnet[private_subnet_id], nil, all_excluded_azs).az_suffix if use_separate_management_nic
-    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:).subject
+    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, use_eip: !is_runner?, create_network_interface: !is_runner?).subject
     user_nic.update(vm_id: vm.id)
     if use_separate_management_nic
       management_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, is_management: true, use_eip: !postgres_aws_ssh_ipv6?).subject
