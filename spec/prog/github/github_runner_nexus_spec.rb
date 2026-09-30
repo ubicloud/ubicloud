@@ -813,6 +813,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.setup_environment }.to hop("register_runner")
     end
 
+    it "resolves the transparent cache domain to the vm on aws" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      ps = PrivateSubnet.create(name: "runner-subnet", location_id: location.id, net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64", state: "waiting", project_id: vm.project_id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
+      vm.update(location_id: location.id, vm_host_id: nil)
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        set -ueo pipefail
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo 10.0.0.5" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
     it "hops to register_runner with cache proxy replacement" do
       installation.update(use_docker_mirror: false, cache_enabled: false)
       project.set_ff_cache_proxy_download_url({"x64" => "https://example.com/cache-proxy-x64.tar.gz", "arm64" => "https://example.com/cache-proxy-arm64.tar.gz"})

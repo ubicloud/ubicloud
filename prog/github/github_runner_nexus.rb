@@ -507,6 +507,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
+    if vm.location.aws?
+      command << NetSsh.command(<<~COMMAND, private_ipv4: vm.private_ipv4)
+        echo :private_ipv4" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
+      COMMAND
+    end
+
     if (cache_proxy_url = project.get_ff_cache_proxy_download_url&.dig(label_data["arch"]))
       command << NetSsh.command(<<~COMMAND, cache_proxy_url:)
         sudo systemctl stop cache-proxy.service
