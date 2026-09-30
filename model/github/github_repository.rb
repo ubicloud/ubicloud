@@ -127,6 +127,7 @@ end
 #  access_key      | text                     |
 #  secret_key      | text                     |
 #  no_cache_since  | timestamp with time zone |
+#  bucket_name     | text                     |
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)
