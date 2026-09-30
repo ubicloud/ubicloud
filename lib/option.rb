@@ -125,8 +125,8 @@ module Option
   GCP_FAMILY_VM_CONFIG = {
     "c4a-standard" => {gce_prefix: "c4a-standard", gce_suffix: "lssd", arch: "arm64", mem_ratio: 4, ssd_gib: 375, shapes: c4a_shapes},
     "c4a-highmem" => {gce_prefix: "c4a-highmem", gce_suffix: "lssd", arch: "arm64", mem_ratio: 8, ssd_gib: 375, shapes: c4a_shapes},
-    "c4-standard" => {gce_prefix: "c4-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4_shapes},
-    "c4-highmem" => {gce_prefix: "c4-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4_shapes},
+    "c4-standard" => {gce_prefix: "c4-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 3.75, ssd_gib: 375, shapes: c4_shapes},
+    "c4-highmem" => {gce_prefix: "c4-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 7.75, ssd_gib: 375, shapes: c4_shapes},
     "c4d-standard" => {gce_prefix: "c4d-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4d_shapes},
     "c4d-highmem" => {gce_prefix: "c4d-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4d_shapes},
     # c3 has no highmem variant.
@@ -244,7 +244,7 @@ module Option
   }).concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
     config[:shapes].keys.map { |vcpu|
       VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0,
-        vcpu * config[:mem_ratio], GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, config[:arch])
+        (vcpu * config[:mem_ratio]).floor, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, config[:arch])
     }
   }).freeze
 
@@ -442,7 +442,7 @@ module Option
     ["r8id", 48, 384],
     ["r8id", 64, 512],
   ].concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
-    config[:shapes].keys.map { |vcpu| [family, vcpu, vcpu * config[:mem_ratio]] }
+    config[:shapes].keys.map { |vcpu| [family, vcpu, (vcpu * config[:mem_ratio]).floor] }
   }).to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
