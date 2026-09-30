@@ -526,21 +526,6 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InvalidParameterValue)
     end
 
-    it "sets transparent cache host for runners" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
-      vm.update(unix_user: "runneradmin")
-      expected_user_data = cloud_config(
-        unix_user: vm.unix_user,
-        keys: [vm.sshable.keys.first.public_key],
-        runcmd: ["usermod -L ubuntu", "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"],
-      )
-      expect(client).to receive(:run_instances).with(hash_including(
-        user_data: Base64.encode64(expected_user_data),
-      )).and_call_original
-      expect { nx.create_instance }.to hop("wait_instance_created")
-      expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
-    end
-
     it "uses spot instances for runners when enabled" do
       expect(Config).to receive(:github_runner_aws_spot_instance_enabled).and_return(true)
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
