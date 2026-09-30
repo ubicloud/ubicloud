@@ -30,6 +30,8 @@ class Serializers::Postgres < Serializers::Base
     end
 
     if options[:detailed]
+      # needs_convergence? reads these from every server
+      pg.servers(eager: [:semaphores, :strand, vm: :vm_storage_volumes], reload: true)
       base.merge!(
         connection_string: pg.connection_string,
         private_connection_string: pg.private_connection_string,
@@ -37,6 +39,7 @@ class Serializers::Postgres < Serializers::Base
         password: pg.superuser_password,
         hostname: pg.hostname,
         primary: pg.representative_server.primary?,
+        needs_convergence: pg.needs_convergence?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas_dataset.eager(:project).all, {include_path: true}),
