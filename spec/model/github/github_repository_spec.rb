@@ -89,6 +89,23 @@ RSpec.describe GithubRepository do
       expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))
     end
 
+    it "uses a precreated bucket if one is available" do
+      bucket = GithubRepositoryBucketPool.create(access_key: "precreated-key", secret_key: Digest::SHA256.hexdigest("precreated-secret"))
+      other_bucket = GithubRepositoryBucketPool.create(access_key: "other-key", secret_key: "other-secret")
+      st = Strand.create(id: Prog::Github::MaintainRepositoryBucketPool::STRAND_ID, prog: "Github::MaintainRepositoryBuckets", label: "wait", schedule: Time.now + 60 * 60)
+      expect(blob_storage_client).not_to receive(:create_bucket)
+      expect(cloudflare_client).not_to receive(:create_token)
+
+      expect { github_repository.setup_blob_storage }.to change(GithubRepositoryBucketPool, :count).from(2).to(1)
+      remaining_bucket = GithubRepositoryBucketPool.first
+      used_bucket = (remaining_bucket.id == bucket.id) ? other_bucket : bucket
+      github_repository.reload
+      expect(github_repository.bucket_name).to eq(used_bucket.ubid)
+      expect(github_repository.access_key).to eq(used_bucket.access_key)
+      expect(github_repository.secret_key).to eq(used_bucket.secret_key)
+      expect(st.reload.schedule).to be_within(5).of(Time.now)
+    end
+
     it "prefixes the bucket and token names with e2e in e2e runs" do
       allow(Config).to receive(:is_e2e).and_return(true)
       expect(blob_storage_client).to receive(:create_bucket).with(hash_including(bucket: "e2e-#{github_repository.ubid}"))
