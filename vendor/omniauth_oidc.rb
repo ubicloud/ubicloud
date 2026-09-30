@@ -160,9 +160,8 @@ module OmniAuth
         end
 
         if opts.need_groups
-          if (groups = token["groups"])
+          if opts.groups_claim && (groups = token[opts.groups_claim])
             Clog.emit("OIDC groups found in token", oidc_groups_found: {groups:, user_info:})
-            user_info["groups"] = groups
           else
             Clog.emit("OIDC groups not found in token", oidc_groups_not_found: {keys: token.keys, user_info:})
             need_user_info = true
@@ -176,9 +175,13 @@ module OmniAuth
             expects: 200
           )
           user_info = JSON.parse(response.body)
+          groups ||= user_info[opts.groups_claim] if opts.need_groups
           @user_info ||= {}
           @user_info.merge!(user_info)
         end
+
+        # After the merge: without an email, user_info was replaced by the userinfo body.
+        @user_info["groups"] = groups if opts.need_groups
 
         super
       rescue CallbackError => e
@@ -222,6 +225,7 @@ module OmniAuth
         :token_endpoint,
         :userinfo_endpoint,
         :need_groups,
+        :groups_claim,
         :pkce_supported
       )
 
@@ -244,7 +248,8 @@ module OmniAuth
           authorization_endpoint: provider.authorization_endpoint,
           token_endpoint: provider.token_endpoint,
           userinfo_endpoint: provider.userinfo_endpoint,
-          need_groups: provider.group_prefix,
+          need_groups: provider.group_prefix && provider.groups_claim,
+          groups_claim: provider.groups_claim,
           pkce_supported: provider.pkce_supported
         )
       end

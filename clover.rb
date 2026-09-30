@@ -537,8 +537,9 @@ class Clover < Roda
         if (groups = omniauth_info["groups"]) &&
             omniauth_provider.bytesize == 26 &&
             (provider = OidcProvider[omniauth_provider]) &&
-            (group_prefix = provider.group_prefix)
-          groups = groups.to_a.map(&:to_s)
+            (group_prefix = provider.group_prefix) &&
+            provider.groups_claim
+          groups = Array(groups).map(&:to_s)
           session["oidc_groups"] = groups
           session["oidc_group_prefix"] = group_prefix
           Clog.emit("OIDC groups login", oidc_groups_login: {groups:, group_prefix:})
