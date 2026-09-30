@@ -3,8 +3,9 @@
 require_relative "spec_helper"
 
 RSpec.describe UbiMcp, "catalog" do
-  expected = %w[get_object_info get_postgres get_postgres_config get_postgres_logs get_postgres_metrics
-    get_postgres_options list_postgres list_postgres_backups].freeze
+  expected = %w[get_firewall get_load_balancer get_object_info get_postgres get_postgres_config
+    get_postgres_logs get_postgres_metrics get_postgres_options get_private_subnet get_vm
+    list_firewall list_load_balancer list_postgres list_postgres_backups list_private_subnet list_vm].freeze
 
   it "pins the tool names" do
     expect(UbiMcp::TOOLS.map(&:tool_name)).to eq expected
