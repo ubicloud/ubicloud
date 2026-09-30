@@ -67,7 +67,7 @@ class GithubRepository < Sequel::Model
       Clog.emit("Repository credentials failed to delete Cloudflare token", {failed_cloudflare_token_delete: {bucket_name:}})
     end
 
-    this.update(access_key: nil, secret_key: nil)
+    this.update(bucket_name: nil, access_key: nil, secret_key: nil)
   end
 
   def self.create_bucket(bucket_name, rescue_bucket_already_owned: true)
@@ -96,9 +96,26 @@ class GithubRepository < Sequel::Model
       lock!(:no_key_update)
       return if access_key && secret_key
 
-      token_id, token = self.class.create_bucket(bucket_name)
-      update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
-      Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
+      ds = DB[:github_repository_bucket]
+      bucket = ds
+        .where(id: ds
+          .limit(1)
+          .for_update
+          .skip_locked
+          .select(:id))
+        .returning
+        .delete
+        .first
+
+      if bucket
+        bucket = GithubRepositoryBucket.call(bucket)
+        update(bucket_name: bucket.ubid, access_key: bucket.access_key, secret_key: bucket.secret_key)
+        Prog::Github::MaintainRepositoryBuckets.schedule_strand
+      else
+        token_id, token = self.class.create_bucket(bucket_name)
+        update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+        Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
+      end
     end
   end
 
