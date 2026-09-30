@@ -1,0 +1,37 @@
+<%# locals: (run:, repository_name:, compact: false) %>
+
+<% if (commit_summary = run.commit_message)
+     commit_summary = commit_summary.split("\n", 2).first
+     commit_summary = nil if commit_summary == run.display_title
+   end
+   commit_url = "https://github.com/#{run.head_repository_full_name || repository_name}/commit/#{run.commit_hash}"
+   if run.head_repository_full_name && run.head_repository_full_name != repository_name
+     fork_owner = run.head_repository_full_name.split("/", 2).first
+   end %>
+
+<% if run.head_branch %>
+  <div
+    class="<%= compact ? "inline font-medium text-gray-700" : "font-medium text-gray-900 max-w-xs truncate" %>"
+    title="<%= run.head_branch %>"
+  >
+    <% if fork_owner %>
+      <span class="text-gray-500"><%= fork_owner %>:</span><%= run.head_branch %>
+    <% else %>
+      <%= run.head_branch %>
+    <% end %>
+  </div>
+
+  <% if compact && run.commit_hash %>
+    |
+  <% end %>
+<% end %>
+
+<% if run.commit_hash %>
+  <div
+    class="<%= compact ? "inline" : "mt-1 text-xs text-gray-500 max-w-xs truncate" %>"
+    title="<%= run.commit_message %>"
+  >
+    <a href="<%= commit_url %>" class="font-mono hover:underline"><%= run.commit_hash[0, 7] %></a>
+    <%= commit_summary %>
+  </div>
+<% end %>

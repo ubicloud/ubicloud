@@ -1,0 +1,128 @@
+<% @page_title = "Workflow Runs" %>
+
+<% if !@runs.empty? && !@runs.first.completed? %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
+<% end %>
+
+<%== render("github/tabbar") %>
+
+<% now = Time.now
+   repository_name = @repository.name
+   badge_class = "inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5" %>
+
+<div class="grid grid-cols-1 gap-6">
+  <div class="md:flex md:items-center md:justify-between">
+    <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:tracking-tight">
+      <%= repository_name %>
+    </h3>
+  </div>
+
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-x-auto">
+      <table id="workflow-runs" class="min-w-full divide-y divide-gray-300">
+        <% unless @runs.empty? %>
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">
+                Workflow Run
+              </th>
+
+              <th scope="col" class="pl-3 pr-6 min-[1200px]:pr-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                Status
+              </th>
+
+              <th
+                scope="col"
+                class="hidden min-[1640px]:table-cell px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+              >
+                Branch / Commit
+              </th>
+
+              <th
+                scope="col"
+                class="
+                  hidden min-[1200px]:table-cell pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              >
+                Timing
+              </th>
+            </tr>
+          </thead>
+        <% end %>
+
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% if @runs.empty? %>
+            <tr>
+              <td colspan="4" class="text-center py-4 px-8 lg:px-32">
+                <%== part(
+                  "components/empty_state",
+                  icon: "hero-clock",
+                  title: "No workflow runs",
+                  description: "No workflow runs were created between #{@empty_date_range.join(" and ")} (UTC)."
+                ) %>
+              </td>
+            </tr>
+          <% else %>
+            <% @runs.each do |run| %>
+              <% status_text, status_color = github_workflow_run_status_label(run) %>
+
+              <tr id="run-<%= run.run_id %>-<%= run.run_attempt %>">
+                <td
+                  class="
+                    pl-4 pr-3 sm:pl-6 py-4 text-sm w-full max-w-0 min-[1200px]:w-auto min-[1200px]:max-w-none
+                    min-[1400px]:w-full min-[1400px]:max-w-0 min-[1640px]:w-auto min-[1640px]:max-w-none
+                  "
+                >
+                  <div class="min-[1200px]:max-w-[500px] min-[1400px]:max-w-none">
+                    <div class="font-medium text-gray-900 min-[1640px]:max-w-md truncate">
+                      <%= run.display_title %>
+                    </div>
+
+                    <div class="mt-1 text-gray-500 text-xs truncate">
+                      <%= run.event %> by
+                      <a href="https://github.com/<%= run.actor_login %>" class="hover:underline"><%= run.actor_login %></a>
+                    </div>
+
+                    <% if run.head_branch || run.commit_hash %>
+                      <div class="mt-1 text-gray-500 text-xs truncate min-[1640px]:hidden">
+                        <%== part("github/run_branch", run:, repository_name:, compact: true) %>
+                      </div>
+                    <% end %>
+
+                    <div class="mt-1 text-gray-500 text-xs truncate min-[1200px]:hidden">
+                      <%== part("github/run_timing", run:, now:, compact: true) %>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="pl-3 pr-6 min-[1200px]:pr-3 py-4 text-sm whitespace-nowrap">
+                  <span class="<%= badge_class %> <%= status_color %>"><%= status_text %></span>
+                </td>
+
+                <td class="hidden min-[1640px]:table-cell px-3 py-4 text-sm">
+                  <%== part("github/run_branch", run:, repository_name:) %>
+                </td>
+
+                <td class="hidden min-[1200px]:table-cell pl-3 pr-4 sm:pr-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                  <%== part("github/run_timing", run:, now:) %>
+                </td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if @older_runs_params %>
+      <div class="px-4 py-3 sm:px-6 flex justify-end">
+        <a
+          href="?<%= to_query_string(@older_runs_params) %>"
+          class="text-sm font-medium text-orange-600 hover:underline"
+        >
+          Older Runs
+        </a>
+      </div>
+    <% end %>
+  </div>
+</div>
