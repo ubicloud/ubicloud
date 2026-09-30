@@ -21,7 +21,7 @@ class GithubRepository < Sequel::Model
   end
 
   def bucket_name
-    Config.is_e2e ? "e2e-#{ubid}" : ubid
+    super || (Config.is_e2e ? "e2e-#{ubid}" : ubid)
   end
 
   def repository_name
