@@ -10367,7 +10367,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-northeast2:
@@ -10815,7 +10815,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-south2:
@@ -11350,7 +11350,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-southeast2:
@@ -11944,7 +11944,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-australia-southeast2:
@@ -12777,7 +12777,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-southwest1:
@@ -13433,7 +13433,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west10:
@@ -13578,7 +13578,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west2:
@@ -13933,7 +13933,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west3:
@@ -14241,7 +14241,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west4:
@@ -14633,7 +14633,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west6:
@@ -14872,7 +14872,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west8:
@@ -16128,7 +16128,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-southamerica-east1:
@@ -16949,7 +16949,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east1:
@@ -17378,7 +17378,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east4:
@@ -17770,7 +17770,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east5:
@@ -18125,7 +18125,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-south1:
@@ -18396,7 +18396,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-west1:
@@ -18667,7 +18667,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-west2:

@@ -98,6 +98,14 @@ RSpec.describe Option do
       expect(Option::VmSizes.find { it.name == "c4-highmem-8" }.memory_gib).to eq(62)
     end
 
+    it "uses the family's memory_gib_overrides for shapes that do not follow the ratio" do
+      expect(described_class.gcp_memory_gib("z3-standardlssd", 176)).to eq(1406)
+      expect(described_class.gcp_memory_gib("z3-standardlssd", 88)).to eq(704)
+      expect(described_class.gcp_memory_gib("c4-standard", 4)).to eq(15)
+      expect(Option::POSTGRES_SIZE_OPTIONS["z3-standardlssd-176"].memory_gib).to eq(1406)
+      expect(Option::VmSizes.find { it.name == "z3-standardlssd-176" }.memory_gib).to eq(1406)
+    end
+
     it "builds the GCE machine type from the family's prefix, vcpu count and suffix" do
       expect(described_class.gcp_instance_type_name("c4a-standard", 16)).to eq("c4a-standard-16-lssd")
       expect(described_class.gcp_instance_type_name("c4d-highmem", 96)).to eq("c4d-highmem-96-lssd")

@@ -77,14 +77,12 @@ class GcpInstanceAvailabilityGenerator
   end
 
   def sizes_for(family, vcpus)
-    config = Option::GCP_FAMILY_VM_CONFIG.fetch(family)
     vcpus.keys.sort.map do |vcpu|
       {
         "name" => "#{family}-#{vcpu}",
         "vcpus" => vcpu,
-        # Same whole-GiB derivation as Option's size tables: c4 ratios are
-        # fractional (3.75 and 7.75), and memory_gib is an Integer everywhere.
-        "memory_gib" => (vcpu * config[:mem_ratio]).floor,
+        # Same derivation as Option's size tables, overrides included.
+        "memory_gib" => Option.gcp_memory_gib(family, vcpu),
         # dup: the same frozen array is shared by every location offering this
         # size, and YAML.dump emits anchors and aliases for repeated objects.
         "storage_size_options" => Option::GCP_STORAGE_SIZE_OPTIONS.fetch(family).fetch(vcpu).dup,
