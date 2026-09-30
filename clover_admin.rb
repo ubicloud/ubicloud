@@ -2433,6 +2433,7 @@ class CloverAdmin < Roda
 
         {table:, **row}
       end
+      @bucket_rows = [{table: :github_repository_bucket_pool, count: GithubRepositoryBucketPool.count}]
 
       view("presigned_certs")
     end
