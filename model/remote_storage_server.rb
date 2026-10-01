@@ -2,11 +2,14 @@
 
 require_relative "../model"
 
-# Serves a single VmStorageVolume over the ubiblk remote stripe protocol
-# (TLS-PSK) so another host can boot a VM whose stripe source is this server.
+# Serves a single VmStorageVolume or DetachableVolume over the ubiblk remote
+# stripe protocol (TLS-PSK) so another host can take the volume over, reading
+# its stripes from this server until it has them all.
 class RemoteStorageServer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :source_vm_storage_volume, class: :VmStorageVolume, read_only: true
+  many_to_one :source_detachable_volume, class: :DetachableVolume, read_only: true
+  many_to_one :host, class: :VmHost, key: :vm_host_id, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :psk
   plugin SemaphoreMethods, :destroy, :checkup
@@ -15,8 +18,10 @@ class RemoteStorageServer < Sequel::Model
     source_vm_storage_volume.vm
   end
 
+  # A detachable volume's own host changes once it is started elsewhere, so
+  # the server keeps the host it serves from.
   def vm_host
-    vm.vm_host
+    source_vm_storage_volume_id ? vm.vm_host : host
   end
 
   # Address a client connects to over the remote stripe protocol.
@@ -39,12 +44,17 @@ end
 #  psk                         | text                     | NOT NULL
 #  psk_identity                | text                     | NOT NULL
 #  port                        | integer                  | NOT NULL
-#  source_vm_storage_volume_id | uuid                     | NOT NULL
+#  source_vm_storage_volume_id | uuid                     |
 #  vm_host_id                  | uuid                     | NOT NULL
+#  source_detachable_volume_id | uuid                     |
 # Indexes:
-#  remote_storage_server_pkey                 | PRIMARY KEY btree (id)
-#  remote_storage_server_vm_host_id_port_uidx | UNIQUE btree (vm_host_id, port)
+#  remote_storage_server_pkey                            | PRIMARY KEY btree (id)
+#  remote_storage_server_source_detachable_volume_id_key | UNIQUE btree (source_detachable_volume_id)
+#  remote_storage_server_vm_host_id_port_uidx            | UNIQUE btree (vm_host_id, port)
+# Check constraints:
+#  remote_storage_server_single_source | (((source_vm_storage_volume_id IS NOT NULL)::integer + (source_detachable_volume_id IS NOT NULL)::integer) = 1)
 # Foreign key constraints:
+#  remote_storage_server_source_detachable_volume_id_fkey | (source_detachable_volume_id) REFERENCES detachable_volume(id)
 #  remote_storage_server_source_vm_storage_volume_id_fkey | (source_vm_storage_volume_id) REFERENCES vm_storage_volume(id)
 #  remote_storage_server_vm_host_id_fkey                  | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:

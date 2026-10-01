@@ -113,6 +113,14 @@ RSpec.describe KeyRotation do
       expect(File.read(backup)).to eq(File.read(spdk_file))
       expect(File.stat(backup).mode & 0o777).to eq(0o600)
     end
+
+    it "leaves the owner alone when no user is given" do
+      write_spdk(old_kek)
+      rotation = described_class.new(spdk_file, :spdk)
+      expect(FileUtils).not_to receive(:chown)
+      rotation.backup(old_kek)
+      expect(File.stat(rotation.backup_path(old_kek)).mode & 0o777).to eq(0o600)
+    end
   end
 
   describe "#rotate" do

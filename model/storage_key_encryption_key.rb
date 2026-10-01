@@ -40,6 +40,17 @@ class StorageKeyEncryptionKey < Sequel::Model
     Base64.strict_encode64(init_vector << cipher.update(plaintext) << cipher.final << cipher.auth_tag)
   end
 
+  def decrypt(wrapped, auth_data)
+    data = Base64.strict_decode64(wrapped)
+    cipher = OpenSSL::Cipher.new(algorithm)
+    cipher.decrypt
+    cipher.key = Base64.decode64(key)
+    cipher.iv = data[0, 12]
+    cipher.auth_data = auth_data
+    cipher.auth_tag = data[-16..]
+    cipher.update(data[12...-16]) << cipher.final
+  end
+
   def secret_key_material_hash
     # default to_hash doesn't decrypt encrypted columns, so implement
     # this to decrypt keys when they need to be sent to a running copy
@@ -64,6 +75,8 @@ end
 # Indexes:
 #  storage_key_encryption_key_pkey | PRIMARY KEY btree (id)
 # Referenced By:
+#  detachable_volume           | detachable_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
+#  detachable_volume           | detachable_volume_key_encryption_key_2_id_fkey  | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
 #  machine_image_version_metal | machine_image_version_metal_archive_kek_id_fkey | (archive_kek_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume           | vm_storage_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume           | vm_storage_volume_key_encryption_key_2_id_fkey  | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)

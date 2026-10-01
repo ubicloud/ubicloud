@@ -7,9 +7,9 @@ RSpec.describe RemoteStorageServer do
 
   let(:kek_material) { {"key" => "a2V5", "init_vector" => "aXY=", "auth_data" => "vmxyz_0"} }
 
-  describe "#listen_config" do
+  describe ".listen_config" do
     it "builds a listen config with the address and PSK" do
-      config = PerfectTOML.parse(server.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss"))
+      config = PerfectTOML.parse(described_class.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss"))
       expect(config["server"]).to eq({"address" => "0.0.0.0:4600", "psk" => {"identity" => "ubiblk-rss", "secret" => {"ref" => "psk"}}})
       expect(config["secrets"]["psk"]).to eq({"source" => {"inline" => "cHNrYnl0ZXM="}, "encoding" => "base64"})
     end

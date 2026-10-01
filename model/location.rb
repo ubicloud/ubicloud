@@ -104,6 +104,7 @@ end
 #  location_project_id_fkey | (project_id) REFERENCES project(id)
 #  location_provider_fkey   | (provider) REFERENCES provider(name)
 # Referenced By:
+#  detachable_volume         | detachable_volume_location_id_fkey         | (location_id) REFERENCES location(id)
 #  firewall                  | firewall_location_id_fkey                  | (location_id) REFERENCES location(id)
 #  gcp_vpc                   | gcp_vpc_location_id_fkey                   | (location_id) REFERENCES location(id)
 #  github_runner             | github_runner_location_id_fkey             | (location_id) REFERENCES location(id)
