@@ -17,8 +17,8 @@ class Prog::Vnet::NicNexus < Prog::Base
     DB.transaction do
       prog, ipv4_addr, mac, state, aws_subnet_id = if subnet.location.aws?
         aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:)
-        ipv4 = ipv4_addr || allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-        ["Vnet::Aws::NicNexus", ipv4.to_s, nil, "active", aws_subnet&.id]
+        ipv4 = ipv4_addr || (allocate_ipv4_from_aws_subnet(subnet, aws_subnet) if create_network_interface)
+        ["Vnet::Aws::NicNexus", ipv4&.to_s, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
         ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active", nil]
       else

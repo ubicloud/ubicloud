@@ -63,6 +63,19 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
     end
 
+    it "leaves the private IPv4 of an AWS NIC created at launch to AWS" do
+      project = Project.create(name: "test-aws-launch-nic")
+      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+
+      strand = described_class.assemble(aws_ps.id, name: "demonic", use_eip: false, create_network_interface: false)
+
+      expect(strand.subject.private_ipv4).to be_nil
+      expect(strand.stack.first).to eq("exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => nil, "aws_subnet_id" => aws_ps.private_subnet_aws_resource.aws_subnets.first.id, "use_eip" => false, "create_network_interface?" => false)
+    end
+
     it "raises if the required availability zone is not available" do
       project = Project.create(name: "test-aws-required-az")
       aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)

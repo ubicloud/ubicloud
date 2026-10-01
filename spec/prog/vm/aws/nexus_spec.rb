@@ -1081,6 +1081,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
 
       expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
       user_nic = vm.reload.user_nic
+      expect(user_nic.private_ipv4).to be_nil
       expect(user_nic.strand.stack.first["use_eip"]).to be(false)
       expect(user_nic.strand.stack.first["create_network_interface?"]).to be(false)
     end
