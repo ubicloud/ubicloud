@@ -386,8 +386,25 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
       ])
     end
 
-    it "keeps the regex escapes for Postgres" do
-      expect(described_class::CTYPE_SQL).to include('~* \'\m(lower|upper|initcap|to_tsvector)\s*\(\'')
+    it "lists case-insensitive matching, regex classes, user functions, check constraints, partition keys, and materialized views" do
+      DB.run(<<~SQL)
+        CREATE FUNCTION audit_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE AS 'SELECT lower(t)';
+        CREATE TABLE audit_t (id int, e text COLLATE "und-x-icu" CHECK (e = lower(e)));
+        CREATE INDEX audit_udf ON audit_t (audit_norm(e));
+        CREATE INDEX audit_ilike ON audit_t (id) WHERE e ILIKE 'a%';
+        CREATE INDEX audit_class ON audit_t (id) WHERE e ~ '^[[:upper:]]';
+        CREATE INDEX audit_plain ON audit_t (e);
+        CREATE TABLE audit_part (region text COLLATE "und-x-icu") PARTITION BY LIST (lower(region));
+        CREATE MATERIALIZED VIEW audit_mv AS SELECT lower(e) AS le FROM audit_t;
+      SQL
+      expect(audit_rows(described_class::CTYPE_SQL, :object).map(&:values)).to eq([
+        ["check_constraint", "audit_t.audit_t_e_check", "icu"],
+        ["expression", "audit_class", "icu"],
+        ["expression", "audit_ilike", "icu"],
+        ["expression", "audit_udf", "icu"],
+        ["materialized_view", "audit_mv", "icu"],
+        ["partition_key", "audit_part", "icu"],
+      ])
     end
   end
 
