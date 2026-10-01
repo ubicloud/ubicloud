@@ -2,14 +2,19 @@
 
 class PostgresResource < Sequel::Model
   module Aws
+    GATED_SIZE_SUFFIX = ".48xlarge"
+
     def self.available_families_and_sizes(location, project)
       postgres_families = Option::POSTGRES_FAMILY_OPTIONS.keys.to_set
+      allow_48xlarge = project.get_ff_enable_aws_48xlarge
       Set.new(
         OptionTreeFilter.filter(provider: "aws", location: location.name)
           .filter_map { |e|
             family = e[:family]
             next unless postgres_families.include?(family)
-            [family, e[:size]] if ["m8gd", "i8g"].include?(family) || project.send(:"get_ff_enable_#{family}")
+            next unless ["m8gd", "i8g"].include?(family) || project.send(:"get_ff_enable_#{family}")
+            next if e[:size].end_with?(GATED_SIZE_SUFFIX) && !allow_48xlarge
+            [family, e[:size]]
           },
       )
     end

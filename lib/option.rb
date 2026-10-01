@@ -76,8 +76,8 @@ module Option
   generic_local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64]
   rgd_families_local_storage_vcpus = [1, *generic_local_storage_vcpus]
   ebs_families_vcpus = [2, 4, 8, 16, 32, 64]
-  i_families_local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64, 96]
-  ie_families_local_storage_vcpus = [2, 4, 8, 12, 24, 48, 72, 96]
+  i_families_local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64, 96, 192]
+  ie_families_local_storage_vcpus = [2, 4, 8, 12, 24, 48, 72, 96, 192]
 
   AWS_FAMILY_VM_CONFIG = {
     # Compute optimized: vcpu * 2 memory
@@ -174,10 +174,10 @@ module Option
     "m8i" => non_storage_optimized_vm_storage_size_options,
     "m8id" => non_storage_optimized_vm_storage_size_options,
     "m9g" => non_storage_optimized_vm_storage_size_options,
-    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500]},
-    "i8ge" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]},
-    "i7i" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500]},
-    "i7ie" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]},
+    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500], 192 => [45000]},
+    "i8ge" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000], 192 => [120000]},
+    "i7i" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500], 192 => [45000]},
+    "i7ie" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000], 192 => [120000]},
     "r6gd" => non_storage_optimized_vm_storage_size_options,
     "r6id" => non_storage_optimized_vm_storage_size_options,
     "r7gd" => non_storage_optimized_vm_storage_size_options,
@@ -379,6 +379,7 @@ module Option
     ["i8g", 48, 384],
     ["i8g", 64, 512],
     ["i8g", 96, 768],
+    ["i8g", 192, 1536],
     ["i8ge", 2, 16],
     ["i8ge", 4, 32],
     ["i8ge", 8, 64],
@@ -387,6 +388,7 @@ module Option
     ["i8ge", 48, 384],
     ["i8ge", 72, 576],
     ["i8ge", 96, 768],
+    ["i8ge", 192, 1536],
     ["i7i", 2, 16],
     ["i7i", 4, 32],
     ["i7i", 8, 64],
@@ -395,6 +397,7 @@ module Option
     ["i7i", 48, 384],
     ["i7i", 64, 512],
     ["i7i", 96, 768],
+    ["i7i", 192, 1536],
     ["i7ie", 2, 16],
     ["i7ie", 4, 32],
     ["i7ie", 8, 64],
@@ -403,6 +406,7 @@ module Option
     ["i7ie", 48, 384],
     ["i7ie", 72, 576],
     ["i7ie", 96, 768],
+    ["i7ie", 192, 1536],
     ["r6gd", 1, 8],
     ["r6gd", 2, 16],
     ["r6gd", 4, 32],

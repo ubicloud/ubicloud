@@ -2091,6 +2091,45 @@ RSpec.describe PostgresResource do
       c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
+
+    describe "AWS 48xlarge sizes" do
+      let(:aws_location) {
+        Location.create(name: "us-east-2", provider: "aws", display_name: "aws-us-east-2", ui_name: "Ohio, US (AWS)", visible: true)
+      }
+
+      def aws_sizes(project)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        OptionTreeGenerator.generate_allowed_options("size", option_tree, parents).map { it["size"] }.uniq
+      end
+
+      it "hides 48xlarge sizes for every family until the project enables the flag" do
+        project.set_ff_enable_i8ge(true)
+
+        sizes = aws_sizes(project)
+        expect(sizes).to include("i8g.24xlarge", "i8ge.24xlarge")
+        expect(sizes).not_to include("i8g.48xlarge", "i8ge.48xlarge")
+        expect(sizes.grep(/48xlarge/)).to be_empty
+      end
+
+      it "offers 48xlarge sizes for enabled families once the project enables the flag" do
+        project.set_ff_enable_aws_48xlarge(true)
+        project.set_ff_enable_i8ge(true)
+
+        sizes = aws_sizes(project)
+        expect(sizes).to include("i8g.48xlarge", "i8ge.48xlarge")
+        expect(sizes).not_to include("i7i.48xlarge", "i7ie.48xlarge")
+      end
+
+      it "offers the 192 vCPU storage size for 48xlarge sizes" do
+        project.set_ff_enable_aws_48xlarge(true)
+        project.set_ff_enable_i8ge(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+        expect(allowed_storage.select { it["size"] == "i8g.48xlarge" }.map { it["storage_size"] }).to eq([45000])
+        expect(allowed_storage.select { it["size"] == "i8ge.48xlarge" }.map { it["storage_size"] }).to eq([120000])
+      end
+    end
   end
 
   describe "#setup_log_aggregation" do

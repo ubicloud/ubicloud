@@ -124,20 +124,34 @@ RSpec.describe Clover, "postgres/capabilities" do
       expect(families.keys).not_to include("i8ge")
     end
 
-    it "includes feature-flagged aws family when enabled" do
+    it "includes feature-flagged aws family when enabled, without its 48xlarge size" do
+      Location.create(name: "us-east-2", provider: "aws", display_name: "aws-us-east-2", ui_name: "Ohio, US (AWS)", visible: true)
       project.set_ff_enable_i8ge(true)
 
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      aws_location = tree.dig("flavor", "standard", "location").keys.find { |l|
-        Location[name: l]&.provider == "aws"
-      }
-      next unless aws_location
-
-      families = tree.dig("flavor", "standard", "location", aws_location, "family")
+      families = tree.dig("flavor", "standard", "location", "us-east-2", "family")
       expect(families.keys).to include("i8ge")
+
+      i8ge_sizes = families["i8ge"]["size"].keys
+      expect(i8ge_sizes).to include("i8ge.24xlarge")
+      expect(i8ge_sizes).not_to include("i8ge.48xlarge")
+    end
+
+    it "includes aws 48xlarge sizes when the project enables the flag" do
+      Location.create(name: "us-east-2", provider: "aws", display_name: "aws-us-east-2", ui_name: "Ohio, US (AWS)", visible: true)
+      project.set_ff_enable_i8ge(true)
+      project.set_ff_enable_aws_48xlarge(true)
+
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+      tree = body["option_tree"]
+
+      i8ge_sizes = tree.dig("flavor", "standard", "location", "us-east-2", "family", "i8ge", "size")
+      expect(i8ge_sizes.keys).to include("i8ge.24xlarge", "i8ge.48xlarge")
+      expect(i8ge_sizes.dig("i8ge.48xlarge", "storage_size").keys).to eq(["120000"])
     end
   end
 end
