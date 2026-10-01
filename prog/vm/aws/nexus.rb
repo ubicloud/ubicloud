@@ -164,12 +164,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         {
           device_index: 0,
           subnet_id: user_nic.nic_aws_resource.subnet_id,
-          private_ip_address: user_nic.private_ipv4.network.to_s,
+          private_ip_address: user_nic.private_ipv4&.network&.to_s,
           groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
           associate_public_ip_address: true,
           ipv_6_address_count: 1,
           delete_on_termination: true,
-        },
+        }.compact,
       ]
     elsif use_separate_management_nic
       [
@@ -244,7 +244,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ipv4_dns_name = instance.public_dns_name
 
     unless user_nic.nic_aws_resource.create_network_interface
-      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+      network_interface = instance.network_interfaces.first
+      user_nic.update(private_ipv4: network_interface.private_ip_address)
+      user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
