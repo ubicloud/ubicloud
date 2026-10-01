@@ -183,6 +183,31 @@ class Clover
             Serializers::GithubRepository.serialize(repository, installation:)
           end
 
+          r.get web?, "job-metrics" do
+            today = Time.now.utc.to_date
+            @metrics = repository
+              .completed_workflow_jobs_dataset
+              .where(workflow_run_create_date: (today - 6)..today)
+              .limit(1000)
+              .from_self
+              .select_group(:workflow_name)
+              .select_append {
+                [
+                  it.count.function.*.as(:count),
+                  it.count.function.*.filter(conclusion: "success").as(:success_count),
+                  it.sum(:duration).as(:total),
+                  it.max(:duration).as(:max),
+                  it.percentile_disc(0.5).within_group(:duration).as(:p50),
+                  it.percentile_disc(0.9).within_group(:duration).as(:p90),
+                  it.percentile_disc(0.99).within_group(:duration).as(:p99),
+                ]
+              }
+              .order(Sequel.desc(:total), :workflow_name)
+              .all
+
+            view "github/job-metrics"
+          end
+
           r.get web?, "runs" do
             limit = 25
             run_id, run_attempt = typecast_params.pos_int(%w[run_id run_attempt].freeze)

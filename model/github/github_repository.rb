@@ -12,6 +12,7 @@ class GithubRepository < Sequel::Model
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, read_only: true, &:active
   one_to_many :active_workflow_runs, key: :repository_id, class: :GithubActiveWorkflowRun, read_only: true, order: [Sequel.desc(:run_id), Sequel.desc(:run_attempt)]
   one_to_many :completed_workflow_runs, key: :repository_id, class: :GithubCompletedWorkflowRun, read_only: true, order: [Sequel.desc(:create_date), Sequel.desc(:run_id), Sequel.desc(:run_attempt)]
+  one_to_many :completed_workflow_jobs, key: :repository_id, class: :GithubCompletedWorkflowJob, read_only: true, order: [Sequel.desc(:workflow_run_create_date), Sequel.desc(:job_id)]
 
   plugin :association_dependencies, cache_entries: :destroy
 
