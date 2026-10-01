@@ -1074,6 +1074,28 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect(vm.user_nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
     end
 
+    it "recreates the NIC without an EIP for AWS to create at launch when the vm was assembled without an EIP" do
+      refresh_frame(nx, new_values: {"use_eip" => false, "create_network_interface" => false})
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      user_nic = vm.reload.user_nic
+      expect(user_nic.strand.stack.first["use_eip"]).to be(false)
+      expect(user_nic.strand.stack.first["create_network_interface?"]).to be(false)
+    end
+
+    it "recreates the NIC with the defaults when the frame does not record them" do
+      refresh_frame(nx, new_values: {"use_eip" => nil, "create_network_interface" => nil})
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      user_nic = vm.reload.user_nic
+      expect(user_nic.strand.stack.first["use_eip"]).to be(true)
+      expect(user_nic.strand.stack.first["create_network_interface?"]).to be(true)
+    end
+
     it "creates both user and mgmt NICs when use_separate_management_nic is set" do
       old_nic.update(vm_id: nil)
       vm.reload
