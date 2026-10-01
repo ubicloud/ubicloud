@@ -182,6 +182,16 @@ RSpec.configure do |config|
   # as the one that triggered the failure.
   Kernel.srand config.seed
 
+  # Handle start_transaction usage inside prog labels
+  catch_prog_return = lambda do |block|
+    ret = catch(:prog_return) do
+      block.call
+      nil
+    end
+    ret = catch(:prog_return, &ret) if ret.is_a?(Proc)
+    ret
+  end
+
   # Custom matcher to expect Progs to hop new label
   # If expected_label is not provided, it expects to hop any label.
   # If expected_prog is not provided, it expects to hop to label at old prog.
@@ -189,10 +199,7 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      @hop = hop = catch(:prog_return) do
-        block.call
-        nil
-      end
+      @hop = hop = catch_prog_return.call(block)
 
       if hop.is_a?(Prog::Base::Hop)
         (expected_label.nil? || hop.new_label == expected_label) &&
@@ -236,10 +243,7 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      @ext = ext = catch(:prog_return) do
-        block.call
-        nil
-      end
+      @ext = ext = catch_prog_return.call(block)
 
       if ext.is_a?(Prog::Base::Exit)
         expected_exitval.nil? || ext.exitval == expected_exitval
@@ -276,10 +280,7 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      @nap = nap = catch(:prog_return) do
-        block.call
-        nil
-      end
+      @nap = nap = catch_prog_return.call(block)
 
       if nap.is_a?(Prog::Base::Nap)
         expected_seconds.nil? || expected_seconds === nap.seconds
