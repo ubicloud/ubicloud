@@ -551,6 +551,36 @@ RSpec.describe Clover, "github" do
       )
     end
 
+    def create_completed_job(job_id, create_date: Time.now.utc.to_date, **)
+      GithubCompletedWorkflowJob.create_partition(create_date) unless GithubCompletedWorkflowJob.partition_days.include?(create_date)
+      now = Time.now
+      GithubCompletedWorkflowJob.insert(
+        repository_id: repository.id,
+        job_id:,
+        workflow_run_create_date: create_date,
+        installation_id: installation.id,
+        runner_id: GithubRunner.generate_uuid,
+        runner_vm_id: Vm.generate_uuid,
+        completed_at: now,
+        run_id: 1005,
+        run_attempt: 2,
+        workflow_name: "CI",
+        job_name: "Completed job #{job_id}",
+        job_created_at: now - 60,
+        job_started_at: now - 50,
+        job_completed_at: now - 5,
+        ready_at: now - 55,
+        status: "completed",
+        conclusion: "failure",
+        label: "ubicloud-standard-4",
+        actual_label: "ubicloud-standard-4",
+        billed_vm_size: "standard-4",
+        vm_family: "standard",
+        duration: 45,
+        **,
+      )
+    end
+
     def run_ids
       page.all("#workflow-runs tbody tr").map { it[:id] }
     end
@@ -669,6 +699,86 @@ RSpec.describe Clover, "github" do
       expect(page).to have_no_css ".auto-refresh"
     end
 
+    describe "job-metrics" do
+      let(:job_metrics_path) { "#{project.path}/github/#{installation.ubid}/repository/#{repository.ubid}/job-metrics" }
+
+      def job_metrics_stats
+        page.all("#job-metrics-stats div").to_h { [it.find("dt").text, it.find("dd").text] }
+      end
+
+      def job_metrics_rows
+        page.all("#job-metrics-workflows tbody tr").map { |tr| tr.all("td").map(&:text) }
+      end
+
+      def job_metrics_bars
+        page.all("#job-metrics-workflows tbody tr").map { |tr| tr.all("rect").drop(1).map { it[:width] } }
+      end
+
+      it "shows empty state if there are no completed jobs in the last 7 days" do
+        create_completed_job(300, create_date: Time.now.utc.to_date - 7)
+
+        visit job_metrics_path
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq "Ubicloud - Job Metrics"
+        expect(page).to have_content "No job metrics"
+        expect(page).to have_content "No completed jobs are available from the last 7 days."
+        expect(page).to have_no_css "#job-metrics-scope"
+        expect(page).to have_no_css "#job-metrics-stats"
+        expect(page).to have_no_css "#job-metrics-workflows"
+      end
+
+      it "shows metrics for jobs from the last 7 days grouped by workflow" do
+        today = Time.now.utc.to_date
+        create_completed_job(300, create_date: today - 7, duration: 10_000)
+        create_completed_job(301, create_date: today - 6, duration: 30, conclusion: "success")
+        create_completed_job(302, create_date: today - 3, duration: 60, conclusion: "success")
+        create_completed_job(303, duration: 90)
+        create_completed_job(304, duration: 600, conclusion: "success")
+        create_completed_job(305, duration: 3700, workflow_name: "Deploy", conclusion: "success")
+        create_completed_job(306, duration: 45, workflow_name: nil, conclusion: "cancelled")
+
+        visit job_metrics_path
+        expect(page.status_code).to eq(200)
+        expect(page.find_by_id("job-metrics-scope").text).to eq "Metrics for all jobs in the last 7 days, grouped by workflow"
+        expect(job_metrics_stats).to eq(
+          "Jobs" => "6",
+          "Success Rate" => "66.7%",
+          "Workflows" => "3",
+          "Runner Time" => "1h 15m 25s",
+        )
+        expect(job_metrics_rows).to eq [
+          ["Deploy", "1", "100.0%", "1h 1m 40s", "1h 1m 40s", "1h 1m 40s", "1h 1m 40s", "1h 1m 40s", ""],
+          ["CI", "4", "75.0%", "1m", "10m", "10m", "10m", "13m", ""],
+          ["Unnamed workflow", "1", "0.0%", "45s", "45s", "45s", "45s", "45s", ""],
+        ]
+        expect(job_metrics_bars).to eq [
+          ["100.0%", "100.0%"],
+          ["16.22%", "1.62%"],
+          ["1.22%", "1.22%"],
+        ]
+        expect(page).to have_css "#job-metrics-workflows td[title='Median: 1m, p90: 10m']"
+      end
+
+      it "shows metrics for the last 1000 jobs" do
+        today = Time.now.utc.to_date
+        create_completed_job(1, duration: 5000, create_date: today - 1)
+        now = Time.now
+        GithubCompletedWorkflowJob.import(
+          %i[repository_id job_id workflow_run_create_date installation_id runner_id runner_vm_id completed_at run_id run_attempt workflow_name job_name job_created_at job_started_at ready_at status conclusion label actual_label billed_vm_size vm_family duration],
+          (2..1001).map { [repository.id, it, today, installation.id, GithubRunner.generate_uuid, Vm.generate_uuid, now, 1, 1, "CI", "Job #{it}", now, now, now, "completed", "failure", "ubicloud", "ubicloud", "standard-2", "standard", it] },
+        )
+
+        visit job_metrics_path
+        expect(page.find_by_id("job-metrics-scope").text).to eq "Metrics for 1000 recent jobs, grouped by workflow"
+        expect(job_metrics_stats).to include(
+          "Jobs" => "1000",
+          "Success Rate" => "0.0%",
+          "Workflows" => "1",
+        )
+        expect(job_metrics_rows).to eq [["CI", "1000", "0.0%", "8m 21s", "15m 1s", "16m 31s", "16m 41s", "139h 18m 20s", ""]]
+      end
+    end
+
     describe "run" do
       let(:run_path_prefix) { "#{project.path}/github/#{installation.ubid}/repository/#{repository.ubid}/run" }
 
@@ -682,36 +792,6 @@ RSpec.describe Clover, "github" do
           run_attempt: 2,
           job_id:,
           job_name: "Runner job #{job_id}",
-          **,
-        )
-      end
-
-      def create_completed_job(job_id, create_date: Time.now.utc.to_date, **)
-        GithubCompletedWorkflowJob.create_partition(create_date) unless GithubCompletedWorkflowJob.partition_days.include?(create_date)
-        now = Time.now
-        GithubCompletedWorkflowJob.insert(
-          repository_id: repository.id,
-          job_id:,
-          workflow_run_create_date: create_date,
-          installation_id: installation.id,
-          runner_id: GithubRunner.generate_uuid,
-          runner_vm_id: Vm.generate_uuid,
-          completed_at: now,
-          run_id: 1005,
-          run_attempt: 2,
-          workflow_name: "CI",
-          job_name: "Completed job #{job_id}",
-          job_created_at: now - 60,
-          job_started_at: now - 50,
-          job_completed_at: now - 5,
-          ready_at: now - 55,
-          status: "completed",
-          conclusion: "failure",
-          label: "ubicloud-standard-4",
-          actual_label: "ubicloud-standard-4",
-          billed_vm_size: "standard-4",
-          vm_family: "standard",
-          duration: 45,
           **,
         )
       end
