@@ -354,6 +354,33 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     project.quota_available?(resource_type, 0)
   end
 
+  def aws_spill_capacity_available?
+    spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
+    spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity && spilled_runners < Config.github_runner_aws_spill_runner_capacity
+  end
+
+  # Large runners may not fit on a fragmented metal fleet even at low
+  # utilization, so spill them over to AWS once, after a short wait.
+  def spill_unallocated_vm?
+    [16, 30].include?(label_data["vcpus"]) &&
+      vm.location_id == Location::GITHUB_RUNNERS_ID &&
+      !vm.allocated_at &&
+      vm.waiting_for_capacity_set? &&
+      Time.now - vm.created_at > 60 &&
+      project.get_ff_spill_to_alien_runners &&
+      aws_quota_available? &&
+      aws_spill_capacity_available?
+  end
+
+  def destroy_vm
+    subnets_ds = vm.private_subnets_dataset.exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
+    subnets_ds.all do |subnet|
+      subnet.firewalls_dataset.destroy
+    end
+    PrivateSubnet.incr_destroy(subnets_ds.select(Sequel[:private_subnet][:id]))
+    vm.incr_destroy
+  end
+
   label def wait_concurrency_limit
     # An operator can set the spill over semaphore by hand to override the checks below.
     hop_allocate_vm if spill_over_set?
@@ -448,6 +475,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm
+    if spill_unallocated_vm?
+      Clog.emit("spilled over unallocated runner", {spilled_over_unallocated_runner: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+      destroy_vm
+      github_runner.update(vm_id: nil, location_id: nil, allocated_at: nil)
+      github_runner.incr_spill_over
+      hop_allocate_vm
+    end
+
     if project.get_ff_early_jit_registration && vm.allocated_at && !github_runner.encoded_jit_config
       generate_jit_config
     end
@@ -765,15 +800,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      subnets_ds = vm.private_subnets_dataset.exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
-      subnets_ds.all do |subnet|
-        subnet.firewalls_dataset.destroy
-      end
-      PrivateSubnet.incr_destroy(subnets_ds.select(Sequel[:private_subnet][:id]))
-
       collect_final_telemetry if vm.allocated_at
-
-      vm.incr_destroy
+      destroy_vm
     end
 
     if github_runner.custom_label
