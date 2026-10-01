@@ -117,18 +117,6 @@ class StorageVolume
     vhost_backend_create_service_file
   end
 
-  def write_new_file(path, user)
-    rm_if_exists(path)
-
-    safe_write_to_file(path) do |file|
-      File.chmod(0o600, file.path)
-      FileUtils.chown user, user, file.path
-      yield file
-    end
-
-    sync_parent_dir(path)
-  end
-
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
       write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if has_source?
@@ -141,16 +129,18 @@ class StorageVolume
   end
 
   def write_config_file(path, content)
-    write_new_file(path, @vm_name) do |file|
+    safe_write_to_file(path, perm: 0o600, owner: @vm_name) do |file|
       file.write(content)
       fsync_or_fail(file)
     end
+
+    sync_parent_dir(path)
   end
 
   def vhost_backend_create_metadata(key_wrapping_secrets)
     metadata_path = sp.vhost_backend_metadata
 
-    write_new_file(metadata_path, @vm_name) do |file|
+    safe_write_to_file(metadata_path, perm: 0o600, owner: @vm_name) do |file|
       file.truncate(8 * 1024 * 1024)
     end
 
