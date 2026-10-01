@@ -126,10 +126,7 @@ RSpec.describe Prog::Base do
   it "keeps children array state in sync even in consecutive-run mode" do
     parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
     child = Strand.create(parent_id: parent.id, prog: "Test", label: "napper")
-    prg = parent.load
-    expect(parent).to receive(:load).twice.and_return(prg)
 
-    expect(prg).to receive(:nap).and_throw(:prog_return, Prog::Base::Nap.new(1))
     expect(parent.run(10)).to be_a Prog::Base::Nap
     expect(parent.associations).to be_empty
 
@@ -219,6 +216,80 @@ RSpec.describe Prog::Base do
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
   end
 
+  describe "deferred transaction start" do
+    let(:events) { [] }
+
+    before do
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        events << :transaction_start if kwargs == {savepoint: true}
+        m.call(*args, **kwargs, &block)
+      end
+      allow(Clog).to receive(:emit).and_wrap_original do |m, message, *args|
+        events << message
+        m.call(message, *args)
+      end
+    end
+
+    it "uses a transaction around the entire run by default" do
+      st = Strand.create(prog: "Test", label: "napper")
+      expect(st.unsynchronized_run).to be_a Prog::Base::Nap
+      expect(events).to eq [:transaction_start]
+    end
+
+    it "runs label outside of transaction if the prog does not want a transaction around the run" do
+      st = Strand.create(prog: "Test", label: "deferred_transaction_napper")
+      nap = st.unsynchronized_run
+      expect(nap).to be_a Prog::Base::Nap
+      expect(nap.seconds).to eq 123
+      expect(events).to eq ["deferred_transaction_napper outside transaction", :transaction_start]
+      expect(st.reload.schedule).to be > Time.now + 120
+    end
+
+    it "runs start_transaction block inside transaction" do
+      st = Strand.create(prog: "Test", label: "deferred_transaction_hopper")
+      hop = st.unsynchronized_run
+      expect(hop).to be_a Prog::Base::Hop
+      expect(hop.new_label).to eq "hop_exit"
+      expect(events).to eq [
+        "deferred_transaction_hopper outside transaction",
+        :transaction_start,
+        "deferred_transaction_hopper inside transaction",
+        "hopped",
+      ]
+      expect(st.reload.label).to eq "hop_exit"
+    end
+
+    it "raises if start_transaction block does not provide flow control" do
+      st = Strand.create(prog: "Test", label: "deferred_transaction_no_flow_control")
+      expect { st.unsynchronized_run }.to raise_error(Strand::InternalError, "BUG: Prog Test#deferred_transaction_no_flow_control did not provide flow control")
+    end
+
+    it "does not run label if before_run provides flow control" do
+      st = Strand.create(prog: "Test", label: "deferred_transaction_hopper")
+      Semaphore.incr(st.id, :destroy)
+      hop = st.unsynchronized_run
+      expect(hop).to be_a Prog::Base::Hop
+      expect(hop.new_label).to eq "destroy"
+      expect(events).to eq [:transaction_start, "hopped"]
+    end
+
+    it "applies semaphore decrements inside the transaction" do
+      st = Strand.create(prog: "Test", label: "deferred_transaction_decrement_semaphore")
+      Semaphore.incr(st.id, :test_semaphore)
+      expect(SemSnap).to receive(:new).and_wrap_original do |m, *args, **kwargs|
+        m.call(*args, **kwargs).tap do |snap|
+          expect(snap).to receive(:apply).and_wrap_original do |m2|
+            events << :apply
+            m2.call
+          end
+        end
+      end
+      expect { st.unsynchronized_run }
+        .to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
+      expect(events).to eq [:transaction_start, :apply]
+    end
+  end
+
   describe Prog::Base, :current_prog do
     it "returns nil if Progs are not in the call stack" do
       expect(described_class.current_prog).to be_nil
@@ -234,9 +305,9 @@ RSpec.describe Prog::Base do
   end
 
   it "calls before_run if it is available" do
-    st = Strand.create(prog: "Prog::Vm::Aws::Nexus", label: "wait")
-    prg = instance_double(Prog::Vm::Aws::Nexus)
-    expect(st).to receive(:load).and_return(prg)
+    st = Strand.create(prog: "Vm::Aws::Nexus", label: "wait")
+    prg = Prog::Vm::Aws::Nexus.new(st, false)
+    expect(st).to receive(:prog_class).and_return(class_double(prg.class, new: prg))
     expect(prg).to receive(:before_run)
     expect(prg).to receive(:wait).and_throw(:prog_return, Prog::Base::Nap.new(30))
     st.unsynchronized_run

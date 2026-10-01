@@ -222,4 +222,30 @@ class Prog::Test < Prog::Base
   label def destroy
     pop "destroyed"
   end
+
+  def transaction_around_run?
+    !strand.label.start_with?("deferred_transaction_")
+  end
+
+  label def deferred_transaction_napper
+    Clog.emit("deferred_transaction_napper outside transaction")
+    nap(123)
+  end
+
+  label def deferred_transaction_hopper
+    Clog.emit("deferred_transaction_hopper outside transaction")
+    start_transaction do
+      Clog.emit("deferred_transaction_hopper inside transaction")
+      hop_hop_exit
+    end
+  end
+
+  label def deferred_transaction_no_flow_control
+    start_transaction {}
+  end
+
+  label def deferred_transaction_decrement_semaphore
+    decr_test_semaphore
+    nap 1
+  end
 end

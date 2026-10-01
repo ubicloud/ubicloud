@@ -17,6 +17,10 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
   end
 
+  def transaction_around_run?
+    strand.label != "wait"
+  end
+
   # We dynamically adjust the polling interval based on the remaining rate
   # limit. It's 5 minutes by default, but it can be increased if the rate limit
   # is low.
@@ -28,7 +32,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
-  def check_queued_jobs
+  def check_queued_jobs(nap_seconds:)
     unless github_repository.installation.project.active?
       @polling_interval = 24 * 60 * 60
       return
@@ -65,32 +69,34 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       end
     end
 
-    queued_labels.each do |(actual_label, label), count|
-      idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
-      # The calculation of the required_runner_count isn't atomic because it
-      # requires multiple API calls and database queries. However, it will
-      # eventually settle on the correct value. If we create more runners than
-      # necessary, the excess will be recycled after 5 minutes at no extra cost
-      # to the customer. If fewer runners are created than needed, the system
-      # will generate more in the next cycle.
-      next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
+    start_transaction do
+      queued_labels.each do |(actual_label, label), count|
+        idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
+        # The calculation of the required_runner_count isn't atomic because it
+        # requires multiple API calls and database queries. However, it will
+        # eventually settle on the correct value. If we create more runners than
+        # necessary, the excess will be recycled after 5 minutes at no extra cost
+        # to the customer. If fewer runners are created than needed, the system
+        # will generate more in the next cycle.
+        next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
 
-      Clog.emit("extra runner needed", {needed_extra_runner: {repository_name: github_repository.name, label:, actual_label:, count: required_runner_count}})
+        Clog.emit("extra runner needed", {needed_extra_runner: {repository_name: github_repository.name, label:, actual_label:, count: required_runner_count}})
 
-      required_runner_count.times do
-        Prog::Github::GithubRunnerNexus.assemble(
-          github_repository.installation,
-          repository_name: github_repository.name,
-          label:,
-          actual_label:,
-        )
+        required_runner_count.times do
+          Prog::Github::GithubRunnerNexus.assemble(
+            github_repository.installation,
+            repository_name: github_repository.name,
+            label:,
+            actual_label:,
+          )
+        end
       end
-    end
 
-    @polling_interval = (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
+      nap(nap_seconds || ((remaining_quota < 0.5) ? 15 * 60 : 5 * 60))
+    end
   end
 
-  def cleanup_cache
+  def cleanup_cache(polling_interval: self.polling_interval)
     # Destroy cache entries not accessed in last 7 days or
     # created more than 7 days ago and not accessed yet.
     seven_days_ago = Time.now - 7 * 24 * 60 * 60
@@ -124,31 +130,36 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       end
     end
 
-    if github_repository.cache_entries.empty?
-      if !github_repository.no_cache_since
-        github_repository.update(no_cache_since: Time.now)
-      elsif github_repository.no_cache_since < seven_days_ago
-        Clog.emit("Deleting empty bucket and tokens", {deleting_empty_bucket: {repository_name: github_repository.name}})
-        github_repository.destroy_blob_storage
+    start_transaction do
+      if github_repository.cache_entries.empty?
+        if !github_repository.no_cache_since
+          github_repository.update(no_cache_since: Time.now)
+        elsif github_repository.no_cache_since < seven_days_ago
+          Clog.emit("Deleting empty bucket and tokens", {deleting_empty_bucket: {repository_name: github_repository.name}})
+          github_repository.destroy_blob_storage
+        end
+      elsif github_repository.no_cache_since
+        github_repository.update(no_cache_since: nil)
       end
-    elsif github_repository.no_cache_since
-      github_repository.update(no_cache_since: nil)
+
+      nap polling_interval
     end
   end
 
   label def wait
     if Time.now - github_repository.last_job_at > 6 * 60 * 60
-      cleanup_cache if github_repository.access_key
-      nap 15 * 60
+      cleanup_cache(polling_interval: 15 * 60) if github_repository.access_key
+      nap(15 * 60)
     end
 
     if Config.enable_github_workflow_poller
       if skip_check_queued_jobs
-        cleanup_cache
         self.skip_check_queued_jobs = false
+        cleanup_cache
       else
+        self.skip_check_queued_jobs = true if github_repository.access_key
         begin
-          check_queued_jobs
+          check_queued_jobs(nap_seconds: (0 if github_repository.access_key))
         rescue Octokit::NotFound
           Clog.emit("not found repository", {not_found_repository: {repository_name: github_repository.name}})
           if github_repository.runners_dataset.empty?
@@ -156,18 +167,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
             nap 0
           end
         end
-
-        if github_repository.access_key
-          self.skip_check_queued_jobs = true
-          nap 0
-        end
       end
     elsif github_repository.access_key
       cleanup_cache
     end
 
-    # check_queued_jobs may have changed the default polling interval based on
-    # the remaining rate limit.
     nap polling_interval
   end
 

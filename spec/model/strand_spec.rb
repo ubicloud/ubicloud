@@ -72,24 +72,16 @@ RSpec.describe Strand do
     end
   end
 
-  it "can load a prog" do
-    expect(st.load).to be_instance_of Prog::Test
-  end
-
   it "can hop" do
-    st.save_changes
-    st.label = "hop_entry"
-    expect(st).to receive(:load).and_return Prog::Test.new(st)
+    st.update(label: "hop_entry")
     expect {
-      st.unsynchronized_run
+      st.run
     }.to change(st, :label).from("hop_entry").to("hop_exit")
   end
 
   it "records the label transition time with subsecond precision on hop" do
-    st.save_changes
-    st.label = "hop_entry"
-    expect(st).to receive(:load).and_return Prog::Test.new(st)
-    st.unsynchronized_run
+    st.update(label: "hop_entry")
+    st.run
     expect(st.stack[0]["last_label_changed_at"]).to match(/\.\d{6} /)
   end
 

@@ -68,12 +68,11 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         GithubRunner.create(installation_id: installation.id, repository_id: repository.id, repository_name: "ubicloud/ubicloud", label:, actual_label: actual_label || label)
       end
 
-      expect { nx.check_queued_jobs }
+      expect { expect { nx.check_queued_jobs(nap_seconds: nil) }.to nap(5 * 60) }
         .to change(GithubRunner, :count).from(3).to(7)
         .and change { GithubRunner.where(label: "ubicloud").count }.from(1).to(3)
         .and change { GithubRunner.where(label: "ubicloud-standard-4").count }.from(1).to(2)
         .and change { GithubRunner.where(label: "ubicloud-standard-8").count }.from(1).to(2)
-      expect(nx.polling_interval).to eq(5 * 60)
     end
 
     it "raises if runtime is too long" do
@@ -82,7 +81,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         {id: 1, run_attempt: 2, status: "queued", created_at: now},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
-      expect { nx.check_queued_jobs }.to raise_error(RuntimeError)
+      expect { nx.check_queued_jobs(nap_seconds: nil) }.to raise_error(RuntimeError)
     end
 
     it "asks GitHub only for runs created in the last 7 days" do
@@ -99,26 +98,31 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(Clog).to receive(:emit).with("polled queued runs", {polled_queued_runs: {repository_name: "ubicloud/ubicloud", count: 2, oldest_run_at: now - 6 * 24 * 60 * 60}}).and_call_original
       expect(Clog).to receive(:emit).with("extra runner needed", {needed_extra_runner: {repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud", count: 1}}).and_call_original
 
-      expect { nx.check_queued_jobs }.to change(GithubRunner, :count).from(0).to(1)
+      expect { expect { nx.check_queued_jobs(nap_seconds: nil) }.to nap(5 * 60) }.to change(GithubRunner, :count).from(0).to(1)
     end
 
     it "naps until the resets_at if remaining quota is low" do
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
-      nx.check_queued_jobs
+      expect(nx.check_queued_jobs(nap_seconds: nil)).to be_nil
       expect(nx.polling_interval).to eq(8 * 60)
     end
 
     it "increases polling interval if remaining quota is lower than 0.5" do
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 40, limit: 100)).at_least(:once)
-      nx.check_queued_jobs
-      expect(nx.polling_interval).to eq(15 * 60)
+      expect { nx.check_queued_jobs(nap_seconds: nil) }.to nap(15 * 60)
+    end
+
+    it "naps for the given number of seconds if provided" do
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 40, limit: 100)).at_least(:once)
+      expect { nx.check_queued_jobs(nap_seconds: 0) }.to nap(0)
     end
 
     it "does not poll jobs if the project is not active" do
       project.update(visible: false)
-      nx.check_queued_jobs
+      expect(nx.check_queued_jobs(nap_seconds: nil)).to be_nil
       expect(nx.polling_interval).to eq(24 * 60 * 60)
     end
   end
@@ -140,7 +144,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       cache_entry = create_cache_entry(last_accessed_at: now - 6 * 24 * 60 * 60)
       ten_days_old = create_cache_entry(last_accessed_at: now - 10 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: ten_days_old.blob_key)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(cache_entry).to exist
       expect(ten_days_old).not_to exist
     end
@@ -150,7 +154,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       thirty_five_minutes_old = create_cache_entry(created_at: now - 35 * 60, committed_at: nil)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: thirty_five_minutes_old.blob_key)
       expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket:, key: thirty_five_minutes_old.blob_key, upload_id: thirty_five_minutes_old.upload_id)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(cache_entry).to exist
       expect(thirty_five_minutes_old).not_to exist
     end
@@ -160,7 +164,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       ten_days_old = create_cache_entry(last_accessed_at: nil, created_at: now - 10 * 24 * 60 * 60)
       expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: six_days_old.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: ten_days_old.blob_key)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(six_days_old).to exist
       expect(ten_days_old).not_to exist
     end
@@ -172,14 +176,14 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: ninety_nine_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: two_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: three_gib_cache.blob_key)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
     end
 
     it "excludes uncommitted cache entries" do
       hundred_two_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 102 * 1024 * 1024 * 1024)
       create_cache_entry(created_at: now - 13 * 60, size: nil)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: hundred_two_gib_cache.blob_key)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
     end
 
     it "deletes oldest cache entries if the total usage exceeds the custom limit" do
@@ -191,47 +195,89 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: nineteen_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: two_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: three_gib_cache.blob_key)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
     end
 
     it "sets no_cache_since when cache entries become empty" do
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(repository.reload.no_cache_since).to eq(now)
     end
 
     it "does not overwrite no_cache_since if already set" do
       purged_at = now - 3 * 24 * 60 * 60
       repository.update(no_cache_since: purged_at)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(repository.reload.no_cache_since).to eq(purged_at)
     end
 
     it "deletes blob storage if cache has been empty for more than 7 days" do
       repository.update(no_cache_since: now - 8 * 24 * 60 * 60)
       expect(nx.github_repository).to receive(:destroy_blob_storage)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
     end
 
     it "does not delete blob storage if cache has been empty for less than 7 days" do
       repository.update(no_cache_since: now - 3 * 24 * 60 * 60)
       expect(nx.github_repository).not_to receive(:destroy_blob_storage)
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
+    end
+
+    it "naps for the given polling interval" do
+      expect { nx.cleanup_cache(polling_interval: 15 * 60) }.to nap(15 * 60)
     end
 
     it "clears no_cache_since when cache entries exist" do
       repository.update(no_cache_since: now - 1 * 24 * 60 * 60)
       create_cache_entry
-      nx.cleanup_cache
+      expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(repository.reload.no_cache_since).to be_nil
     end
   end
 
+  describe "#transaction_around_run?" do
+    it "is false only for the wait label" do
+      expect(nx.transaction_around_run?).to be false
+      nx.strand.label = "destroy"
+      expect(nx.transaction_around_run?).to be true
+    end
+  end
+
   describe "#wait" do
+    it "runs through the strand, using a transaction only around the start_transaction block" do
+      repository.update(access_key: "key")
+      expect(Config).to receive(:enable_github_workflow_poller).and_return(false)
+      transaction_started = false
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        transaction_started = true if kwargs == {savepoint: true}
+        m.call(*args, **kwargs, &block)
+      end
+      st = nx.strand
+      expect(st).to receive(:prog_class).and_return(class_double(nx.class, new: nx))
+      expect(nx.github_repository).to receive(:cache_entries_dataset).and_wrap_original do |m|
+        expect(transaction_started).to be false
+        m.call
+      end.at_least(:once)
+      expect(nx.github_repository).to receive(:update).and_wrap_original do |m, **kwargs|
+        expect(transaction_started).to be true
+        m.call(**kwargs)
+      end
+      expect(st.unsynchronized_run).to be_a Prog::Base::Nap
+      expect(transaction_started).to be true
+      expect(repository.reload.no_cache_since).to eq(now)
+      expect(st.reload.schedule).to be_within(5).of(now + 5 * 60)
+    end
+
     it "alternates between checking queued jobs and cache usage" do
       repository.update(access_key: "key")
       called = []
-      expect(nx).to receive(:check_queued_jobs) { called << :check_queued_jobs }.at_least(:once)
-      expect(nx).to receive(:cleanup_cache) { called << :cleanup_cache }
+      expect(nx).to receive(:check_queued_jobs).with(nap_seconds: 0).twice do |nap_seconds:|
+        called << :check_queued_jobs
+        nx.nap(nap_seconds)
+      end
+      expect(nx).to receive(:cleanup_cache).with(no_args) do
+        called << :cleanup_cache
+        nx.nap(nx.polling_interval)
+      end
       expect { nx.wait }.to nap(0)
       expect(nx.strand.stack[0]["skip_check_queued_jobs"]).to be true
       expect { nx.wait }.to nap(5 * 60)
@@ -243,7 +289,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "does not check queued jobs but check cache usage if 6 hours passed from the last job" do
       repository.update(access_key: "key", last_job_at: now - 7 * 60 * 60)
       expect(nx).not_to receive(:check_queued_jobs)
-      expect(nx).to receive(:cleanup_cache)
+      expect(nx).to receive(:cleanup_cache).with(polling_interval: 15 * 60)
       expect { nx.wait }.to nap(15 * 60)
     end
 
@@ -255,7 +301,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "checks queued jobs every call if there is no access key" do
-      expect(nx).to receive(:check_queued_jobs).twice
+      expect(nx).to receive(:check_queued_jobs).with(nap_seconds: nil).twice
       expect(nx).not_to receive(:cleanup_cache)
       expect { nx.wait }.to nap(5 * 60)
       expect { nx.wait }.to nap(5 * 60)

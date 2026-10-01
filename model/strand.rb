@@ -198,8 +198,12 @@ SQL
     end
   end
 
-  def load(snap = nil)
-    Object.const_get("::Prog::" + prog).new(self, snap)
+  def prog_class
+    Object.const_get("::Prog::" + prog)
+  end
+
+  def prog_run(&)
+    prog_class.new(self, false).run(&)
   end
 
   POSTGRES_SERVER_WITH_RESOURCE = ->(s) { s.is_a?(PostgresServer) && s.resource }
@@ -265,38 +269,30 @@ SQL
 
     # Savepoint needed for correct error handling behavior when parent runs
     # child strands via #reap
-    DB.transaction(savepoint: true) do
-      prog_action = SemSnap.use(id) do |snap|
-        prg = load(snap)
-        catch(:prog_return) do
-          prg.public_send(:before_run)
-          prg.public_send(label)
-          nil
-        end
-      end
-
-      case prog_action
-      when Prog::Base::Nap
-        save_changes
-        seconds = prog_action.seconds
-        unless seconds == 0
-          closest_unnotified_deadline = stack.filter_map do |frame|
-            if frame["deadline_at"] && !frame["deadline_notified"]
-              Time.new(frame["deadline_at"])
+    begin
+      prog_run do |prog_action|
+        case prog_action
+        when Prog::Base::Nap
+          save_changes
+          seconds = prog_action.seconds
+          unless seconds == 0
+            closest_unnotified_deadline = stack.filter_map do |frame|
+              if frame["deadline_at"] && !frame["deadline_notified"]
+                Time.new(frame["deadline_at"])
+              end
+            end.min
+            if closest_unnotified_deadline
+              deadline_seconds = (closest_unnotified_deadline - Time.now).clamp(0, nil)
+              seconds = seconds.clamp(0, deadline_seconds) + 0.001
             end
-          end.min
-          if closest_unnotified_deadline
-            deadline_seconds = (closest_unnotified_deadline - Time.now).clamp(0, nil)
-            seconds = seconds.clamp(0, deadline_seconds) + 0.001
           end
-        end
 
-        # Compare-and-set with schedule as the optimistic concurrency
-        # control key: apply the nap only if schedule still holds the
-        # lease-time value. A concurrent wake wrote through
-        # SCHEDULE_NO_LATER_THAN_NOW, guaranteed to differ from it, so
-        # the wake-up schedule survives the nap.
-        scheduled = DB[<<SQL, schedule, seconds, id].get
+          # Compare-and-set with schedule as the optimistic concurrency
+          # control key: apply the nap only if schedule still holds the
+          # lease-time value. A concurrent wake wrote through
+          # SCHEDULE_NO_LATER_THAN_NOW, guaranteed to differ from it, so
+          # the wake-up schedule survives the nap.
+          scheduled = DB[<<SQL, schedule, seconds, id].get
 UPDATE strand
 SET try = 0,
     schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
@@ -304,38 +300,39 @@ SET try = 0,
 WHERE id = ?
 RETURNING schedule
 SQL
-        # For convenience, reflect the updated record's schedule content
-        # in the model object, but since it's fresh, remove it from the
-        # changed columns so save_changes won't update it again.
-        self.schedule = scheduled
-        changed_columns.delete(:schedule)
-      when Prog::Base::Hop
-        hp = prog_action
-        last_changed_at = Time.new(top_frame["last_label_changed_at"])
-        Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
-        top_frame["last_label_changed_at"] = time_string(Time.now)
-        modified!(:stack)
+          # For convenience, reflect the updated record's schedule content
+          # in the model object, but since it's fresh, remove it from the
+          # changed columns so save_changes won't update it again.
+          self.schedule = scheduled
+          changed_columns.delete(:schedule)
+        when Prog::Base::Hop
+          hp = prog_action
+          last_changed_at = Time.new(top_frame["last_label_changed_at"])
+          Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+          top_frame["last_label_changed_at"] = time_string(Time.now)
+          modified!(:stack)
 
-        update(**hp.strand_update_args, try: 0)
-      when Prog::Base::Exit
-        ext = prog_action
-        last_changed_at = Time.new(top_frame["last_label_changed_at"])
-        Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
+          update(**hp.strand_update_args, try: 0)
+        when Prog::Base::Exit
+          ext = prog_action
+          last_changed_at = Time.new(top_frame["last_label_changed_at"])
+          Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
-        update(exitval: ext.exitval, retval: nil)
-        if parent_id
-          @exited = true
+          update(exitval: ext.exitval, retval: nil)
+          if parent_id
+            @exited = true
+          else
+            # No parent Strand to reap here, so self-reap.
+            semaphores_dataset.destroy
+            destroy
+            @deleted = true
+          end
         else
-          # No parent Strand to reap here, so self-reap.
-          semaphores_dataset.destroy
-          destroy
-          @deleted = true
+          raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
         end
-      else
-        raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
-      end
 
-      prog_action
+        prog_action
+      end
     rescue RunError, InternalError, Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
       raise
     rescue => ex
