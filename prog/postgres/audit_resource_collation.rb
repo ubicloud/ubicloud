@@ -15,15 +15,15 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   # with locale C, POSIX, or C.* (case-insensitive, as Postgres compares them).
   # Anything else is unsafe, so a missing version field or a new provider
   # cannot pass as safe. The shared pg_database catalog also gives the default of
-  # a database that does not allow connections. The ICU locale column was
-  # renamed in PG 17, hence the jsonb lookup.
+  # a database that does not allow connections. Its ctype is at risk unless it
+  # is builtin or libc with ctype C or POSIX, and the ctype is C or POSIX even
+  # for builtin, as text search and pg_trgm read datctype on every provider.
+  # The ICU locale column was renamed in PG 17, hence the jsonb lookup.
   DATABASES_SQL = <<~SQL
     SELECT datname, datallowconn,
       NOT coalesce(datlocprovider='b' OR (datlocprovider='c' AND (lower(datcollate) IN ('c','posix') OR datcollate ILIKE 'c.%')), false) AS default_unsafe,
       datcollate,
-      CASE WHEN datlocprovider='i' THEN true
-           WHEN datlocprovider='c' AND datctype NOT IN ('C','POSIX') THEN true
-           ELSE false END AS ctype_at_risk,
+      datlocprovider NOT IN ('b','c') OR datctype NOT IN ('C','POSIX') AS ctype_at_risk,
       datlocprovider, datctype,
       coalesce(to_jsonb(d)->>'datlocale', to_jsonb(d)->>'daticulocale') AS icu_locale
     FROM pg_database d
