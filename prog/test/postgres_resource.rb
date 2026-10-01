@@ -26,6 +26,7 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
     end
 
     verify_cloudwatch_cutover unless fail_message
+    verify_guardduty_agent unless fail_message
 
     hop_destroy
   end
