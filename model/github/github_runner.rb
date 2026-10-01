@@ -97,6 +97,10 @@ class GithubRunner < Sequel::Model
     Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
   end
 
+  def completed?
+    false
+  end
+
   def custom_label
     GithubCustomLabel.first(name: actual_label, installation_id:)
   end

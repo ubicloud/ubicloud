@@ -8,6 +8,7 @@
 
 <% now = Time.now
    repository_name = @repository.name
+   run_path_prefix = "#{path(@installation)}/repository/#{@repository.ubid}/run"
    badge_class = "inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5" %>
 
 <div class="grid grid-cols-1 gap-6">
@@ -76,7 +77,12 @@
                 >
                   <div class="min-[1200px]:max-w-[500px] min-[1400px]:max-w-none">
                     <div class="font-medium text-gray-900 min-[1640px]:max-w-md truncate">
-                      <%= run.display_title %>
+                      <a
+                        href="<%= run_path_prefix %>/<%= run.create_date %>/<%= run.run_id %>/<%= run.run_attempt %>"
+                        class="hover:underline"
+                      >
+                        <%= run.display_title %>
+                      </a>
                     </div>
 
                     <div class="mt-1 text-gray-500 text-xs truncate">

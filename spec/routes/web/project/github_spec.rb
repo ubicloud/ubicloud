@@ -668,5 +668,158 @@ RSpec.describe Clover, "github" do
       expect(page).to have_link "Older Runs", href: "?date=#{today - 14}"
       expect(page).to have_no_css ".auto-refresh"
     end
+
+    describe "run" do
+      let(:run_path_prefix) { "#{project.path}/github/#{installation.ubid}/repository/#{repository.ubid}/run" }
+
+      def create_runner(job_id, **)
+        GithubRunner.create(
+          installation_id: installation.id,
+          repository_id: repository.id,
+          repository_name: repository.name,
+          label: "ubicloud",
+          run_id: 1005,
+          run_attempt: 2,
+          job_id:,
+          job_name: "Runner job #{job_id}",
+          **,
+        )
+      end
+
+      def create_completed_job(job_id, create_date: Time.now.utc.to_date, **)
+        GithubCompletedWorkflowJob.create_partition(create_date) unless GithubCompletedWorkflowJob.partition_days.include?(create_date)
+        now = Time.now
+        GithubCompletedWorkflowJob.insert(
+          repository_id: repository.id,
+          job_id:,
+          workflow_run_create_date: create_date,
+          installation_id: installation.id,
+          runner_id: GithubRunner.generate_uuid,
+          runner_vm_id: Vm.generate_uuid,
+          completed_at: now,
+          run_id: 1005,
+          run_attempt: 2,
+          workflow_name: "CI",
+          job_name: "Completed job #{job_id}",
+          job_created_at: now - 60,
+          job_started_at: now - 50,
+          job_completed_at: now - 5,
+          ready_at: now - 55,
+          status: "completed",
+          conclusion: "failure",
+          label: "ubicloud-standard-4",
+          actual_label: "ubicloud-standard-4",
+          billed_vm_size: "standard-4",
+          vm_family: "standard",
+          duration: 45,
+          **,
+        )
+      end
+
+      def job_ids
+        page.all("#workflow-jobs tbody tr").map { it[:id] }
+      end
+
+      it "shows details of an active workflow run and its jobs" do
+        now = Time.now
+        today = Time.now.utc.to_date
+        create_active_run(1005, run_attempt: 2, status: "in_progress", run_started_at: now - 125, head_branch: "feature", commit_hash: "a" * 40, commit_message: "Active 1005-2", event: "pull_request", actor_login: "alice")
+        create_runner(30, workflow_name: "CI", status: "in_progress", job_created_at: now - 90, job_started_at: now - 80, label: "ubicloud-arm")
+        create_runner(31, status: "completed", conclusion: "success", job_created_at: now - 90, job_started_at: now - 80, completed_at: now - 20)
+        create_runner(32, status: "queued", job_created_at: now - 70)
+        create_runner(33, status: "queued")
+        create_completed_job(20)
+
+        visit runs_path
+        click_link "Active 1005-2"
+        expect(page).to have_current_path("#{run_path_prefix}/#{today}/1005/2")
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq "Ubicloud - Workflow Run"
+        expect(page).to have_css ".auto-refresh"
+        expect(page).to have_content "In progress"
+        expect(page).to have_content "CI"
+        expect(page).to have_content "pull_request by alice"
+        expect(page).to have_content "Attempt #2"
+        expect(page).to have_content "feature"
+        expect(page).to have_link "aaaaaaa", href: "https://github.com/#{repository.name}/commit/#{"a" * 40}"
+        expect(page).to have_content(/Running for 2m \d+s/)
+        expect(page).to have_link "View on GitHub", href: "https://github.com/#{repository.name}/actions/runs/1005/attempts/2"
+        expect(job_ids).to eq %w[job-30 job-31 job-32 job-33 job-20]
+
+        row = find_by_id("job-30")
+        expect(row).to have_content "Runner job 30"
+        expect(row).to have_content "In progress"
+        expect(row).to have_content "ubicloud-arm"
+        expect(row).to have_content(/Running for 1m \d+s/)
+        expect(row).to have_content "Started 1 minutes ago"
+
+        row = find_by_id("job-31")
+        expect(row).to have_content "Success"
+        expect(row).to have_content "Took 1m"
+        expect(row).to have_content "Started 1 minutes ago"
+
+        row = find_by_id("job-32")
+        expect(row).to have_content "Queued"
+        expect(row).to have_content(/Queued for 1m \d+s/)
+        expect(row).to have_no_content "Started"
+
+        row = find_by_id("job-33")
+        expect(row).to have_content "Queued"
+        expect(row).to have_no_content "Queued for"
+        expect(row).to have_no_content "Started"
+
+        row = find_by_id("job-20")
+        expect(row).to have_content "Completed job 20"
+        expect(row).to have_content "Failure"
+        expect(row).to have_content "ubicloud-standard-4"
+        expect(row).to have_content "Took 45s"
+        expect(row).to have_content "Started just now"
+      end
+
+      it "shows details of a completed workflow run and its jobs" do
+        today = Time.now.utc.to_date
+        create_completed_run(1005, create_date: today - 2, run_attempt: 2)
+        create_completed_job(20, create_date: today - 2, conclusion: "success")
+        create_completed_job(21, create_date: today - 2)
+
+        visit "#{runs_path}?date=#{today}"
+        click_link "Completed 1005-2"
+        expect(page).to have_current_path("#{run_path_prefix}/#{today - 2}/1005/2")
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_no_css ".auto-refresh"
+        expect(page).to have_content "Took 1m 30s"
+        expect(job_ids).to eq %w[job-20 job-21]
+        expect(find_by_id("job-20")).to have_content "Success"
+        expect(find_by_id("job-21")).to have_content "Failure"
+      end
+
+      it "shows empty state for a workflow run without jobs" do
+        today = Time.now.utc.to_date
+        create_completed_run(1005)
+
+        visit "#{run_path_prefix}/#{today}/1005/1"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "Completed 1005-1"
+        expect(page).to have_no_content "Attempt #"
+        expect(page).to have_content "No workflow jobs"
+        expect(page).to have_no_css "#workflow-jobs thead"
+      end
+
+      it "returns 404 for missing workflow run or invalid date" do
+        today = Time.now.utc.to_date
+        create_completed_run(1005)
+
+        visit "#{run_path_prefix}/#{today}/1005/2"
+        expect(page.status_code).to eq(404)
+
+        visit "#{run_path_prefix}/#{today - 1}/1005/1"
+        expect(page.status_code).to eq(404)
+
+        visit "#{run_path_prefix}/2026-02-30/1005/1"
+        expect(page.status_code).to eq(404)
+      end
+    end
   end
 end
