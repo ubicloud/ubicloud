@@ -1080,6 +1080,7 @@ class CloverAdmin < Roda
     ["GithubRepository", :runners] => "repository",
     ["Project", :vms] => "project",
     ["Project", :postgres_resources] => "project",
+    ["Project", :kubernetes_clusters] => "project",
     ["Project", :invoices] => "project",
     ["PostgresResource", :servers] => "resource",
     ["Strand", :children] => "parent",
@@ -1119,6 +1120,15 @@ class CloverAdmin < Roda
       "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.send(label))}</a>"
     end
 
+    node_storage = lambda do |obj|
+      if obj.target_node_storage_size_gib
+        obj.target_node_storage_size_gib.to_s
+      else
+        vm_size = Option::VmSizes.find { it.name == obj.target_node_size }
+        "#{vm_size.storage_size_options.first} (default)"
+      end
+    end
+
     show_html do |obj, column|
       case column
       when :name, :ubid, :invoice_number
@@ -1129,6 +1139,13 @@ class CloverAdmin < Roda
         link.call(obj.send(column), label: :ubid)
       when :subtotal, :cost
         "$%0.02f" % (obj.send(column) || 0)
+      when :target_node_storage_size_gib
+        node_storage.call(obj)
+      when :nodepools
+        lines = obj.nodepools.map do |np|
+          "#{Erubi.h(np.name)}: #{np.node_count} x #{np.target_node_size}, #{node_storage.call(np)} GiB, #{np.version}"
+        end
+        "<details><summary>#{lines.size} nodepools</summary>#{lines.join("<br>")}</details>"
       end
     end
 
@@ -1302,6 +1319,22 @@ class CloverAdmin < Roda
           ubid_uuid_grep.call(ds, Sequel[:project][:id], value)
         end
       end
+    end
+
+    model KubernetesCluster do
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
+      eager [:location, :project]
+      columns do |type_symbol, request|
+        if type_symbol == :search_form
+          [:name, :project, :location, :version]
+        else
+          [:name, :project, :location, :version, :cp_node_count, :target_node_size, :target_node_storage_size_gib, :created_at, :nodepools]
+        end
+      end
+      column_options version: {type: "select", options: Option.kubernetes_versions, add_blank: true},
+        target_node_size: {label: "Node size"},
+        target_node_storage_size_gib: {label: "Storage (GiB)"},
+        project: ubid_input.call("Project")
     end
 
     model PaymentMethod do
