@@ -9508,104 +9508,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-asia-east1:
@@ -9651,104 +9651,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -9829,84 +9829,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
       gcp-asia-east2:
@@ -9915,104 +9915,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-asia-northeast1:
@@ -10053,104 +10053,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -10231,84 +10231,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -10367,7 +10367,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-northeast2:
@@ -10410,104 +10410,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-asia-south1:
@@ -10585,104 +10585,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -10815,7 +10815,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-south2:
@@ -10824,104 +10824,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-asia-southeast1:
@@ -11036,104 +11036,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -11214,84 +11214,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -11350,7 +11350,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-asia-southeast2:
@@ -11359,104 +11359,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -11576,104 +11576,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-australia-southeast1:
@@ -11714,104 +11714,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -11944,7 +11944,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-australia-southeast2:
@@ -11953,104 +11953,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -12131,84 +12131,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
       gcp-europe-central2:
@@ -12326,6 +12326,110 @@ providers:
               memory_gib: 1440
               storage_size_options:
               - 12000
+          c4-highmem:
+            sizes:
+            - name: c4-highmem-4
+              vcpus: 4
+              memory_gib: 31
+              storage_size_options:
+              - 375
+            - name: c4-highmem-8
+              vcpus: 8
+              memory_gib: 62
+              storage_size_options:
+              - 375
+            - name: c4-highmem-16
+              vcpus: 16
+              memory_gib: 124
+              storage_size_options:
+              - 750
+            - name: c4-highmem-24
+              vcpus: 24
+              memory_gib: 186
+              storage_size_options:
+              - 1500
+            - name: c4-highmem-32
+              vcpus: 32
+              memory_gib: 248
+              storage_size_options:
+              - 1875
+            - name: c4-highmem-48
+              vcpus: 48
+              memory_gib: 372
+              storage_size_options:
+              - 3000
+            - name: c4-highmem-96
+              vcpus: 96
+              memory_gib: 744
+              storage_size_options:
+              - 6000
+            - name: c4-highmem-144
+              vcpus: 144
+              memory_gib: 1116
+              storage_size_options:
+              - 9000
+            - name: c4-highmem-192
+              vcpus: 192
+              memory_gib: 1488
+              storage_size_options:
+              - 12000
+            - name: c4-highmem-288
+              vcpus: 288
+              memory_gib: 2232
+              storage_size_options:
+              - 18000
+          c4-standard:
+            sizes:
+            - name: c4-standard-4
+              vcpus: 4
+              memory_gib: 15
+              storage_size_options:
+              - 375
+            - name: c4-standard-8
+              vcpus: 8
+              memory_gib: 30
+              storage_size_options:
+              - 375
+            - name: c4-standard-16
+              vcpus: 16
+              memory_gib: 60
+              storage_size_options:
+              - 750
+            - name: c4-standard-24
+              vcpus: 24
+              memory_gib: 90
+              storage_size_options:
+              - 1500
+            - name: c4-standard-32
+              vcpus: 32
+              memory_gib: 120
+              storage_size_options:
+              - 1875
+            - name: c4-standard-48
+              vcpus: 48
+              memory_gib: 180
+              storage_size_options:
+              - 3000
+            - name: c4-standard-96
+              vcpus: 96
+              memory_gib: 360
+              storage_size_options:
+              - 6000
+            - name: c4-standard-144
+              vcpus: 144
+              memory_gib: 540
+              storage_size_options:
+              - 9000
+            - name: c4-standard-192
+              vcpus: 192
+              memory_gib: 720
+              storage_size_options:
+              - 12000
+            - name: c4-standard-288
+              vcpus: 288
+              memory_gib: 1080
+              storage_size_options:
+              - 18000
           c4a-highmem:
             sizes:
             - name: c4a-highmem-4
@@ -12443,104 +12547,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -12673,7 +12777,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-southwest1:
@@ -12682,104 +12786,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -12860,84 +12964,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
       gcp-europe-west1:
@@ -13015,104 +13119,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -13193,84 +13297,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -13329,7 +13433,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west10:
@@ -13338,84 +13442,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -13474,7 +13578,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west2:
@@ -13515,104 +13619,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -13693,84 +13797,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -13829,7 +13933,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west3:
@@ -13907,104 +14011,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -14137,7 +14241,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west4:
@@ -14215,104 +14319,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -14393,84 +14497,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -14529,7 +14633,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west6:
@@ -14538,104 +14642,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -14768,7 +14872,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-europe-west8:
@@ -14777,104 +14881,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-europe-west9:
@@ -14883,104 +14987,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
       gcp-me-central1:
@@ -15238,6 +15342,90 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          c4d-highmem:
+            sizes:
+            - name: c4d-highmem-8
+              vcpus: 8
+              memory_gib: 63
+              storage_size_options:
+              - 375
+            - name: c4d-highmem-16
+              vcpus: 16
+              memory_gib: 126
+              storage_size_options:
+              - 375
+            - name: c4d-highmem-32
+              vcpus: 32
+              memory_gib: 252
+              storage_size_options:
+              - 750
+            - name: c4d-highmem-48
+              vcpus: 48
+              memory_gib: 378
+              storage_size_options:
+              - 1500
+            - name: c4d-highmem-64
+              vcpus: 64
+              memory_gib: 504
+              storage_size_options:
+              - 2250
+            - name: c4d-highmem-96
+              vcpus: 96
+              memory_gib: 756
+              storage_size_options:
+              - 3000
+            - name: c4d-highmem-192
+              vcpus: 192
+              memory_gib: 1512
+              storage_size_options:
+              - 6000
+            - name: c4d-highmem-384
+              vcpus: 384
+              memory_gib: 3024
+              storage_size_options:
+              - 12000
+          c4d-standard:
+            sizes:
+            - name: c4d-standard-8
+              vcpus: 8
+              memory_gib: 31
+              storage_size_options:
+              - 375
+            - name: c4d-standard-16
+              vcpus: 16
+              memory_gib: 62
+              storage_size_options:
+              - 375
+            - name: c4d-standard-32
+              vcpus: 32
+              memory_gib: 124
+              storage_size_options:
+              - 750
+            - name: c4d-standard-48
+              vcpus: 48
+              memory_gib: 186
+              storage_size_options:
+              - 1500
+            - name: c4d-standard-64
+              vcpus: 64
+              memory_gib: 248
+              storage_size_options:
+              - 2250
+            - name: c4d-standard-96
+              vcpus: 96
+              memory_gib: 372
+              storage_size_options:
+              - 3000
+            - name: c4d-standard-192
+              vcpus: 192
+              memory_gib: 744
+              storage_size_options:
+              - 6000
+            - name: c4d-standard-384
+              vcpus: 384
+              memory_gib: 1488
+              storage_size_options:
+              - 12000
       gcp-northamerica-northeast1:
         families:
           c3-standard:
@@ -15276,104 +15464,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -15456,104 +15644,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -15710,104 +15898,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -15940,7 +16128,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-southamerica-east1:
@@ -15981,104 +16169,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -16161,104 +16349,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -16447,104 +16635,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -16625,84 +16813,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -16761,7 +16949,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east1:
@@ -16876,104 +17064,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -17054,84 +17242,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -17190,7 +17378,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east4:
@@ -17268,104 +17456,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -17446,84 +17634,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -17582,7 +17770,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-east5:
@@ -17623,104 +17811,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -17801,84 +17989,84 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
           z3-highlssd:
@@ -17937,7 +18125,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-south1:
@@ -17978,104 +18166,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -18208,7 +18396,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-west1:
@@ -18249,104 +18437,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -18479,7 +18667,7 @@ providers:
               - 18000
             - name: z3-standardlssd-176
               vcpus: 176
-              memory_gib: 1408
+              memory_gib: 1406
               storage_size_options:
               - 36000
       gcp-us-west2:
@@ -18488,104 +18676,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -18668,188 +18856,188 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4d-highmem:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
       gcp-us-west4:
@@ -18927,104 +19115,104 @@ providers:
             sizes:
             - name: c4-highmem-4
               vcpus: 4
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4-highmem-24
               vcpus: 24
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 1875
             - name: c4-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4-highmem-144
               vcpus: 144
-              memory_gib: 1152
+              memory_gib: 1116
               storage_size_options:
               - 9000
             - name: c4-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000
             - name: c4-highmem-288
               vcpus: 288
-              memory_gib: 2304
+              memory_gib: 2232
               storage_size_options:
               - 18000
           c4-standard:
             sizes:
             - name: c4-standard-4
               vcpus: 4
-              memory_gib: 16
+              memory_gib: 15
               storage_size_options:
               - 375
             - name: c4-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 30
               storage_size_options:
               - 375
             - name: c4-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 60
               storage_size_options:
               - 750
             - name: c4-standard-24
               vcpus: 24
-              memory_gib: 96
+              memory_gib: 90
               storage_size_options:
               - 1500
             - name: c4-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 120
               storage_size_options:
               - 1875
             - name: c4-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 180
               storage_size_options:
               - 3000
             - name: c4-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 360
               storage_size_options:
               - 6000
             - name: c4-standard-144
               vcpus: 144
-              memory_gib: 576
+              memory_gib: 540
               storage_size_options:
               - 9000
             - name: c4-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 720
               storage_size_options:
               - 12000
             - name: c4-standard-288
               vcpus: 288
-              memory_gib: 1152
+              memory_gib: 1080
               storage_size_options:
               - 18000
           c4a-highmem:
@@ -19105,83 +19293,83 @@ providers:
             sizes:
             - name: c4d-highmem-8
               vcpus: 8
-              memory_gib: 64
+              memory_gib: 63
               storage_size_options:
               - 375
             - name: c4d-highmem-16
               vcpus: 16
-              memory_gib: 128
+              memory_gib: 126
               storage_size_options:
               - 375
             - name: c4d-highmem-32
               vcpus: 32
-              memory_gib: 256
+              memory_gib: 252
               storage_size_options:
               - 750
             - name: c4d-highmem-48
               vcpus: 48
-              memory_gib: 384
+              memory_gib: 378
               storage_size_options:
               - 1500
             - name: c4d-highmem-64
               vcpus: 64
-              memory_gib: 512
+              memory_gib: 504
               storage_size_options:
               - 2250
             - name: c4d-highmem-96
               vcpus: 96
-              memory_gib: 768
+              memory_gib: 756
               storage_size_options:
               - 3000
             - name: c4d-highmem-192
               vcpus: 192
-              memory_gib: 1536
+              memory_gib: 1512
               storage_size_options:
               - 6000
             - name: c4d-highmem-384
               vcpus: 384
-              memory_gib: 3072
+              memory_gib: 3024
               storage_size_options:
               - 12000
           c4d-standard:
             sizes:
             - name: c4d-standard-8
               vcpus: 8
-              memory_gib: 32
+              memory_gib: 31
               storage_size_options:
               - 375
             - name: c4d-standard-16
               vcpus: 16
-              memory_gib: 64
+              memory_gib: 62
               storage_size_options:
               - 375
             - name: c4d-standard-32
               vcpus: 32
-              memory_gib: 128
+              memory_gib: 124
               storage_size_options:
               - 750
             - name: c4d-standard-48
               vcpus: 48
-              memory_gib: 192
+              memory_gib: 186
               storage_size_options:
               - 1500
             - name: c4d-standard-64
               vcpus: 64
-              memory_gib: 256
+              memory_gib: 248
               storage_size_options:
               - 2250
             - name: c4d-standard-96
               vcpus: 96
-              memory_gib: 384
+              memory_gib: 372
               storage_size_options:
               - 3000
             - name: c4d-standard-192
               vcpus: 192
-              memory_gib: 768
+              memory_gib: 744
               storage_size_options:
               - 6000
             - name: c4d-standard-384
               vcpus: 384
-              memory_gib: 1536
+              memory_gib: 1488
               storage_size_options:
               - 12000

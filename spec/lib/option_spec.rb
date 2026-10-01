@@ -82,6 +82,32 @@ RSpec.describe Option do
       end
     end
 
+    it "derives whole-GiB memory for GCP sizes even when the family ratio is fractional" do
+      Option::GCP_FAMILY_OPTIONS.each do |family|
+        Option::GCP_STORAGE_SIZE_OPTIONS[family].each_key do |vcpu|
+          expect(Option::POSTGRES_SIZE_OPTIONS["#{family}-#{vcpu}"].memory_gib).to be_an(Integer)
+        end
+      end
+      Option::VmSizes.select { Option::GCP_FAMILY_OPTIONS.include?(it.family) }.each do |size|
+        expect(size.memory_gib).to be_an(Integer), "#{size.name} memory_gib is #{size.memory_gib.inspect}"
+      end
+
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-4"].memory_gib).to eq(15)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-8"].memory_gib).to eq(30)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-highmem-4"].memory_gib).to eq(31)
+      expect(Option::VmSizes.find { it.name == "c4-highmem-8" }.memory_gib).to eq(62)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-standard-8"].memory_gib).to eq(31)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-highmem-8"].memory_gib).to eq(63)
+    end
+
+    it "uses the family's memory_gib_overrides for shapes that do not follow the ratio" do
+      expect(described_class.gcp_memory_gib("z3-standardlssd", 176)).to eq(1406)
+      expect(described_class.gcp_memory_gib("z3-standardlssd", 88)).to eq(704)
+      expect(described_class.gcp_memory_gib("c4-standard", 4)).to eq(15)
+      expect(Option::POSTGRES_SIZE_OPTIONS["z3-standardlssd-176"].memory_gib).to eq(1406)
+      expect(Option::VmSizes.find { it.name == "z3-standardlssd-176" }.memory_gib).to eq(1406)
+    end
+
     it "builds the GCE machine type from the family's prefix, vcpu count and suffix" do
       expect(described_class.gcp_instance_type_name("c4a-standard", 16)).to eq("c4a-standard-16-lssd")
       expect(described_class.gcp_instance_type_name("c4d-highmem", 96)).to eq("c4d-highmem-96-lssd")

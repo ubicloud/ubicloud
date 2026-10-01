@@ -69,6 +69,14 @@ module Option
     "#{config[:gce_prefix]}-#{vcpu_count}#{"-#{config[:gce_suffix]}" if lssd}"
   end
 
+  # Whole GiB, since vm.memory_gib is an integer column: c4 ratios are
+  # fractional (3.75 and 7.75), and a few shapes do not follow their family's
+  # ratio at all and are listed in memory_gib_overrides.
+  def self.gcp_memory_gib(family, vcpu_count)
+    config = GCP_FAMILY_VM_CONFIG.fetch(family)
+    config.dig(:memory_gib_overrides, vcpu_count) || (vcpu_count * config[:mem_ratio]).floor
+  end
+
   def self.vring_workers(vcpus)
     [1, vcpus / 2].max
   end
@@ -125,10 +133,10 @@ module Option
   GCP_FAMILY_VM_CONFIG = {
     "c4a-standard" => {gce_prefix: "c4a-standard", gce_suffix: "lssd", arch: "arm64", mem_ratio: 4, ssd_gib: 375, shapes: c4a_shapes},
     "c4a-highmem" => {gce_prefix: "c4a-highmem", gce_suffix: "lssd", arch: "arm64", mem_ratio: 8, ssd_gib: 375, shapes: c4a_shapes},
-    "c4-standard" => {gce_prefix: "c4-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4_shapes},
-    "c4-highmem" => {gce_prefix: "c4-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4_shapes},
-    "c4d-standard" => {gce_prefix: "c4d-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4d_shapes},
-    "c4d-highmem" => {gce_prefix: "c4d-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4d_shapes},
+    "c4-standard" => {gce_prefix: "c4-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 3.75, ssd_gib: 375, shapes: c4_shapes},
+    "c4-highmem" => {gce_prefix: "c4-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 7.75, ssd_gib: 375, shapes: c4_shapes},
+    "c4d-standard" => {gce_prefix: "c4d-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 3.875, ssd_gib: 375, shapes: c4d_shapes},
+    "c4d-highmem" => {gce_prefix: "c4d-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 7.875, ssd_gib: 375, shapes: c4d_shapes},
     # c3 has no highmem variant.
     "c3-standard" => {gce_prefix: "c3-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375,
                       shapes: {4 => 1, 8 => 2, 22 => 4, 44 => 8, 88 => 16, 176 => 32}},
@@ -136,7 +144,9 @@ module Option
     "c3d-highmem" => {gce_prefix: "c3d-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c3d_shapes},
     # z3 is highmem only; the suffix selects local SSD per vcpu, not memory.
     "z3-standardlssd" => {gce_prefix: "z3-highmem", gce_suffix: "standardlssd", arch: "x64", mem_ratio: 8, ssd_gib: 3000,
-                          shapes: {14 => 1, 22 => 2, 44 => 3, 88 => 6, 176 => 12}},
+                          shapes: {14 => 1, 22 => 2, 44 => 3, 88 => 6, 176 => 12},
+                          # z3-highmem-176-standardlssd ships 1406 GiB, not the 1408 the 8x ratio gives.
+                          memory_gib_overrides: {176 => 1406}},
     "z3-highlssd" => {gce_prefix: "z3-highmem", gce_suffix: "highlssd", arch: "x64", mem_ratio: 8, ssd_gib: 3000,
                       shapes: {8 => 1, 16 => 2, 22 => 3, 32 => 4, 44 => 6, 88 => 12}},
   }.freeze
@@ -244,7 +254,7 @@ module Option
   }).concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
     config[:shapes].keys.map { |vcpu|
       VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0,
-        vcpu * config[:mem_ratio], GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, config[:arch])
+        gcp_memory_gib(family, vcpu), GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, config[:arch])
     }
   }).freeze
 
@@ -442,7 +452,7 @@ module Option
     ["r8id", 48, 384],
     ["r8id", 64, 512],
   ].concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
-    config[:shapes].keys.map { |vcpu| [family, vcpu, vcpu * config[:mem_ratio]] }
+    config[:shapes].keys.map { |vcpu| [family, vcpu, gcp_memory_gib(family, vcpu)] }
   }).to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
