@@ -233,6 +233,17 @@ class Clover
             view "github/runs"
           end
 
+          r.get web?, "run", Date, Integer, Integer do |date, run_id, run_attempt|
+            cond = {create_date: date, run_id:, run_attempt:}
+            next unless (@run = repository.active_workflow_runs_dataset.first(cond) ||
+              repository.completed_workflow_runs_dataset.first(cond))
+
+            @jobs = @run.completed_workflow_jobs
+            @jobs = @run.active_runners + @jobs unless @run.completed?
+
+            view "github/run"
+          end
+
           r.on "cache" do
             r.get api? do
               paginated_result(repository.cache_entries_dataset.exclude(committed_at: nil).order(:id), Serializers::GithubCacheEntry, installation:, repository:)

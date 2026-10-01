@@ -77,6 +77,15 @@ class Clover < Roda
     end
   end
 
+  plugin :class_matchers
+
+  class_matcher(Date, /(\d{4})-(\d\d)-(\d\d)/) do |y, m, d|
+    y = Integer(y, 10)
+    m = Integer(m, 10)
+    d = Integer(d, 10)
+    Date.new(y, m, d) if Date.valid_civil?(y, m, d)
+  end
+
   plugin :symbol_matchers
 
   symbol_matcher(:object_name, /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/, segment: true)
