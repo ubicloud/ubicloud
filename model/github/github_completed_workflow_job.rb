@@ -8,6 +8,10 @@ class GithubCompletedWorkflowJob < Sequel::Model
   def completed?
     true
   end
+
+  def github_duration
+    job_completed_at&.-(job_started_at)
+  end
 end
 
 # Table: github_completed_workflow_job

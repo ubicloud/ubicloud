@@ -748,7 +748,7 @@ RSpec.describe Clover, "github" do
         expect(job_ids).to eq %w[job-30 job-31 job-32 job-33 job-20]
 
         row = find_by_id("job-30")
-        expect(row).to have_content "Runner job 30"
+        expect(row).to have_link "Runner job 30", href: "https://github.com/#{repository.name}/actions/runs/1005/job/30"
         expect(row).to have_content "In progress"
         expect(row).to have_content "ubicloud-arm"
         expect(row).to have_content(/Running for 1m \d+s/)
@@ -770,7 +770,7 @@ RSpec.describe Clover, "github" do
         expect(row).to have_no_content "Started"
 
         row = find_by_id("job-20")
-        expect(row).to have_content "Completed job 20"
+        expect(row).to have_link "Completed job 20", href: "#{run_path_prefix}/#{today}/1005/2/20"
         expect(row).to have_content "Failure"
         expect(row).to have_content "ubicloud-standard-4"
         expect(row).to have_content "Took 45s"
@@ -793,6 +793,10 @@ RSpec.describe Clover, "github" do
         expect(job_ids).to eq %w[job-20 job-21]
         expect(find_by_id("job-20")).to have_content "Success"
         expect(find_by_id("job-21")).to have_content "Failure"
+
+        click_link "Completed job 21"
+        expect(page).to have_current_path("#{run_path_prefix}/#{today - 2}/1005/2/21")
+        expect(page.title).to eq "Ubicloud - Workflow Job"
       end
 
       it "shows empty state for a workflow run without jobs" do
@@ -819,6 +823,83 @@ RSpec.describe Clover, "github" do
 
         visit "#{run_path_prefix}/2026-02-30/1005/1"
         expect(page.status_code).to eq(404)
+      end
+
+      describe "job" do
+        it "shows details of a completed job for an active workflow run" do
+          now = Time.now
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2, status: "in_progress", run_started_at: now - 125, head_branch: "feature", commit_hash: "a" * 40, commit_message: "Fix bug\n\nLonger explanation", event: "pull_request", actor_login: "alice")
+          runner_id = GithubRunner.generate_uuid
+          create_completed_job(20, runner_id:, head_branch: "feature", job_created_at: now - 125, job_started_at: now - 50, job_completed_at: now - 5, actual_label: "custom-label", billed_vm_size: "standard-4-arm", duration: 52)
+
+          visit "#{run_path_prefix}/#{today}/1005/2/20"
+          expect(page.status_code).to eq(200)
+          expect(page.title).to eq "Ubicloud - Workflow Job"
+          expect(page).to have_no_css ".auto-refresh"
+          expect(page).to have_css "h3", text: "Completed job 20"
+          expect(page).to have_content "pull_request by alice"
+          expect(page).to have_link "alice", href: "https://github.com/alice"
+          expect(page).to have_content(/feature\s+\|\s+aaaaaaa Fix bug/)
+          expect(page).to have_link "aaaaaaa", href: "https://github.com/#{repository.name}/commit/#{"a" * 40}"
+          expect(page).to have_no_content "Longer explanation"
+          expect(page).to have_link "View on GitHub", href: "https://github.com/#{repository.name}/actions/runs/1005/job/20"
+
+          rows = page.all("dl div").to_h { [it.find("dt").text, it.find("dd").text] }
+          time_format = "%Y-%m-%d %H:%M:%S UTC"
+          expect(rows).to include(
+            "Job ID" => "20",
+            "Job" => "Completed job 20",
+            "Workflow Name" => "CI",
+            "Workflow Run" => "Active 1005-2",
+            "Label" => "ubicloud-standard-4",
+            "Actual Label" => "custom-label",
+            "Billed VM Size" => "standard-4-arm",
+            "Status" => "Failure",
+            "Created At" => (now - 125).getutc.strftime(time_format),
+            "Started At" => (now - 50).getutc.strftime(time_format),
+            "Completed At" => (now - 5).getutc.strftime(time_format),
+            "Queued For" => "1m 15s",
+            "Duration" => "52s",
+            "GitHub Workflow Job Duration" => "45s",
+          )
+
+          click_link "Active 1005-2"
+          expect(page).to have_current_path("#{run_path_prefix}/#{today}/1005/2")
+        end
+
+        it "shows details of a completed job for a completed workflow run" do
+          today = Time.now.utc.to_date
+          create_completed_run(1005, create_date: today - 2)
+          completed_at = Time.now - 3
+          create_completed_job(20, create_date: today - 2, run_attempt: 1, workflow_name: nil, conclusion: "success", job_completed_at: nil, completed_at:)
+
+          visit "#{run_path_prefix}/#{today - 2}/1005/1/20"
+          expect(page.status_code).to eq(200)
+          expect(page).to have_content "push by octocat"
+          expect(page).to have_no_css "a.font-mono"
+
+          rows = page.all("dl div").to_h { [it.find("dt").text, it.find("dd").text] }
+          expect(rows).to include("Workflow Name" => "-", "Workflow Run" => "Completed 1005-1", "Status" => "Success", "Completed At" => completed_at.getutc.strftime("%Y-%m-%d %H:%M:%S UTC"), "Duration" => "45s")
+          expect(rows).not_to have_key "GitHub Workflow Job Duration"
+        end
+
+        it "returns 404 for missing job" do
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2)
+          create_runner(30, status: "in_progress")
+          create_completed_job(20)
+          create_completed_job(21, run_attempt: 1)
+
+          visit "#{run_path_prefix}/#{today}/1005/2/30"
+          expect(page.status_code).to eq(404)
+
+          visit "#{run_path_prefix}/#{today}/1005/2/21"
+          expect(page.status_code).to eq(404)
+
+          visit "#{run_path_prefix}/#{today}/1005/1/20"
+          expect(page.status_code).to eq(404)
+        end
       end
     end
   end
