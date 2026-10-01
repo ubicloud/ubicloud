@@ -28,6 +28,12 @@ RSpec.describe Nic do
     end
   end
 
+  describe "#private_ipv4_address" do
+    it "returns nil when the nic has no private_ipv4" do
+      expect(described_class.new.private_ipv4_address).to be_nil
+    end
+  end
+
   describe "private_ipv4 uniqueness" do
     let(:subnet) { PrivateSubnet.create(net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id) }
 
