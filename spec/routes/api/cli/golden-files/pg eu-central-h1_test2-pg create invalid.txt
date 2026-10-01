@@ -36,12 +36,13 @@ Allowed Option Values:
           m8gd.4xlarge m8gd.8xlarge m8gd.12xlarge m8gd.16xlarge m8id.large
           m8id.xlarge m8id.2xlarge m8id.4xlarge m8id.8xlarge m8id.12xlarge
           m8id.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
-          i8g.12xlarge i8g.16xlarge i8g.24xlarge i8ge.large i8ge.xlarge
-          i8ge.2xlarge i8ge.3xlarge i8ge.6xlarge i8ge.12xlarge i8ge.18xlarge
-          i8ge.24xlarge i7i.large i7i.xlarge i7i.2xlarge i7i.4xlarge i7i.8xlarge
-          i7i.12xlarge i7i.16xlarge i7i.24xlarge i7ie.large i7ie.xlarge
-          i7ie.2xlarge i7ie.3xlarge i7ie.6xlarge i7ie.12xlarge i7ie.18xlarge
-          i7ie.24xlarge r6gd.medium r6gd.large r6gd.xlarge r6gd.2xlarge
+          i8g.12xlarge i8g.16xlarge i8g.24xlarge i8g.48xlarge i8ge.large
+          i8ge.xlarge i8ge.2xlarge i8ge.3xlarge i8ge.6xlarge i8ge.12xlarge
+          i8ge.18xlarge i8ge.24xlarge i8ge.48xlarge i7i.large i7i.xlarge
+          i7i.2xlarge i7i.4xlarge i7i.8xlarge i7i.12xlarge i7i.16xlarge
+          i7i.24xlarge i7i.48xlarge i7ie.large i7ie.xlarge i7ie.2xlarge
+          i7ie.3xlarge i7ie.6xlarge i7ie.12xlarge i7ie.18xlarge i7ie.24xlarge
+          i7ie.48xlarge r6gd.medium r6gd.large r6gd.xlarge r6gd.2xlarge
           r6gd.4xlarge r6gd.8xlarge r6gd.12xlarge r6gd.16xlarge r6id.large
           r6id.xlarge r6id.2xlarge r6id.4xlarge r6id.8xlarge r6id.12xlarge
           r6id.16xlarge r7gd.medium r7gd.large r7gd.xlarge r7gd.2xlarge

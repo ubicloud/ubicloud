@@ -152,6 +152,26 @@ RSpec.describe Option do
     end
   end
 
+  describe "AWS storage-optimized Postgres options" do
+    it "offers the 192 vCPU size for every i family" do
+      %w[i8g i8ge i7i i7ie].each do |family|
+        size = Option::POSTGRES_SIZE_OPTIONS["#{family}.48xlarge"]
+        expect(size).not_to be_nil, "Missing POSTGRES_SIZE_OPTIONS entry for #{family}.48xlarge"
+        expect(size.family).to eq(family)
+        expect(size.vcpu_count).to eq(192)
+        expect(size.memory_gib).to eq(1536)
+      end
+    end
+
+    it "pins the 192 vCPU storage size to the instance availability data" do
+      %w[i8g i8ge i7i i7ie].each do |family|
+        available = OptionTreeFilter.filter(provider: "aws", location: "us-east-1", size: "#{family}.48xlarge").first
+        expect(available).not_to be_nil, "#{family}.48xlarge missing from instance_availability.yml"
+        expect(Option::AWS_STORAGE_SIZE_OPTIONS[family][192]).to eq(available["storage_size_options"])
+      end
+    end
+  end
+
   describe "POSTGRES_FAMILY_FALLBACK_CHAINS" do
     it "matches the derivation from POSTGRES_SIZE_OPTIONS" do
       derived = (Option::POSTGRES_SIZE_OPTIONS.values.map(&:family).uniq & Option::AWS_FAMILY_OPTIONS)

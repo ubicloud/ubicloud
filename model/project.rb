@@ -288,6 +288,7 @@ class Project < Sequel::Model
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
     :early_jit_registration,
+    :enable_aws_48xlarge,
     :enable_c3_standard,
     :enable_c3d_highmem,
     :enable_c3d_standard,
