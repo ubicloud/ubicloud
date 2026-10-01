@@ -299,11 +299,12 @@ end
 
 # Table: sshable
 # Columns:
-#  id                | uuid | PRIMARY KEY
-#  host              | text |
-#  raw_private_key_1 | text |
-#  raw_private_key_2 | text |
-#  unix_user         | text | NOT NULL DEFAULT 'rhizome'::text
+#  id                | uuid   | PRIMARY KEY
+#  host              | text   |
+#  raw_private_key_1 | text   |
+#  raw_private_key_2 | text   |
+#  unix_user         | text   | NOT NULL DEFAULT 'rhizome'::text
+#  host_keys         | text[] |
 # Indexes:
 #  sshable_pkey     | PRIMARY KEY btree (id)
 #  sshable_host_key | UNIQUE btree (host)
