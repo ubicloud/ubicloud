@@ -337,6 +337,21 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
     end
   end
 
+  # The SQL specs run each query in the test database, as psql runs it in a
+  # customer database, and keep the rows for the fixture objects. The fixtures
+  # use ICU and libc C.* collations, which every Postgres build has.
+  def audit_rows(sql, key)
+    DB.fetch(sql).all.select { it[key].start_with?("audit_") }
+  end
+
+  describe "DETAILS_SQL" do
+    it "lists a column on an ICU collation, and leaves out libc C, C.* and builtin ones" do
+      DB.run("CREATE COLLATION audit_c_utf8 (provider = libc, locale = 'C.UTF-8')")
+      DB.run(%(CREATE TABLE audit_t (icu text COLLATE "und-x-icu", cu text COLLATE audit_c_utf8, c text COLLATE "C", p text COLLATE "POSIX")))
+      expect(audit_rows(described_class::DETAILS_SQL, :name).map { it.values_at(:kind, :name, :collname) }).to eq([["column", "audit_t.icu", "und-x-icu"]])
+    end
+  end
+
   describe "CTYPE_SQL" do
     it "keeps the regex escapes for Postgres" do
       expect(described_class::CTYPE_SQL).to include('~* \'\m(lower|upper|initcap|to_tsvector)\s*\(\'')

@@ -11,14 +11,15 @@ require "csv"
 class Prog::Postgres::AuditResourceCollation < Prog::Base
   subject_is :postgres_resource
 
-  # Lists every database. Its default is unsafe when Postgres versions it and it
-  # is not builtin; Postgres does not version libc C, POSIX, or C.*. The shared
-  # pg_database catalog also gives the default of a database that does not
-  # allow connections. The ICU locale column was renamed in PG 17, hence the
-  # jsonb lookup.
+  # Lists every database. Its default is safe only when it is builtin, or libc
+  # with locale C, POSIX, or C.* (case-insensitive, as Postgres compares them).
+  # Anything else is unsafe, so a missing version field or a new provider
+  # cannot pass as safe. The shared pg_database catalog also gives the default of
+  # a database that does not allow connections. The ICU locale column was
+  # renamed in PG 17, hence the jsonb lookup.
   DATABASES_SQL = <<~SQL
     SELECT datname, datallowconn,
-      datlocprovider<>'b' AND datcollversion IS NOT NULL AS default_unsafe,
+      NOT coalesce(datlocprovider='b' OR (datlocprovider='c' AND (lower(datcollate) IN ('c','posix') OR datcollate ILIKE 'c.%')), false) AS default_unsafe,
       datcollate,
       CASE WHEN datlocprovider='i' THEN true
            WHEN datlocprovider='c' AND datctype NOT IN ('C','POSIX') THEN true
@@ -34,27 +35,30 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   # default carry collation "default"; the default's own entry comes from
   # DATABASES_SQL. Partitions are left out, so a partitioned object counts once.
   DETAILS_SQL = <<~SQL
-    WITH risky AS (
-      SELECT oid, collname FROM pg_collation WHERE collprovider<>'b' AND collversion IS NOT NULL
+    WITH coll AS (
+      SELECT oid, collname::text AS collname, collprovider::text AS provider, collcollate AS locale FROM pg_collation WHERE oid<>100
+      UNION ALL
+      SELECT 100, 'default', datlocprovider::text, datcollate FROM pg_database WHERE datname=current_database()
     ),
-    def AS (
-      SELECT datlocprovider<>'b' AND datcollversion IS NOT NULL AS unsafe FROM pg_database WHERE datname=current_database()
+    risky AS (
+      SELECT oid, collname FROM coll
+      WHERE NOT coalesce(provider='b' OR (provider='c' AND (lower(locale) IN ('c','posix') OR locale ILIKE 'c.%')), false)
     ),
     idx AS (
       SELECT DISTINCT i.indexrelid, u.coll FROM pg_index i JOIN pg_class rel ON rel.oid=i.indexrelid
       JOIN pg_namespace n ON n.oid=rel.relnamespace JOIN LATERAL unnest(i.indcollation) u(coll) ON true
       WHERE NOT rel.relispartition AND n.nspname NOT IN ('pg_catalog','information_schema')
-        AND (u.coll IN (SELECT oid FROM risky) OR (u.coll=100 AND (SELECT unsafe FROM def)))
+        AND u.coll IN (SELECT oid FROM risky)
     ),
     col AS (
       SELECT a.attrelid, a.attname, a.attcollation AS coll FROM pg_attribute a
       JOIN pg_class rel ON rel.oid=a.attrelid JOIN pg_namespace n ON n.oid=rel.relnamespace
       WHERE a.attnum>0 AND NOT a.attisdropped AND rel.relkind IN ('r','m','p') AND NOT rel.relispartition
-        AND n.nspname NOT IN ('pg_catalog','information_schema') AND a.attcollation IN (SELECT oid FROM risky)
+        AND n.nspname NOT IN ('pg_catalog','information_schema') AND a.attcollation IN (SELECT oid FROM risky WHERE oid<>100)
     ),
     dom AS (
       SELECT t.oid, t.typcollation AS coll FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
-      WHERE t.typtype='d' AND n.nspname NOT IN ('pg_catalog','information_schema') AND t.typcollation IN (SELECT oid FROM risky)
+      WHERE t.typtype='d' AND n.nspname NOT IN ('pg_catalog','information_schema') AND t.typcollation IN (SELECT oid FROM risky WHERE oid<>100)
     ),
     used AS (SELECT coll FROM idx UNION SELECT coll FROM col UNION SELECT coll FROM dom)
     SELECT * FROM (
@@ -63,14 +67,14 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
         c.collctype, c.collisdeterministic, NULL::bool, NULL::bigint
       FROM pg_collation c WHERE c.oid IN (SELECT coll FROM used) AND c.oid<>100
       UNION ALL
-      SELECT 'index', i.indexrelid::regclass::text, CASE WHEN i.coll=100 THEN 'default' ELSE r.collname::text END,
+      SELECT 'index', i.indexrelid::regclass::text, r.collname,
         NULL, NULL, NULL, NULL, x.indisunique, pg_relation_size(i.indexrelid)
-      FROM idx i JOIN pg_index x ON x.indexrelid=i.indexrelid LEFT JOIN risky r ON r.oid=i.coll
+      FROM idx i JOIN pg_index x ON x.indexrelid=i.indexrelid JOIN risky r ON r.oid=i.coll
       UNION ALL
-      SELECT 'column', format('%s.%I', col.attrelid::regclass, col.attname), r.collname::text, NULL, NULL, NULL, NULL, NULL, NULL
+      SELECT 'column', format('%s.%I', col.attrelid::regclass, col.attname), r.collname, NULL, NULL, NULL, NULL, NULL, NULL
       FROM col JOIN risky r ON r.oid=col.coll
       UNION ALL
-      SELECT 'domain', dom.oid::regtype::text, r.collname::text, NULL, NULL, NULL, NULL, NULL, NULL
+      SELECT 'domain', dom.oid::regtype::text, r.collname, NULL, NULL, NULL, NULL, NULL, NULL
       FROM dom JOIN risky r ON r.oid=dom.coll
     ) d(kind, name, collname, provider, locale, ctype, deterministic, is_unique, size_bytes)
     ORDER BY array_position(ARRAY['collation','index','column','domain'], kind), size_bytes DESC NULLS LAST, name;
