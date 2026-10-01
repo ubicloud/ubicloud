@@ -2232,6 +2232,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.logs_config[:cloudwatch_auth_region]).to be_nil
     end
 
+    it "installs no GuardDuty agent outside AWS" do
+      expect(postgres_server.logs_config[:guardduty_region]).to be_nil
+    end
+
     context "with an AWS location" do
       let(:location) {
         Location.create(
@@ -2251,6 +2255,15 @@ RSpec.describe PostgresServer do
 
       it "ships no auth logs to CloudWatch for a project without the feature flag" do
         expect(postgres_server.logs_config[:cloudwatch_auth_region]).to be_nil
+      end
+
+      it "installs the GuardDuty agent from the server's region for a project with the feature flag" do
+        project.set_ff_aws_cloudwatch_logs(true)
+        expect(postgres_server.logs_config[:guardduty_region]).to eq("us-west-2")
+      end
+
+      it "installs no GuardDuty agent for a project without the feature flag" do
+        expect(postgres_server.logs_config[:guardduty_region]).to be_nil
       end
     end
 

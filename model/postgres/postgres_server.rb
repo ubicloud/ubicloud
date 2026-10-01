@@ -645,6 +645,7 @@ class PostgresServer < Sequel::Model
       resource_id: resource.ubid,
       log_destinations: destinations,
       cloudwatch_auth_region: (vm.location.name if aws_cloudwatch_logs?),
+      guardduty_region: (vm.location.name if aws_cloudwatch_logs?),
     }
   end
 
