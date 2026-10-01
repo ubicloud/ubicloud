@@ -118,15 +118,22 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   # Objects on builtin or C/POSIX (ASCII) rules are left out.
   #
   # Single-quoted heredoc so the regex escapes reach Postgres. citext is matched
-  # by typname, as the extension may be absent or outside search_path.
+  # by typname, as the extension may be absent or outside search_path, and
+  # through arrays and domains to any depth. An index is a citext one when a
+  # key (a column, a cast, or an array element) or a column it reads is citext.
   CTYPE_SQL = <<~'SQL'
-    WITH dflt AS (
+    WITH RECURSIVE citext_types(oid) AS (
+      SELECT oid FROM pg_type WHERE typname = 'citext' AND typtype = 'b'
+      UNION
+      SELECT t.oid FROM pg_type t JOIN citext_types ct ON t.typbasetype = ct.oid OR (t.typelem = ct.oid AND t.typcategory = 'A')
+    ),
+    dflt AS (
       SELECT CASE WHEN datlocprovider = 'i' THEN 'icu'
                   WHEN datlocprovider = 'c' AND datctype NOT IN ('C', 'POSIX') THEN 'glibc' END AS source
       FROM pg_database WHERE datname = current_database()
     ),
     idx AS (
-      SELECT i.indexrelid, i.indrelid, i.indkey, i.indclass, pg_get_indexdef(i.indexrelid) AS def,
+      SELECT i.indexrelid, i.indclass, pg_get_indexdef(i.indexrelid) AS def,
         array_remove(i.indcollation::oid[], 0::oid) AS colls
       FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
       WHERE NOT c.relispartition
@@ -169,8 +176,11 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       UNION ALL
       SELECT 'citext', indexrelid::regclass::text, 'pg_class'::regclass, indexrelid, colls, false
       FROM idx WHERE EXISTS (
-        SELECT 1 FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid LEFT JOIN pg_type bt ON bt.oid = t.typbasetype
-        WHERE a.attrelid = idx.indrelid AND a.attnum = ANY(idx.indkey::int2[]) AND 'citext' IN (t.typname, bt.typname))
+          SELECT 1 FROM pg_attribute a WHERE a.attrelid = idx.indexrelid AND a.atttypid IN (SELECT oid FROM citext_types))
+        OR EXISTS (
+          SELECT 1 FROM pg_depend d JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+          WHERE d.classid = 'pg_class'::regclass AND d.objid = idx.indexrelid AND d.refclassid = 'pg_class'::regclass
+            AND d.refobjsubid > 0 AND a.atttypid IN (SELECT oid FROM citext_types))
       UNION ALL
       SELECT 'pg_trgm', indexrelid::regclass::text, NULL, NULL, '{}', true
       FROM idx WHERE EXISTS (

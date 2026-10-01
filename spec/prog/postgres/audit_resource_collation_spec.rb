@@ -406,6 +406,23 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
         ["partition_key", "audit_part", "icu"],
       ])
     end
+
+    it "finds citext through arrays, nested domains, and casts" do
+      DB.run(<<~SQL)
+        CREATE DOMAIN audit_d1 AS citext;
+        CREATE DOMAIN audit_d2 AS audit_d1;
+        CREATE TABLE audit_t (a citext[] COLLATE "und-x-icu", d audit_d2 COLLATE "und-x-icu", e text COLLATE "und-x-icu");
+        CREATE INDEX audit_array ON audit_t USING gin (a);
+        CREATE UNIQUE INDEX audit_domain ON audit_t (d);
+        CREATE INDEX audit_cast ON audit_t ((e::citext));
+        CREATE INDEX audit_text ON audit_t (e);
+      SQL
+      expect(audit_rows(described_class::CTYPE_SQL, :object).map(&:values)).to eq([
+        ["citext", "audit_array", "icu"],
+        ["citext", "audit_cast", "icu"],
+        ["citext", "audit_domain", "icu"],
+      ])
+    end
   end
 
   describe "#parse_databases" do
