@@ -373,6 +373,19 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
   end
 
   describe "CTYPE_SQL" do
+    it "takes the case rules from the columns an object reads, not only from its keys" do
+      DB.run(<<~SQL)
+        CREATE TABLE audit_t (id int, name text COLLATE "und-x-icu", g text GENERATED ALWAYS AS (lower(name)) STORED);
+        CREATE INDEX audit_bool ON audit_t ((lower(name) = 'x'));
+        CREATE INDEX audit_pred ON audit_t (id) WHERE lower(name) = 'x';
+      SQL
+      expect(audit_rows(described_class::CTYPE_SQL, :object).map(&:values)).to eq([
+        ["expression", "audit_bool", "icu"],
+        ["expression", "audit_pred", "icu"],
+        ["stored_column", "audit_t.g", "icu"],
+      ])
+    end
+
     it "keeps the regex escapes for Postgres" do
       expect(described_class::CTYPE_SQL).to include('~* \'\m(lower|upper|initcap|to_tsvector)\s*\(\'')
     end

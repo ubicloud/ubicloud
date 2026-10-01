@@ -104,11 +104,13 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   SQL
 
   # Lists objects that store or index case-mapped values, with the source of
-  # their case rules: "glibc" needs a data scan, "icu" a REINDEX. The source
-  # comes from each object's key or column collation; default (oid 100),
-  # to_tsvector, pg_trgm, and tsvector use the database ctype. A COLLATE inside
-  # a generated expression is not seen, which errs toward reporting. Objects on
-  # builtin or C/POSIX (ASCII) rules are left out.
+  # their case rules: "glibc" needs a data scan, "icu" a REINDEX. An object's
+  # collations are its own (index keys, the column) plus those of every column
+  # it reads and every COLLATE it names, from pg_depend: lower(name) = 'x' as a
+  # boolean key, or in a predicate, follows name's collation. Default (oid
+  # 100), to_tsvector, pg_trgm, and tsvector use the database ctype. If the
+  # sources differ, ICU wins, since a REINDEX also clears the glibc risk.
+  # Objects on builtin or C/POSIX (ASCII) rules are left out.
   #
   # Single-quoted heredoc so the regex escapes reach Postgres. citext is matched
   # by typname, as the extension may be absent or outside search_path.
@@ -126,21 +128,21 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
         AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace, 'pg_toast'::regnamespace)
     ),
     objs AS (
-      SELECT 'expression' AS kind, indexrelid::regclass::text AS object,
-        CASE WHEN def ~* '\mto_tsvector\s*\(' OR colls = '{}' THEN colls || 100::oid ELSE colls END AS colls
+      SELECT 'expression' AS kind, indexrelid::regclass::text AS object, 'pg_class'::regclass AS classid, indexrelid AS objid, colls,
+        def ~* '\mto_tsvector\s*\(' AS db_ctype
       FROM idx WHERE def ~* '\m(lower|upper|initcap|to_tsvector)\s*\('
       UNION ALL
-      SELECT 'citext', indexrelid::regclass::text, CASE WHEN colls = '{}' THEN ARRAY[100::oid] ELSE colls END
+      SELECT 'citext', indexrelid::regclass::text, 'pg_class'::regclass, indexrelid, colls, false
       FROM idx WHERE EXISTS (
         SELECT 1 FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid LEFT JOIN pg_type bt ON bt.oid = t.typbasetype
         WHERE a.attrelid = idx.indrelid AND a.attnum = ANY(idx.indkey::int2[]) AND 'citext' IN (t.typname, bt.typname))
       UNION ALL
-      SELECT 'pg_trgm', indexrelid::regclass::text, ARRAY[100::oid]
+      SELECT 'pg_trgm', indexrelid::regclass::text, NULL, NULL, '{}', true
       FROM idx WHERE EXISTS (
         SELECT 1 FROM pg_opclass oc WHERE oc.oid = ANY(idx.indclass::oid[]) AND oc.opcname IN ('gin_trgm_ops', 'gist_trgm_ops'))
       UNION ALL
-      SELECT 'stored_column', format('%s.%I', a.attrelid::regclass, a.attname),
-        CASE WHEN a.atttypid = 'tsvector'::regtype OR a.attcollation = 0 THEN ARRAY[100::oid] ELSE ARRAY[a.attcollation] END
+      SELECT 'stored_column', format('%s.%I', a.attrelid::regclass, a.attname), 'pg_attrdef'::regclass, d.oid,
+        array_remove(ARRAY[a.attcollation], 0::oid), a.atttypid = 'tsvector'::regtype
       FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
       LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
       WHERE c.relkind IN ('r', 'p') AND NOT c.relispartition AND a.attnum > 0 AND NOT a.attisdropped
@@ -153,7 +155,18 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
         CASE WHEN u.coll = 100 THEN (SELECT source FROM dflt)
              WHEN pc.collprovider = 'i' THEN 'icu'
              WHEN pc.collprovider = 'c' AND pc.collctype NOT IN ('C', 'POSIX') THEN 'glibc' END AS source
-      FROM objs o CROSS JOIN LATERAL unnest(o.colls) u(coll) LEFT JOIN pg_collation pc ON pc.oid = u.coll
+      FROM objs o
+      CROSS JOIN LATERAL (
+        SELECT o.colls || ARRAY(
+          SELECT a.attcollation FROM pg_depend d JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+          WHERE d.classid = o.classid AND d.objid = o.objid AND d.refclassid = 'pg_class'::regclass
+            AND d.refobjsubid > 0 AND a.attcollation <> 0
+          UNION
+          SELECT d.refobjid FROM pg_depend d
+          WHERE d.classid = o.classid AND d.objid = o.objid AND d.refclassid = 'pg_collation'::regclass) AS colls
+      ) x
+      CROSS JOIN LATERAL unnest(CASE WHEN o.db_ctype OR x.colls = '{}' THEN x.colls || 100::oid ELSE x.colls END) u(coll)
+      LEFT JOIN pg_collation pc ON pc.oid = u.coll
     )
     SELECT kind, object, CASE WHEN bool_or(source = 'icu') THEN 'icu' ELSE 'glibc' END AS source
     FROM sourced GROUP BY kind, object HAVING bool_or(source IS NOT NULL)
