@@ -84,12 +84,12 @@ class Prog::Vnet::NicNexus < Prog::Base
       total_hosts = 2**(32 - subnet_cidr.netmask.prefix_len) - 5
       random_offset = SecureRandom.random_number(total_hosts) + 4
 
-      addr = subnet_cidr.nth(random_offset)
+      ipv4 = "#{subnet_cidr.nth(random_offset)}/32"
 
       # Check no existing NIC uses this IP
-      next if subnet.nics.any? { |n| n.private_ipv4.network.to_s == addr.to_s }
+      next unless subnet.nics_dataset.where(private_ipv4: ipv4).empty?
 
-      "#{addr}/32"
+      ipv4
     end
   end
 end
