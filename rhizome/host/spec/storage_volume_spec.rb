@@ -540,10 +540,7 @@ RSpec.describe StorageVolume do
     it "can create vhost backend config" do
       config_path = "/var/storage/test/2/vhost-backend.conf"
       f = instance_double(File)
-      expect(f).to receive(:path).and_return(config_path).at_least(:once)
-      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(config_path).and_yield(f)
-      expect(FileUtils).to receive(:chown).with("test", "test", config_path)
-      expect(File).to receive(:chmod).with(0o600, config_path)
+      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(config_path, perm: 0o600, owner: "test").and_yield(f)
       expect(f).to receive(:write).with(/image_path/)
       expect(encrypted_vhost_sv).to receive(:fsync_or_fail).with(f)
       expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(config_path)
@@ -728,14 +725,10 @@ RSpec.describe StorageVolume do
       }
       metadata_path = "/var/storage/test/2/metadata"
       f = instance_double(File)
-      expect(f).to receive(:path).and_return(metadata_path).at_least(:once)
-      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(metadata_path)
-      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(metadata_path).and_yield(f)
-      expect(FileUtils).to receive(:chown).with("test", "test", metadata_path)
-      expect(File).to receive(:chmod).with(0o600, metadata_path)
+      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(metadata_path, perm: 0o600, owner: "test").and_yield(f)
       expect(f).to receive(:truncate).with(8 * 1024 * 1024)
       expect(encrypted_vhost_sv).to receive(:vhost_backend_create_encrypted_metadata).with(key_wrapping_secrets)
-      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path).at_least(:once)
+      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
       encrypted_vhost_sv.vhost_backend_create_metadata(key_wrapping_secrets)
     end
   end

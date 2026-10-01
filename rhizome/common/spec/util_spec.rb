@@ -134,6 +134,16 @@ RSpec.describe "util" do
         expect(File.stat(path).mode & 0o777).to eq(0o600)
       end
     end
+
+    it "chowns the file to the owner before publishing it" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        expect(FileUtils).to receive(:chown).with("vmuser", "vmuser", "#{path}.tmp")
+        safe_write_to_file(path, "string content", perm: 0o600, owner: "vmuser")
+        expect(File.read(path)).to eq("string content")
+        expect(File.stat(path).mode & 0o777).to eq(0o600)
+      end
+    end
   end
 
   describe "validate_keys" do
