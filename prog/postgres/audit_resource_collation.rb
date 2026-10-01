@@ -113,8 +113,10 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   # collations are its own (index keys, the column) plus those of every column
   # it reads and every COLLATE it names, from pg_depend: lower(name) = 'x' as a
   # boolean key, or in a predicate, follows name's collation. Default (oid
-  # 100), to_tsvector, pg_trgm, and tsvector use the database ctype. If the
-  # sources differ, ICU wins, since a REINDEX also clears the glibc risk.
+  # 100) follows the database provider. Full text search, pg_trgm, and
+  # tsvector also classify characters with the libc ctype (datctype) on every
+  # provider, builtin included, so they are glibc when it is not C/POSIX. If
+  # the sources differ, ICU wins, since a REINDEX also clears the glibc risk.
   # Objects on builtin or C/POSIX (ASCII) rules are left out.
   #
   # Single-quoted heredoc so the regex escapes reach Postgres. citext is matched
@@ -129,7 +131,8 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
     ),
     dflt AS (
       SELECT CASE WHEN datlocprovider = 'i' THEN 'icu'
-                  WHEN datlocprovider = 'c' AND datctype NOT IN ('C', 'POSIX') THEN 'glibc' END AS source
+                  WHEN datlocprovider = 'c' AND datctype NOT IN ('C', 'POSIX') THEN 'glibc' END AS source,
+        CASE WHEN datctype NOT IN ('C', 'POSIX') THEN 'glibc' END AS ctype_source
       FROM pg_database WHERE datname = current_database()
     ),
     idx AS (
@@ -208,6 +211,8 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       ) x
       CROSS JOIN LATERAL unnest(CASE WHEN o.db_ctype OR x.colls = '{}' THEN x.colls || 100::oid ELSE x.colls END) u(coll)
       LEFT JOIN pg_collation pc ON pc.oid = u.coll
+      UNION ALL
+      SELECT kind, object, (SELECT ctype_source FROM dflt) FROM objs WHERE db_ctype
     )
     SELECT kind, object, CASE WHEN bool_or(source = 'icu') THEN 'icu' ELSE 'glibc' END AS source
     FROM sourced GROUP BY kind, object HAVING bool_or(source IS NOT NULL)
