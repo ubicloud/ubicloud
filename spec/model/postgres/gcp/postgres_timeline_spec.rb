@@ -102,6 +102,20 @@ PGDATA=/dat/17/data
       end
     end
 
+    describe "#get_object" do
+      it "rewinds the downloaded body before reading it" do
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        bucket = instance_double(Google::Cloud::Storage::Bucket)
+        file = instance_double(Google::Cloud::Storage::File)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
+        expect(bucket).to receive(:file).with("basebackups_005/x_backup_stop_sentinel.json").and_return(file)
+        expect(file).to receive(:download).and_return(StringIO.new("{}").tap(&:read))
+
+        expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+      end
+    end
+
     describe "#list_objects" do
       it "returns wrapped GCS file objects with key and last_modified converted to Time" do
         bucket = instance_double(Google::Cloud::Storage::Bucket)

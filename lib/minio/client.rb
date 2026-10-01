@@ -119,6 +119,10 @@ class Minio::Client
     response.status == 200
   end
 
+  def get_object(bucket_name, object_name)
+    send_request("GET", s3_uri("#{bucket_name}/#{object_name}")).data[:body]
+  end
+
   def list_objects(bucket_name, folder_path, max_keys: 1000, delimiter: "")
     objects = []
     query = URI.encode_www_form({

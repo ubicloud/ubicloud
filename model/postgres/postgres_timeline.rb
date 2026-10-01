@@ -75,6 +75,16 @@ class PostgresTimeline < Sequel::Model
     @backups = []
   end
 
+  def latest_completed_backup
+    return unless (newest = backups.max_by(&:last_modified))
+    return unless (finish_lsn = JSON.parse(get_object(newest.key))["FinishLSN"])
+
+    {lsn: PostgresServer.int2lsn(finish_lsn), wal_timeline_id: newest.key[%r{\Abasebackups_005/base_([0-9A-F]{8})}, 1]&.to_i(16)}
+  rescue JSON::ParserError => ex
+    Clog.emit("Could not read the wal-g backup sentinel", Util.exception_to_hash(ex, into: {ubid:}))
+    nil
+  end
+
   def latest_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { it.last_modified < target }
     fail "BUG: no backup found" unless backup

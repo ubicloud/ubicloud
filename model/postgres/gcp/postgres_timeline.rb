@@ -40,6 +40,10 @@ PGDATA=/dat/#{version}/data
       @blob_storage_client ||= location.location_credential_gcp.storage_client
     end
 
+    def gcp_get_object(key)
+      blob_storage_client.bucket(ubid).file(key).download.tap(&:rewind).read
+    end
+
     def gcp_list_objects(prefix, delimiter: "")
       bucket = blob_storage_client.bucket(ubid)
       return [] unless bucket
