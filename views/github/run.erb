@@ -10,6 +10,7 @@
    run = @run
    repository_name = @repository.name
    run_url = "https://github.com/#{repository_name}/actions/runs/#{run.run_id}/attempts/#{run.run_attempt}"
+   run_path = "#{path(@installation)}/repository/#{@repository.ubid}/run/#{run.create_date}/#{run.run_id}/#{run.run_attempt}"
    workflow_name = @jobs.find(&:workflow_name)&.workflow_name
    badge_class = "inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5"
    run_status_text, run_status_color = github_workflow_run_status_label(run) %>
@@ -106,6 +107,11 @@
             <% @jobs.each do |job| %>
               <% status_text, status_color = github_workflow_run_status_label(job)
                  started_at = job.job_started_at
+                 job_link = if job.completed?
+                   "#{run_path}/#{job.job_id}"
+                 else
+                   "https://github.com/#{repository_name}/actions/runs/#{job.run_id}/job/#{job.job_id}"
+                 end
                  duration = if job.completed?
                    job.duration
                  elsif job.completed_at && started_at
@@ -128,7 +134,7 @@
                 >
                   <div class="min-[1200px]:max-w-[500px] min-[1400px]:max-w-none">
                     <div class="font-medium text-gray-900 min-[1640px]:max-w-md truncate">
-                      <%= job.job_name %>
+                      <a href="<%= job_link %>" class="hover:underline"><%= job.job_name %></a>
                     </div>
 
                     <div class="mt-1 text-gray-500 text-xs truncate min-[1640px]:hidden">

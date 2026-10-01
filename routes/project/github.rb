@@ -233,15 +233,22 @@ class Clover
             view "github/runs"
           end
 
-          r.get web?, "run", Date, Integer, Integer do |date, run_id, run_attempt|
+          r.on web?, "run", Date, Integer, Integer do |date, run_id, run_attempt|
             cond = {create_date: date, run_id:, run_attempt:}
             next unless (@run = repository.active_workflow_runs_dataset.first(cond) ||
               repository.completed_workflow_runs_dataset.first(cond))
 
-            @jobs = @run.completed_workflow_jobs
-            @jobs = @run.active_runners + @jobs unless @run.completed?
+            r.get true do
+              @jobs = @run.completed_workflow_jobs
+              @jobs = @run.active_runners + @jobs unless @run.completed?
 
-            view "github/run"
+              view "github/run"
+            end
+
+            r.get Integer do |job_id|
+              next unless (@job = @run.completed_workflow_jobs_dataset.first(job_id:))
+              view "github/job"
+            end
           end
 
           r.on "cache" do
