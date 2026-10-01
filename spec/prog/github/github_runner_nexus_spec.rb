@@ -677,6 +677,103 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   describe "#wait_vm" do
     before { project.set_ff_early_jit_registration(true) }
 
+    context "when a large runner waits for metal capacity" do
+      before do
+        project.set_ff_early_jit_registration(false)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(label: "ubicloud-standard-16")
+        vm.update(allocated_at: nil, provisioned_at: nil, created_at: now - 61)
+        Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "start")
+        vm.incr_waiting_for_capacity
+      end
+
+      it "destroys the metal vm and spills over to aws" do
+        ps = PrivateSubnet.create(name: "runner-subnet", location_id: Location::GITHUB_RUNNERS_ID, net4: "10.0.0.0/28", net6: "fd10::/64", project_id: vm.project_id)
+        fw = Firewall.create(name: "runner-fw", location_id: Location::GITHUB_RUNNERS_ID, project_id: vm.project_id)
+        fw.associate_with_private_subnet(ps, apply_firewalls: false)
+        Nic.create(private_subnet_id: ps.id, vm_id: vm.id, name: "runner-nic", mac: "00:00:00:00:00:01", private_ipv4: "10.0.0.2/32", private_ipv6: "fd10::2/128", state: "active")
+        Strand.create_with_id(ps, prog: "Vnet::SubnetNexus", label: "wait")
+
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.vm_id).to be_nil
+        expect(runner.location_id).to be_nil
+        expect(runner.allocated_at).to be_nil
+        expect(runner.spill_over_set?).to be(true)
+        expect(vm.reload.destroy_set?).to be(true)
+        expect(ps.destroy_set?).to be(true)
+        expect(fw).not_to exist
+      end
+
+      it "spills over 30 vCPU runners" do
+        runner.update(label: "ubicloud-standard-30")
+
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.spill_over_set?).to be(true)
+      end
+
+      it "does not spill over smaller runners" do
+        runner.update(label: "ubicloud-standard-8")
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over runners that are not on metal" do
+        vm.update(location_id: Location::HETZNER_FSN1_ID)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the vm is allocated" do
+        vm.update(allocated_at: now)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the metal allocator has not run out of capacity" do
+        vm.semaphores_dataset.destroy
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the vm has not waited enough" do
+        vm.update(created_at: now - 59)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the feature flag is disabled" do
+        project.set_ff_spill_to_alien_runners(false)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the customer's alien quota is exceeded" do
+        project.update(reputation: "limited")
+        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+        allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+        aws_vm = create_vm(location_id: location.id)
+        aws_runner = GithubRunner.create(installation_id: installation.id, vm_id: aws_vm.id, location_id: location.id, repository_name: "test-repo", label: "ubicloud-standard-2")
+        Strand.create_with_id(aws_runner, prog: "Github::GithubRunnerNexus", label: "wait")
+
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the spill vcpus limit is exceeded" do
+        expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
+        create_vm(vcpus: 16, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "does not spill over if the spill runner limit is exceeded" do
+        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(1)
+        create_vm(vcpus: 2, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+    end
+
     it "does not generate the jit config if the feature flag is not enabled" do
       project.set_ff_early_jit_registration(false)
       vm.update(allocated_at: now)
