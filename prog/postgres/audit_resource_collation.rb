@@ -104,7 +104,12 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   SQL
 
   # Lists objects that store or index case-mapped values, with the source of
-  # their case rules: "glibc" needs a data scan, "icu" a REINDEX. An object's
+  # their case rules: "glibc" needs a data scan, "icu" a REINDEX. An index, a
+  # generated column, a check constraint, a partition key, or a materialized
+  # view is listed when its expression case-maps (lower, upper, initcap,
+  # casefold, full text search, ILIKE, ~*, regex functions and classes), or
+  # when it calls a function outside pg_catalog, which can case-map
+  # internally. citext, pg_trgm, and tsvector are matched by type. An object's
   # collations are its own (index keys, the column) plus those of every column
   # it reads and every COLLATE it names, from pg_depend: lower(name) = 'x' as a
   # boolean key, or in a predicate, follows name's collation. Default (oid
@@ -127,10 +132,40 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       WHERE NOT c.relispartition
         AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace, 'pg_toast'::regnamespace)
     ),
+    exprs AS (
+      SELECT 'expression' AS kind, indexrelid::regclass::text AS object, 'pg_class'::regclass AS classid, indexrelid AS objid, def, colls
+      FROM idx
+      UNION ALL
+      SELECT 'stored_column', format('%s.%I', a.attrelid::regclass, a.attname), 'pg_attrdef'::regclass, d.oid,
+        pg_get_expr(d.adbin, d.adrelid), array_remove(ARRAY[a.attcollation], 0::oid)
+      FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      WHERE a.attgenerated = 's' AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+        AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace, 'pg_toast'::regnamespace)
+      UNION ALL
+      SELECT 'check_constraint',
+        format('%s.%I', CASE WHEN con.conrelid <> 0 THEN con.conrelid::regclass::text ELSE con.contypid::regtype::text END, con.conname),
+        'pg_constraint'::regclass, con.oid, pg_get_constraintdef(con.oid), array_remove(ARRAY[coalesce(t.typcollation, 0::oid)], 0::oid)
+      FROM pg_constraint con LEFT JOIN pg_class c ON c.oid = con.conrelid LEFT JOIN pg_type t ON t.oid = con.contypid
+      WHERE con.contype = 'c' AND NOT coalesce(c.relispartition, false)
+        AND con.connamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+      UNION ALL
+      SELECT 'partition_key', p.partrelid::regclass::text, 'pg_class'::regclass, p.partrelid, pg_get_partkeydef(p.partrelid),
+        array_remove(p.partcollation::oid[], 0::oid)
+      FROM pg_partitioned_table p JOIN pg_class c ON c.oid = p.partrelid
+      WHERE c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+      UNION ALL
+      SELECT 'materialized_view', c.oid::regclass::text, 'pg_rewrite'::regclass, r.oid, pg_get_viewdef(c.oid), '{}'
+      FROM pg_class c JOIN pg_rewrite r ON r.ev_class = c.oid AND r.rulename = '_RETURN'
+      WHERE c.relkind = 'm' AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+    ),
     objs AS (
-      SELECT 'expression' AS kind, indexrelid::regclass::text AS object, 'pg_class'::regclass AS classid, indexrelid AS objid, colls,
-        def ~* '\mto_tsvector\s*\(' AS db_ctype
-      FROM idx WHERE def ~* '\m(lower|upper|initcap|to_tsvector)\s*\('
+      SELECT kind, object, classid, objid, colls, def ~* '\m(jsonb?_)?to_tsvector\s*\(' AS db_ctype
+      FROM exprs e
+      WHERE def ~* '\m(lower|upper|initcap|casefold|(jsonb?_)?to_tsvector|regexp_[a-z_]+)\s*\(|~~?\*|\[\[:|\\[wW]'
+        OR EXISTS (
+          SELECT 1 FROM pg_depend d JOIN pg_proc p ON p.oid = d.refobjid
+          WHERE d.classid = e.classid AND d.objid = e.objid AND d.refclassid = 'pg_proc'::regclass
+            AND p.pronamespace <> 'pg_catalog'::regnamespace)
       UNION ALL
       SELECT 'citext', indexrelid::regclass::text, 'pg_class'::regclass, indexrelid, colls, false
       FROM idx WHERE EXISTS (
@@ -141,14 +176,10 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       FROM idx WHERE EXISTS (
         SELECT 1 FROM pg_opclass oc WHERE oc.oid = ANY(idx.indclass::oid[]) AND oc.opcname IN ('gin_trgm_ops', 'gist_trgm_ops'))
       UNION ALL
-      SELECT 'stored_column', format('%s.%I', a.attrelid::regclass, a.attname), 'pg_attrdef'::regclass, d.oid,
-        array_remove(ARRAY[a.attcollation], 0::oid), a.atttypid = 'tsvector'::regtype
+      SELECT 'stored_column', format('%s.%I', a.attrelid::regclass, a.attname), NULL, NULL, '{}', true
       FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
-      LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-      WHERE c.relkind IN ('r', 'p') AND NOT c.relispartition AND a.attnum > 0 AND NOT a.attisdropped
+      WHERE a.atttypid = 'tsvector'::regtype AND c.relkind IN ('r', 'p') AND NOT c.relispartition AND a.attnum > 0 AND NOT a.attisdropped
         AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace, 'pg_toast'::regnamespace)
-        AND (a.atttypid = 'tsvector'::regtype
-             OR (a.attgenerated = 's' AND pg_get_expr(d.adbin, d.adrelid) ~* '\m(lower|upper|initcap)\s*\('))
     ),
     sourced AS (
       SELECT o.kind, o.object,
@@ -159,11 +190,11 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       CROSS JOIN LATERAL (
         SELECT o.colls || ARRAY(
           SELECT a.attcollation FROM pg_depend d JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
-          WHERE d.classid = o.classid AND d.objid = o.objid AND d.refclassid = 'pg_class'::regclass
+          WHERE d.classid = o.classid AND d.objid = o.objid AND d.objsubid = 0 AND d.refclassid = 'pg_class'::regclass
             AND d.refobjsubid > 0 AND a.attcollation <> 0
           UNION
           SELECT d.refobjid FROM pg_depend d
-          WHERE d.classid = o.classid AND d.objid = o.objid AND d.refclassid = 'pg_collation'::regclass) AS colls
+          WHERE d.classid = o.classid AND d.objid = o.objid AND d.objsubid = 0 AND d.refclassid = 'pg_collation'::regclass) AS colls
       ) x
       CROSS JOIN LATERAL unnest(CASE WHEN o.db_ctype OR x.colls = '{}' THEN x.colls || 100::oid ELSE x.colls END) u(coll)
       LEFT JOIN pg_collation pc ON pc.oid = u.coll
