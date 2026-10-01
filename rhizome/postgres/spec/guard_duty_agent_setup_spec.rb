@@ -6,7 +6,7 @@ RSpec.describe GuardDutyAgentSetup do
   subject(:setup) { described_class.new("eu-central-1") }
 
   let(:package_arch) { Arch.render(x64: "amd64", arm64: "arm64") }
-  let(:url) { "https://323658145986-eu-central-1-guardduty-agent-deb-artifacts.s3.eu-central-1.amazonaws.com/1.9.2/#{package_arch}/amazon-guardduty-agent-1.9.2.#{package_arch}.deb" }
+  let(:url) { "https://323658145986-eu-central-1-guardduty-agent-deb-artifacts.s3.eu-central-1.amazonaws.com/1.17.1/#{package_arch}/amazon-guardduty-agent-1.17.1.#{package_arch}.deb" }
 
   def expect_installed_version(version)
     expect(setup).to receive(:_run_command).with("dpkg-query", "--show", "--showformat=${Version}", "amazon-guardduty-agent", expect: [0, 1]).and_return(version)
@@ -27,7 +27,7 @@ RSpec.describe GuardDutyAgentSetup do
 
   describe "#run" do
     it "leaves the pinned version in place" do
-      expect_installed_version("1.9.2")
+      expect_installed_version("1.17.1")
       expect(setup).not_to receive(:curl_file)
       setup.run
     end
@@ -40,7 +40,7 @@ RSpec.describe GuardDutyAgentSetup do
     end
 
     it "replaces another installed version" do
-      expect_installed_version("1.8.0")
+      expect_installed_version("1.9.2")
       expect_install
       setup.run
     end

@@ -7,11 +7,11 @@ require_relative "../../common/lib/arch"
 # The agent carries no redistribution grant, so it is installed from AWS's
 # regional bucket at runtime rather than baked into the image.
 class GuardDutyAgentSetup
-  VERSION = "1.9.2"
+  VERSION = "1.17.1"
   PACKAGE_ARCH = Arch.render(x64: "amd64", arm64: "arm64")
   CHECKSUM = Arch.render(
-    x64: "b35b3f25da7b2f829b9972f6d32f44adda77178e5e380fd839f6f40f95933bb2",
-    arm64: "78b336c6f14d6677a0c57810829e2e794113435bffc7f77bbc586586224cdf80",
+    x64: "ab5fc415dce090e50889893009b1d6ef39dd4b95448a0fd302f1b97c3362cf8a",
+    arm64: "53783454fa1ac8d205ce2baf6d0dfff1f26540b9f6ceeae372dfc9db7a7d4d80",
   )
   BUCKET_OWNERS = {
     "us-west-2" => "733349766148",
