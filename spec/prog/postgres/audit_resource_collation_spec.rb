@@ -158,6 +158,7 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
         ["collation", "natural_sort", "natural_sort", "i", "en-u-kn", "", "t", "", ""],
         ["index", "tags_name_lower_key", "natural_sort", "", "", "", "", "t", "16384"],
         ["column", "\"\"\"Tag\"\".name\"", "natural_sort", "", "", "", "", "", ""],
+        ["object", "constraint tags_name_check on table tags", "natural_sort", "", "", "", "", "", ""],
       ])
       stub_details(sshable, "postgres")
       stub_ctype(sshable, "postgres")
@@ -167,8 +168,9 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
           "objects" => [
             {"kind" => "index", "object" => "tags_name_lower_key", "collation" => "natural_sort", "action" => "reindex", "unique" => true, "size_bytes" => 16384},
             {"kind" => "column", "object" => "\"Tag\".name", "collation" => "natural_sort", "action" => "reindex"},
+            {"kind" => "object", "object" => "constraint tags_name_check on table tags", "collation" => "natural_sort", "action" => "reindex"},
           ],
-          "object_total" => 2,
+          "object_total" => 3,
         }},
         "database_totals" => {"flagged" => 1, "unverified" => 0, "ctype" => 0}, "actions" => ["reindex"]})
       expect(Page.active).to be_empty
@@ -338,10 +340,10 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
   end
 
   # The SQL specs run each query in the test database, as psql runs it in a
-  # customer database, and keep the rows for the fixture objects. The fixtures
-  # use ICU and libc C.* collations, which every Postgres build has.
+  # customer database, and keep the rows that name a fixture object. The
+  # fixtures use ICU and libc C.* collations, which every Postgres build has.
   def audit_rows(sql, key)
-    DB.fetch(sql).all.select { it[key].start_with?("audit_") }
+    DB.fetch(sql).all.select { it[key].include?("audit_") }
   end
 
   describe "DETAILS_SQL" do
@@ -349,6 +351,24 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
       DB.run("CREATE COLLATION audit_c_utf8 (provider = libc, locale = 'C.UTF-8')")
       DB.run(%(CREATE TABLE audit_t (icu text COLLATE "und-x-icu", cu text COLLATE audit_c_utf8, c text COLLATE "C", p text COLLATE "POSIX")))
       expect(audit_rows(described_class::DETAILS_SQL, :name).map { it.values_at(:kind, :name, :collname) }).to eq([["column", "audit_t.icu", "und-x-icu"]])
+    end
+
+    it "finds an ICU collation named only inside an expression or by a type, once per partitioned table" do
+      DB.run(<<~SQL)
+        CREATE TABLE audit_t (id int, name text, g bool GENERATED ALWAYS AS (name COLLATE "und-x-icu" < 'm') STORED);
+        CREATE INDEX audit_pred ON audit_t (id) WHERE name COLLATE "und-x-icu" > 'm';
+        ALTER TABLE audit_t ADD CONSTRAINT audit_check CHECK (name COLLATE "und-x-icu" > 'a');
+        CREATE TABLE audit_part (name text) PARTITION BY RANGE (name COLLATE "und-x-icu");
+        CREATE TABLE audit_part_a PARTITION OF audit_part FOR VALUES FROM ('a') TO ('m');
+        CREATE TYPE audit_range AS RANGE (subtype = text, collation = "und-x-icu");
+      SQL
+      expect(audit_rows(described_class::DETAILS_SQL, :name).map { it.values_at(:kind, :name, :collname) }).to eq([
+        ["index", "audit_pred", "und-x-icu"],
+        ["object", "constraint audit_check on table audit_t", "und-x-icu"],
+        ["object", "default value for column g of table audit_t", "und-x-icu"],
+        ["object", "table audit_part", "und-x-icu"],
+        ["object", "type audit_range", "und-x-icu"],
+      ])
     end
   end
 

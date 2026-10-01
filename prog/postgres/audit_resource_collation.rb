@@ -31,9 +31,13 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   SQL
 
   # Lists a database's non-verified collations in use, then the indexes,
-  # columns, and domains on them, largest index first. Index rows on the
-  # default carry collation "default"; the default's own entry comes from
-  # DATABASES_SQL. Partitions are left out, so a partitioned object counts once.
+  # columns, domains, and other objects on them, largest index first. Index
+  # rows on the default carry collation "default"; the default's own entry
+  # comes from DATABASES_SQL. Postgres records every explicit COLLATE in
+  # pg_depend, so a collation named only inside an expression (an index key or
+  # predicate, a partition key, a constraint, a generated column) or by a range
+  # or composite type is found too. Partitions are left out, so a partitioned
+  # object counts once.
   DETAILS_SQL = <<~SQL
     WITH coll AS (
       SELECT oid, collname::text AS collname, collprovider::text AS provider, collcollate AS locale FROM pg_collation WHERE oid<>100
@@ -44,11 +48,21 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       SELECT oid, collname FROM coll
       WHERE NOT coalesce(provider='b' OR (provider='c' AND (lower(locale) IN ('c','posix') OR locale ILIKE 'c.%')), false)
     ),
+    dep AS (
+      SELECT d.classid, d.objid, d.objsubid, d.refobjid AS coll, rel.relkind FROM pg_depend d
+      LEFT JOIN pg_constraint con ON d.classid='pg_constraint'::regclass AND con.oid=d.objid
+      LEFT JOIN pg_attrdef ad ON d.classid='pg_attrdef'::regclass AND ad.oid=d.objid
+      LEFT JOIN pg_class rel ON rel.oid=CASE WHEN d.classid='pg_class'::regclass THEN d.objid ELSE coalesce(con.conrelid, ad.adrelid) END
+      WHERE d.refclassid='pg_collation'::regclass AND d.refobjid IN (SELECT oid FROM risky)
+        AND NOT coalesce(rel.relispartition AND NOT (d.classid='pg_class'::regclass AND rel.relkind='p' AND d.objsubid=0), false)
+    ),
     idx AS (
-      SELECT DISTINCT i.indexrelid, u.coll FROM pg_index i JOIN pg_class rel ON rel.oid=i.indexrelid
+      SELECT i.indexrelid, u.coll FROM pg_index i JOIN pg_class rel ON rel.oid=i.indexrelid
       JOIN pg_namespace n ON n.oid=rel.relnamespace JOIN LATERAL unnest(i.indcollation) u(coll) ON true
       WHERE NOT rel.relispartition AND n.nspname NOT IN ('pg_catalog','information_schema')
         AND u.coll IN (SELECT oid FROM risky)
+      UNION
+      SELECT objid, coll FROM dep WHERE classid='pg_class'::regclass AND relkind IN ('i','I')
     ),
     col AS (
       SELECT a.attrelid, a.attname, a.attcollation AS coll FROM pg_attribute a
@@ -60,7 +74,13 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       SELECT t.oid, t.typcollation AS coll FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
       WHERE t.typtype='d' AND n.nspname NOT IN ('pg_catalog','information_schema') AND t.typcollation IN (SELECT oid FROM risky WHERE oid<>100)
     ),
-    used AS (SELECT coll FROM idx UNION SELECT coll FROM col UNION SELECT coll FROM dom)
+    other AS (
+      SELECT dep.classid, dep.objid, dep.objsubid, dep.coll FROM dep
+      LEFT JOIN pg_type t ON dep.classid='pg_type'::regclass AND t.oid=dep.objid
+      WHERE NOT coalesce(dep.classid='pg_class'::regclass AND (dep.relkind IN ('i','I') OR (dep.objsubid>0 AND dep.relkind IN ('r','m','p'))), false)
+        AND t.typtype IS DISTINCT FROM 'd'
+    ),
+    used AS (SELECT coll FROM idx UNION SELECT coll FROM col UNION SELECT coll FROM dom UNION SELECT coll FROM other)
     SELECT * FROM (
       SELECT 'collation', c.collname::text, c.collname::text, c.collprovider::text,
         CASE WHEN c.collprovider='i' THEN coalesce(to_jsonb(c)->>'colllocale', to_jsonb(c)->>'colliculocale') ELSE c.collcollate END,
@@ -76,8 +96,11 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       UNION ALL
       SELECT 'domain', dom.oid::regtype::text, r.collname, NULL, NULL, NULL, NULL, NULL, NULL
       FROM dom JOIN risky r ON r.oid=dom.coll
+      UNION ALL
+      SELECT 'object', pg_describe_object(o.classid, o.objid, o.objsubid), r.collname, NULL, NULL, NULL, NULL, NULL, NULL
+      FROM other o JOIN risky r ON r.oid=o.coll
     ) d(kind, name, collname, provider, locale, ctype, deterministic, is_unique, size_bytes)
-    ORDER BY array_position(ARRAY['collation','index','column','domain'], kind), size_bytes DESC NULLS LAST, name;
+    ORDER BY array_position(ARRAY['collation','index','column','domain','object'], kind), size_bytes DESC NULLS LAST, name;
   SQL
 
   # Lists objects that store or index case-mapped values, with the source of
