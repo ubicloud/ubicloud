@@ -1,0 +1,7 @@
+<% @page_title = "Approximate Table Row Counts" %>
+
+<%== part("components/table",
+  title: "Approximate Table Row Counts",
+  table_class: "object-table",
+  data: @table_row_counts.map { |k, v| {"Table" => k, "Approximate Row Count" => v} }
+) %>

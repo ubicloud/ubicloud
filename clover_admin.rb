@@ -2415,6 +2415,11 @@ class CloverAdmin < Roda
       view("search")
     end
 
+    r.get "table-row-counts" do
+      @table_row_counts = DB.loose_counts("public")
+      view("table_row_counts")
+    end
+
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
