@@ -15,9 +15,9 @@
     data["remaining"] = if strand.prog == "RolloutBootImage"
       frame["todo"].size + frame["in_progress"].size + frame["stages"].sum(&:size)
     else
-      (frame["remaining_host_ids"] || frame["remaining"])&.size
+      (frame["remaining_host_ids"] || frame["remaining"]).size
     end
-    data["completed"] = frame["completed"]&.size
+    data["completed"] = frame["completed"].size
   end
   data["image"] = "#{frame["image_name"]} #{frame["version"]} #{frame["arch"]}" if strand.prog == "RolloutBootImage"
   data.compact!
