@@ -856,6 +856,17 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "my-image@latest"
       end
 
+      it "does not show storage size when virtual machine has no storage volumes" do
+        expect(vm.storage_size_gib).to be > 0
+        visit "#{project.path}#{vm.path}"
+        expect(page).to have_content "#{vm.storage_size_gib} GB"
+
+        vm.vm_storage_volumes_dataset.destroy
+        visit "#{project.path}#{vm.path}"
+        expect(page).to have_content vm.name
+        expect(page).to have_no_content(/\d+ GB/)
+      end
+
       it "raises forbidden when does not have permissions" do
         visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
 

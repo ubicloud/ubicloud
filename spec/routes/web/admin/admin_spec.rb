@@ -3258,6 +3258,18 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content(/commit:/)
   end
 
+  it "shows staging environment in footer" do
+    expect(Config).to receive(:staging).and_return(true).at_least(:once)
+    visit "/"
+    expect(page.find("footer")).to have_content("clover-staging")
+  end
+
+  it "shows production environment in footer" do
+    expect(Config).to receive(:production?).and_return(true).at_least(:once)
+    visit "/"
+    expect(page.find("footer span.env-production").text).to eq "clover-test"
+  end
+
   it "finds both active and archived VMs by IPv4" do
     host = create_vm_host
     project = Project.create(name: "test")
@@ -3806,6 +3818,15 @@ RSpec.describe CloverAdmin do
       fill_in "Account", with: "not-a-ubid-or-name"
       click_button "Search"
       expect(audit_log_content).to be_empty
+    end
+
+    it "does not show pagination link for invalid end date" do
+      insert_account_audit_log(account_id: user.id)
+
+      visit "/authentication-audit-log?end=2026-03-aa"
+      expect(audit_log_content).to be_empty
+      expect(page).to have_no_link("Older Results")
+      expect(page).to have_no_link("Next Page")
     end
   end
 

@@ -142,6 +142,33 @@ RSpec.describe Clover, "machine-image" do
         expect(page).to have_no_content "Delete Machine Image"
       end
 
+      it "allows a view-only user to list machine images and versions without create or edit controls" do
+        click_button "Log out"
+        login(view_only_user.email)
+
+        visit "#{project.path}/machine-image"
+        expect(page).to have_content "No machine images yet"
+        expect(page).to have_no_content "Create Machine Image"
+
+        mi.update(latest_version_id: mi_version.id)
+        metal_less_version = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
+
+        visit "#{project.path}/machine-image"
+        within("#mi-#{mi.ubid}") do
+          expect(page).to have_content mi.name
+          expect(page).to have_content mi_version.version
+        end
+        expect(page).to have_no_content "Create Machine Image"
+
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        expect(page).to have_no_content "Create Version"
+        expect(page).to have_no_button(class: "delete-btn")
+        within("#miv-#{metal_less_version.ubid}") do
+          expect(page).to have_content "v2"
+          expect(page).to have_no_content "MiB"
+        end
+      end
+
       it "can not create machine image with invalid name" do
         source_vm
         visit "#{project.path}/machine-image/create"
@@ -295,6 +322,13 @@ RSpec.describe Clover, "machine-image" do
         end
         expect(page).to have_flash_notice("Latest version updated")
         expect(mi.refresh.latest_version_id).to eq(mi_version.id)
+      end
+
+      it "only offers ready versions with metal as the latest version" do
+        mi_version_metal
+        MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        expect(page).to have_select("latest_version", options: [mi_version.version])
       end
 
       it "refuses to set latest to a non-existent version" do

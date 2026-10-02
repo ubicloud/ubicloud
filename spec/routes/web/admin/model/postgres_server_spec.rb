@@ -42,4 +42,20 @@ RSpec.describe CloverAdmin, "PostgresServer" do
     expect(page.status_code).to eq 200
     expect(page.body).to include("<svg")
   end
+
+  it "renders replay lag chart for standby, handling empty results and client errors" do
+    standby = create_postgres_server(resource: @instance.resource, is_representative: false)
+    tsdb_client = instance_double(VictoriaMetrics::Client)
+    expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+    expect(tsdb_client).to receive(:query_range).and_invoke(
+      ->(**) { [] },
+      ->(**) { raise VictoriaMetrics::ClientError, "error" },
+      ->(**) { [{"labels" => {}, "values" => [[Time.now.to_i, "5"]]}] },
+    )
+
+    visit "/model/PostgresServer/#{standby.ubid}"
+    expect(page.status_code).to eq 200
+    expect(page).to have_content("Replay Lag")
+    expect(page.body).to include("<svg")
+  end
 end

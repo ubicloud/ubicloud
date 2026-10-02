@@ -353,6 +353,11 @@ RSpec.describe Clover, "github" do
       runner.update(label: "ubicloud-premium-4")
       visit "#{project.path}/github/#{installation.ubid}/runner"
       expect(page).to have_no_content "Some of your standard runners were given premium hardware instead, on us."
+
+      runner.update(label: "ubicloud-standard-4", vm_id: nil, location_id: nil)
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page).to have_content runner.ubid
+      expect(page).to have_no_content "Some of your standard runners were given premium hardware instead, on us."
     end
 
     it "shows info about premium runners given standard hardware" do
