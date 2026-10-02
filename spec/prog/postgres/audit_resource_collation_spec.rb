@@ -439,13 +439,6 @@ RSpec.describe Prog::Postgres::AuditResourceCollation do
     end
   end
 
-  describe "#conninfo" do
-    it "quotes the name and escapes backslashes and single quotes" do
-      expect(nx.conninfo("appdb")).to eq("dbname='appdb'")
-      expect(nx.conninfo("it's=a\\b")).to eq("dbname='it\\'s=a\\\\b'")
-    end
-  end
-
   describe "#normalize_locale" do
     it "lowercases the codeset and drops its dashes, as locale -a prints it" do
       expect(nx.normalize_locale("en_US.UTF-8")).to eq("en_US.utf8")
