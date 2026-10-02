@@ -27,7 +27,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
     name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
 
     if has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
-      content_generator ||= content_generator_class&.method(name)
+      content_generator ||= content_generator_class.method(name)
       options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
         opt_val = if option[name].is_a?(Sequel::Model)
           option[name].ubid

@@ -7,7 +7,7 @@
 end
 
 inventory_data = if (inv = obj.inventory)
-  inventory_data = inv.to_hash.except(:id)&.map do |k, v|
+  inventory_data = inv.to_hash.except(:id).map do |k, v|
     v = "%.2f" % v if k == :monthly_price && v
     {"Column" => k, "Value" => v}
   end
