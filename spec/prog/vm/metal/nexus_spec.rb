@@ -687,7 +687,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -711,7 +710,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: "ubuntu-24.04",
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -755,7 +753,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -775,7 +772,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -798,7 +794,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -824,7 +819,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -848,7 +842,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -874,7 +867,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -897,7 +889,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard", "premium"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -920,7 +911,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["premium", "standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -944,7 +934,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["premium"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -967,32 +956,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "can keep an ip4 address that is assigned before the allocation" do
-      st.stack = [{
-        "force_host_id" => vm_host.id,
-        "keep_ip4" => true,
-        "storage_volumes" => storage_volumes,
-      }]
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
-        allocation_state_filter: [],
-        distinct_storage_devices: false,
-        host_filter: [vm_host.id],
-        host_exclusion_filter: [],
-        data_center_exclusion_filter: [],
-        location_filter: [],
-        location_preference: [],
-        gpu_count: 0,
-        gpu_device: nil,
-        os_filter: nil,
-        family_filter: [],
-        keep_ip4: true,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -1016,7 +979,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: [],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -1040,7 +1002,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -1065,7 +1026,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -1089,7 +1049,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         gpu_device: nil,
         os_filter: nil,
         family_filter: ["standard"],
-        keep_ip4: false,
       )
       expect { nx.start }.to hop("create_unix_user")
     end
