@@ -1383,8 +1383,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vol1 = create_stale_kek_volume(disk_index: 0)
       vol2 = create_stale_kek_volume(disk_index: 1)
       expect { nx.rotate_storage_keys }.to hop("wait_rotate_storage_keys")
-      children = Strand.where(parent_id: st.id, prog: "Storage::RotateKek").select_map(:id)
-      expect(children).to contain_exactly(vol1.id, vol2.id)
+      subjects = Strand.where(parent_id: st.id, prog: "Storage::RotateKek").select_map(Sequel.pg_jsonb_op(:stack)[0].get_text("subject_id"))
+      expect(subjects).to contain_exactly(vol1.id, vol2.id)
     end
   end
 
