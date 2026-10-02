@@ -1,0 +1,11 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/runner_metrics_setup"
+
+unless ARGV.length == 1
+  warn "usage: setup-runner-metrics VM_NAME < labels.json"
+  exit 1
+end
+
+RunnerMetricsSetup.new(ARGV[0]).setup(JSON.parse($stdin.read))

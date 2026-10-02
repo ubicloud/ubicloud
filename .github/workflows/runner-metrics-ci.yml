@@ -1,0 +1,49 @@
+name: runner-metrics CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'runner-metrics/**'
+      - '.github/workflows/runner-metrics-ci.yml'
+  pull_request:
+    paths:
+      - 'runner-metrics/**'
+      - '.github/workflows/runner-metrics-ci.yml'
+
+jobs:
+  runner-metrics-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud, ubicloud-arm]
+    name: runner-metrics CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: 'runner-metrics/go.mod'
+
+    - name: Run tests
+      run: cd runner-metrics && go test ./...
+
+    - name: Run go fmt and check it makes no changes
+      run: cd runner-metrics && go fmt && git diff --stat --exit-code
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      with:
+        version: v2.1.5
+        working-directory: runner-metrics
