@@ -651,6 +651,27 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_link "Set a maintenance window", href: "#{project.path}#{pg.path}/settings"
       end
 
+      it "shows fallback information on the resize page" do
+        pg.update(target_vm_size: "standard-4")
+        pg.representative_server.incr_ignore_instance_size_mismatch
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content("Fallback from standard-4")
+        expect(page).to have_no_content("Resizing to")
+      end
+
+      it "shows pending resize and high disk usage on the resize page" do
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 90, observed_at: Time.now)
+        pg.update(target_vm_size: "standard-4", target_storage_size_gib: 256)
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content("Resizing to standard-4")
+        expect(page).to have_content("Resizing to 256 GB")
+        expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90%)")
+      ensure
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
+      end
+
       it "can update PostgreSQL high availability" do
         visit "#{project.path}#{pg.path}"
         click_link "High Availability"
@@ -1148,6 +1169,106 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content("End time must be after start time")
         expect(page).to have_content("Log Destinations")
+      end
+
+      it "shows a message when no logs are found" do
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        expect(parseable_client).to receive(:query).and_return([])
+
+        visit "#{project.path}#{pg.path}/logs"
+
+        expect(page).to have_content("No logs found in the selected time range.")
+      end
+
+      it "shows logs with unparseable timestamps, various severity levels, and no context" do
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        rows = [
+          ["invalid", "WARN"],
+          ["2026-05-08T10:00:01", "DEBUG"],
+          ["2026-05-08T10:00:02", "UNSPECIFIED"],
+          ["2026-05-08T10:00:03", nil],
+          ["2026-05-08T10:00:04", "INFO"],
+        ].map.with_index { |(time, severity), i|
+          {
+            "log_id" => "0196a9f7-0000-7000-8000-#{i.to_s.rjust(12, "0")}",
+            "time_unix_nano" => time,
+            "stream" => "postgres",
+            "severity_text" => severity,
+            "body" => "msg-#{i}",
+            "server_role" => "primary",
+          }
+        }
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        visit "#{project.path}#{pg.path}/logs"
+
+        expect(page).to have_content("invalidZ")
+        expect(page).to have_css("span.text-yellow-600", text: "WARN")
+        expect(page).to have_css("span.text-gray-400", text: "DEBUG")
+        expect(page).to have_css("span.text-gray-400", text: "NONE", count: 2)
+        expect(page).to have_css("span.text-sky-600", text: "INFO")
+        expect(page).to have_no_css("details")
+      end
+
+      it "does not show log destination edit options without edit permission" do
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+
+        visit "#{project.path}#{pg.path}/logs"
+        expect(page).to have_content("No log destinations configured.")
+        expect(page).to have_css("td[colspan='3']")
+        expect(page).to have_no_content("Add Log Destination")
+
+        ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        visit "#{project.path}#{pg.path}/logs"
+        expect(page).to have_content("graylog")
+        expect(page).to have_no_css("#ld-delete-#{ld.ubid}")
+      end
+
+      it "redisplays otlp log destination form on validation failure" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "nr", type: "otlp", url: "not-a-url",
+          header_keys: ["api-key", ""],
+          header_values: ["secret", "ignored"],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(400)
+        expect(page.body).to include("OTLP Endpoint URL")
+        expect(page.body).to include('value="api-key"')
+        expect(page.body).not_to include('value="ignored"')
+        expect(page.body).not_to include("No logs found")
+        expect(pg.reload.log_destinations).to be_empty
+      end
+
+      it "redisplays syslog log destination form on validation failure" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "mezmo", type: "syslog", url: "https://logs.example.com",
+          structured_data_ids: ["honeybadger@61642", "", "honeybadger@61642"],
+          structured_data_keys: ["api_key", "ignored", ""],
+          structured_data_values: ["secret", "ignored", "ignored"],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(400)
+        expect(page.body).to include("Syslog TCP Endpoint")
+        expect(page.body).to include('data-sd-id="honeybadger@61642"')
+        expect(page.body).to include('value="secret"')
+        expect(page.body).not_to include('value="ignored"')
+
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "mezmo", type: "syslog", url: "https://logs.example.com",
+          structured_data_ids: [""],
+          structured_data_keys: [""],
+          structured_data_values: [""],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(400)
+        expect(page.body).to include("Syslog TCP Endpoint")
+        expect(page.body).not_to include('data-sd-id="honeybadger@61642"')
+        expect(pg.reload.log_destinations).to be_empty
       end
 
       it "can create an otlp log destination" do

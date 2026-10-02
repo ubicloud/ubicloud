@@ -73,8 +73,8 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(setup_intents_service).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
-      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
-      expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"}, "billing_details" => {})).thrice
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(4)
+      expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"}, "billing_details" => {})).exactly(4)
 
       visit project.path
 
@@ -105,6 +105,13 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "100%"
       expect(page).to have_content "LNM"
       expect(page).to have_content "$3.50"
+
+      ResourceDiscount.first(project_id: project.id).update(name: "")
+      ResourceCredit.create(project_id: project.id, amount: 1, active_from: Time.utc(now.year, now.month), name: "Used Credit").update(amount: 0)
+      page.refresh
+      expect(page).to have_content "Discount: 100%"
+      expect(page).to have_content "LNM: $3.50"
+      expect(page).to have_no_content "Used Credit"
     end
 
     it "can not create billing info with unauthorized payment" do
