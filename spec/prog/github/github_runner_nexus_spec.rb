@@ -1446,14 +1446,28 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
       expect(nx).to receive(:collect_final_telemetry)
-      fw = instance_double(Firewall)
-      ps = instance_double(PrivateSubnet, firewalls: [fw])
-      expect(fw).to receive(:destroy)
-      expect(ps).to receive(:incr_destroy)
-      expect(vm).to receive(:private_subnets).and_return([ps])
+      ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, allow_only_ssh: true).subject
+      firewall = ps.firewalls.first
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(ps.destroy_set?).to be(true)
+      expect(firewall).not_to exist
+    end
+
+    it "keeps the private subnet the installation shares between its runners" do
+      runner.incr_skip_deregistration
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
+      ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, allow_only_ssh: true).subject
+      installation.add_private_subnet(ps)
+      firewall = ps.firewalls.first
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(ps.destroy_set?).to be(false)
+      expect(firewall).to exist
+      expect(vm.destroy_set?(cached: false)).to be(true)
     end
 
     it "skip deregistration and destroy vm immediately" do

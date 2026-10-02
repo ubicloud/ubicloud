@@ -765,10 +765,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      vm.private_subnets.each do |subnet|
-        subnet.firewalls.map(&:destroy)
-        subnet.incr_destroy
+      subnets_ds = vm.private_subnets_dataset.exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
+      subnets_ds.all do |subnet|
+        subnet.firewalls_dataset.destroy
       end
+      PrivateSubnet.incr_destroy(subnets_ds.select(Sequel[:private_subnet][:id]))
 
       collect_final_telemetry if vm.allocated_at
 
