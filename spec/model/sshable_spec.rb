@@ -194,6 +194,117 @@ LOCK
     end
   end
 
+  describe "#start_fresh_session" do
+    def host_key
+      pub = SshKey.generate.public_key
+      [pub, Net::SSH::Buffer.new(pub.split(" ")[1].unpack1("m")).read_key]
+    end
+
+    def expect_ssh_start(server_key, session, verifier_class: Net::SSH::Verifiers::AcceptNew)
+      expect(Net::SSH).to receive(:start).with("test.localhost", "testuser", hash_including(known_hosts: Sshable::KnownHosts)) do |*, **opts, &block|
+        verifier = opts[:verify_host_key]
+        verifier = Net::SSH::Verifiers::AcceptNew.new if verifier == :accept_new
+        expect(verifier).to be_a(verifier_class)
+
+        transport = instance_double(Net::SSH::Transport::Session, host_keys: opts[:known_hosts].search_for("test.localhost", opts))
+        args = {key: server_key, key_blob: server_key.to_blob, fingerprint: "SHA256:test", session: transport}
+        expect(verifier.verify(args)).to be true
+        expect(verifier.verify_signature { :verified }).to eq :verified
+
+        block ? block.call(session) : session
+      end
+    end
+
+    before { sa.save_changes }
+
+    it "records the host key when the sshable has no host keys" do
+      pub, server_key = host_key
+      session = ssh_session
+      expect_ssh_start(server_key, session)
+      expect(Clog).to receive(:emit).with("sshable host keys added", {sshable_host_keys_added: {sshable: sa.ubid, keys: [pub]}}).and_call_original
+
+      expect(sa.start_fresh_session).to equal(session)
+      expect(sa.host_keys).to eq [pub]
+      expect(sa.reload.host_keys).to eq [pub]
+    end
+
+    it "records the host key before yielding when called with a block" do
+      pub, server_key = host_key
+      session = ssh_session
+      expect_ssh_start(server_key, session)
+
+      result = sa.start_fresh_session do |sess|
+        expect(sess).to equal(session)
+        expect(sa.reload.host_keys).to eq [pub]
+        :block_result
+      end
+      expect(result).to eq :block_result
+    end
+
+    it "does not record host keys when the host offers a known host key" do
+      pub, server_key = host_key
+      other_pub, = host_key
+      sa.update(host_keys: [other_pub, pub])
+      session = ssh_session
+      expect_ssh_start(server_key, session, verifier_class: Sshable::Verifier)
+      expect(Clog).not_to receive(:emit)
+
+      expect(sa.start_fresh_session).to equal(session)
+      expect(sa.reload.host_keys).to eq [other_pub, pub]
+    end
+
+    it "logs and allows the connection when the host offers an unknown host key" do
+      pub, = host_key
+      _, server_key = host_key
+      sa.update(host_keys: [pub])
+      session = ssh_session
+      expect_ssh_start(server_key, session, verifier_class: Sshable::Verifier)
+      expect(Clog).to receive(:emit).with("sshable host key mismatch", {sshable_host_key_mismatch: {ubid: sa.ubid}}).and_call_original
+
+      result = sa.start_fresh_session do |sess|
+        expect(sess).to equal(session)
+        :block_result
+      end
+      expect(result).to eq :block_result
+      expect(sa.reload.host_keys).to eq [pub]
+    end
+
+    it "does not overwrite host keys concurrently recorded by another process" do
+      pub, = host_key
+      expect(Net::SSH).to receive(:start) do |*, **opts|
+        sa.this.update(host_keys: Sequel.pg_array([pub], :text))
+        opts[:known_hosts].search_for("test.localhost").add_host_key(host_key[1])
+        ssh_session
+      end
+      expect(Clog).not_to receive(:emit)
+
+      sa.start_fresh_session
+      expect(sa.host_keys).to eq [pub]
+    end
+  end
+
+  describe "#add_host_keys" do
+    before { sa.save_changes }
+
+    it "appends the keys and logs when the host keys have not changed concurrently" do
+      sa.update(host_keys: ["ssh-ed25519 a"])
+      expect(Clog).to receive(:emit).with("sshable host keys added", {sshable_host_keys_added: {sshable: sa.ubid, keys: ["ssh-ed25519 b"]}}).and_call_original
+
+      sa.add_host_keys(["ssh-ed25519 b"])
+      expect(sa.host_keys).to eq ["ssh-ed25519 a", "ssh-ed25519 b"]
+      expect(sa.reload.host_keys).to eq ["ssh-ed25519 a", "ssh-ed25519 b"]
+    end
+
+    it "does not update or log when the host keys have changed concurrently" do
+      sa.update(host_keys: ["ssh-ed25519 a"])
+      sa.this.update(host_keys: Sequel.pg_array(["ssh-ed25519 c"], :text))
+      expect(Clog).not_to receive(:emit)
+
+      sa.add_host_keys(["ssh-ed25519 b"])
+      expect(sa.host_keys).to eq ["ssh-ed25519 c"]
+    end
+  end
+
   describe "#cmd" do
     let(:session) { Net::SSH::Connection::Session.allocate }
 
