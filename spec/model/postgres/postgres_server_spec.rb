@@ -1169,6 +1169,11 @@ RSpec.describe PostgresServer do
     expect(postgres_server.run_query("SELECT 1", statement_timeout: 5)).to eq("1")
   end
 
+  it "quotes a database name as a conninfo value, escaping backslashes and single quotes" do
+    expect(described_class.conninfo("appdb")).to eq("dbname='appdb'")
+    expect(described_class.conninfo("it's=a\\b")).to eq("dbname='it\\'s=a\\\\b'")
+  end
+
   it "runs query over a provided ssh session" do
     session = Net::SSH::Connection::Session.allocate
     expect(postgres_server.vm.sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1", session:).and_return("1\n")
