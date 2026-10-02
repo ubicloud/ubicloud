@@ -26,7 +26,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(machine_image.location_id).to eq location_id
       expect(machine_image.project_id).to eq image_project.id
 
-      expect(vm.boot_image).to eq "ubuntu-noble"
+      expect(vm.boot_image).to eq "ubuntu-resolute"
       expect(vm.unix_user).to eq "ubi"
       expect(vm.storage_size_gib).to eq 10
       expect(strand.stack.first["skip_verification"]).to be false
