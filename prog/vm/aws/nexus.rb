@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone
+  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open
 
   NETWORKD_DROPINS = <<~SCRIPT
@@ -129,8 +129,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     instance_market_options = nil
     if is_runner?
-      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      runcmd << "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
@@ -166,12 +164,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         {
           device_index: 0,
           subnet_id: user_nic.nic_aws_resource.subnet_id,
-          private_ip_address: user_nic.private_ipv4.network.to_s,
+          private_ip_address: user_nic.private_ipv4&.network&.to_s,
           groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
           associate_public_ip_address: true,
           ipv_6_address_count: 1,
           delete_on_termination: true,
-        },
+        }.compact,
       ]
     elsif use_separate_management_nic
       [
@@ -246,7 +244,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ipv4_dns_name = instance.public_dns_name
 
     unless user_nic.nic_aws_resource.create_network_interface
-      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+      network_interface = instance.network_interfaces.first
+      user_nic.update(private_ipv4: network_interface.private_ip_address)
+      user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
@@ -260,7 +260,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
     availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(PrivateSubnet[private_subnet_id], nil, all_excluded_azs).az_suffix if use_separate_management_nic
-    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:).subject
+    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, use_eip: use_eip != false, create_network_interface: create_network_interface != false).subject
     user_nic.update(vm_id: vm.id)
     if use_separate_management_nic
       management_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, is_management: true, use_eip: !postgres_aws_ssh_ipv6?).subject

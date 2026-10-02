@@ -61,7 +61,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     boot_image = label_data["boot_image"]
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
-    preferred_azs = []
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
     if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
@@ -77,8 +76,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         size = Option.aws_instance_type_name("m9g", vcpus)
         alternative_families = ["m8g", "m7g"]
       end
-      # eu-central-1a is usually give capacity errors
-      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
     end
 
     if location_id == Location::GITHUB_RUNNERS_ID && rand * 100 < Config.github_actions_ch_53_percent
@@ -90,7 +87,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       location_id:,
       allow_only_ssh: true,
       ipv4_range_size: 28,
-      preferred_azs:,
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -501,9 +497,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       UBICLOUD_CACHE_URL=":base_url"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
     COMMAND
 
+    private_ipv4 = vm.private_ipv4
     if installation.cache_enabled
-      command << NetSsh.command(<<~COMMAND, private_ipv4: vm.private_ipv4)
+      command << NetSsh.command(<<~COMMAND, private_ipv4:)
         echo "CUSTOM_ACTIONS_CACHE_URL=http://":private_ipv4":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
+      COMMAND
+    end
+
+    if vm.location.aws?
+      command << NetSsh.command(<<~COMMAND, private_ipv4:)
+        echo :private_ipv4" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
       COMMAND
     end
 
@@ -762,10 +765,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      vm.private_subnets.each do |subnet|
-        subnet.firewalls.map(&:destroy)
-        subnet.incr_destroy
+      subnets_ds = vm.private_subnets_dataset.exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
+      subnets_ds.all do |subnet|
+        subnet.firewalls_dataset.destroy
       end
+      PrivateSubnet.incr_destroy(subnets_ds.select(Sequel[:private_subnet][:id]))
 
       collect_final_telemetry if vm.allocated_at
 

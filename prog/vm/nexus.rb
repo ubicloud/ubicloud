@@ -82,6 +82,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     Validation.validate_name(name)
     Validation.validate_os_user_name(unix_user)
+    create_network_interface = use_eip
 
     DB.transaction do
       subnet = nil
@@ -112,7 +113,7 @@ class Prog::Vm::Nexus < Prog::Base
           subnet = project.default_private_subnet(location)
         end
         availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, use_eip:, create_network_interface: use_eip).subject
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, use_eip:, create_network_interface:).subject
       end
 
       vm = Vm.create(
@@ -194,6 +195,8 @@ class Prog::Vm::Nexus < Prog::Base
           "waiting_strand_id" => waiting_strand_id,
           "allocated_waiting_strand_id" => allocated_waiting_strand_id,
           "use_separate_management_nic" => use_separate_management_nic,
+          "use_eip" => use_eip,
+          "create_network_interface" => create_network_interface,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.
           "unsupported_azs" => exclude_availability_zones,
