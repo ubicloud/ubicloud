@@ -223,6 +223,16 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(repo.destroy_set?).to be(true)
     end
 
+    it "waits private subnets of the installation to be destroyed" do
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
+      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
+      installation = GithubInstallation.first(project_id: gr_test.customer_project_id)
+      ps = Prog::Vnet::SubnetNexus.assemble(installation.project_id, allow_only_ssh: true).subject
+      installation.add_private_subnet(ps)
+      expect { gr_test.clean_resources }.to nap(15)
+      expect(ps.destroy_set?).to be(true)
+    end
+
     it "cleans resources and hop finish" do
       refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
