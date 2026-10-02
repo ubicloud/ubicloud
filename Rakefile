@@ -547,3 +547,133 @@ end
 
 desc "Run all linters"
 task linter: ["rubocop", "erb_formatter", "openapi", "go", "xss_check", "cmd_exec"].map { "linter:#{it}" }
+
+namespace :terraform do
+  terraform_env = lambda do
+    require_relative "loader"
+    require_relative "lib/terraform_generator"
+    TerraformGenerator.load_definitions!
+  end
+
+  # Generator for the terraform provider's Go source; see
+  # doc/terraform-generator-architecture.md.
+  desc "Show generated-vs-current diff for a resource's datasource"
+  task :diff, [:resource] do |_, args|
+    terraform_env.call
+    puts TerraformGenerator::Emit.datasource_diff(args[:resource].to_sym)
+  end
+
+  desc "Regenerate every resource into the provider checkout"
+  task :generate_all do
+    terraform_env.call
+    TerraformGenerator.resources.each_key { TerraformGenerator::Emit.write_all(it) }
+  end
+
+  desc "Drift guard: fail unless every generated artifact matches a fresh render"
+  task :check do
+    terraform_env.call
+    emit = TerraformGenerator::Emit
+    stale = []
+    fresh = {}
+    TerraformGenerator.resources.each_key do |name|
+      TerraformGenerator[name].emitted_kinds.each do |kind|
+        path = emit.send(:"#{kind}_path", name)
+        fresh[path] = emit.send(:"#{kind}_source", name)
+      end
+    end
+    fresh[File.join(emit.provider_repo, "internal", "provider", "gen_support.go")] = emit::GEN_SUPPORT
+    fresh.merge!(emit.scaffold_sources)
+    TerraformGenerator.resources.each_key do |name|
+      d = TerraformGenerator[name]
+      fresh.merge!(TerraformGenerator::Emit::Declarations.sources(d))
+    end
+    fresh.each do |path, want|
+      stale << path unless File.exist?(path) && File.read(path) == want
+    end
+    # Renames orphan their predecessors silently (the api_components
+    # rename taught us); anything generated-looking outside the fresh
+    # map is a failure.
+    prov = File.join(emit.provider_repo, "internal", "provider")
+    orphans = (Dir[File.join(prov, "*_gen.go")] + [File.join(prov, "gen_support.go")] +
+        Dir[File.join(emit.provider_repo, "examples", "{resources,data-sources}", "ubicloud_*", "*.tf")])
+      .reject { fresh.key?(it) }
+    # Schema goldens are the authority, never regenerated here: fresh
+    # derivation must match them, and every mismatch is a failure until
+    # an explicit `rake terraform:goldens` records the intent.
+    missing, drift = TerraformGenerator::Schema.golden_diff(TerraformGenerator.resources.keys)
+    if stale.any? || drift.any? || missing.any? || orphans.any?
+      stale.each { puts "stale: #{it}" }
+      orphans.each { puts "orphan generated file: #{it}" }
+      drift.each { puts "schema drift: #{it}" }
+      missing.each { puts "no schema golden: #{it} (run rake terraform:goldens)" }
+      abort "terraform:check FAILED (#{stale.length} stale, #{drift.length} drift, #{missing.length} ungoldened, #{orphans.length} orphans)"
+    end
+    puts "terraform:check clean (#{fresh.length} artifacts, schema goldens verified)"
+  end
+
+  desc "One command to true terraform up after clover changes: regenerate, goldens, wire goldens, docs, verify"
+  task :true_up do
+    terraform_env.call
+    TerraformGenerator.resources.each_key { TerraformGenerator::Emit.write_all(it) }
+    # Invoking true_up IS the intent; the ratification artifact is the
+    # provider diff printed below, goldens included. Report only real
+    # movement.
+    gp = TerraformGenerator::Schema.goldens_path
+    before = File.exist?(gp) ? File.read(gp) : ""
+    TerraformGenerator::Schema.write_goldens!(TerraformGenerator.resources.keys)
+    puts "schema goldens: #{(File.read(gp) == before) ? "unchanged" : "UPDATED - review the diff"}"
+    provider = TerraformGenerator::Emit.provider_repo
+    sh("bash", "-c", "cd #{provider} && " \
+      "GOTOOLCHAIN=local UPDATE_WIRE_GOLDENS=1 go test ./internal/provider/ -run TestWireGoldens && " \
+      "GOTOOLCHAIN=local go test ./internal/provider/ > /dev/null && echo 'wire goldens + unit tests: ok'")
+    # The Go test updated the module's copy; the clover-owned file is
+    # the authority, so carry any movement back and say so.
+    wire_module = File.join(provider, "internal", "provider", "testdata", "wire_goldens.json")
+    wire_owned = TerraformGenerator::Schema.wire_goldens_path
+    if File.read(wire_module) == File.read(wire_owned)
+      puts "wire goldens: unchanged"
+    else
+      FileUtils.cp(wire_module, wire_owned)
+      puts "wire goldens: UPDATED - review the diff"
+    end
+    Rake::Task["terraform:docs"].invoke
+    Rake::Task["terraform:check"].invoke
+    if File.directory?(File.join(provider, ".git"))
+      pending = `git -C #{provider} status --short`.strip
+      puts(pending.empty? ? "terraform:true_up - nothing to commit; already trued up" : "terraform:true_up - commit these in the provider repo:\n#{pending}")
+    else
+      puts "terraform:true_up - module at #{provider}"
+    end
+    puts "then: spec/terraform/run"
+  end
+
+  desc "Regenerate provider registry docs (tfplugindocs)"
+  task :docs do
+    require_relative "loader"
+    require_relative "lib/terraform_generator"
+    provider = TerraformGenerator::Emit.provider_repo
+    # tfplugindocs fetches terraform through hc-install. A
+    # network-restricted environment can point UBICLOUD_TF_HCINSTALL_SHIM
+    # at a local replacement module that resolves the terraform already
+    # on PATH; the resulting go.work is local to the generated module.
+    if (shim = ENV["UBICLOUD_TF_HCINSTALL_SHIM"])
+      File.write(File.join(provider, "go.work"), "go 1.26.0\n\nuse .\n\nreplace github.com/hashicorp/hc-install => #{shim}\n")
+    end
+    sh("bash", "-c", "cd #{provider} && " \
+      "GOTOOLCHAIN=local go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate -provider-name ubicloud")
+  end
+
+  desc "Record current schema derivation as the goldens (reviewed intent)"
+  task :goldens do
+    terraform_env.call
+    written = TerraformGenerator::Schema.write_goldens!(TerraformGenerator.resources.keys)
+    puts written.any? ? "goldens updated: #{written.join(", ")}" : "goldens unchanged"
+    puts TerraformGenerator::Schema.goldens_path
+  end
+
+  desc "Generate a resource's datasource into the provider repo"
+  task :generate, [:resource] do |_, args|
+    terraform_env.call
+    puts TerraformGenerator::Emit.write_all(args[:resource].to_sym)
+  end
+end
