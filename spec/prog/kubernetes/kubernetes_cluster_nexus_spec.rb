@@ -161,6 +161,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.private_subnet.firewalls).to eq [customer_firewall]
       expect(customer_firewall.project_id).to eq customer_project.id
       expect(customer_firewall.firewall_rules).to eq []
+      expect(st.stack.first["hostname_version"]).to eq 1
+    end
+
+    it "supports hostname_version" do
+      st = described_class.assemble(name: "k8stest", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, hostname_version: 2)
+      expect(st.stack.first["hostname_version"]).to eq 2
     end
   end
 

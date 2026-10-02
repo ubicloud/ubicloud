@@ -6,7 +6,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   frame_reader :machine_image_version_id, :hostname_version
   frame_accessor :changed_csi_config_keys
 
-  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil)
+  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil, hostname_version: 1)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
@@ -52,7 +52,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       id = ubid.to_uuid
       KubernetesCluster.create_with_id(id, name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
 
-      Strand.create_with_id(id, prog: "Kubernetes::KubernetesClusterNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id}])
+      Strand.create_with_id(id, prog: "Kubernetes::KubernetesClusterNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id, "hostname_version" => hostname_version}])
     end
   end
 
