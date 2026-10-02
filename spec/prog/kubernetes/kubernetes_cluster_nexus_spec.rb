@@ -192,13 +192,15 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#create_load_balancers" do
-    it "creates api server and services load balancers with the right dns zone on prod and hops" do
+    before do
       api_server_lb = kubernetes_cluster.api_server_lb
       services_lb = kubernetes_cluster.services_lb
       kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
       api_server_lb.destroy
       services_lb.destroy
+    end
 
+    it "creates api server and services load balancers with the right dns zone on prod and hops" do
       allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
       dns_zone = DnsZone[name: "k8s.ubicloud.com"]
 
@@ -222,13 +224,22 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.services_lb.custom_hostname).to eq "cluster-services-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.com"
     end
 
-    it "creates load balancers with dns zone id on development for api server and services, then hops" do
-      api_server_lb = kubernetes_cluster.api_server_lb
-      services_lb = kubernetes_cluster.services_lb
-      kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
-      api_server_lb.destroy
-      services_lb.destroy
+    it "uses Config.kubernetes_service_hostname_v2 for hostname_version 2" do
+      expect(Config).to receive(:kubernetes_service_hostname_v2).and_return("k8s.ubicloud.app")
+      dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.app")
+      refresh_frame(nx, new_values: {"hostname_version" => 2})
 
+      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
+
+      services_hostname = "cluster-services-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.app"
+      expect(kubernetes_cluster.api_server_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
+      expect(kubernetes_cluster.api_server_lb.custom_hostname).to eq "cluster-apiserver-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.app"
+      expect(kubernetes_cluster.services_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
+      expect(kubernetes_cluster.services_lb.custom_hostname).to eq services_hostname
+      expect(dns_zone.records_dataset.select_map([:name, :type, :data])).to eq [["*.#{services_hostname}.", "CNAME", "#{services_hostname}."]]
+    end
+
+    it "creates load balancers with dns zone id on development for api server and services, then hops" do
       expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
