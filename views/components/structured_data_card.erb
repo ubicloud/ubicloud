@@ -7,7 +7,7 @@
     <div class="sd-id-group border border-gray-200 rounded-lg overflow-hidden" data-sd-id="<%= sd_id %>">
       <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
         <span class="font-mono text-sm font-semibold text-gray-800 sd-id-label"><%= sd_id %></span>
-        <%== part("components/button", type: "danger", text: "Remove", extra_class: "delete-sd-id-btn") if @edit_perm %>
+        <%== part("components/button", type: "danger", text: "Remove", extra_class: "delete-sd-id-btn") %>
       </div>
 
       <div class="sd-kv-rows divide-y divide-gray-100 font-mono">
@@ -31,7 +31,7 @@
               class="<%= input_class %>"
             >
 
-            <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") if @edit_perm %>
+            <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
           </div>
         <% end %>
       </div>
@@ -63,18 +63,16 @@
           disabled
         >
 
-        <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") if @edit_perm %>
+        <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
       </div>
 
-      <% if @edit_perm %>
-        <div class="new-sd-kv-row flex items-center gap-2 py-2 px-4 font-mono">
-          <input type="text" class="new-sd-key <%= input_class %>" placeholder="Key">
-          <span class="text-gray-400 text-sm">=</span>
+      <div class="new-sd-kv-row flex items-center gap-2 py-2 px-4 font-mono">
+        <input type="text" class="new-sd-key <%= input_class %>" placeholder="Key">
+        <span class="text-gray-400 text-sm">=</span>
 
-          <input type="text" class="new-sd-value <%= input_class %>" placeholder="Value">
-          <%== part("components/button", type: "safe", text: "", icon: "hero-plus", extra_class: "add-sd-kv-btn") %>
-        </div>
-      <% end %>
+        <input type="text" class="new-sd-value <%= input_class %>" placeholder="Value">
+        <%== part("components/button", type: "safe", text: "", icon: "hero-plus", extra_class: "add-sd-kv-btn") %>
+      </div>
     </div>
   <% end %>
 
@@ -82,7 +80,7 @@
   <div class="sd-id-placeholder-group hidden border border-gray-200 rounded-lg overflow-hidden" data-sd-id="">
     <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
       <span class="font-mono text-sm font-semibold text-gray-800 sd-id-label"></span>
-      <%== part("components/button", type: "danger", text: "Remove", extra_class: "delete-sd-id-btn") if @edit_perm %>
+      <%== part("components/button", type: "danger", text: "Remove", extra_class: "delete-sd-id-btn") %>
     </div>
 
     <div class="sd-kv-rows divide-y divide-gray-100 font-mono"></div>
@@ -113,32 +111,28 @@
         disabled
       >
 
-      <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") if @edit_perm %>
+      <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
     </div>
 
-    <% if @edit_perm %>
-      <div class="new-sd-kv-row flex items-center gap-2 py-2 px-4 font-mono">
-        <input type="text" class="new-sd-key <%= input_class %>" placeholder="Key">
-        <span class="text-gray-400 text-sm">=</span>
+    <div class="new-sd-kv-row flex items-center gap-2 py-2 px-4 font-mono">
+      <input type="text" class="new-sd-key <%= input_class %>" placeholder="Key">
+      <span class="text-gray-400 text-sm">=</span>
 
-        <input type="text" class="new-sd-value <%= input_class %>" placeholder="Value">
-        <%== part("components/button", type: "safe", text: "", icon: "hero-plus", extra_class: "add-sd-kv-btn") %>
-      </div>
-    <% end %>
+      <input type="text" class="new-sd-value <%= input_class %>" placeholder="Value">
+      <%== part("components/button", type: "safe", text: "", icon: "hero-plus", extra_class: "add-sd-kv-btn") %>
+    </div>
   </div>
 
-  <% if @edit_perm %>
-    <div class="new-sd-id-row flex items-center gap-2 py-1">
-      <input
-        type="text"
-        class="
-          new-sd-id-name w-64 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500
-          font-mono
-        "
-        placeholder="provider@65535"
-      >
+  <div class="new-sd-id-row flex items-center gap-2 py-1">
+    <input
+      type="text"
+      class="
+        new-sd-id-name w-64 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500
+        font-mono
+      "
+      placeholder="provider@65535"
+    >
 
-      <%== part("components/button", type: "safe", text: "Add SD-ID", icon: "hero-plus", extra_class: "add-sd-id-btn") %>
-    </div>
-  <% end %>
+    <%== part("components/button", type: "safe", text: "Add SD-ID", icon: "hero-plus", extra_class: "add-sd-id-btn") %>
+  </div>
 </div>
