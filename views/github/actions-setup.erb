@@ -74,7 +74,7 @@ headings = [
         text: "We place a small temporary authorization to verify the card and cancel it right away. " \
               "Depending on your bank, it can take up to two weeks to drop off your statement."
       ) %>
-    <% when 4 %>
+    <% else %>
       <p class="text-sm leading-6 text-gray-600">
         Change <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">runs-on</code> to a
         Ubicloud runner in each workflow file:
