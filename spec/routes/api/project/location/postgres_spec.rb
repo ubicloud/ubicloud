@@ -1184,6 +1184,41 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
       end
 
+      it "reports needs_convergence after a recycle request" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be false
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/recycle"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be true
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be true
+      end
+
+      it "reports needs_convergence false for a database with its standby, including the restart response" do
+        pg.update(ha_type: PostgresResource::HaType::ASYNC)
+        pg.provision_new_standby
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be false
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restart"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be false
+      end
+
+      it "reports needs_convergence for a database with a standby while an upgrade is pending" do
+        pg.update(ha_type: PostgresResource::HaType::ASYNC)
+        pg.provision_new_standby
+        pg.update(target_version: "17")
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["needs_convergence"]).to be true
+      end
+
       it "not found" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/not-exists-pg"
 

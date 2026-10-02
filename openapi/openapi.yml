@@ -4795,6 +4795,9 @@ components:
                   primary:
                     description: Is the database primary
                     type: boolean
+                  needs_convergence:
+                    description: Whether servers still need to be replaced, added or removed to reach the target configuration, for example after a resize, a recycle request, a high availability change or a version upgrade
+                    type: boolean
                   maintenance_window_start_at:
                     description: Maintenance window start time
                     type: integer
@@ -4814,6 +4817,7 @@ components:
                   - firewall_rules
                   - latest_restore_time
                   - primary
+                  - needs_convergence
                   - maintenance_window_start_at
                   - tags
     PostgresDatabases:
