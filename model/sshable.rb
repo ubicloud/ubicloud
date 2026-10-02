@@ -27,6 +27,11 @@ class Sshable < Sequel::Model
     IOError,
   ].freeze
 
+  dataset_module do
+    order :by_id, :id
+    exclude :with_host_keys, host_keys: nil
+  end
+
   def admin_label
     "#{unix_user}@#{host}"
   end
