@@ -161,12 +161,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.private_subnet.firewalls).to eq [customer_firewall]
       expect(customer_firewall.project_id).to eq customer_project.id
       expect(customer_firewall.firewall_rules).to eq []
-      expect(st.stack.first["hostname_version"]).to eq 1
+      expect(st.stack.first["hostname_version"]).to eq 2
     end
 
     it "supports hostname_version" do
-      st = described_class.assemble(name: "k8stest", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, hostname_version: 2)
-      expect(st.stack.first["hostname_version"]).to eq 2
+      st = described_class.assemble(name: "k8stest", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, hostname_version: 1)
+      expect(st.stack.first["hostname_version"]).to eq 1
     end
   end
 
@@ -206,9 +206,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       services_lb.destroy
     end
 
-    it "creates api server and services load balancers with the right dns zone on prod and hops" do
+    it "creates api server and services load balancers with the right dns zone on prod for hostname_version 1 and hops" do
       allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
       dns_zone = DnsZone[name: "k8s.ubicloud.com"]
+      refresh_frame(nx, new_values: {"hostname_version" => 1})
 
       expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
 
@@ -233,7 +234,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "uses Config.kubernetes_service_hostname_v2 for hostname_version 2" do
       expect(Config).to receive(:kubernetes_service_hostname_v2).and_return("k8s.ubicloud.app")
       dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.app")
-      refresh_frame(nx, new_values: {"hostname_version" => 2})
 
       expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
 
