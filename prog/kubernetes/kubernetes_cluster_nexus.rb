@@ -6,7 +6,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   frame_reader :machine_image_version_id, :hostname_version
   frame_accessor :changed_csi_config_keys
 
-  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil, hostname_version: 1)
+  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil,
+    hostname_version: Config.kubernetes_hostname_version_default)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
