@@ -7,6 +7,17 @@ RSpec.describe Prog::CheckUsageAlerts do
     described_class.new(Strand.create_with_id("645cc9ff-7954-1f3a-fa82-ec6b3ffffff5", prog: "CheckUsageAlerts", label: "wait"))
   }
 
+  def create_billing_record(project, amount)
+    BillingRecord.create(
+      project_id: project.id,
+      resource_id: "d5c1c540-407e-8374-a5f3-337204777db4",
+      resource_name: "test",
+      span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-hel1")["id"],
+      amount:,
+    )
+  end
+
   describe "#wait" do
     it "triggers alerts if usage is exceeded given threshold" do
       last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
@@ -18,19 +29,39 @@ RSpec.describe Prog::CheckUsageAlerts do
       alert2 = UsageAlert.create(project_id: project2.id, name: "alert2", user_id:, limit:, last_triggered_at:)
 
       [[project1, 1_000_000], [project2, 100]].each do |project, amount|
-        BillingRecord.create(
-          project_id: project.id,
-          resource_id: "d5c1c540-407e-8374-a5f3-337204777db4",
-          resource_name: "test",
-          span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
-          billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-hel1")["id"],
-          amount:,
-        )
+        create_billing_record(project, amount)
       end
 
       expect { prog.wait }.to nap(5 * 60)
       expect(alert1.reload.last_triggered_at).not_to eq(last_triggered_at)
       expect(alert2.reload.last_triggered_at).to eq(last_triggered_at)
+    end
+
+    it "does not trigger alerts if discounts bring usage below the threshold" do
+      last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
+      user_id = Account.create(email: "user@example.com").id
+      project = Project.create(name: "project1")
+      alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit: 100, last_triggered_at:)
+      ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Full discount")
+      create_billing_record(project, 1000000)
+
+      expect { prog.wait }.to nap(5 * 60)
+      expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
+    end
+
+    it "triggers alerts if usage exceeds the threshold even if credits cover the usage" do
+      last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
+      user_id = Account.create(email: "user@example.com").id
+      project = Project.create(name: "project1")
+      create_billing_record(project, 1000000)
+
+      usage = project.current_invoice.content["cost"]
+      alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit: usage * 0.8, last_triggered_at:)
+      ResourceCredit.create(project_id: project.id, amount: usage * 1.2, active_from: Time.utc(Time.now.year, Time.now.month), name: "Credit")
+      expect(project.current_invoice.content["cost"]).to eq 0
+
+      expect { prog.wait }.to nap(5 * 60)
+      expect(alert.reload.last_triggered_at).not_to eq(last_triggered_at)
     end
 
     it "only considers current month usage even if previous month invoice is not yet generated" do
