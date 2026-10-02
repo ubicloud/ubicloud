@@ -110,9 +110,9 @@
         <% end %>
         <ul class="divide-y divide-gray-100 font-mono text-xs leading-5">
           <% @logs&.each do |log| %>
-            <% timestamp = log[:timestamp].to_s
+            <% timestamp = log[:timestamp]
               time_display = begin
-                timestamp.empty? ? "" : Time.iso8601(timestamp).utc.strftime("%F %T.%L")
+                Time.iso8601(timestamp).utc.strftime("%F %T.%L")
               rescue
                 timestamp
               end
