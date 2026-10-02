@@ -308,6 +308,19 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - #{ps.name}")
       end
 
+      it "allows attaching vms without IPv4 only to IPv6-only load balancers" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, stack: "ipv6").subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id, enable_ip4: false).subject
+
+        visit "#{project.path}#{lb.path}/vms"
+        expect(page).to have_select("vm_id", with_options: [vm.name])
+
+        lb.update(stack: "ipv4")
+        page.refresh
+        expect(page).to have_no_select("vm_id", with_options: [vm.name])
+      end
+
       it "can not attach vm when it is already attached to another load balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject

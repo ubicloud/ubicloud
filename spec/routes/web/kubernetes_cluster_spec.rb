@@ -488,6 +488,12 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content(kn.node_count)
         expect(page).to have_content(kn.target_node_size)
         expect(page).to have_content(kn.version)
+        expect(page).to have_css(".auto-refresh", visible: :all)
+
+        kn.strand.update(label: "wait")
+        page.refresh
+        expect(page).to have_content(kn.ubid)
+        expect(page).to have_no_css(".auto-refresh", visible: :all)
       end
 
       it "can rename a nodepool" do
