@@ -256,8 +256,71 @@ LOCK
     false
   end
 
+  # Temporary class that does not raise for HostKeyMismatch.
+  # After deployment, if there are no logged sshable_host_key_mismatch entries,
+  # we can remove this and use the verify_host_key: :always option if there are
+  # known host keys.
+  class Verifier < Net::SSH::Verifiers::AcceptNew
+    def initialize(ubid)
+      @ubid = ubid
+    end
+
+    def verify(arguments)
+      rescue_host_key_mismatch { super }
+    end
+
+    def verify_signature
+      rescue_host_key_mismatch { super }
+    end
+
+    private
+
+    def rescue_host_key_mismatch
+      yield
+    rescue Net::SSH::HostKeyMismatch
+      Clog.emit("sshable host key mismatch", {sshable_host_key_mismatch: {ubid: @ubid}})
+      true
+    end
+  end
+
+  KnownHosts = Data.define(:host_keys, :new_host_keys) do
+    def search_for(host, options = {})
+      keys = host_keys.map do |str|
+        _, blob = str.split(" ", 3)
+        Net::SSH::HostKeyEntries::PubKey.new(Net::SSH::Buffer.new(blob.unpack1("m")).read_key)
+      end
+
+      Net::SSH::HostKeys.new(keys, host, self, options)
+    end
+
+    def add(host, key, options = {})
+      new_host_keys << "#{key.ssh_type} #{[key.to_blob].pack("m0")}"
+    end
+  end
+
   def start_fresh_session(&block)
-    Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS, key_data: keys.map(&:private_key), &block)
+    new_host_keys = []
+    known_hosts = KnownHosts.new(host_keys || [], new_host_keys)
+    args = {**COMMON_SSH_ARGS, key_data: keys.map(&:private_key), known_hosts:}
+    args[:verify_host_key] = Verifier.new(ubid) if host_keys
+
+    if block
+      Net::SSH.start(host, unix_user, **args) do |session|
+        add_host_keys(new_host_keys) unless new_host_keys.empty?
+        yield session
+      end
+    else
+      sess = Net::SSH.start(host, unix_user, **args)
+      add_host_keys(new_host_keys) unless new_host_keys.empty?
+      sess
+    end
+  end
+
+  def add_host_keys(keys)
+    if this.where(host_keys:).update(host_keys: Sequel.pg_array((host_keys || []) + keys, :text)) == 1
+      Clog.emit("sshable host keys added", {sshable_host_keys_added: {sshable: ubid, keys:}})
+    end
+    reload
   end
 
   def invalidate_cache_entry
