@@ -757,7 +757,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       short_cert_pem, short_key_pem = Util.create_certificate(
         subject: "/CN=Test Server",
         extensions: ["keyUsage=digitalSignature"],
-        duration: 60 * 60 * 24 * 29,
+        duration: 60 * 60 * 24 * 14,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
         issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
@@ -765,6 +765,48 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect { nx.refresh_certificates }.to hop("wait")
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
+
+    def create_server_cert(duration)
+      cert_pem, key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration:,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
+      ).map(&:to_pem)
+      postgres_resource.update(server_cert: cert_pem, server_cert_key: key_pem)
+      cert_pem
+    end
+
+    it "rotates server certificate valid for more than 60 days if it expires within 30 days" do
+      postgres_server
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now - 60 * 60 * 24 * 61).twice
+      cert_pem = create_server_cert(60 * 60 * 24 * 90)
+      expect(Time).to receive(:now).and_call_original.at_least(:once)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(postgres_resource.reload.server_cert).not_to eq cert_pem
+      expect(postgres_server.refresh_certificates_set?(cached: false)).to be true
+    end
+
+    it "does not rotate server certificate valid for 60 days or less if it expires in more than 15 days" do
+      postgres_server
+      cert_pem = create_server_cert(60 * 60 * 24 * 20)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(postgres_resource.reload.server_cert).to eq cert_pem
+      expect(postgres_server.refresh_certificates_set?(cached: false)).to be false
+    end
+
+    it "rotates server certificate valid for 60 days or less if it expires within 15 days" do
+      postgres_server
+      cert_pem = create_server_cert(60 * 60 * 24 * 14)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(postgres_resource.reload.server_cert).not_to eq cert_pem
+      expect(postgres_server.refresh_certificates_set?(cached: false)).to be true
     end
 
     it "rotates server certificate if refresh_certificate semaphore is set" do
@@ -781,7 +823,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       short_server_cert_pem, short_server_key_pem = Util.create_certificate(
         subject: "/CN=Test Server",
         extensions: ["keyUsage=digitalSignature"],
-        duration: 60 * 60 * 24 * 29,
+        duration: 60 * 60 * 24 * 14,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
         issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
@@ -797,7 +839,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       short_server_cert_pem, short_server_key_pem = Util.create_certificate(
         subject: "/CN=Test Server",
         extensions: ["keyUsage=digitalSignature"],
-        duration: 60 * 60 * 24 * 29,
+        duration: 60 * 60 * 24 * 14,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
         issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
@@ -820,7 +862,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       short_client_cert_pem, short_client_key_pem = Util.create_certificate(
         subject: "/CN=Test Server",
         extensions: ["keyUsage=digitalSignature"],
-        duration: 60 * 60 * 24 * 29,
+        duration: 60 * 60 * 24 * 14,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1),
         issuer_key: OpenSSL::PKey::EC.new(postgres_resource.client_root_cert_key_1),
       ).map(&:to_pem)

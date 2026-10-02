@@ -333,6 +333,18 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait }.to nap(0)
       expect(Semaphore.where(strand_id: cert.id, name: "destroy").count).to eq(1)
     end
+
+    it "naps until an hour after expires_at if set" do
+      secs = 60 * 60 * 24 * 10
+      cert.update(created_at: Time.now, expires_at: Time.now + secs)
+      expect { nx.wait }.to nap((secs + 3600 - 5)..(secs + 3600 + 5))
+    end
+
+    it "destroys the certificate if expires_at has passed" do
+      cert.update(created_at: Time.now, expires_at: Time.now - 60)
+      expect { nx.wait }.to nap(0)
+      expect(Semaphore.where(strand_id: cert.id, name: "destroy").count).to eq(1)
+    end
   end
 
   describe "#restart" do

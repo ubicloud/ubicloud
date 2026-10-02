@@ -136,7 +136,8 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def wait
-    nap_time = cert.created_at + 60 * 60 * 24 * 30 * 3 - Time.now # 90 days
+    expires_at = cert.expires_at || cert.created_at + 60 * 60 * 24 * 30 * 3 # 90 days
+    nap_time = expires_at - Time.now
 
     if nap_time < 0
       cert.incr_destroy

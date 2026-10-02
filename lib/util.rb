@@ -38,6 +38,14 @@ module Util
     ).map(&:to_pem)
   end
 
+  def self.cert_expires_at(cert)
+    cert = OpenSSL::X509::Certificate.new(cert)
+  rescue
+    nil
+  else
+    cert.not_after
+  end
+
   def self.create_certificate(subject:, duration:, extensions: [], issuer_cert: nil, issuer_key: nil)
     cert = OpenSSL::X509::Certificate.new
     key = OpenSSL::PKey::EC.generate("prime256v1")

@@ -359,7 +359,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     refresh = false
-    if OpenSSL::X509::Certificate.new(postgres_resource.send(use_publicly_signed_certificates? ? :client_cert : :server_cert)).not_after < Time.now + 60 * 60 * 24 * 30
+    cert = OpenSSL::X509::Certificate.new(postgres_resource.send(use_publicly_signed_certificates? ? :client_cert : :server_cert))
+    validity_days = (cert.not_after - cert.not_before > 60 * 60 * 24 * 60) ? 30 : 15
+    if cert.not_after < Time.now + 60 * 60 * 24 * validity_days
       refresh = true
     end
     when_refresh_certificates_set? do
