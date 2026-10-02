@@ -305,9 +305,11 @@ LOCK
 
   def start_fresh_session(&block)
     new_host_keys = []
-    known_hosts = KnownHosts.new(host_keys || [], new_host_keys)
-    args = {**COMMON_SSH_ARGS, key_data: keys.map(&:private_key), known_hosts:}
-    args[:verify_host_key] = Verifier.new(ubid) if host_keys
+    args = {**COMMON_SSH_ARGS, key_data: keys.map(&:private_key)}
+    unless unix_user == "runneradmin"
+      args[:known_hosts] = KnownHosts.new(host_keys || [], new_host_keys)
+      args[:verify_host_key] = Verifier.new(ubid) if host_keys
+    end
 
     if block
       Net::SSH.start(host, unix_user, **args) do |session|
