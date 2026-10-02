@@ -6,7 +6,7 @@ class RunCommand < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :vm, read_only: true
 
-  plugin ResourceMethods, encrypted_columns: :output
+  plugin ResourceMethods, encrypted_columns: {output: {format: ResourceMethods::UTF8_FORMAT}}
 
   # Tail-truncated to this size so a runaway command can't bloat the database.
   MAX_OUTPUT_BYTES = 64 * 1024

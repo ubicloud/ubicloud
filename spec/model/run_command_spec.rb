@@ -42,6 +42,14 @@ RSpec.describe RunCommand do
     expect(rc.output).to eq "\e[0;32m  OK  \e[0m Started"
   end
 
+  it "returns the output as UTF-8 after a round trip through the database" do
+    rc.update(output: "héllo \e[0m wörld")
+
+    output = described_class[rc.id].output
+    expect(output.encoding).to eq Encoding::UTF_8
+    expect(output).to eq "héllo \e[0m wörld"
+  end
+
   it "leaves output nil when set to nil" do
     rc.update(output: nil)
     expect(rc.output).to be_nil
