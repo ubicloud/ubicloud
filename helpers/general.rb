@@ -258,6 +258,57 @@ class Clover < Roda
     end
   end
 
+  OIDC_GROUPS_REFRESH_INTERVAL = 600
+
+  private def refresh_oidc_groups_if_stale
+    return unless web?
+    return unless (refresh_token = session["oidc_refresh_token"])
+    return if Time.now.to_i - session["oidc_groups_refreshed_at"].to_i < OIDC_GROUPS_REFRESH_INTERVAL
+
+    provider = begin
+      OidcProvider[UBID.to_uuid(session["oidc_provider_id"])]
+    rescue UBIDParseError, NoMethodError
+      # Malformed or missing provider id in the session; shouldn't happen
+      # since it's only ever set from a route-validated ubid, but don't
+      # crash the request over corrupted session data.
+      # simplecov:disable
+      nil
+      # simplecov:enable
+    end
+
+    unless provider
+      # Provider row not found locally: a local data/config issue, not an
+      # IdP decision. Keep cached groups rather than treating this the same
+      # as a revoked token.
+      Clog.emit("OIDC provider not found, keeping cached groups", oidc_provider_missing: {})
+      session["oidc_groups_refreshed_at"] = Time.now.to_i
+      return
+    end
+
+    begin
+      result = provider.refresh_groups(refresh_token)
+    rescue ::OidcProvider::RefreshError => e
+      # Transient failure (IdP blip, network error, unexpected response): keep
+      # the cached groups and back off until the next interval, rather than
+      # failing the request or treating this the same as a revoked token.
+      Clog.emit("OIDC refresh failed, keeping cached groups", oidc_refresh_error: {error: e.message})
+      session["oidc_groups_refreshed_at"] = Time.now.to_i
+      return
+    end
+
+    if result
+      groups, rotated_refresh_token = result
+      session["oidc_refresh_token"] = rotated_refresh_token if rotated_refresh_token
+      session["oidc_groups"] = groups
+      session["oidc_groups_refreshed_at"] = Time.now.to_i
+      Clog.emit("OIDC groups refreshed", oidc_groups_refreshed: {groups: session["oidc_groups"]})
+    else
+      session.delete("oidc_groups")
+      session.delete("oidc_refresh_token")
+      Clog.emit("OIDC refresh token invalid, cleared cached groups", oidc_refresh_invalid: {})
+    end
+  end
+
   private def subject_match_predicate(subject_id)
     if (ds = oidc_group_subject_tags_ds)
       super | {subject_id: ds}
