@@ -21,6 +21,11 @@ class Cert < Sequel::Model
   def hostnames
     private_hostname ? [hostname, private_hostname] : [hostname]
   end
+
+  def before_save
+    self.expires_at ||= Util.cert_expires_at(cert) if cert
+    super
+  end
 end
 
 # Table: cert
