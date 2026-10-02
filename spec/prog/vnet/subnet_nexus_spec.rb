@@ -207,6 +207,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       # Should have created 4 subnets, not 5
       expect(AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id).count).to eq(4)
     end
+
+    it "creates AZ subnets of the given size" do
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: aws_location.id, az: "b", zone_id: "usw2-az2")
+
+      ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: "10.1.0.0/16", aws_subnet_ipv4_range_size: 20).subject
+
+      expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.1.0.0/20", "10.1.16.0/20"])
+    end
   end
 
   describe ".random_private_ipv6" do
