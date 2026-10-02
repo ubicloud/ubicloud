@@ -313,6 +313,7 @@ module Config
   # Kubernetes
   optional :kubernetes_service_project_id, uuid
   optional :kubernetes_service_hostname, string
+  override :kubernetes_service_hostname_v2, Config.kubernetes_service_hostname, string
 
   # Billing
   optional :stripe_secret_key, string, clear: true
