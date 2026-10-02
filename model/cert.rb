@@ -35,6 +35,7 @@ end
 #  order_url        | text                        |
 #  csr_key          | text                        |
 #  private_hostname | text                        |
+#  expires_at       | timestamp with time zone    |
 # Indexes:
 #  cert_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
