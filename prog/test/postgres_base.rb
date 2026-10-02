@@ -118,6 +118,18 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     end
   end
 
+  def verify_guardduty_agent
+    failure = postgres_resource.servers.lazy.filter_map { guardduty_agent_failure(it) }.first
+    self.fail_message = failure if failure
+  end
+
+  def guardduty_agent_failure(server)
+    return unless server.aws_cloudwatch_logs?
+
+    status = server.vm.sshable.cmd("dpkg-query --show --showformat='${Status}' amazon-guardduty-agent || true")
+    "GuardDuty agent is not installed on #{server.ubid}" unless status == "install ok installed"
+  end
+
   def test_queries_sql
     File.read("./prog/test/testdata/order_analytics_queries.sql").freeze
   end

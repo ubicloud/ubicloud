@@ -4,6 +4,7 @@
 require "json"
 require_relative "../../common/lib/util"
 require_relative "../lib/otel_log_config"
+require_relative "../lib/guard_duty_agent_setup"
 
 config = JSON.parse($stdin.read)
 instance = config["instance"]
@@ -13,6 +14,7 @@ resource_id = config["resource_id"]
 resource_name = config["resource_name"]
 log_destinations = config["log_destinations"] || []
 cloudwatch_auth_region = config["cloudwatch_auth_region"]
+guardduty_region = config["guardduty_region"]
 
 log_dir = "/dat/#{version}/data/pg_log"
 
@@ -95,3 +97,5 @@ r "systemctl", "restart", "otelcol-contrib"
 if cloudwatch_auth_region && r("systemctl cat amazon-cloudwatch-agent.service > /dev/null 2>&1 && echo YES || echo NO").strip == "YES"
   r "systemctl", "disable", "--now", "amazon-cloudwatch-agent"
 end
+
+GuardDutyAgentSetup.new(guardduty_region).run if guardduty_region

@@ -223,7 +223,7 @@ RSpec.describe Prog::Test::PostgresResource do
     end
   end
 
-  describe "#verify_cloudwatch_cutover" do
+  context "with an AWS server" do
     before do
       setup_postgres_resource(with_server: false)
       test_project.set_ff_aws_cloudwatch_logs(true)
@@ -240,33 +240,49 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(sshable).to receive(:_cmd).with(command).and_return(result)
     end
 
-    it "passes when the agent is inactive and the collector runs both pipelines" do
-      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
-      expect_check("systemctl is-active otelcol-contrib || true", "active\n")
-      expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "2\n")
-      pgr_test.verify_cloudwatch_cutover
-      expect(pgr_test.fail_message).to be_nil
+    describe "#verify_cloudwatch_cutover" do
+      it "passes when the agent is inactive and the collector runs both pipelines" do
+        expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+        expect_check("systemctl is-active otelcol-contrib || true", "active\n")
+        expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "2\n")
+        pgr_test.verify_cloudwatch_cutover
+        expect(pgr_test.fail_message).to be_nil
+      end
+
+      it "fails when the agent is still active" do
+        expect_check("systemctl is-active amazon-cloudwatch-agent || true", "active\n")
+        pgr_test.verify_cloudwatch_cutover
+        expect(pgr_test.fail_message).to eq("CloudWatch agent is active on #{server.ubid}, expected inactive")
+      end
+
+      it "fails when the collector is not running" do
+        expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+        expect_check("systemctl is-active otelcol-contrib || true", "failed\n")
+        pgr_test.verify_cloudwatch_cutover
+        expect(pgr_test.fail_message).to eq("Collector is failed on #{server.ubid}, expected active")
+      end
+
+      it "fails when the collector config lacks a cloudwatch pipeline" do
+        expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+        expect_check("systemctl is-active otelcol-contrib || true", "active\n")
+        expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "1\n")
+        pgr_test.verify_cloudwatch_cutover
+        expect(pgr_test.fail_message).to eq("Collector config on #{server.ubid} has 1 cloudwatch pipelines, expected 2")
+      end
     end
 
-    it "fails when the agent is still active" do
-      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "active\n")
-      pgr_test.verify_cloudwatch_cutover
-      expect(pgr_test.fail_message).to eq("CloudWatch agent is active on #{server.ubid}, expected inactive")
-    end
+    describe "#verify_guardduty_agent" do
+      it "passes when the agent package is installed" do
+        expect_check("dpkg-query --show --showformat='${Status}' amazon-guardduty-agent || true", "install ok installed")
+        pgr_test.verify_guardduty_agent
+        expect(pgr_test.fail_message).to be_nil
+      end
 
-    it "fails when the collector is not running" do
-      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
-      expect_check("systemctl is-active otelcol-contrib || true", "failed\n")
-      pgr_test.verify_cloudwatch_cutover
-      expect(pgr_test.fail_message).to eq("Collector is failed on #{server.ubid}, expected active")
-    end
-
-    it "fails when the collector config lacks a cloudwatch pipeline" do
-      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
-      expect_check("systemctl is-active otelcol-contrib || true", "active\n")
-      expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "1\n")
-      pgr_test.verify_cloudwatch_cutover
-      expect(pgr_test.fail_message).to eq("Collector config on #{server.ubid} has 1 cloudwatch pipelines, expected 2")
+      it "fails when the agent package is missing" do
+        expect_check("dpkg-query --show --showformat='${Status}' amazon-guardduty-agent || true", "")
+        pgr_test.verify_guardduty_agent
+        expect(pgr_test.fail_message).to eq("GuardDuty agent is not installed on #{server.ubid}")
+      end
     end
   end
 
