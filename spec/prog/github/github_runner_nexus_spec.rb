@@ -209,6 +209,108 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
     end
+
+    it "creates a private subnet for each alien vm unless the project shares a VPC between them" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+
+      ps = nx.pick_vm.private_subnets.first
+      expect(installation.private_subnets_dataset.all).to eq []
+      expect(ps.net4.netmask.prefix_len).to eq(28)
+    end
+
+    it "creates a private subnet for the alien vms of the installation" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "euc1-az2")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az3")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      # Ubid and IPv6 generation also call random_number, so only the VPC range draw is stubbed.
+      allow(SecureRandom).to receive(:random_number).and_call_original
+      expect(SecureRandom).to receive(:random_number).with(1..255).and_return(42)
+      expect(installation).to receive(:lock!).with(:no_key_update).and_call_original
+
+      picked_vm = nx.pick_vm
+      ps = picked_vm.private_subnets.first
+      expect(installation.private_subnets.map(&:id)).to eq([ps.id])
+      expect(ps).to have_attributes(location_id: location.id, project_id: vm.project_id)
+      expect(ps.net4.to_s).to eq("10.42.0.0/16")
+      expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.42.0.0/20", "10.42.16.0/20"])
+    end
+
+    it "places alien vms in the private subnet of the installation in the location" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      other_installation = GithubInstallation.create(installation_id: 456, project_id: project.id, name: "other", type: "Organization")
+      other_installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject)
+      installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(vm.project_id).subject)
+      ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      installation.add_private_subnet(ps)
+      expect(installation).not_to receive(:lock!)
+
+      picked_vm = nil
+      expect { picked_vm = nx.pick_vm }.not_to change(PrivateSubnet, :count)
+      expect(picked_vm.private_subnets.map(&:id)).to eq([ps.id])
+    end
+
+    it "places alien vms in the private subnet another runner of the installation created while waiting for the lock" do
+      project.set_ff_aws_alien_runners_shared_vpc(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      ps = Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      expect(installation).to receive(:lock!).with(:no_key_update).and_wrap_original do |original, *args|
+        installation.add_private_subnet(ps)
+        original.call(*args)
+      end
+
+      picked_vm = nil
+      expect { picked_vm = nx.pick_vm }.not_to change(PrivateSubnet, :count)
+      expect(picked_vm.private_subnets.map(&:id)).to eq([ps.id])
+    end
+
+    describe "while the private subnet of the installation is being destroyed" do
+      let(:installation_ps) do
+        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+        LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+        LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+        Prog::Vnet::SubnetNexus.assemble(vm.project_id, location_id: location.id).subject
+      end
+
+      before do
+        project.set_ff_aws_alien_runners_shared_vpc(true)
+        runner.incr_spill_over
+        installation.add_private_subnet(installation_ps)
+        expect(Config).to receive(:github_runner_aws_location_id).and_return(installation_ps.location_id)
+      end
+
+      it "places alien vms in a dedicated private subnet when destroy is set" do
+        installation_ps.incr_destroy
+
+        ps = nx.pick_vm.private_subnets.first
+        expect(ps.net4.netmask.prefix_len).to eq(28)
+        expect(installation.private_subnets_dataset.select_map(Sequel[:private_subnet][:id])).to eq([installation_ps.id])
+      end
+
+      it "places alien vms in a dedicated private subnet when destroying is set" do
+        installation_ps.incr_destroying
+
+        ps = nx.pick_vm.private_subnets.first
+        expect(ps.net4.netmask.prefix_len).to eq(28)
+        expect(installation.private_subnets_dataset.select_map(Sequel[:private_subnet][:id])).to eq([installation_ps.id])
+      end
+    end
   end
 
   describe ".update_billing_record" do
