@@ -82,7 +82,29 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ch_version = "53.0"
     end
 
-    ps = Prog::Vnet::SubnetNexus.assemble(
+    if location_id != Location::GITHUB_RUNNERS_ID && project.get_ff_aws_alien_runners_shared_vpc
+      unless (ps = installation_private_subnet(location_id))
+        # Only the first runner of the installation creates the subnet. FOR NO KEY UPDATE lets webhooks keep
+        # inserting runners, and the lock lasts until the label commits, so keep network requests out of it.
+        installation.lock!(:no_key_update)
+        unless (ps = installation_private_subnet(location_id))
+          ps = Prog::Vnet::SubnetNexus.assemble(
+            Config.github_runner_service_project_id,
+            location_id:,
+            allow_only_ssh: true,
+            ipv4_range: "10.#{SecureRandom.random_number(1..255)}.0.0/17",
+            ipv4_range_size: 17,
+            aws_subnet_ipv4_range_size: 20,
+          ).subject
+          installation.add_private_subnet(ps)
+        end
+      end
+
+      # The location holds one subnet of the installation, so use a dedicated one until this one is gone.
+      ps = nil if ps.destroy_set? || ps.destroying_set?
+    end
+
+    ps ||= Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
       location_id:,
       allow_only_ssh: true,
@@ -110,6 +132,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     )
 
     vm_st.subject
+  end
+
+  def installation_private_subnet(location_id)
+    installation.private_subnets_dataset.first(Sequel[:github_installation_private_subnet][:location_id] => location_id)
   end
 
   def update_billing_record

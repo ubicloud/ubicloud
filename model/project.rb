@@ -286,6 +286,7 @@ class Project < Sequel::Model
     :allocator_diagnostics,
     :authentication_audit_log,
     :aws_alien_runners_ratio,
+    :aws_alien_runners_shared_vpc,
     :aws_cloudwatch_logs,
     :early_jit_registration,
     :enable_aws_48xlarge,
