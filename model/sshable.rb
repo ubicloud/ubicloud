@@ -323,6 +323,18 @@ LOCK
     reload
   end
 
+  def check_for_new_host_keys
+    # If the Sshable doesn't have host keys, they will be added during
+    # the first connection attempt, in which case this code isn't needed
+    return unless host_keys
+
+    start_fresh_session do |sess|
+      handle_host_keys_update(sess)
+      sess.send_global_request("keepalive@openssh.com") { nil }
+      sess.loop { !sess.pending_requests.empty? }
+    end
+  end
+
   def invalidate_cache_entry
     Thread.current[:clover_ssh_cache]&.delete([host, unix_user])
   end
@@ -347,6 +359,64 @@ LOCK
   end
 
   private
+
+  HOSTKEYS_PROVE_REQUEST = "hostkeys-prove-00@openssh.com"
+  RSA_SIGNATURE_TYPES = %w[ssh-rsa rsa-sha2-256 rsa-sha2-512].freeze
+
+  # For hosts with known host keys, check if they have additional host keys
+  # using OpenSSH protocol extensions. If so, add those keys to host_keys.
+  # This allows for newer, stronger keys to be automatically added and used.
+  # This is not done automatically for every session for performance reasons.
+  def handle_host_keys_update(sess)
+    sess.on_global_request("hostkeys-00@openssh.com") do |data, _want_reply|
+      matched = false
+      new_keys = []
+
+      until data.eof?
+        blob = data.read_string
+        begin
+          key = Net::SSH::Buffer.new(blob).read_key
+        rescue NotImplementedError
+          # Unsupported key type
+          next
+        end
+
+        str = "#{key.ssh_type} #{[blob].pack("m0")}"
+        if host_keys.include?(str)
+          matched = true
+        else
+          new_keys << [key, blob, str]
+        end
+      end
+
+      if matched && !new_keys.empty?
+        args = new_keys.flat_map { |_, blob, _| [:string, blob] }
+        sess.send_global_request(HOSTKEYS_PROVE_REQUEST, *args) do |success, response|
+          next unless success
+
+          session_id = sess.transport.algorithms.session_id
+          proven_keys = new_keys.filter_map do |key, blob, str|
+            next unless (sig_blob = response.read_string)
+
+            sig_buffer = Net::SSH::Buffer.new(sig_blob)
+            sig_type = sig_buffer.read_string
+            next unless (key.ssh_type == "ssh-rsa") ? RSA_SIGNATURE_TYPES.include?(sig_type) : (sig_type == key.ssh_type)
+
+            signed_data = Net::SSH::Buffer.from(:string, HOSTKEYS_PROVE_REQUEST, :string, session_id, :string, blob).to_s
+            begin
+              str if key.ssh_do_verify(sig_buffer.read_string, signed_data, host_key: sig_type)
+            rescue
+              false
+            end
+          end
+
+          add_host_keys(proven_keys) unless proven_keys.empty?
+        end
+      end
+
+      false
+    end
+  end
 
   def channel_wait(ch, wait_deadline)
     if wait_deadline
