@@ -86,6 +86,27 @@ RSpec.describe Util do
     end
   end
 
+  describe "#cert_expires_at" do
+    let(:cert_pem) { described_class.create_root_certificate(common_name: "test CA", duration: 60 * 60 * 24 * 30)[0] }
+
+    it "returns the expiration time of the certificate" do
+      expect(described_class.cert_expires_at(cert_pem)).to be_within(5).of(Time.now + 60 * 60 * 24 * 30)
+    end
+
+    it "returns the expiration time of the first certificate in a chain" do
+      other_pem = described_class.create_root_certificate(common_name: "other CA", duration: 60 * 60 * 24 * 365)[0]
+      expect(described_class.cert_expires_at(cert_pem + other_pem)).to be_within(5).of(Time.now + 60 * 60 * 24 * 30)
+    end
+
+    it "returns nil for invalid certificate data" do
+      expect(described_class.cert_expires_at("not a cert")).to be_nil
+    end
+
+    it "returns nil for nil" do
+      expect(described_class.cert_expires_at(nil)).to be_nil
+    end
+  end
+
   describe "#parse_key" do
     it "can parse an elliptic key" do
       expect(described_class.parse_key(Clec::Cert::EC_KEY_PEM)).to be_instance_of OpenSSL::PKey::EC
