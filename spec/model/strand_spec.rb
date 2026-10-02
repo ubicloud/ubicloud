@@ -19,6 +19,11 @@ RSpec.describe Strand do
       st = described_class.create(prog: "RolloutBootImage", label: "start")
       expect { st.destroy }.to change { DeletedRecord.where(model_name: "Strand").count }.by(1)
     end
+
+    it "does not keep one for a strand listed as adding nothing to its resource" do
+      st = described_class.create(prog: "LearnHypervisor", label: "start")
+      expect { st.destroy }.not_to change { DeletedRecord.where(model_name: "Strand").count }
+    end
   end
 
   context "when leasing" do

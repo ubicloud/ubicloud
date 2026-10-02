@@ -376,10 +376,14 @@ SQL
     time.strftime("%F %T.%6N %z")
   end
 
+  PROGS_WITHOUT_DELETED_RECORD = [
+    prog_verify(Prog::LearnHypervisor),
+  ].freeze
+
   private
 
   def create_deleted_record
-    super unless prog.end_with?("Nexus")
+    super unless prog.end_with?("Nexus") || PROGS_WITHOUT_DELETED_RECORD.include?(prog)
   end
 end
 
