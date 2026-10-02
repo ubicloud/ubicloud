@@ -67,6 +67,10 @@ PGDATA=/dat/#{version}/data
       )
     end
 
+    def aws_get_object(key)
+      blob_storage_client.get_object(bucket: ubid, key:).body.read
+    end
+
     def aws_list_objects(prefix, delimiter: "")
       response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:)
       objects = response.contents
