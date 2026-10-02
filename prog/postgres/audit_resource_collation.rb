@@ -4,10 +4,10 @@ require "csv"
 
 # Audits a Postgres resource before it moves from Ubuntu 22.04 (glibc 2.35) to
 # 26.04 (glibc 2.43). It checks every database for sort order on collations
-# that are not verified order-stable (UBI-351), and for objects that store
-# case-mapped values. It is fail-closed: anything it cannot check is reported
-# for review, not passed as clean. Each verdict lists the actions it needs, most
-# severe first (ACTIONS).
+# that are not proven to keep their order across that change, and for objects
+# that store case-mapped values. It is fail-closed: anything it cannot check is
+# reported for review, not passed as clean. Each verdict lists the actions it
+# needs, most severe first (ACTIONS).
 class Prog::Postgres::AuditResourceCollation < Prog::Base
   subject_is :postgres_resource
 
@@ -227,11 +227,11 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   DATABASE_LIMIT = 20
 
   # libc locales in the ubuntu-2604 image, asserted by its build
-  # (postgres-vm-images common/setup_base.sh). UBI-351 proved each of them
-  # order-identical from glibc 2.35 to 2.43, so a libc collation on them needs
-  # only REFRESH COLLATION VERSION. Any other libc locale cannot load on the
-  # target, which blocks the move. A locale added to the image needs the same
-  # proof before it joins this list.
+  # (postgres-vm-images common/setup_base.sh). Their compiled LC_COLLATE data
+  # and their strxfrm keys for every code point are identical from glibc 2.35
+  # to 2.43, so a libc collation on them needs only REFRESH COLLATION VERSION.
+  # Any other libc locale cannot load on the target, which blocks the move. A
+  # locale added to the image needs the same proof before it joins this list.
   TARGET_LIBC_LOCALES = %w[C POSIX C.utf8 en_US.utf8].freeze
 
   # The actions a verdict can ask for, most severe first.
