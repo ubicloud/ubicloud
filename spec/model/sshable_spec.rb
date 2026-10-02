@@ -217,6 +217,21 @@ LOCK
 
     before { sa.save_changes }
 
+    it "does not record host keys for runner sshables" do
+      sa.update(unix_user: "runneradmin")
+      session = ssh_session
+      expect(Net::SSH).to receive(:start).with("test.localhost", "runneradmin", any_args) do |*, **opts, &block|
+        expect(opts.except(:key_data)).to eq described_class::COMMON_SSH_ARGS.except(:key_data)
+        expect(opts[:key_data].map { Net::SSH::KeyFactory.load_data_private_key(it).public_key.to_blob })
+          .to eq(sa.keys.map { Net::SSH::KeyFactory.load_data_private_key(it.private_key).public_key.to_blob })
+        session
+      end
+      expect(Clog).not_to receive(:emit)
+
+      expect(sa.start_fresh_session).to equal(session)
+      expect(sa.reload.host_keys).to be_nil
+    end
+
     it "records the host key when the sshable has no host keys" do
       pub, server_key = host_key
       session = ssh_session
