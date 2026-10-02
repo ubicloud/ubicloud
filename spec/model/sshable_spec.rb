@@ -305,6 +305,166 @@ LOCK
     end
   end
 
+  describe "#check_for_new_host_keys" do
+    rsa_key = OpenSSL::PKey::RSA.generate(2048)
+    ecdsa_keys = Array.new(2) { OpenSSL::PKey::EC.generate("prime256v1") }
+    ed25519_keys = Array.new(3) { Net::SSH::KeyFactory.load_data_private_key(SshKey.generate.private_key) }
+    prove_request = "hostkeys-prove-00@openssh.com"
+
+    let(:rsa_key) { rsa_key }
+    let(:ecdsa_keys) { ecdsa_keys }
+    let(:ed25519_keys) { ed25519_keys }
+    let(:server_key_class) { Struct.new(:private_key, :blob, :str) }
+
+    def server_key(type, index = 0)
+      private_key, public_key = case type
+      when :ed25519
+        key = ed25519_keys.fetch(index)
+        [key, key.public_key]
+      when :rsa
+        [rsa_key, rsa_key]
+      when :ecdsa
+        key = ecdsa_keys.fetch(index)
+        [key, key]
+      end
+      blob = public_key.to_blob
+      server_key_class.new(private_key, blob, "#{public_key.ssh_type} #{[blob].pack("m0")}")
+    end
+
+    def proof(key, sig_type, blob: key.blob)
+      data = Net::SSH::Buffer.from(:string, "hostkeys-prove-00@openssh.com", :string, "test-session-id", :string, blob).to_s
+      Net::SSH::Buffer.from(:string, sig_type, :string, key.private_key.ssh_do_sign(data, sig_type)).to_s
+    end
+
+    def expect_host_keys_session(offered, proof_response = nil)
+      algorithms = instance_double(Net::SSH::Transport::Algorithms, session_id: "test-session-id")
+      session = instance_double(Net::SSH::Connection::Session, transport: instance_double(Net::SSH::Transport::Session, algorithms:))
+      handler = nil
+      pending = []
+      requests = []
+      responses = [[false, nil]]
+      responses << proof_response if proof_response
+
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:on_global_request).with("hostkeys-00@openssh.com") { |&block| handler = block }
+      allow(session).to receive(:send_global_request) do |*args, &block|
+        requests << args
+        pending << block
+      end
+      allow(session).to receive(:pending_requests).and_return(pending)
+      expect(session).to receive(:loop) do |&running|
+        expect(handler.call(Net::SSH::Buffer.from(*offered.flat_map { [:string, it] }), false)).to be false
+        pending.shift.call(*responses.shift) while running.call
+      end
+
+      requests
+    end
+
+    before { sa.save_changes }
+
+    it "adds new host keys the host proves it has" do
+      known = server_key(:ed25519)
+      rsa = server_key(:rsa)
+      ecdsa = server_key(:ecdsa)
+      unsupported = Net::SSH::Buffer.from(:string, "sk-ssh-ed25519@openssh.com", :string, "x").to_s
+      sa.update(host_keys: [known.str])
+
+      requests = expect_host_keys_session([known.blob, unsupported, rsa.blob, ecdsa.blob],
+        [true, Net::SSH::Buffer.from(:string, proof(rsa, "rsa-sha2-512"), :string, proof(ecdsa, "ecdsa-sha2-nistp256"))])
+      expect(Clog).to receive(:emit).with("sshable host keys added", {sshable_host_keys_added: {sshable: sa.ubid, keys: [rsa.str, ecdsa.str]}}).and_call_original
+
+      sa.check_for_new_host_keys
+      expect(requests).to eq [["keepalive@openssh.com"], [prove_request, :string, rsa.blob, :string, ecdsa.blob]]
+      expect(sa.host_keys).to eq [known.str, rsa.str, ecdsa.str]
+      expect(sa.reload.host_keys).to eq [known.str, rsa.str, ecdsa.str]
+    end
+
+    it "only adds host keys with valid proofs" do
+      known = server_key(:ed25519)
+      rsa = server_key(:rsa)
+      bad_ed25519 = server_key(:ed25519, 1)
+      ecdsa = server_key(:ecdsa)
+      bad_ecdsa = server_key(:ecdsa, 1)
+      unproven = server_key(:ed25519, 2)
+      sa.update(host_keys: [known.str])
+
+      expect_host_keys_session([known.blob, rsa.blob, bad_ed25519.blob, ecdsa.blob, bad_ecdsa.blob, unproven.blob],
+        [true, Net::SSH::Buffer.from(
+          # RSA key with a signature type that is not an RSA signature type
+          :string, proof(rsa, "ssh-ed25519"),
+          # Signature for a different blob, which raises when verified
+          :string, proof(bad_ed25519, "ssh-ed25519", blob: known.blob),
+          # Key with valid signature
+          :string, proof(ecdsa, "ecdsa-sha2-nistp256"),
+          # Non-RSA key with a signature type that does not match the key type
+          :string, proof(bad_ecdsa, "ecdsa-sha2-nistp384"),
+          # Missing signature for unproven
+        )])
+
+      sa.check_for_new_host_keys
+      expect(sa.reload.host_keys).to eq [known.str, ecdsa.str]
+    end
+
+    it "does not add host keys if no proofs are valid" do
+      known = server_key(:ed25519)
+      ecdsa = server_key(:ecdsa)
+      other_ecdsa = server_key(:ecdsa, 1)
+      sa.update(host_keys: [known.str])
+
+      expect_host_keys_session([known.blob, ecdsa.blob],
+        [true, Net::SSH::Buffer.from(:string, proof(other_ecdsa, "ecdsa-sha2-nistp256", blob: ecdsa.blob))])
+      expect(Clog).not_to receive(:emit)
+      expect(sa).not_to receive(:add_host_keys)
+
+      sa.check_for_new_host_keys
+      expect(sa.reload.host_keys).to eq [known.str]
+    end
+
+    it "does not add host keys if the host does not respond successfully to the prove request" do
+      known = server_key(:ed25519)
+      ecdsa = server_key(:ecdsa)
+      sa.update(host_keys: [known.str])
+
+      requests = expect_host_keys_session([known.blob, ecdsa.blob], [false, nil])
+      expect(sa).not_to receive(:add_host_keys)
+
+      sa.check_for_new_host_keys
+      expect(requests).to eq [["keepalive@openssh.com"], [prove_request, :string, ecdsa.blob]]
+      expect(sa.reload.host_keys).to eq [known.str]
+    end
+
+    it "does not request proofs if the host does not offer a known host key" do
+      known = server_key(:ed25519)
+      ecdsa = server_key(:ecdsa)
+      sa.update(host_keys: [known.str])
+
+      requests = expect_host_keys_session([ecdsa.blob])
+      expect(sa).not_to receive(:add_host_keys)
+
+      sa.check_for_new_host_keys
+      expect(requests).to eq [["keepalive@openssh.com"]]
+      expect(sa.reload.host_keys).to eq [known.str]
+    end
+
+    it "does not request proofs if the host does not offer new host keys" do
+      known = server_key(:ed25519)
+      sa.update(host_keys: [known.str])
+
+      requests = expect_host_keys_session([known.blob])
+      expect(sa).not_to receive(:add_host_keys)
+
+      sa.check_for_new_host_keys
+      expect(requests).to eq [["keepalive@openssh.com"]]
+      expect(sa.reload.host_keys).to eq [known.str]
+    end
+
+    it "does not attempt connection if the sshable has no host keys" do
+      expect(sa).not_to receive(:start_fresh_session)
+      sa.check_for_new_host_keys
+      expect(sa.reload.host_keys).to be_nil
+    end
+  end
+
   describe "#cmd" do
     let(:session) { Net::SSH::Connection::Session.allocate }
 
