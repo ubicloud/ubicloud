@@ -6,7 +6,13 @@ DAT=${DAT:-/dat}
 # Logical slot WAL retention threshold to drop the slot. see drop_inactive_or_lagging_logical_slots
 LOGICAL_SLOT_MAX_WAL_BYTES=2147483648
 
-read name btotal bused bavailable usedp mount_path <<< "$(df -P -B1 "$DAT" | tail -n +2)"
+# df -P prints six columns and read needs a name for every one of them; only
+# btotal and bavailable are read afterwards, and the other four are named
+# after their columns rather than discarded so the line still reads as df
+# output. df -P escapes nothing, so there is no backslash for read to consume
+# and -r is the reader that matches what df prints.
+# shellcheck disable=SC2034  # name, bused, usedp and mount_path are df's other four columns
+read -r name btotal bused bavailable usedp mount_path <<< "$(df -P -B1 "$DAT" | tail -n +2)"
 PGDATA="$DAT/$1/data"
 
 # Drop logical replication slots that are inactive or retain more than
