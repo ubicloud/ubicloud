@@ -2,6 +2,7 @@
 
 class Prog::Github::GithubRepositoryNexus < Prog::Base
   subject_is :github_repository
+  frame_accessor :skip_check_queued_jobs
 
   def self.assemble(installation, name, default_branch)
     DB.transaction do
@@ -136,17 +137,33 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
-    cleanup_cache if github_repository.access_key
-    nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
+    if Time.now - github_repository.last_job_at > 6 * 60 * 60
+      cleanup_cache if github_repository.access_key
+      nap 15 * 60
+    end
 
-    begin
-      check_queued_jobs if Config.enable_github_workflow_poller
-    rescue Octokit::NotFound
-      Clog.emit("not found repository", {not_found_repository: {repository_name: github_repository.name}})
-      if github_repository.runners_dataset.empty?
-        github_repository.incr_destroy
-        nap 0
+    if Config.enable_github_workflow_poller
+      if skip_check_queued_jobs
+        cleanup_cache
+        self.skip_check_queued_jobs = false
+      else
+        begin
+          check_queued_jobs
+        rescue Octokit::NotFound
+          Clog.emit("not found repository", {not_found_repository: {repository_name: github_repository.name}})
+          if github_repository.runners_dataset.empty?
+            github_repository.incr_destroy
+            nap 0
+          end
+        end
+
+        if github_repository.access_key
+          self.skip_check_queued_jobs = true
+          nap 0
+        end
       end
+    elsif github_repository.access_key
+      cleanup_cache
     end
 
     # check_queued_jobs may have changed the default polling interval based on
