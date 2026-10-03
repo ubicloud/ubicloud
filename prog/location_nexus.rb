@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "aws-sdk-ec2"
+require "google/cloud/errors"
 
 class Prog::LocationNexus < Prog::Base
   subject_is :location
@@ -40,6 +41,10 @@ class Prog::LocationNexus < Prog::Base
     Clog.emit("AWS UnauthorizedOperation error when checking for scheduled maintenance events", Util.exception_to_hash(e, into: {location_id: location.id}))
     # This is a known issue with AWS accounts that don't have the right permissions to describe maintenance events.
     Prog::PageNexus.assemble("aws_unauthorized_operation", ["AwsUnauthorizedOperation", location.ubid], location.ubid, resource_id: location.id, severity: "warning", extra_data: {project: location.project.ubid})
+    nap 3600 * 24 * 31
+  rescue Google::Cloud::PermissionDeniedError => e
+    Clog.emit("GCP PermissionDenied error when checking for scheduled maintenance events", Util.exception_to_hash(e, into: {location_id: location.id}))
+    Prog::PageNexus.assemble("gcp_permission_denied", ["GcpPermissionDenied", location.ubid], location.ubid, resource_id: location.id, severity: "warning", extra_data: {project: location.project&.ubid})
     nap 3600 * 24 * 31
   end
 
