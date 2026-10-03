@@ -15,18 +15,15 @@ class Prog::Vm::HostNexus < Prog::Base
       Sshable.create_with_id(id, host: sshable_hostname)
       vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
 
-      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
+      provider_host = [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
+      if provider_host
         HostProvider.create do |hp|
           hp.id = id
           hp.provider_name = provider_name
           hp.server_identifier = server_identifier
         end
-      end
 
-      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
-        vmh.create_addresses
-        vmh.set_data_center
-        vmh.create_inventory
+        # Renaming here fails the assemble for an unknown server identifier.
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
       else
@@ -36,9 +33,21 @@ class Prog::Vm::HostNexus < Prog::Base
 
       Strand.create_with_id(id,
         prog: "Vm::HostNexus",
-        label: "start",
+        label: provider_host ? "create_addresses" : "start",
         stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images, "install_os" => install_os}])
     end
+  end
+
+  label def create_addresses
+    register_deadline("start", 10 * 60)
+    vm_host.create_addresses
+    hop_pull_server_info
+  end
+
+  label def pull_server_info
+    vm_host.set_data_center
+    vm_host.create_inventory unless vm_host.inventory
+    hop_start
   end
 
   label def start
