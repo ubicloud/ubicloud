@@ -22,6 +22,12 @@ class GithubInstallation < Sequel::Model
     runners_dataset.total_active_runner_vcpus
   end
 
+  def active_runners_dataset
+    runners_dataset.eager(:vm).eager_graph(:strand)
+      .exclude(Sequel[:strand][:prog] => "Github::GithubRunnerNexus", Sequel[:strand][:label] => ["destroy", "wait_vm_destroy"])
+      .reverse(Sequel[:github_runner][:created_at])
+  end
+
   def free_runner_upgrade?(at = Time.now)
     free_runner_upgrade_expires_at&.>(at)
   end

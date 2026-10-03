@@ -97,26 +97,26 @@ class Clover
         r.redirect @installation, "/setting"
       end
 
-      r.on web?, "runner" do
+      r.on "runner" do
         r.get true do
-          @runners = @installation.runners_dataset.eager(:vm).eager_graph(:strand)
-            .exclude(Sequel[:strand][:prog] => "Github::GithubRunnerNexus", Sequel[:strand][:label] => ["destroy", "wait_vm_destroy"])
-            .reverse(Sequel[:github_runner][:created_at])
-            .all
+          if api?
+            paginated_result(@installation.active_runners_dataset, Serializers::GithubRunner)
+          else
+            @runners = @installation.active_runners_dataset.all
+            @requested_vcpus = @runners.sum { Github.runner_labels[it.label]["vcpus"] }
+            @allocated_vcpus = @runners.sum { it.vm&.allocated_at ? it.vm.vcpus : 0 }
+            date = Date.today
+            today_begin = date.to_time
+            today_end = (date + 1).to_time
+            last_30_day = (date - 29).to_time
+            @today_usage = @project.total_github_amount(today_begin, today_end)
+            @last_30_usage = @project.total_github_amount(last_30_day, today_end)
 
-          @requested_vcpus = @runners.sum { Github.runner_labels[it.label]["vcpus"] }
-          @allocated_vcpus = @runners.sum { it.vm&.allocated_at ? it.vm.vcpus : 0 }
-          date = Date.today
-          today_begin = date.to_time
-          today_end = (date + 1).to_time
-          last_30_day = (date - 29).to_time
-          @today_usage = @project.total_github_amount(today_begin, today_end)
-          @last_30_usage = @project.total_github_amount(last_30_day, today_end)
-
-          view "github/runner"
+            view "github/runner"
+          end
         end
 
-        r.delete :ubid_uuid do |id|
+        r.delete web?, :ubid_uuid do |id|
           next unless (runner = @installation.runners_dataset.with_pk(id))
 
           DB.transaction do

@@ -198,4 +198,30 @@ RSpec.describe GithubRunner do
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
     github_runner.check_pulse(session:, previous_pulse: pulse)
   end
+
+  describe "#status" do
+    it "is running when a workflow job is assigned" do
+      github_runner.update(workflow_job: {"id" => 1})
+      expect(github_runner.status).to eq("running")
+    end
+
+    it "is waiting_for_job when ready but no workflow job yet" do
+      github_runner.update(ready_at: Time.now)
+      expect(github_runner.status).to eq("waiting_for_job")
+    end
+
+    it "is concurrency_limited when the strand is waiting on the concurrency limit" do
+      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "wait_concurrency_limit")
+      expect(github_runner.status).to eq("concurrency_limited")
+    end
+
+    it "is custom_label_quota when the strand is checking a custom label quota" do
+      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "apply_custom_label_quota")
+      expect(github_runner.status).to eq("custom_label_quota")
+    end
+
+    it "is provisioning otherwise" do
+      expect(github_runner.status).to eq("provisioning")
+    end
+  end
 end

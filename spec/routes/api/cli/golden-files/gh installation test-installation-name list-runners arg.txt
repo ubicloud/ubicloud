@@ -1,0 +1,9 @@
+! Invalid number of arguments for gh installation list-runners subcommand (requires: 0, given: 1)
+
+List active GitHub Actions runners for an installation
+
+Usage:
+    ubi gh installation installation-name list-runners [options]
+
+Options:
+    -N, --no-headers                 do not show headers

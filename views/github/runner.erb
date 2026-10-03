@@ -69,26 +69,28 @@
                 </div>
               CONTENT
             ], {}],
-            if (workflow_job = runner.workflow_job)
+            case runner.status
+            when "running"
+              workflow_job = runner.workflow_job
               [[
                 [workflow_job["workflow_name"].to_s, {link: runner.run_url}],
                 [workflow_job["name"].to_s, {link: runner.job_url}],
               ], {}]
-            elsif runner.ready_at
+            when "waiting_for_job"
               [
-                  [
-                    "Waiting for GitHub to assign a job",
-                    "Ready for #{format_time_diff(runner.ready_at, Time.now)}"
-                  ], {}
-                ]
-            elsif runner.strand && runner.strand.label == "wait_concurrency_limit"
                 [
-                  [
-                    "Reached your concurrency limit",
-                    "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
-                  ], {}
-                ]
-            elsif runner.strand && runner.strand.label == "apply_custom_label_quota"
+                  "Waiting for GitHub to assign a job",
+                  "Ready for #{format_time_diff(runner.ready_at, Time.now)}"
+                ], {}
+              ]
+            when "concurrency_limited"
+              [
+                [
+                  "Reached your concurrency limit",
+                  "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                ], {}
+              ]
+            when "custom_label_quota"
               [
                 [
                   "Checking concurrency quota for custom labels",
@@ -96,12 +98,12 @@
                 ], {}
               ]
             else
+              [
                 [
-                  [
-                    "Provisioning an ephemeral virtual machine",
-                    "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
-                  ], {}
-                ]
+                  "Provisioning an ephemeral virtual machine",
+                  "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                ], {}
+              ]
             end,
             if (job = runner.workflow_job)
               [

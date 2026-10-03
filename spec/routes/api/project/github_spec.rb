@@ -28,6 +28,30 @@ RSpec.describe Clover, "github" do
     expect(JSON.parse(last_response.body)["name"]).to eq("test-repo")
   end
 
+  it "can list active runners" do
+    vm = create_vm
+    runner = GithubRunner.create(installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id, repository_name: "test-user/test-repo", label: "ubicloud-standard-2")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+
+    get "/project/#{project.ubid}/github/test-user/runner"
+
+    expect(last_response.status).to eq(200)
+    body = JSON.parse(last_response.body)
+    expect(body["count"]).to eq(1)
+    expect(body["items"].first).to include("id" => runner.ubid, "repository_name" => "test-user/test-repo", "label" => "ubicloud-standard-2", "status" => "provisioning")
+  end
+
+  it "excludes runners being destroyed from the active runner list" do
+    vm = create_vm
+    runner = GithubRunner.create(installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id, repository_name: "test-user/test-repo", label: "ubicloud-standard-2")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "destroy")
+
+    get "/project/#{project.ubid}/github/test-user/runner"
+
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)["count"]).to eq(0)
+  end
+
   it "can get cache entry information" do
     get "/project/#{project.ubid}/github/test-user/repository/test-repo/cache/#{cache_entry.ubid}"
 

@@ -278,6 +278,7 @@ Commands:
 
 Post Commands:
     list-repositories    List GitHub repositories for an installation
+    list-runners         List active GitHub Actions runners for an installation
 
 
 List GitHub installations
@@ -293,6 +294,15 @@ List GitHub repositories for an installation
 
 Usage:
     ubi gh installation installation-name list-repositories [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List active GitHub Actions runners for an installation
+
+Usage:
+    ubi gh installation installation-name list-runners [options]
 
 Options:
     -N, --no-headers                 do not show headers

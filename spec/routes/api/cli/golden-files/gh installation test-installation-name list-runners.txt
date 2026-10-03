@@ -1,0 +1,2 @@
+id                          repository-name                              label                status        created-at          
+vftkh9pyjw665ks11z2hwdnds1  test-installation-name/test-repository-name  ubicloud-standard-2  provisioning  2025-11-21T15:22:32Z
