@@ -70,7 +70,16 @@ class SpdkSetup
     temp_tarball = "/tmp/spdk.tar.gz"
     url = package_url(os_version: os_version)
     puts "Downloading SPDK package from #{url}"
-    r "curl", "-L3", "-o", temp_tarball, url
+    # Spelled long because curl bundles short options: its own table reads
+    # "-3, --sslv3", so "-L3" was --location --sslv3, not a redirect limit.
+    # --sslv3 asks for a protocol RFC 7568 withdrew and curl has ignored
+    # outright since 7.77.0, so only --location is kept.
+    #
+    # --fail, because without it a 404 or a 503 from the package host is exit 0
+    # with the error body written to temp_tarball, and the run dies at the tar
+    # below as "not in gzip format" -- a corrupt-package message for a URL that
+    # named nothing. The fetch is where that has to fail.
+    r "curl", "--fail", "--location", "--output", temp_tarball, url
 
     FileUtils.mkdir_p(install_path)
     FileUtils.cd install_path do
