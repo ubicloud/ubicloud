@@ -70,13 +70,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
       # instance, but the customer is still billed for 30 vCPUs.
       vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
-      if x64?
-        size = Option.aws_instance_type_name("m8a", vcpus)
-        alternative_families = ["m8i", "m7a", "m7i", "m6a"]
-      else
-        size = Option.aws_instance_type_name("m9g", vcpus)
-        alternative_families = ["m8g", "m7g"]
-      end
+      family, *alternative_families = x64? ? Config.github_runner_aws_spill_x64_families : Config.github_runner_aws_spill_arm64_families
+      size = Option.aws_instance_type_name(family, vcpus)
       # eu-central-1a is usually give capacity errors
       preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
     end

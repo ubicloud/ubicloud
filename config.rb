@@ -146,6 +146,8 @@ module Config
   override :github_runner_aws_spill_threshold_seconds, 30, int
   override :github_runner_aws_spill_vcpu_capacity, 100, int
   override :github_runner_aws_spill_runner_capacity, 50, int
+  override :github_runner_aws_spill_x64_families, "m8a,m8i,m7a,m7i,m6a", array(string)
+  override :github_runner_aws_spill_arm64_families, "m9g,m8g,m7g", array(string)
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
