@@ -1508,6 +1508,8 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "accepting"
     expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Reboot", "Move to Location", "Force Create VM", "Download Boot Image"]
+    # Moving back to accepting after a drain schedules stale artifact cleanup.
+    expect(Strand.where(prog: "Vm::HostCleanup", stack: Sequel.pg_jsonb_wrap([{"subject_id" => vmh.id}])).count).to eq(1)
   end
 
   it "does not allow moving a VmHost to the allocation state it already has" do
