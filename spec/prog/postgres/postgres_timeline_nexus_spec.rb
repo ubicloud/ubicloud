@@ -494,6 +494,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.incr_take_backup_for_converge
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      mock_minio_client(list_objects: [])
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
@@ -666,6 +667,50 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
         expect(postgres_timeline).not_to exist
       end
+    end
+  end
+
+  describe "latest completed backup reference" do
+    def sentinel(name, days_ago)
+      Struct.new(:key, :last_modified).new("basebackups_005/#{name}_backup_stop_sentinel.json", Time.now - days_ago * 24 * 60 * 60)
+    end
+
+    before do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      # Older than 6 hours, so before_run lists the bucket and memoizes it.
+      postgres_timeline.update(created_at: Time.now - 7 * 60 * 60)
+    end
+
+    it "re-lists the bucket so a sentinel that landed after before_run is not missed" do
+      older = sentinel("base_00000003000000BD00000024", 1)
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      client = mock_minio_client
+      allow(client).to receive(:list_objects).and_return([older], [older, newest])
+      allow(client).to receive(:get_object).with(postgres_timeline.ubid, older.key).and_return('{"FinishLSN":812352799064}')
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(client).to receive(:get_object).with(postgres_timeline.ubid, newest.key).and_return('{"FinishLSN":836545544480}').ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+
+      nx.before_run
+
+      expect { nx.take_backup }.to hop("wait")
+      timeline = postgres_timeline.reload
+      expect(timeline.latest_backup_lsn).to eq("C2/C6000120")
+      expect(timeline.latest_backup_wal_timeline_id).to eq(4)
+    end
+
+    it "leaves an existing reference alone when the store reports no backups" do
+      postgres_timeline.update(latest_backup_lsn: "C2/C6000120", latest_backup_wal_timeline_id: 4)
+      mock_minio_client(list_objects: [])
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to eq("C2/C6000120")
     end
   end
 end
