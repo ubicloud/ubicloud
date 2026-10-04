@@ -789,4 +789,86 @@ PGDATA=/dat/17/data
       expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
     end
   end
+
+  describe "#latest_completed_backup" do
+    def sentinel(name, age) = instance_double(Minio::Client::Blob, key: "basebackups_005/#{name}_backup_stop_sentinel.json", last_modified: Time.now - age)
+
+    # Mock the store, not the model
+    def mock_store(objects, bodies = {})
+      expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
+      client = instance_double(Minio::Client)
+      expect(client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return(objects)
+      bodies.each { |key, body| expect(client).to receive(:get_object).with(postgres_timeline.ubid, key).and_return(body) }
+      expect(Minio::Client).to receive(:new).and_return(client)
+    end
+
+    it "reads FinishLSN from the newest sentinel and the WAL timeline from its key" do
+      older = sentinel("base_00000003000000BD00000024", 100)
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      mock_store([newest, older], newest.key => '{"LSN":812352799064,"FinishLSN":836545544480,"PgVersion":170000}')
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: 4})
+    end
+
+    it "re-lists the bucket rather than reusing a memoized listing" do
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
+      client = instance_double(Minio::Client)
+      expect(client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return([], [newest])
+      expect(client).to receive(:get_object).with(postgres_timeline.ubid, newest.key).and_return('{"FinishLSN":836545544480}')
+      expect(Minio::Client).to receive(:new).and_return(client)
+
+      expect(postgres_timeline.backups).to eq([])
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: 4})
+    end
+
+    it "returns nil when the store holds no backups" do
+      mock_store([])
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "returns nil when the newest sentinel carries no FinishLSN" do
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      mock_store([newest], newest.key => '{"LSN":812352799064}')
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "still reports the LSN when the key carries no WAL timeline" do
+      newest = sentinel("0001", 0)
+      mock_store([newest], newest.key => '{"FinishLSN":836545544480}')
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: nil})
+    end
+
+    it "logs and returns nil when the sentinel body does not parse" do
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      mock_store([newest], newest.key => "<Error><Code>NoSuchKey</Code></Error>")
+      expect(Clog).to receive(:emit).with("Could not read the wal-g backup sentinel", anything).and_call_original
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+  end
+
+  it "reads an object body" do
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
+    minio_client = instance_double(Minio::Client)
+    expect(minio_client).to receive(:get_object).with(postgres_timeline.ubid, "basebackups_005/x_backup_stop_sentinel.json").and_return("{}")
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+
+    expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+  end
+
+  it "reads an object body for AWS regions" do
+    postgres_timeline.update(location_id: create_aws_location.id)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:get_object, {body: "{}"})
+    expect(s3_client).to receive(:get_object).with(bucket: postgres_timeline.ubid, key: "basebackups_005/x_backup_stop_sentinel.json").and_call_original
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+
+    expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+  end
 end
