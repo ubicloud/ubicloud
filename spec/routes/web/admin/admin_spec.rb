@@ -2417,6 +2417,11 @@ RSpec.describe CloverAdmin do
     )
     intent_params = {currency: "usd", confirm: true, off_session: true, customer: "cus_123", payment_method: "pm_new"}
 
+    # Rejects an amount below the minimum charge
+    visit path
+    fill_in "amount", with: "0.49"
+    expect { click_button "Charge Card" }.to raise_error(CloverError, "Amount must be at least 0.5")
+
     # Shows a flash error when the charge does not succeed
     visit path
     fill_in "amount", with: "20"
