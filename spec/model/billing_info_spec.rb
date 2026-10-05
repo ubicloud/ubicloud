@@ -49,7 +49,7 @@ RSpec.describe BillingInfo do
 
   it "returns nil when Stripe data is nil" do
     expect(customers_service).to receive(:retrieve).and_return(nil)
-    expect(billing_info.email).to be_nil
+    2.times { expect(billing_info.email).to be_nil }
   end
 
   it "delete Stripe customer if Stripe enabled" do
