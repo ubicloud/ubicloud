@@ -1788,6 +1788,51 @@ RSpec.describe PostgresServer do
       expect(session[:replica_lag_breach_count]).to eq(0)
     end
 
+    [96, 8192].each do |byte_lag|
+      it "ignores an old replay timestamp with a stable #{byte_lag}-byte WAL gap" do
+        set_primary_lsn("10/#{byte_lag.to_s(16)}")
+        expect(standby.vm.sshable).to receive(:_cmd).with(
+          "PGOPTIONS=-c\\ statement_timeout\\=5s psql -U ubi_monitoring -d ubi_admin -t --csv -v 'ON_ERROR_STOP=1'", stdin: replica_lag_query,
+        ).exactly(5).times.and_return("t,10/00000000,100000")
+
+        5.times { standby.observe_replica_lag(session) }
+
+        expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
+        expect(session[:replica_lag_breach_count]).to eq(0)
+      end
+    end
+
+    it "resolves an existing page when only a small WAL tail remains" do
+      set_primary_lsn("10/00000060")
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, resource_id: standby.id, severity: "warning", extra_data: {byte_lag: 96, time_lag: 100000, read_replica: false}).subject
+      session[:replica_lag_breach_count] = 5
+      expect(standby.vm.sshable).to receive(:_cmd).with(
+        "PGOPTIONS=-c\\ statement_timeout\\=5s psql -U ubi_monitoring -d ubi_admin -t --csv -v 'ON_ERROR_STOP=1'", stdin: replica_lag_query,
+      ).and_return("t,10/00000000,100000")
+
+      standby.observe_replica_lag(session)
+
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+      expect(session[:replica_lag_breach_count]).to eq(0)
+    end
+
+    it "pages after five time breaches when the WAL gap exceeds one page" do
+      set_primary_lsn("10/00002001")
+      expect(standby.vm.sshable).to receive(:_cmd).with(
+        "PGOPTIONS=-c\\ statement_timeout\\=5s psql -U ubi_monitoring -d ubi_admin -t --csv -v 'ON_ERROR_STOP=1'", stdin: replica_lag_query,
+      ).exactly(5).times.and_return("t,10/00000000,1000")
+
+      4.times { standby.observe_replica_lag(session) }
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
+
+      standby.observe_replica_lag(session)
+
+      page = Page.from_tag_parts("PGReplicaLagHigh", standby.id)
+      expect(page.details["byte_lag"]).to eq(8193)
+      expect(page.details["time_lag"]).to eq(1000)
+      expect(page.severity).to eq("warning")
+    end
+
     it "does not page while the replica is past the soft limit but still making progress" do
       set_primary_lsn("10/00000000")
       expect(standby).to receive(:_run_query).with(replica_lag_query, user: "ubi_monitoring", dbname: "ubi_admin", statement_timeout: 5).and_return(
