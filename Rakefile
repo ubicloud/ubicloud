@@ -210,7 +210,7 @@ end
 
 desc "Run route specs checking no SSH access from web process"
 task "route_spec" do
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "PROCESS_TYPE" => "web"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "PROCESS_TYPE" => "web", "CHECK_HTTP_REQUEST_INSIDE_TRANSACTION" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")
 end
 
 desc "Run rhizome (data plane) tests"
