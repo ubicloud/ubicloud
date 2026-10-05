@@ -45,25 +45,29 @@ class BillingInfo < Sequel::Model
 
   def stripe_data
     if Config.stripe_secret_key
-      @stripe_data ||= begin
-        data = StripeClient.customers.retrieve(stripe_id)
-        return nil unless data
-
-        address = data["address"] || {}
-        metadata = data["metadata"] || {}
-        {
-          "name" => data["name"],
-          "email" => data["email"],
-          "address" => [address["line1"], address["line2"]].compact.join(" "),
-          "country" => address["country"],
-          "city" => address["city"],
-          "state" => address["state"],
-          "postal_code" => address["postal_code"],
-          "tax_id" => metadata["tax_id"],
-          "company_name" => metadata["company_name"],
-          "note" => metadata["note"],
-        }
+      unless @stripe_data.nil?
+        return (@stripe_data == false) ? nil : @stripe_data
       end
+
+      unless (data = StripeClient.customers.retrieve(stripe_id))
+        @stripe_data = false
+        return
+      end
+
+      address = data["address"] || {}
+      metadata = data["metadata"] || {}
+      @stripe_data = {
+        "name" => data["name"],
+        "email" => data["email"],
+        "address" => [address["line1"], address["line2"]].compact.join(" "),
+        "country" => address["country"],
+        "city" => address["city"],
+        "state" => address["state"],
+        "postal_code" => address["postal_code"],
+        "tax_id" => metadata["tax_id"],
+        "company_name" => metadata["company_name"],
+        "note" => metadata["note"],
+      }
     end
   end
 
