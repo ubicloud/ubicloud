@@ -2385,6 +2385,82 @@ RSpec.describe CloverAdmin do
     expect(billing_info.reload.valid_vat).to be_nil
   end
 
+  it "supports charging the card of a Project" do
+    billing_info = BillingInfo.create(stripe_id: "cus_123")
+    p = Project.create(name: "Default", billing_info_id: billing_info.id)
+    path = "/model/Project/#{p.ubid}/charge_card"
+    PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_old", created_at: Time.now - 60)
+    PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_new")
+
+    # Action is unavailable when Stripe is not enabled
+    expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
+
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    customers_service = instance_double(Stripe::CustomerService)
+    expect(StripeClient).to receive(:customers).and_return(customers_service).at_least(:once)
+    expect(customers_service).to receive(:retrieve).with("cus_123").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}}).at_least(:once)
+    payment_intents_service = instance_double(Stripe::PaymentIntentService)
+    expect(StripeClient).to receive(:payment_intents).and_return(payment_intents_service).at_least(:once)
+
+    # Action is unavailable when the project has no payment method
+    no_card_path = "/model/Project/#{Project.create(name: "NoCard").ubid}/charge_card"
+    expect { visit no_card_path }.to raise_error(RuntimeError, "admin route not handled: #{no_card_path}")
+
+    BillingRecord.create(
+      project_id: p.id,
+      resource_id: GithubRunner.generate_uuid,
+      resource_name: "runner",
+      span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
+      billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")["id"],
+      amount: 11992,
+    )
+    intent_params = {currency: "usd", confirm: true, off_session: true, customer: "cus_123", payment_method: "pm_new"}
+
+    # Shows a flash error when the charge does not succeed
+    visit path
+    fill_in "amount", with: "20"
+    expect(payment_intents_service).to receive(:create).with({amount: 2000, **intent_params}).and_raise(Stripe::CardError.new("Your card was declined.", {}))
+    click_button "Charge Card"
+    expect(page).to have_flash_error("Charge failed: Your card was declined.")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+
+    visit path
+    fill_in "amount", with: "30"
+    expect(payment_intents_service).to receive(:create).with({amount: 3000, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_123", status: "processing"))
+    click_button "Charge Card"
+    expect(page).to have_flash_error("Payment intent pi_123 has status processing")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    expect(ResourceCredit.all).to eq []
+    expect(p.reload.reputation).to eq "new"
+
+    # Prefills the amount with the current usage
+    visit "/model/Project/#{p.ubid}"
+    click_link "Charge Card"
+    expect(page).to have_field("amount", with: "12.49")
+    expect(payment_intents_service).to receive(:create).with({amount: 1249, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_456", status: "succeeded"))
+    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 12.49, intent_id: "pi_456", admin: "admin"}}).and_call_original
+    click_button "Charge Card"
+    expect(page).to have_flash_notice("Charged card and added prepaid credit")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    credit = ResourceCredit.first
+    expect(credit.project_id).to eq p.id
+    expect(credit.name).to eq "Prepaid Credit"
+    expect(credit.amount).to eq 12.49
+    t = Time.now.utc
+    expect(credit.active_from).to eq Time.utc(t.year, t.month)
+    expect(p.reload.reputation).to eq "verified"
+
+    # Charges a custom amount
+    click_link "Charge Card"
+    expect(page).to have_field("amount", with: "0.0")
+    fill_in "amount", with: "19.99"
+    expect(payment_intents_service).to receive(:create).with({amount: 1999, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_789", status: "succeeded"))
+    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 19.99, intent_id: "pi_789", admin: "admin"}}).and_call_original
+    click_button "Charge Card"
+    expect(page).to have_flash_notice("Charged card and added prepaid credit")
+    expect(ResourceCredit.select_order_map(:amount)).to eq [12.49, 19.99]
+  end
+
   it "lists multiple info pages with proper links and content in table format" do
     info_pages = [["first", "tag1", Time.now], ["second", "tag2", Time.now - 1], ["third", "tag3", Time.now - 2]].map do |summary, tag, created_at|
       Page.create(summary:, tag:, severity: "info", created_at:)
