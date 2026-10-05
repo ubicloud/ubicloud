@@ -366,6 +366,11 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
       [shift, icu].each { DB.run(it[:finish].freeze) }
       expect(results("reindex")).to eq([["rh_icu_idx", true, nil], ["rh_shift_idx", false, nil]])
     end
+
+    it "builds no refresh when the recorded versions match the libraries" do
+      expect(DB.fetch(described_class::REFRESH_COLLATION_STATEMENTS_SQL).all).to eq([])
+      expect(DB.fetch(described_class::REFRESH_DATABASE_STATEMENTS_SQL).all).to eq([])
+    end
   end
 
   describe "#wait_review" do

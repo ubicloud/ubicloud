@@ -4,9 +4,9 @@ require "csv"
 
 # Rehearses an image family migration of a Postgres resource on a private
 # fork. It forks the resource into an internal project, audits the fork, moves
-# it to the target family, then checks and reindexes the objects at risk in
-# every database. It ends in wait_review with the results in the frame and the
-# Clog line, and leaves the fork for an operator to review and destroy.
+# it to the target family, then checks, reindexes, and refreshes the objects at
+# risk in every database. It ends in wait_review with the results in the frame
+# and the Clog line, and leaves the fork for an operator to review and destroy.
 class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   subject_is :postgres_resource
 
@@ -145,6 +145,25 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
     FROM target WHERE reindex ORDER BY oid
   SQL
 
+  # The statements, run by \gexec, that refresh each collation whose
+  # recorded version no longer matches the library, and record the change.
+  REFRESH_COLLATION_STATEMENTS_SQL = <<~SQL
+    SELECT format('ALTER COLLATION %s REFRESH VERSION', oid::regcollation) AS refresh,
+      format('INSERT INTO ubi_collation_rehearsal.result SELECT %L, %L, collversion IS NOT DISTINCT FROM pg_collation_actual_version(oid), %L, '
+        'clock_timestamp(), clock_timestamp() FROM pg_collation WHERE oid = %s',
+        'refresh', oid::regcollation::text, collversion || ' -> ' || pg_collation_actual_version(oid), oid) AS record
+    FROM pg_collation WHERE collprovider IN ('c', 'i') AND collversion IS DISTINCT FROM pg_collation_actual_version(oid)
+  SQL
+
+  # The same for the current database's default collation.
+  REFRESH_DATABASE_STATEMENTS_SQL = <<~SQL
+    SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) AS refresh,
+      format('INSERT INTO ubi_collation_rehearsal.result SELECT %L, %L, datcollversion IS NOT DISTINCT FROM pg_database_collation_actual_version(oid), %L, '
+        'clock_timestamp(), clock_timestamp() FROM pg_database WHERE oid = %s',
+        'refresh', 'database ' || datname, datcollversion || ' -> ' || pg_database_collation_actual_version(oid), oid) AS record
+    FROM pg_database WHERE datname = current_database() AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid)
+  SQL
+
   # The psql script run in each database, through the daemonizer because
   # amcheck and REINDEX can outlast a strand lease. Setup errors stop it, as
   # nothing after them can work; from the REINDEX on, a failed statement is
@@ -156,6 +175,8 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
     #{ROW_CHECKS_SQL}
     \\set ON_ERROR_STOP off
     #{REINDEX_STATEMENTS_SQL.chomp} \\gexec
+    #{REFRESH_COLLATION_STATEMENTS_SQL.chomp} \\gexec
+    #{REFRESH_DATABASE_STATEMENTS_SQL.chomp} \\gexec
   SQL
 
   DATABASES_SQL = "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"
