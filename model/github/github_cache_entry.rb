@@ -17,6 +17,7 @@ class GithubCacheEntry < Sequel::Model
     # to the WHERE clause of the DELETE statement for each destroyed row.
     def destroy_where(cond)
       where_all(cond) do |entry|
+        entry.delete_blob_storage
         entry.destroy_where(cond)
       end
     end
@@ -38,6 +39,13 @@ class GithubCacheEntry < Sequel::Model
 
   def after_destroy
     super
+    delete_blob_storage(destroyed: true)
+  end
+
+  BLOB_STORAGE_DELETED_UPLOAD_ID = "_deleted"
+
+  def delete_blob_storage(destroyed: false)
+    return if upload_id == BLOB_STORAGE_DELETED_UPLOAD_ID
 
     bucket = repository.bucket_name
     key = blob_key
@@ -60,6 +68,8 @@ class GithubCacheEntry < Sequel::Model
       retries += 1
       retry
     end
+
+    update(upload_id: BLOB_STORAGE_DELETED_UPLOAD_ID) unless destroyed
   end
 end
 
