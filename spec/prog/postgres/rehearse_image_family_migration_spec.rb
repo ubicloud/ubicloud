@@ -328,10 +328,10 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
       DB[Sequel[:ubi_collation_rehearsal][:result]].where(phase:).where(Sequel.like(:object, "rh\\_%")).order(:object).select_map([:object, :ok, :detail])
     end
 
-    it "lists the indexes the audit lists, with their access method" do
-      expect(DB.fetch(described_class::TARGETS_SQL).all.select { it[:name].start_with?("rh_") }.sort_by { it[:name] }.map { it.values_at(:name, :amname) }).to eq([
-        ["rh_icu_idx", "btree"],
-        ["rh_shift_idx", "btree"],
+    it "lists the audit's indexes, and marks case-mapping and ICU ones for a REINDEX" do
+      expect(DB.fetch(described_class::TARGETS_SQL).all.select { it[:name].start_with?("rh_") }.sort_by { it[:name] }.map { it.values_at(:name, :amname, :reindex) }).to eq([
+        ["rh_icu_idx", "btree", true],
+        ["rh_shift_idx", "btree", true],
       ])
     end
 
@@ -350,6 +350,21 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
       expect([results("check_constraint"), results("generated_column"), results("partition_bound")]).to eq([
         [["rh_t.rh_check", false, "2 rows do not match"]], [["rh_t.g", false, "2 rows do not match"]], [["rh_part_eu", false, "1 rows do not match"]],
       ])
+    end
+
+    it "builds a REINDEX for each target, and records one that leaves the index's OID unchanged as failed" do
+      DB.run(described_class::SETUP_SQL)
+      statements = DB.fetch(described_class::REINDEX_STATEMENTS_SQL).all.select { it[:reindex].include?(" rh_") }
+      expect(statements.map { it[:reindex] }).to eq(["REINDEX INDEX CONCURRENTLY rh_shift_idx", "REINDEX INDEX CONCURRENTLY rh_icu_idx"])
+
+      # REINDEX CONCURRENTLY cannot run in the spec's transaction. Recreating
+      # one index gives it a new OID, as a successful run does; the other keeps
+      # its OID, as a failed run does.
+      shift, icu = statements
+      [shift, icu].each { DB.run(it[:start].freeze) }
+      DB.run("DROP INDEX rh_icu_idx; CREATE INDEX rh_icu_idx ON rh_t (name)")
+      [shift, icu].each { DB.run(it[:finish].freeze) }
+      expect(results("reindex")).to eq([["rh_icu_idx", true, nil], ["rh_shift_idx", false, nil]])
     end
   end
 

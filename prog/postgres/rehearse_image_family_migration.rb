@@ -4,9 +4,9 @@ require "csv"
 
 # Rehearses an image family migration of a Postgres resource on a private
 # fork. It forks the resource into an internal project, audits the fork, moves
-# it to the target family, then checks the objects at risk in every database.
-# It ends in wait_review with the results in the frame and the Clog line, and
-# leaves the fork for an operator to review and destroy.
+# it to the target family, then checks and reindexes the objects at risk in
+# every database. It ends in wait_review with the results in the frame and the
+# Clog line, and leaves the fork for an operator to review and destroy.
 class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   subject_is :postgres_resource
 
@@ -17,15 +17,22 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
 
   # The indexes the collation audit lists in the current database: sort-order
   # index rows from DETAILS_SQL and index-backed case-mapping rows from
-  # CTYPE_SQL. Reusing the audit's queries keeps the two from drifting.
+  # CTYPE_SQL. Reusing the audit's queries keeps the two from drifting. An
+  # index needs a REINDEX for case mapping, or for an ICU collation; a libc
+  # collation the audit marks "refresh" keeps its order, so it gets amcheck
+  # only.
   TARGETS_SQL = <<~SQL.freeze
-    WITH listed(name) AS (
-      SELECT name FROM (#{AUDIT::DETAILS_SQL.chomp.delete_suffix(";")}) d WHERE kind = 'index'
+    WITH listed(name, source, collname) AS (
+      SELECT name, 'sort_order', collname FROM (#{AUDIT::DETAILS_SQL.chomp.delete_suffix(";")}) d WHERE kind = 'index'
       UNION
-      SELECT object FROM (#{AUDIT::CTYPE_SQL.chomp.delete_suffix(";")}) c WHERE kind IN ('expression', 'citext', 'pg_trgm')
+      SELECT object, 'ctype', NULL FROM (#{AUDIT::CTYPE_SQL.chomp.delete_suffix(";")}) c WHERE kind IN ('expression', 'citext', 'pg_trgm')
     )
-    SELECT c.oid, c.oid::regclass::text AS name, am.amname
+    SELECT c.oid, c.oid::regclass::text AS name, am.amname,
+      bool_or(l.source = 'ctype' OR coalesce(pc.collprovider, db.datlocprovider) = 'i') AS reindex
     FROM listed l JOIN pg_class c ON c.oid = l.name::regclass JOIN pg_am am ON am.oid = c.relam
+    LEFT JOIN pg_collation pc ON pc.collname = l.collname AND l.collname <> 'default'
+    CROSS JOIN (SELECT datlocprovider FROM pg_database WHERE datname = current_database()) db
+    GROUP BY c.oid, am.amname
   SQL
 
   # Every part below records its outcome as rows in
@@ -125,14 +132,30 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
     $do$;
   SQL
 
+  # The statements, run by psql's \gexec, that REINDEX CONCURRENTLY each
+  # listed index that needs it, with a row before and after. A successful
+  # REINDEX CONCURRENTLY gives the index a new OID, so an unchanged OID marks
+  # a failure; psql's error is in the unit's log.
+  REINDEX_STATEMENTS_SQL = <<~SQL
+    SELECT format('INSERT INTO ubi_collation_rehearsal.result (phase, object) VALUES (%L, %L)', 'reindex', name) AS start,
+      format('REINDEX INDEX CONCURRENTLY %s', name) AS reindex,
+      format('UPDATE ubi_collation_rehearsal.result SET finished_at = clock_timestamp(), '
+        'ok = (SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(%L) AND indexrelid <> %s) IS TRUE '
+        'WHERE phase = %L AND object = %L AND finished_at IS NULL', name, oid, 'reindex', name) AS finish
+    FROM target WHERE reindex ORDER BY oid
+  SQL
+
   # The psql script run in each database, through the daemonizer because
-  # amcheck can outlast a strand lease. A setup error stops it, as nothing
-  # after it can work; the checks record their own failures.
+  # amcheck and REINDEX can outlast a strand lease. Setup errors stop it, as
+  # nothing after them can work; from the REINDEX on, a failed statement is
+  # recorded and the script continues.
   SCRIPT = <<~SQL.freeze
     \\set ON_ERROR_STOP on
     #{SETUP_SQL}
     #{AMCHECK_SQL}
     #{ROW_CHECKS_SQL}
+    \\set ON_ERROR_STOP off
+    #{REINDEX_STATEMENTS_SQL.chomp} \\gexec
   SQL
 
   DATABASES_SQL = "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"
