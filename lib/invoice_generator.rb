@@ -20,8 +20,12 @@ class InvoiceGenerator
   def run
     invoices = []
 
+    billing_records_by_project = active_billing_records.group_by { |br| br[:project] }
+    # Collect and cache stripe information outside of the transaction
+    billing_records_by_project.each_key { it.billing_info&.stripe_data }
+
     DB.transaction do
-      active_billing_records.group_by { |br| br[:project] }.each do |project, project_records|
+      billing_records_by_project.each do |project, project_records|
         project_content = {}
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
