@@ -71,6 +71,20 @@ RSpec.describe Clover, "github" do
     expect(page).to have_flash_notice(/.*awaiting approval from the GitHub organization's administrator.*/)
   end
 
+  it "fails if there is a connection failure when exchanging the oauth code" do
+    expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_raise(Faraday::ConnectionFailed, "Connection reset by peer")
+    expect(Clog).to receive(:emit).with("GitHub callback failed due to failure when attempting to contact GitHub", instance_of(Hash)).and_wrap_original do |m, msg, hash|
+      expect(hash[:installation_failed]).to eq({id: "345", account_ubid: user.ubid})
+      expect(hash[:exception]).to include(message: "Connection reset by peer", class: "Faraday::ConnectionFailed")
+      m.call(msg, hash)
+    end
+
+    visit "/github/callback?code=123123&installation_id=345"
+
+    expect(page.title).to eq("Ubicloud - Projects")
+    expect(page).to have_flash_error("There was an issue contacting GitHub. Hopefully, this issue is temporary. If this is the first time you've received this error, please try again.")
+  end
+
   it "fails if oauth code is invalid" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("invalid").and_return({})
 

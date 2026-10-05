@@ -7,7 +7,14 @@ class Clover
       oauth_code = typecast_params.str("code")
       installation_id = typecast_params.str("installation_id")
       setup_action = typecast_params.str("setup_action")
-      code_response = Github.oauth_client.exchange_code_for_token(oauth_code)
+
+      begin
+        code_response = Github.oauth_client.exchange_code_for_token(oauth_code)
+      rescue Faraday::ConnectionFailed => ex
+        flash["error"] = "There was an issue contacting GitHub. Hopefully, this issue is temporary. If this is the first time you've received this error, please try again."
+        Clog.emit("GitHub callback failed due to failure when attempting to contact GitHub", Util.exception_to_hash(ex, into: {installation_failed: {id: installation_id, account_ubid: current_account.ubid}}))
+        r.redirect "/project"
+      end
 
       if (installation = GithubInstallation.with_github_installation_id(installation_id))
         @project = installation.project
