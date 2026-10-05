@@ -141,6 +141,7 @@ class Clover
             r.redirect @project, "/billing"
           end
 
+          payment_method.detach_stripe
           DB.transaction do
             payment_method.destroy
             audit_log(payment_method, "destroy")

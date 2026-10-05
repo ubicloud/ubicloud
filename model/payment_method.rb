@@ -18,10 +18,17 @@ class PaymentMethod < Sequel::Model
   end
 
   def after_destroy
-    if Config.stripe_secret_key
-      StripeClient.payment_methods.detach(stripe_id)
-    end
+    detach_stripe(destroyed: true)
     super
+  end
+
+  DELETED_ORDER = 4313734
+
+  def detach_stripe(destroyed: false)
+    if Config.stripe_secret_key && order != DELETED_ORDER
+      StripeClient.payment_methods.detach(stripe_id)
+      update(order: DELETED_ORDER) unless destroyed
+    end
   end
 
   def path
