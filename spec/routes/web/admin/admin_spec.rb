@@ -2130,6 +2130,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
 
     click_link "Add credit"
+    expect(page.find_field("credit")["step"]).to eq "0.01"
     fill_in "name", with: "Good behavior"
     fill_in "credit", with: "50.0"
     click_button "Add credit"
