@@ -643,6 +643,40 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_flash_error("Unfortunately, no virtual machines with GPUs are currently available.")
       end
 
+      it "offers sizes with gpus with their gpus, with one volume per gpu" do
+        project.set_ff_gpu_vm(true)
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "us-west-u1-dedicated"].id).subject
+        vmh.update(project_id: project.id)
+        8.times do
+          PciDevice.create(vm_host_id: vmh.id, slot: "0#{it}:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: it / 4, iommu_group: it)
+        end
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "96 vCPUs / 864 GB RAM"
+        expect(page).to have_content "4 × 1600GB"
+        expect(page).to have_content "4 × 3200GB"
+        expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
+      end
+
+      it "offers sizes with gpus only in dedicated locations" do
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["us-west-u1-ps"])
+        dedicated, ps = [["::1", "us-west-u1-dedicated", project.id], ["::2", "us-west-u1-ps", nil]].map do |ip, location_name, project_id|
+          vmh = Prog::Vm::HostNexus.assemble(ip, location_id: Location[name: location_name].id).subject
+          vmh.update(project_id:)
+          4.times { PciDevice.create(vm_host_id: vmh.id, slot: "0#{it}:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: it) }
+          vmh.location
+        end
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        size_classes = ->(size) { page.all("input[name=size][value=#{size}]", visible: false).map { it.find(:xpath, "..", visible: false)[:class].split } }
+        expect(size_classes["b300-4"]).to all(include("form_location_#{dedicated.ubid}"))
+        expect(size_classes["standard-30"]).to include(include("form_location_#{ps.ubid}", "form_gpu_4:3182"))
+      end
+
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
         project
         vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject
