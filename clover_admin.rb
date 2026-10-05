@@ -770,6 +770,46 @@ class CloverAdmin < Roda
           BillingInfo.update_or_create_stripe_customer(obj, name:, email:, country:, state:, city:, postal_code:, address:, tax_id:, company_name:, note:)
         end
       end
+
+      action "charge_card", "Charge Card" do
+        flash "Charged card and added prepaid credit"
+        pass_request!
+        allow_if { Config.stripe_secret_key && !it.payment_methods_dataset.empty? }
+        param :amount, typecast: :float!, type: "number", attr: {min: 0.5, step: 0.01}, value: ->(obj) { obj.current_invoice.cost.round(2) }
+        run do |obj, amount, request:|
+          amount = amount.round(2)
+          billing_info = obj.billing_info
+          begin
+            payment_intent = StripeClient.payment_intents.create({
+              amount: (amount * 100).round,
+              currency: "usd",
+              confirm: true,
+              off_session: true,
+              customer: billing_info.stripe_id,
+              payment_method: billing_info.payment_methods_dataset.get(:stripe_id),
+            })
+          rescue Stripe::CardError, Stripe::InvalidRequestError => e
+            error = "Charge failed: #{e.message}"
+          else
+            unless payment_intent.status == "succeeded"
+              error = "Payment intent #{payment_intent.id} has status #{payment_intent.status}"
+            end
+          end
+
+          if error
+            request.scope.flash["error"] = error
+            request.redirect("/model/Project/#{obj.ubid}")
+          end
+
+          Clog.emit("Project card charged", {project_card_charged: {ubid: obj.ubid, amount:, intent_id: payment_intent.id, admin: request.scope.rodauth.account_from_session[:login]}})
+
+          now = Time.now.utc
+          DB.transaction do
+            obj.add_active_resource_credit(name: "Prepaid Credit", amount:, active_from: Time.utc(now.year, now.month))
+            obj.update(reputation: "verified")
+          end
+        end
+      end
     end
 
     [ResourceCredit, ResourceDiscount].each do |klass|
