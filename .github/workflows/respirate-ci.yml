@@ -44,7 +44,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Clover
-      uses: ./.github/actions/setup-clover
+      uses: $/.github/actions/setup-clover
 
     - name: Run respirate smoke test
       run: bundle exec rake respirate_smoke_test
