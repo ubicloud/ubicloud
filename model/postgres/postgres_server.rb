@@ -869,11 +869,9 @@ class PostgresServer < Sequel::Model
     made_progress = previous_replay_lsn.nil? || lsn_diff(replay_lsn, previous_replay_lsn) > 0
     byte_breach = byte_lag > REPLICA_LAG_HARD_THRESHOLD_BYTES || (byte_lag > REPLICA_LAG_SOFT_THRESHOLD_BYTES && !made_progress)
 
-    # pg_last_xact_replay_timestamp only advances when a transaction is replayed,
-    # so on an idle primary NOW() - pg_last_xact_replay_timestamp grows without bound.
-    # Take it into account only if standby/replica is genuinely behind the primary's LSN
-    # Otherwise everything has been applied and the time lag is zero.
-    time_lag = (byte_lag > 0 && !replay_age.to_s.empty?) ? Integer(replay_age) : 0
+    # An idle primary can leave a small WAL tail while its last transaction ages.
+    # Ignore up to one WAL page when interpreting that age as replication lag.
+    time_lag = (byte_lag > REPLICA_LAG_TIME_THRESHOLD_BYTES && !replay_age.to_s.empty?) ? Integer(replay_age) : 0
     time_breach = time_lag > REPLICA_LAG_THRESHOLD_SECONDS
 
     if byte_breach || time_breach
@@ -900,6 +898,7 @@ class PostgresServer < Sequel::Model
 
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
+  REPLICA_LAG_TIME_THRESHOLD_BYTES = 8 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "backfill_wal_archive", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   CATCH_UP_LABELS = ["wait_catch_up", "wait_synchronization"].freeze
