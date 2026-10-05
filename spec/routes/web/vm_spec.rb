@@ -633,6 +633,24 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_no_content "PS: SF Bay Area, US"
       end
 
+      it "offers sizes with gpus with their gpus, with one volume per gpu" do
+        project.set_ff_gpu_vm(true)
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "us-west-u1-dedicated"].id).subject
+        gp = GpuPartition.create(vm_host_id: vmh.id, partition_id: 1, gpu_count: 8, project_id: project.id)
+        8.times do
+          pci = PciDevice.create(vm_host_id: vmh.id, slot: "0#{it}:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: it / 4, iommu_group: it)
+          DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
+        end
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "96 vCPUs / 864 GB RAM"
+        expect(page).to have_content "4 × 1600GB"
+        expect(page).to have_content "4 × 3200GB"
+        expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
+      end
+
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
         project
         vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject

@@ -340,6 +340,49 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "with a size with gpus" do
+      before do
+        project.set_ff_gpu_vm(true)
+        vm_host = create_vm_host(location_id: Location[name: "us-west-u1-dedicated"].id)
+        GpuPartition.create(vm_host_id: vm_host.id, partition_id: 1, gpu_count: 8, project_id: project.id)
+      end
+
+      def create_b300_vm(**params)
+        post "/project/#{project.ubid}/location/us-west-u1-dedicated/vm/test-vm", {public_key: "ssh key", size: "b300-4", **params}.to_json
+      end
+
+      it "succeeds with the gpus and storage of the size, exempt from the vcpu quota" do
+        create_b300_vm
+
+        expect(last_response.status).to eq(200)
+        vm = Vm.first(name: "test-vm")
+        expect(vm.values.slice(:vcpus, :memory_gib)).to eq(vcpus: 96, memory_gib: 864)
+        frame = vm.strand.stack.first
+        expect(frame.slice("gpu_count", "gpu_device", "distinct_storage_devices")).to eq("gpu_count" => 4, "gpu_device" => "3182", "distinct_storage_devices" => true)
+        expect(frame["storage_volumes"].map { it["size_gib"] }).to eq([1600] * 4)
+        expect(frame["storage_volumes"].map { it["boot"] }).to eq([true, false, false, false])
+      end
+
+      it "succeeds with the gpus of the size and the larger storage size" do
+        create_b300_vm(gpu: "4:3182", storage_size: 3200)
+
+        expect(last_response.status).to eq(200)
+        expect(Vm.first(name: "test-vm").strand.stack.first["storage_volumes"].map { it["size_gib"] }).to eq([3200] * 4)
+      end
+
+      it "fails with other gpus than those of the size" do
+        create_b300_vm(gpu: "1:3182")
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "b300-4 virtual machines have the GPUs 4:3182"})
+      end
+
+      it "fails with another storage size" do
+        create_b300_vm(storage_size: 40)
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_size", {"storage_size" => "Storage size must be one of the following: 1600, 3200"})
+      end
+    end
+
     it "succeeds with gpu count of zero" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
         public_key: "ssh key",
