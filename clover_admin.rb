@@ -775,9 +775,12 @@ class CloverAdmin < Roda
         flash "Charged card and added prepaid credit"
         pass_request!
         allow_if { Config.stripe_secret_key && !it.payment_methods_dataset.empty? }
-        param :amount, typecast: :float!, type: "number", attr: {min: 0.5, step: 0.01}, value: ->(obj) { obj.current_invoice.cost.round(2) }
+        min_amount = Config.minimum_invoice_charge_threshold
+        param :amount, typecast: :float!, type: "number", attr: {min: min_amount, step: 0.01}, value: ->(obj) { obj.current_invoice.cost.round(2) }
         run do |obj, amount, request:|
           amount = amount.round(2)
+          fail CloverError.new(400, "InvalidRequest", "Amount must be at least #{min_amount}") if amount < min_amount
+
           billing_info = obj.billing_info
           begin
             payment_intent = StripeClient.payment_intents.create({
