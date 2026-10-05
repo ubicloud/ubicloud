@@ -396,7 +396,12 @@ LOCK
         end
       end
 
-      if matched && !new_keys.empty?
+      if !matched
+        Prog::PageNexus.assemble(
+          "No matching existing host keys when checking for updated host keys",
+          ["SshableHostKeyUpdate", id], ubid, resource_id: id, severity: "error",
+        )
+      elsif !new_keys.empty?
         args = new_keys.flat_map { |_, blob, _| [:string, blob] }
         sess.send_global_request(HOSTKEYS_PROVE_REQUEST, *args) do |success, response|
           next unless success

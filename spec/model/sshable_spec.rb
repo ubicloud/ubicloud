@@ -392,6 +392,7 @@ LOCK
       expect(requests).to eq [["keepalive@openssh.com"], [prove_request, :string, rsa.blob, :string, ecdsa.blob]]
       expect(sa.host_keys).to eq [known.str, rsa.str, ecdsa.str]
       expect(sa.reload.host_keys).to eq [known.str, rsa.str, ecdsa.str]
+      expect(Page.count).to eq 0
     end
 
     it "only adds host keys with valid proofs" do
@@ -448,7 +449,7 @@ LOCK
       expect(sa.reload.host_keys).to eq [known.str]
     end
 
-    it "does not request proofs if the host does not offer a known host key" do
+    it "pages and does not request proofs if the host does not offer a known host key" do
       known = server_key(:ed25519)
       ecdsa = server_key(:ecdsa)
       sa.update(host_keys: [known.str])
@@ -459,6 +460,11 @@ LOCK
       sa.check_for_new_host_keys
       expect(requests).to eq [["keepalive@openssh.com"]]
       expect(sa.reload.host_keys).to eq [known.str]
+      page = Page.active.first(tag: Page.generate_tag(["SshableHostKeyUpdate", sa.id]))
+      expect(page.summary).to eq "No matching existing host keys when checking for updated host keys"
+      expect(page.severity).to eq "error"
+      expect(page.resource_id).to eq sa.id
+      expect(page.details["related_resources"]).to eq [sa.ubid]
     end
 
     it "does not request proofs if the host does not offer new host keys" do
