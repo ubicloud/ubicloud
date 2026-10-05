@@ -4,9 +4,9 @@ require "csv"
 
 # Rehearses an image family migration of a Postgres resource on a private
 # fork. It forks the resource into an internal project, audits the fork, moves
-# it to the target family, then runs amcheck on the indexes at risk in every
-# database. It ends in wait_review with the results in the frame and the Clog
-# line, and leaves the fork for an operator to review and destroy.
+# it to the target family, then checks the objects at risk in every database.
+# It ends in wait_review with the results in the frame and the Clog line, and
+# leaves the fork for an operator to review and destroy.
 class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   subject_is :postgres_resource
 
@@ -71,13 +71,68 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
     $do$;
   SQL
 
+  # Each row check lists (phase, object, query), where the query counts the
+  # rows that no longer pass. Validated check constraints, checked once on a
+  # partitioned table's parent:
+  CHECK_CONSTRAINT_CHECKS = <<~SQL
+    SELECT 'check_constraint' AS phase, format('%s.%I', con.conrelid::regclass, con.conname) AS object,
+      format('SELECT count(*) FROM %s WHERE NOT (%s)', con.conrelid::regclass, pg_get_expr(con.conbin, con.conrelid)) AS query
+    FROM pg_constraint con JOIN pg_class r ON r.oid = con.conrelid
+    WHERE con.contype = 'c' AND con.convalidated AND NOT r.relispartition
+      AND r.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Stored generated columns, whose values must equal their expression:
+  GENERATED_COLUMN_CHECKS = <<~SQL
+    SELECT 'generated_column', format('%s.%I', a.attrelid::regclass, a.attname),
+      format('SELECT count(*) FROM %s WHERE %I IS DISTINCT FROM (%s)', a.attrelid::regclass, a.attname, pg_get_expr(d.adbin, d.adrelid))
+    FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum JOIN pg_class r ON r.oid = a.attrelid
+    WHERE a.attgenerated = 's' AND NOT a.attisdropped AND r.relkind IN ('r', 'p') AND NOT r.relispartition
+      AND r.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Leaf partitions, whose rows must still satisfy their bound:
+  PARTITION_BOUND_CHECKS = <<~SQL
+    SELECT 'partition_bound', c.oid::regclass::text,
+      format('SELECT count(*) FROM ONLY %s WHERE NOT (%s)', c.oid::regclass, pg_get_partition_constraintdef(c.oid))
+    FROM pg_class c
+    WHERE c.relispartition AND c.relkind = 'r' AND pg_get_partition_constraintdef(c.oid) IS NOT NULL
+      AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Runs every row check and records the count; an error is a failure too.
+  ROW_CHECKS_SQL = <<~SQL.freeze
+    DO $do$
+    DECLARE
+      o record;
+      n bigint;
+      started timestamptz;
+    BEGIN
+      FOR o IN
+        #{[CHECK_CONSTRAINT_CHECKS, GENERATED_COLUMN_CHECKS, PARTITION_BOUND_CHECKS].join("UNION ALL\n").chomp}
+        ORDER BY 1, 2
+      LOOP
+        started := clock_timestamp();
+        BEGIN
+          EXECUTE o.query INTO n;
+          INSERT INTO ubi_collation_rehearsal.result
+            VALUES (o.phase, o.object, n = 0, CASE WHEN n > 0 THEN n || ' rows do not match' END, started, clock_timestamp());
+        EXCEPTION WHEN OTHERS THEN
+          INSERT INTO ubi_collation_rehearsal.result VALUES (o.phase, o.object, false, SQLERRM, started, clock_timestamp());
+        END;
+      END LOOP;
+    END
+    $do$;
+  SQL
+
   # The psql script run in each database, through the daemonizer because
   # amcheck can outlast a strand lease. A setup error stops it, as nothing
-  # after it can work; amcheck records its own failures.
+  # after it can work; the checks record their own failures.
   SCRIPT = <<~SQL.freeze
     \\set ON_ERROR_STOP on
     #{SETUP_SQL}
     #{AMCHECK_SQL}
+    #{ROW_CHECKS_SQL}
   SQL
 
   DATABASES_SQL = "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"

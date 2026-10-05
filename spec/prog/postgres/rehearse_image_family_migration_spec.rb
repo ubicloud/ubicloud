@@ -301,9 +301,10 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     end
   end
 
-  # These run the script's parts in the test database; rh_shift stands in for
-  # a user function that case-maps. The amcheck part needs a superuser to
-  # create the extension, which the CI role is not.
+  # These run the script's parts in the test database. A function that falsely
+  # claims IMMUTABLE stands in for a library change: flipping rh_cfg makes
+  # it return a different value for rows already stored. The amcheck part
+  # needs a superuser to create the extension, which the CI role is not.
   describe "script parts" do
     before do
       DB.run(<<~SQL)
@@ -311,18 +312,43 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
         INSERT INTO rh_cfg VALUES (false);
         CREATE FUNCTION rh_shift(t text) RETURNS text IMMUTABLE LANGUAGE sql
           AS $$ SELECT CASE WHEN (SELECT flag FROM public.rh_cfg) THEN 'same' ELSE lower(t) END $$;
-        CREATE TABLE rh_t (id int, name text COLLATE "und-x-icu");
+        CREATE TABLE rh_t (id int, name text COLLATE "und-x-icu", g text GENERATED ALWAYS AS (rh_shift(name)) STORED,
+          CONSTRAINT rh_check CHECK (rh_shift(name) = lower(name)));
         CREATE UNIQUE INDEX rh_shift_idx ON rh_t (rh_shift(name));
         CREATE INDEX rh_icu_idx ON rh_t (name);
         CREATE INDEX rh_plain_idx ON rh_t (id);
+        CREATE TABLE rh_part (region text) PARTITION BY LIST (rh_shift(region));
+        CREATE TABLE rh_part_eu PARTITION OF rh_part FOR VALUES IN ('eu');
         INSERT INTO rh_t (id, name) VALUES (1, 'a'), (2, 'b');
+        INSERT INTO rh_part VALUES ('EU');
       SQL
+    end
+
+    def results(phase)
+      DB[Sequel[:ubi_collation_rehearsal][:result]].where(phase:).where(Sequel.like(:object, "rh\\_%")).order(:object).select_map([:object, :ok, :detail])
     end
 
     it "lists the indexes the audit lists, with their access method" do
       expect(DB.fetch(described_class::TARGETS_SQL).all.select { it[:name].start_with?("rh_") }.sort_by { it[:name] }.map { it.values_at(:name, :amname) }).to eq([
         ["rh_icu_idx", "btree"],
         ["rh_shift_idx", "btree"],
+      ])
+    end
+
+    it "records the row checks as passing before the library changes" do
+      DB.run(described_class::SETUP_SQL)
+      DB.run(described_class::ROW_CHECKS_SQL)
+      expect([results("check_constraint"), results("generated_column"), results("partition_bound")]).to eq([
+        [["rh_t.rh_check", true, nil]], [["rh_t.g", true, nil]], [["rh_part_eu", true, nil]],
+      ])
+    end
+
+    it "counts the rows each check finds stale after the library changes" do
+      DB.run(described_class::SETUP_SQL)
+      DB.run("UPDATE rh_cfg SET flag = true")
+      DB.run(described_class::ROW_CHECKS_SQL)
+      expect([results("check_constraint"), results("generated_column"), results("partition_bound")]).to eq([
+        [["rh_t.rh_check", false, "2 rows do not match"]], [["rh_t.g", false, "2 rows do not match"]], [["rh_part_eu", false, "1 rows do not match"]],
       ])
     end
   end
