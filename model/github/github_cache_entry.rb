@@ -16,7 +16,7 @@ class GithubCacheEntry < Sequel::Model
     # The same as Dataset#destroy, except that it adds the given condition
     # to the WHERE clause of the DELETE statement for each destroyed row.
     def destroy_where(cond)
-      all do |entry|
+      where_all(cond) do |entry|
         entry.destroy_where(cond)
       end
     end
