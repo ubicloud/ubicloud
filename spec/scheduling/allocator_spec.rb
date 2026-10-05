@@ -1892,6 +1892,48 @@ RSpec.describe Scheduling::Allocator do
       expect(al.select_cpuset(vh.id, 6)).to eq([2, 3, 4, 5, 6, 7])
     end
 
+    it "select_cpuset prefers the given numa node if it has enough free cpus" do
+      vm = create_vm
+      req = create_req(vm, vol)
+      al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
+
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..6).update(numa_node: 0) # 5 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 7..10).update(numa_node: 1) # 4 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..16).update(numa_node: 2) # 6 free cpus
+
+      expect(al.select_cpuset(vh.id, 4, 2)).to eq([11, 12, 13, 14])
+      expect(al.select_cpuset(vh.id, 6, 0)).to eq([11, 12, 13, 14, 15, 16])
+    end
+
+    it "allocates a slice with the memory of the vm and cpus on the numa node of its gpus" do
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..8).update(numa_node: 0) # 7 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 9..16).update(numa_node: 1) # 8 free cpus
+      PciDevice.create(vm_host_id: vh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 1, iommu_group: 3)
+
+      vm = create_vm(vcpus: 2, memory_gib: 16)
+      create_storage_volumes(vm, vol)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, gpu_count: 1))
+      expect { al.update(vm) }.to change { vh.reload.used_hugepages_1g }.by(16)
+
+      slice = vm.vm_host_slice
+      expect(slice.total_memory_gib).to eq(16)
+      expect(slice.allowed_cpus_cgroup).to eq("9-10")
+      expect(vm.pci_devices.map(&:numa_node)).to eq([1])
+    end
+
+    it "GpuAllocation#numa_node is nil if the gpus span numa nodes" do
+      vh = VmHost.first
+      PciDevice.create(vm_host_id: vh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: 3)
+      PciDevice.create(vm_host_id: vh.id, slot: "02:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 1, iommu_group: 4)
+      candidate_host = {vm_host_id: vh.id, num_gpus: 2, available_gpus: 2, use_gpu_partition: false,
+                        available_iommu_groups: [{"iommu_group" => 3, "numa_node" => 0}, {"iommu_group" => 4, "numa_node" => 1}]}
+
+      expect(Al::GpuAllocation.new(candidate_host, create_req(vm, vol, gpu_count: 2)).numa_node).to be_nil
+      expect(Al::GpuAllocation.new(candidate_host, create_req(vm, vol, gpu_count: 1)).numa_node).to eq(0)
+    end
+
     it "keeps a slice's cpuset within a single numa node when allocating" do
       vh = VmHost.first
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..9).update(numa_node: 0) # 8 free cpus

@@ -401,11 +401,12 @@ module Scheduling::Allocator
       @vm_host_allocations = [VmHostCpuAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request_cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.memory_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
-      @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
+      gpu_allocation = GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
+      @device_allocations << gpu_allocation if gpu_allocation
 
       if request.use_slices && candidate_host[:accepts_slices]
         # Wrap around and replace the host allocations. That way we can control that logic from the slice POV
-        @vm_host_allocations = [VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)]
+        @vm_host_allocations = [VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations, gpu_allocation)]
       end
 
       @allocations = @vm_host_allocations + @device_allocations
@@ -542,10 +543,11 @@ module Scheduling::Allocator
   # one checks if the candidate_host can host a slice or has one already.
   # The second one creates a slice if needed, once the host candidate is selected.
   class VmHostSliceAllocation
-    def initialize(candidate_host, request, vm_host_allocations)
+    def initialize(candidate_host, request, vm_host_allocations, gpu_allocation = nil)
       @candidate_host = candidate_host
       @request = request
       @vm_host_allocations = vm_host_allocations
+      @gpu_allocation = gpu_allocation
 
       @existing_slice = select_existing_slice if @request.require_shared_slice
     end
@@ -598,14 +600,14 @@ module Scheduling::Allocator
           threads_per_core = vm_host.total_cpus / vm_host.total_cores
           request_cores = @request.cores_for_vcpus(threads_per_core)
           slice_cpus = request_cores * threads_per_core
-          cpus = select_cpuset(vm_host.id, slice_cpus)
+          cpus = select_cpuset(vm_host.id, slice_cpus, @gpu_allocation&.numa_node)
 
           st = Prog::Vm::VmHostSliceNexus.assemble_with_host(
             "#{vm.family}_#{vm.inhost_name}",
             vm_host,
             family: vm.family,
             allowed_cpus: cpus,
-            memory_gib: @request.memory_gib_for_vcpus(cpus.count),
+            memory_gib: [@request.memory_gib_for_vcpus(cpus.count), @request.memory_gib].max,
             is_shared: @request.require_shared_slice,
           )
 
@@ -632,15 +634,17 @@ module Scheduling::Allocator
       end
     end
 
-    def select_cpuset(vm_host_id, n)
+    def select_cpuset(vm_host_id, n, numa_node = nil)
       # select the cpuset for the new slice
-      cpus = VmHostCpu
+      cpus_by_numa_node = VmHostCpu
         .where(vm_host_id:, io: false, vm_host_slice_id: nil)
         .order_by(:cpu_number)
         .to_hash_groups(:numa_node)
-        .values
+      cpus = cpus_by_numa_node.values
+      fitting = cpus.select { |arr| arr.size >= n }
 
-      chosen = cpus.select { |arr| arr.size >= n }.min_by(&:size) || cpus.flatten
+      chosen = cpus_by_numa_node[numa_node] if fitting.include?(cpus_by_numa_node[numa_node])
+      chosen ||= fitting.min_by(&:size) || cpus.flatten
 
       fail "failed to allocate cpus" if chosen.size < n
 
@@ -666,6 +670,7 @@ module Scheduling::Allocator
   class GpuAllocation
     attr_reader
     def initialize(candidate_host, request)
+      @vm_host_id = candidate_host[:vm_host_id]
       @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
       @total = candidate_host[:num_gpus]
       @requested = request.gpu_count
@@ -682,6 +687,11 @@ module Scheduling::Allocator
 
     def is_valid
       @used < @total && (!@use_partition || @partition)
+    end
+
+    def numa_node
+      numa_nodes = PciDevice.where(vm_host_id: @vm_host_id, iommu_group: @iommu_groups).distinct.select_map(:numa_node)
+      numa_nodes.first if numa_nodes.one?
     end
 
     def utilization
