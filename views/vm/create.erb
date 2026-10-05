@@ -36,12 +36,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
   ]
 
   if @show_gpu != false
-    gpu = {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required"}
-    if @show_gpu
-      elements.unshift gpu
-    else
-      elements.push gpu
-    end
+    elements.unshift({name: "gpu", type: "radio_small_cards", label: "GPU", required: "required"})
   end
 
   form_elements.concat(elements)
