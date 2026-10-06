@@ -31,7 +31,8 @@
               is_active:
                 request.path.start_with?("#{@project.path}/private-subnet") ||
                 request.path.start_with?("#{@project.path}/firewall") ||
-                request.path.start_with?("#{@project.path}/load-balancer"),
+                request.path.start_with?("#{@project.path}/load-balancer") ||
+                request.path.start_with?("#{@project.path}/private-link-service"),
               icon: "hero-globe-alt"
             ) %>
             <%== part(

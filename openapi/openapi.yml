@@ -2243,6 +2243,100 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/private-link-service:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+    get:
+      operationId: listLocationPrivateLinkServices
+      summary: List private link services in a location
+      parameters:
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkServices'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
+  /project/{project_id}/location/{location}/private-link-service/{private_link_service_reference}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_link_service_reference'
+    post:
+      operationId: createLocationPrivateLinkService
+      summary: Create a private link service in a private subnet of the location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrivateLinkServiceCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkService'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
+    get:
+      operationId: getLocationPrivateLinkService
+      summary: Get details of a private link service
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkService'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
+    patch:
+      operationId: updateLocationPrivateLinkService
+      summary: Change the settings of a private link service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: Each setting given is applied; settings left out are unchanged. Provider settings live under the provider's key, as in the response.
+              type: object
+              properties:
+                aws:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    allowed_principals:
+                      type: array
+                      items:
+                        type: string
+                    allowed_vpc_endpoints:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/PrivateLinkServiceAllowedEndpoint'
+                    supported_regions:
+                      type: array
+                      items:
+                        type: string
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkService'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
+    delete:
+      operationId: deleteLocationPrivateLinkService
+      summary: Delete a private link service
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
   /project/{project_id}/location/{location}/private-subnet:
     get:
       operationId: listLocationPrivateSubnets
@@ -2653,6 +2747,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/private-link-service:
+    get:
+      operationId: listPrivateLinkServices
+      summary: List all private link services in the project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkServices'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
   /project/{project_id}/private-location:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3061,6 +3171,18 @@ components:
           value: postgres-database-name
       in: path
       name: postgres_database_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    private_link_service_reference:
+      description: Private link service ID or name
+      examples:
+        id:
+          value: pn45xss5619a5gx2k7xz482n0s
+        name:
+          value: private-link-service-name
+      in: path
+      name: private_link_service_reference
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
@@ -4135,6 +4257,185 @@ components:
         - name
         - type
         - url
+    PrivateLinkService:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^pn[0-9a-hj-km-np-tv-z]{24}$
+        name:
+          type: string
+        location:
+          type: string
+        private_subnet:
+          description: Name of the private subnet the service lives in
+          type: string
+        state:
+          type: string
+          enum:
+            - creating
+            - available
+            - deleting
+        postgres_resource:
+          description: ID of the attached PostgreSQL database, whose primary is the target
+          type: string
+          nullable: true
+        ports:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrivateLinkServicePort'
+        allowed_principals:
+          description: IAM ARNs allowed to connect, or "*" for anyone
+          type: array
+          items:
+            type: string
+        ip_address_type:
+          type: string
+          enum:
+            - ipv4
+            - ipv6
+            - dual
+        private_dns_name:
+          description: Derived from the attached database's private hostname; never user-set
+          type: string
+          nullable: true
+        private_hostname:
+          description: The attached database's private hostname, the name its server certificate carries; consumers reach it through their endpoint once the private DNS name is verified. Null without an attached database
+          type: string
+          nullable: true
+        aws:
+          $ref: '#/components/schemas/PrivateLinkServiceAws'
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - location
+        - private_subnet
+        - state
+        - postgres_resource
+        - ports
+        - allowed_principals
+        - ip_address_type
+        - private_dns_name
+        - private_hostname
+    PrivateLinkServiceAws:
+      description: AWS PrivateLink state of the service
+      type: object
+      properties:
+        service_name:
+          description: The com.amazonaws.vpce.<region>.vpce-svc-... name consumers use
+          type: string
+          nullable: true
+        service_id:
+          type: string
+          nullable: true
+        supported_regions:
+          description: Additional regions consumers may connect from; the service's own region is implicit
+          type: array
+          items:
+            type: string
+        allowed_vpc_endpoints:
+          description: Consumer VPC endpoints approved to connect; acceptance is always required, so waiting connections from these are accepted and established connections from any other endpoint are rejected on each connection reconcile
+          type: array
+          items:
+            $ref: '#/components/schemas/PrivateLinkServiceAllowedEndpoint'
+        registered_target_ips:
+          type: array
+          items:
+            type: string
+        private_dns_verification_state:
+          type: string
+          nullable: true
+      additionalProperties: false
+      nullable: true
+      required:
+        - service_name
+        - service_id
+        - supported_regions
+        - allowed_vpc_endpoints
+        - registered_target_ips
+        - private_dns_verification_state
+    PrivateLinkServiceAllowedEndpoint:
+      description: A consumer VPC endpoint approved to connect, with the owner's note on it
+      type: object
+      properties:
+        vpc_endpoint_id:
+          description: VPC endpoint ID (vpce-...)
+          type: string
+        description:
+          description: Free text for the owner, such as which team or VPC the endpoint belongs to; empty by default
+          type: string
+      additionalProperties: false
+      required:
+        - vpc_endpoint_id
+    PrivateLinkServiceAwsSettings:
+      description: 'AWS PrivateLink settings of a service in an AWS location: who may create endpoints to it and from which additional regions.'
+      type: object
+      properties:
+        allowed_principals:
+          description: IAM ARNs (account root, role, user) allowed to connect, or "*" for anyone
+          type: array
+          items:
+            type: string
+        allowed_vpc_endpoints:
+          description: Consumer VPC endpoints approved to connect; empty by default, so every connection waits until its endpoint is approved
+          type: array
+          items:
+            $ref: '#/components/schemas/PrivateLinkServiceAllowedEndpoint'
+        supported_regions:
+          description: Additional AWS regions consumers may connect from; must be enabled in the provider account
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      required:
+        - allowed_principals
+    PrivateLinkServiceCreate:
+      description: Neutral settings at the top level; everything provider-shaped under the provider's key, matching the response. The section must be the one of the subnet's location.
+      type: object
+      properties:
+        private_subnet_id:
+          description: ID of the private subnet, in the location, the service lives in
+          type: string
+        postgres_resource_id:
+          description: ID of a PostgreSQL database in that subnet to expose
+          type: string
+        ports:
+          description: Ports consumers connect on; default 5432 and 6432
+          type: array
+          items:
+            type: integer
+        target_ports:
+          description: Ports the target listens on, one per entry of ports
+          type: array
+          items:
+            type: integer
+        ip_address_type:
+          description: Address families consumers connect over; default ipv4. IPv6 needs a subnet with IPv6 addressing
+          type: string
+          enum:
+            - ipv4
+            - ipv6
+            - dual
+        aws:
+          $ref: '#/components/schemas/PrivateLinkServiceAwsSettings'
+      additionalProperties: false
+      required:
+        - private_subnet_id
+        - aws
+    PrivateLinkServicePort:
+      type: object
+      properties:
+        port:
+          description: Port consumers connect on
+          type: integer
+        target_port:
+          description: Port the target listens on
+          type: integer
+      additionalProperties: false
+      required:
+        - port
+        - target_port
     PrivateSubnet:
       type: object
       properties:
@@ -4961,6 +5262,29 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/CertAuthUserList'
+    PrivateLinkService:
+      description: Details of a private link service
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PrivateLinkService'
+    PrivateLinkServices:
+      description: A list of private link services
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrivateLinkService'
+            additionalProperties: false
+            required:
+              - count
+              - items
     PrivateSubnet:
       description: A Private Subnet
       content:
@@ -5174,6 +5498,8 @@ tags:
     name: Postgres Metric Destination
   - description: Postgres Log Destination
     name: Postgres Log Destination
+  - description: Private Link Service Operations
+    name: Private Link Service
   - description: Private Subnet Operations
     name: Private Subnet
   - description: Project Operations

@@ -521,6 +521,15 @@ module AdminModelSpecHelper
       PrivateSubnetAwsResource.create_with_id(ps, vpc_id: "vpc-12345")
     end
 
+    def create_private_link_service
+      ps = create_private_subnet
+      PrivateLinkService.create(name: "test-es", project_id: ps.project_id, location_id: ps.location_id, private_subnet_id: ps.id)
+    end
+
+    def create_private_link_service_aws_resource
+      PrivateLinkServiceAwsResource.create_with_id(create_private_link_service, service_name: "com.amazonaws.vpce.us-west-2.vpce-svc-0123456789abcdef0")
+    end
+
     def create_project
       Project.create(name: "test-project")
     end

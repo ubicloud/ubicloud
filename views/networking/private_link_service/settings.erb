@@ -1,0 +1,40 @@
+<% edit_perm = has_permission?("PrivateLinkService:edit", @pls.id)
+delete_perm = has_permission?("PrivateLinkService:delete", @pls.id) %>
+
+<% if edit_perm %>
+  <%== part("networking/private_link_service/#{@pls.location.provider}/settings", pls: @pls) %>
+<% end %>
+
+<% if delete_perm %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Danger Zone
+        </h3>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete private link service</h3>
+
+            <div class="mt-2 text-sm text-gray-500">
+              <p>
+                This action will permanently delete this private link service and everything it created at the provider,
+                such as its load balancer and endpoint service. Consumers connected through it lose access. Deleted
+                private link services cannot be recovered.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <%== part("components/delete_button", url: path(@pls), confirmation: @pls.name) %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,39 @@
+<% ui = private_link_service_provider_ui(@provider)
+create_link = "#{@project.path}/private-link-service/#{@provider}/create"
+@page_title = ui[:label] %>
+
+<%== render("networking/tabbar") %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Private Subnet", "Service Name", "Attached Resource", "State"],
+    rows: @private_link_services.map do |pls|
+      [
+        [
+          [pls.name, {link: path(pls)}],
+          pls.private_subnet.name,
+          (service_name = pls.private_link_service_aws_resource.service_name) ? [service_name, {copyable: true}] : "Provisioning",
+          pls.postgres_resource&.name || "None",
+          ["ps_state_label", {component: {state: pls.display_state}}]
+        ],
+        {id: "pl-#{pls.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-lock-closed",
+      title: "No #{ui[:label]}",
+      description: "You don't have permission to create #{ui[:label]}."
+    }.merge(has_project_permission("PrivateLinkService:create") ? {
+      description: ui[:blurb],
+      button_link: create_link,
+      button_title: ui[:create]
+    } : {})
+  ) %>
+
+  <% if @private_link_services.count > 0 && has_project_permission("PrivateLinkService:create") %>
+    <div class="flex justify-end">
+      <%== part("components/button", text: ui[:create], link: create_link) %>
+    </div>
+  <% end %>
+</div>

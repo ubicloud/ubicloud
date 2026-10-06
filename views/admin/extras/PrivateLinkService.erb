@@ -1,0 +1,18 @@
+<%# locals: (obj:) %>
+
+<p id="allowed-vpc-endpoints">
+  Acceptance is always required; the approved endpoints below are applied on each connection reconcile (waiting
+  connections from approved endpoints are accepted, established connections from other endpoints rejected). Every
+  connection AWS lists, and every decision, is in the respirate log under "private link service connections reconciled".
+</p>
+
+<%== part("components/table",
+  title: "Approved Consumer Endpoints",
+  table_class: "private-link-service-allowed-endpoints-table",
+  data: obj.private_link_service_aws_resource.allowed_endpoints.map do |e|
+    {
+      "VPC Endpoint" => e.vpc_endpoint_id,
+      "Description" => e.description
+    }
+  end
+) %>

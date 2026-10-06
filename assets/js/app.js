@@ -1216,3 +1216,24 @@ function setupLogDestinationForm() {
     $("#url-hidden").val(prefix + suffix);
   });
 }
+
+// Multi-value input: a data-multi-input container holds .multi-input-row rows;
+// Add clones the last row, Remove always keeps one.
+$(document).on("click", ".add-multi-input", function (event) {
+  event.preventDefault();
+  const container = $($(this).data("target"));
+  const row = container.find(".multi-input-row").last().clone();
+  row.find("input, select").val("").removeAttr("id");
+  container.append(row);
+});
+
+$(document).on("click", ".remove-multi-input", function (event) {
+  event.preventDefault();
+  const container = $(this).closest("[data-multi-input]");
+  const row = $(this).closest(".multi-input-row");
+  if (container.find(".multi-input-row").length > 1) {
+    row.remove();
+  } else {
+    row.find("input, select").val("");
+  }
+});

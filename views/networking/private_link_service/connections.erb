@@ -1,0 +1,81 @@
+<% edit_perm = has_permission?("PrivateLinkService:edit", @pls.id)
+allowed = @pls.private_link_service_aws_resource.allowed_endpoints %>
+
+<div class="p-6 space-y-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-base font-semibold leading-6 text-gray-900">Approved consumer endpoints</h3>
+
+      <p class="mt-1 text-sm text-gray-500">
+        Every consumer connection waits for acceptance. Applying the list accepts waiting connections from these VPC
+        endpoints and rejects established connections from any other endpoint. The description is your own note on an
+        endpoint, such as which team or VPC it belongs to.
+      </p>
+
+      <% if edit_perm %>
+        <% form(action: "#{path(@pls)}/allowed-vpc-endpoints", method: :post, id: "form-private-link-service-allowed-vpc-endpoints") do %>
+          <div class="mt-4 space-y-4">
+            <div class="flex gap-2 text-sm font-medium leading-6">
+              <span class="w-full">VPC endpoint ID</span>
+              <span class="w-full">Description</span>
+              <span class="w-24"></span>
+            </div>
+
+            <div id="allowed-vpc-endpoints" class="space-y-2" data-multi-input>
+              <% (allowed.empty? ? [nil] : allowed).each_with_index do |endpoint, i| %>
+                <div class="flex gap-2 multi-input-row">
+                  <input
+                    type="text"
+                    id="allowed-vpc-endpoint-<%= i %>"
+                    name="allowed_vpc_endpoint_ids[]"
+                    value="<%= endpoint&.vpc_endpoint_id %>"
+                    placeholder="vpce-0123456789abcdef0"
+                    class="
+                      block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
+                      text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
+                      focus:ring-orange-600
+                    "
+                  >
+
+                  <input
+                    type="text"
+                    id="allowed-vpc-endpoint-description-<%= i %>"
+                    name="allowed_vpc_endpoint_descriptions[]"
+                    value="<%= endpoint&.description %>"
+                    placeholder="Analytics team, production VPC"
+                    class="
+                      block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
+                      text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
+                      focus:ring-orange-600
+                    "
+                  >
+
+                  <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
+                </div>
+              <% end %>
+            </div>
+
+            <% if error = flash.dig("errors", "allowed_vpc_endpoints") %>
+              <%== part("components/form/error", name: "allowed_vpc_endpoints", error:) %>
+            <% end %>
+
+            <div class="flex items-center justify-between">
+              <%== part("components/button", text: "Add another endpoint", extra_class: "add-multi-input", attributes: {"type" => "button", "data-target" => "#allowed-vpc-endpoints"}) %>
+              <%== part("components/form/submit_button", text: "Apply") %>
+            </div>
+          </div>
+        <% end %>
+      <% elsif allowed.empty? %>
+        <p class="mt-4 text-sm text-gray-500">No endpoint approved yet.</p>
+      <% else %>
+        <ul class="mt-4 text-sm text-gray-900 space-y-1">
+          <% allowed.each do |endpoint| %>
+            <li id="pl-allowed-<%= endpoint.vpc_endpoint_id %>">
+              <%= endpoint.vpc_endpoint_id %><%= " - #{endpoint.description}" unless endpoint.description.empty? %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  </div>
+</div>

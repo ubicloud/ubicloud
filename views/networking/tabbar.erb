@@ -3,6 +3,7 @@
   tabs: [
     ["Private Subnets", @project.path + "/private-subnet"],
     ["Firewalls", @project.path + "/firewall"],
-    ["Load Balancers", @project.path + "/load-balancer"]
+    ["Load Balancers", @project.path + "/load-balancer"],
+    *private_link_service_enabled_providers.map { [private_link_service_provider_ui(it)[:label], "#{@project.path}/private-link-service/#{it}"] }
   ]
 ) %>

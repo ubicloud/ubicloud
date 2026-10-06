@@ -1,0 +1,68 @@
+<% edit_perm = has_permission?("PrivateLinkService:edit", @pls.id)
+pg = @pls.postgres_resource
+primary = pg&.representative_server
+primary_vm = primary&.vm
+primary_ip = primary_vm&.private_ipv4
+hostname = @pls.private_hostname
+rows = if pg
+  [
+    [
+      [
+        [pg.name, {link: path(pg)}],
+        ["pg_state_label", {component: {state: pg.display_state}}],
+        primary&.ubid || "-",
+        primary_vm ? [primary_vm.ubid, {link: path(primary_vm)}] : "-",
+        primary_ip ? primary_ip.to_s : "-",
+        hostname ? [hostname, {copyable: true}] : "-"
+      ],
+      {id: "pl-pg-#{pg.ubid}"}
+    ]
+  ]
+else
+  []
+end %>
+
+<div class="p-6 space-y-6">
+  <%== part(
+    "components/table_card",
+    title: "Attached PostgreSQL resource",
+    headers: ["Name", "State", "Primary Server", "Primary VM", "Private IPv4", "Private Hostname"],
+    rows:,
+    empty_state: {
+      icon: "hero-circle-stack",
+      title: "No PostgreSQL resource attached",
+      description: "Attach a PostgreSQL resource from this private subnet. Its primary server becomes the target of the private link service and follows failovers."
+    }
+  ) %>
+
+  <% if edit_perm && (error = flash.dig("errors", "postgres_resource_id")) %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-3 sm:px-6">
+      <%== part("components/form/error", name: "postgres_resource_id", error:) %>
+    </div>
+  <% end %>
+
+  <% if edit_perm && pg.nil? %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(@pls)}/attach-postgres", method: :post, id: "form-private-link-service-attach") do %>
+          <div class="grid grid-cols-6 gap-6">
+            <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+              <%== part(
+                "components/form/select",
+                name: "postgres_resource_id",
+                label: "PostgreSQL resource in #{@pls.private_subnet.name}",
+                placeholder: "Select a PostgreSQL resource",
+                options: private_link_service_attachable_postgres_resources(@pls).map { [it.ubid, it.name] },
+                attributes: {required: true}
+              ) %>
+            </div>
+
+            <div class="col-span-6 flex justify-end">
+              <%== part("components/form/submit_button", text: "Attach") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

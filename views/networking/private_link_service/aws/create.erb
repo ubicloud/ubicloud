@@ -1,0 +1,193 @@
+<% @page_title = "Create AWS service endpoint" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    ["AWS service endpoints", "#{@project.path}/private-link-service/aws"],
+    %w[Create #].freeze
+  ]
+) %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <div class="p-6">
+    <p class="text-sm text-gray-500">
+      Creates an AWS PrivateLink service in the selected private subnet: a VPC endpoint service backed by a network load
+      balancer. Consumers in the allowed AWS accounts connect from their own VPC without traffic leaving the AWS
+      network. A PostgreSQL resource in the same subnet can be attached as the first target.
+    </p>
+  </div>
+
+  <div class="p-6">
+    <% form(action: "#{@project.path}/private-link-service/aws", method: :post, id: "form-private-link-service-create") do %>
+      <div class="grid grid-cols-6 gap-6">
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+          <%== part(
+            "components/form/text",
+            name: "name",
+            label: "Name",
+            attributes: {placeholder: "Enter name", required: true}
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+          <%== part(
+            "components/form/select",
+            name: "private_subnet_id",
+            label: "Private Subnet",
+            placeholder: "Select private subnet",
+            options: @private_subnets.map { [it.ubid, it.name] },
+            attributes: {required: true}
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+          <%== part(
+            "components/form/select",
+            name: "ip_address_type",
+            label: "IP Address Type",
+            options: PRIVATE_LINK_SERVICE_IP_ADDRESS_TYPE_LABELS.to_a,
+            selected: "ipv4",
+            attributes: {required: true}
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3 space-y-2 text-gray-900">
+          <label for="allowed-principal-0" class="block text-sm font-medium leading-6">Allowed AWS principals</label>
+
+          <p class="text-sm text-gray-500">
+            AWS accounts, IAM users or roles allowed to connect. One ARN per row.
+          </p>
+
+          <div id="allowed-principals" class="space-y-2" data-multi-input>
+            <div class="flex gap-2 multi-input-row">
+              <input
+                type="text"
+                id="allowed-principal-0"
+                name="allowed_principals[]"
+                placeholder="arn:aws:iam::123456789012:root"
+                required
+                class="
+                  block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
+                  text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
+                  focus:ring-orange-600
+                "
+              >
+
+              <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
+            </div>
+          </div>
+
+          <% if error = flash.dig("errors", "allowed_principals") %>
+            <%== part("components/form/error", name: "allowed_principals", error:) %>
+          <% end %>
+
+          <%== part("components/button", text: "Add another principal", extra_class: "add-multi-input", attributes: {"type" => "button", "data-target" => "#allowed-principals"}) %>
+        </div>
+
+        <div class="col-span-6">
+          <%== part(
+            "components/form/section",
+            label: "Ports",
+            content: "Consumers connect to the endpoint on the port; the target listens on the target port. Defaults cover PostgreSQL (5432) and PgBouncer (6432).",
+            separator: true
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3 space-y-2 text-gray-900">
+          <div class="flex gap-2 text-sm font-medium leading-6">
+            <span class="w-full">Port</span>
+            <span class="w-full">Target port</span>
+            <span class="w-24"></span>
+          </div>
+
+          <div id="ports" class="space-y-2" data-multi-input>
+            <% [[5432, 5432], [6432, 6432]].each_with_index do |(port, target_port), i| %>
+              <div class="flex gap-2 multi-input-row">
+                <input
+                  type="number"
+                  id="port-<%= i %>"
+                  name="ports[]"
+                  value="<%= port %>"
+                  min="1"
+                  max="65535"
+                  required
+                  class="
+                    block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
+                    text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
+                    focus:ring-orange-600
+                  "
+                >
+
+                <input
+                  type="number"
+                  id="target-port-<%= i %>"
+                  name="target_ports[]"
+                  value="<%= target_port %>"
+                  min="1"
+                  max="65535"
+                  required
+                  class="
+                    block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
+                    text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
+                    focus:ring-orange-600
+                  "
+                >
+
+                <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
+              </div>
+            <% end %>
+          </div>
+
+          <% if error = flash.dig("errors", "ports") %>
+            <%== part("components/form/error", name: "ports", error:) %>
+          <% end %>
+
+          <%== part("components/button", text: "Add another port", extra_class: "add-multi-input", attributes: {"type" => "button", "data-target" => "#ports"}) %>
+        </div>
+
+        <div class="col-span-6">
+          <%== part(
+            "components/form/section",
+            label: "Connection settings",
+            content: "How consumers connect to the service. Every endpoint connection waits until its VPC endpoint is on the approved list, maintained on the Connections tab once the service exists. A private DNS name lets consumers use your hostname instead of the generated service name; AWS verifies domain ownership through a TXT record before it becomes active.",
+            separator: true
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+          <%== part(
+            "networking/private_link_service/aws/region_select",
+            selected: [],
+            description: "Optional. The private subnet's own region is always allowed; add more to enable cross-region PrivateLink."
+          ) %>
+        </div>
+
+        <div class="col-span-6">
+          <%== part(
+            "components/form/section",
+            label: "Attach PostgreSQL resource",
+            content: "Optional. The resource must live in the selected private subnet. Its primary server becomes the target of the private link service and follows failovers.",
+            separator: true
+          ) %>
+        </div>
+
+        <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+          <%== part(
+            "components/form/select",
+            name: "postgres_resource_id",
+            label: "PostgreSQL Resource",
+            placeholder: "None",
+            options: @postgres_resources.map { [it.ubid, it.name] }
+          ) %>
+        </div>
+
+        <div class="col-span-6 flex items-center justify-end gap-x-6">
+          <a href="<%= @project.path %>/private-link-service/aws" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: "Create AWS service endpoint") %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
