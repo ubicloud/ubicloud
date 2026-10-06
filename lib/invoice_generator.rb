@@ -6,14 +6,26 @@ require "stripe"
 class InvoiceGenerator
   CURRENT_INVOICE_VERSION = 2
 
-  def initialize(begin_time, end_time, save_result: false, project_ids: [], eur_rate: nil)
+  def initialize(begin_time, end_time, save_result: false, project_ids: [], discounts_and_credits_hashes: nil, eur_rate: nil)
     @begin_time = begin_time
     @end_time = end_time
     @save_result = save_result
     @project_ids = project_ids
+    @discounts_and_credits_hashes = discounts_and_credits_hashes
     @eur_rate = eur_rate
     if @save_result && !@eur_rate
       raise ArgumentError, "eur_rate must be provided when save_result is true"
+    end
+  end
+
+  def self.discounts_and_credits_hashes(begin_time, end_time, project_ids)
+    [ResourceDiscount, ResourceCredit].map! do |model|
+      ds = model
+        .for_project(project_ids)
+        .active_during(begin_time, end_time)
+
+      ds = ds.remaining if model == ResourceCredit
+      ds.to_hash_groups(:project_id)
     end
   end
 
@@ -26,14 +38,7 @@ class InvoiceGenerator
     billing_records_by_project.each_key { it.billing_info&.stripe_data }
 
     DB.transaction do
-      all_resource_discounts, all_resource_credits = [ResourceDiscount, ResourceCredit].map! do |model|
-        ds = model
-          .for_project(billing_record_project_ids)
-          .active_during(@begin_time, @end_time)
-
-        ds = ds.remaining if model == ResourceCredit
-        ds.to_hash_groups(:project_id)
-      end
+      all_resource_discounts, all_resource_credits = @discounts_and_credits_hashes || self.class.discounts_and_credits_hashes(@begin_time, @end_time, billing_record_project_ids)
 
       billing_records_by_project.each do |project, project_records|
         project_content = {}
