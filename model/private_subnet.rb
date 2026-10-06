@@ -200,6 +200,7 @@ end
 #  firewall_priority | integer                  |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
+#  private_subnet_id_project_id_location_id_uidx         | UNIQUE btree (id, project_id, location_id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 #  private_subnet_location_id_private_idx                | btree (location_id) WHERE location_id <> ALL (ARRAY['caa7a807-36c5-8420-a75c-f906839dad71'::uuid, '1f214853-0bc4-8020-b910-dffb867ef44f'::uuid, '6b9ef786-b842-8420-8c65-c25e3d4bdf3d'::uuid, 'e0865080-9a3d-8020-a812-f5817c7afe7f'::uuid])
@@ -223,6 +224,7 @@ end
 #  nic                                | nic_rekey_coordinator_id_fkey                             | (rekey_coordinator_id) REFERENCES private_subnet(id)
 #  parseable_resource                 | parseable_resource_private_subnet_id_fkey                 | (private_subnet_id) REFERENCES private_subnet(id)
 #  postgres_resource                  | postgres_resource_private_subnet_id_fkey                  | (private_subnet_id) REFERENCES private_subnet(id)
+#  private_link_service               | private_link_service_private_subnet_fkey                  | (private_subnet_id, project_id, location_id) REFERENCES private_subnet(id, project_id, location_id)
 #  private_subnet_aws_resource        | private_subnet_aws_resource_id_fkey                       | (id) REFERENCES private_subnet(id)
 #  private_subnet_gcp_vpc             | private_subnet_gcp_vpc_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id) ON DELETE CASCADE
 #  victoria_metrics_resource          | victoria_metrics_resource_private_subnet_id_fkey          | (private_subnet_id) REFERENCES private_subnet(id)
