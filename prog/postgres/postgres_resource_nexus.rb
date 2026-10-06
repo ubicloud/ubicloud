@@ -179,8 +179,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     days = PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS
-    archived_postgres_resource = DeletedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days:) ||
-      ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days:)
+    archived_postgres_resource = DeletedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days:)
     fail "No archived PostgresResource for id #{postgres_resource_id}" unless archived_postgres_resource
 
     last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{days} days", :interval)
@@ -190,8 +189,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       model_values.get_text("resource_id") => postgres_resource_id,
       model_values.get_text("is_representative") => "true",
     }
-    archived_representative_server = DB[:deleted_record].where(representative_server).where { deleted_at > last_n_days }.first ||
-      DB[:archived_record].where(representative_server).where { archived_at > last_n_days }.first
+    archived_representative_server = DB[:deleted_record].where(representative_server).where { deleted_at > last_n_days }.first
     fail "No archived representative PostgresServer for id #{postgres_resource_id}" unless archived_representative_server
 
     timeline_id = archived_representative_server[:model_values]["timeline_id"]

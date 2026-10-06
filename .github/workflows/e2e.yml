@@ -323,7 +323,7 @@ jobs:
       if: always() && env.METAL_PAUSED != 'true'
       run: |
         pg_dump "postgres:///clover_test?user=clover" \
-          --table='archived_record*' \
+          --table='deleted_record*' \
           --table=vm \
           --table=vm_host \
           --table=load_balancer \
