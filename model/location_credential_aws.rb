@@ -2,6 +2,7 @@
 
 require_relative "../model"
 require "aws-sdk-ec2"
+require "aws-sdk-elasticloadbalancingv2"
 require "aws-sdk-iam"
 
 class LocationCredentialAws < Sequel::Model
@@ -24,8 +25,16 @@ class LocationCredentialAws < Sequel::Model
     @iam_client ||= Aws::IAM::Client.new(region: location.name, credentials:)
   end
 
+  def elbv2_client
+    @elbv2_client ||= Aws::ElasticLoadBalancingV2::Client.new(region: location.name, credentials:)
+  end
+
   def aws_iam_account_id
     @account_id ||= Aws::STS::Client.new(region: location.name, credentials:).get_caller_identity.account
+  end
+
+  def enabled_regions
+    client.describe_regions.regions.map(&:region_name)
   end
 end
 
