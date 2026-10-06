@@ -46,6 +46,12 @@ class Prog::LearnPci < Prog::Base
       end
     end
 
-    pop("created PciDevice records")
+    hop_learn_gpu_partitions
+  end
+
+  label def learn_gpu_partitions
+    pop "created PciDevice records" if retval&.dig("msg") == "learned GPU partitions"
+
+    push Prog::LearnGpuPartitions
   end
 end
