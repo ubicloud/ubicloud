@@ -927,7 +927,7 @@ NFTABLES_CONF
     }
 
     it "can purge storage" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
 
       # delete the unencrypted volume
@@ -946,7 +946,7 @@ NFTABLES_CONF
     end
 
     it "exits silently if vm hasn't been created yet" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(nil)
       expect { vs.purge_storage }.not_to raise_error
     end
 
@@ -956,7 +956,7 @@ NFTABLES_CONF
         "pci_devices" => [["00:01.0", "1"], ["00:01.1", "2"], ["00:02.0", "3"]],
         "storage_volumes" => [],
       })
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
       expect(vs).to receive(:bind_driver).with("00:01.0", "nvidia")
       expect(vs).to receive(:bind_driver).with("00:02.0", "nvidia")
@@ -969,7 +969,7 @@ NFTABLES_CONF
         "gpu_partition_id" => "gpu-partition-123",
         "storage_volumes" => [],
       })
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
       expect(vs).not_to receive(:bind_driver)
 
@@ -981,7 +981,7 @@ NFTABLES_CONF
         "pci_devices" => [["00:01.0", "1"]],
         "storage_volumes" => [],
       })
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
       expect(vs).not_to receive(:bind_driver)
 
@@ -1144,21 +1144,21 @@ NFTABLES_CONF
         "gpu_partition_id" => 3,
         "storage_volumes" => [],
       })
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
       expect(vs).to receive(:_run_command).with("/usr/bin/fmpm", "-d", "3", expect: [0, 238])
       vs.deactivate_gpu_partition
     end
 
     it "does nothing when gpu_partition_id is absent" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(100)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(JSON.generate({"storage_volumes" => []}))
       expect(vs).not_to receive(:_run_command)
       vs.deactivate_gpu_partition
     end
 
     it "exits silently if vm hasn't been created yet" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
+      expect(File).to receive(:size?).with("/vm/test/prep.json").and_return(nil)
       expect(vs).not_to receive(:_run_command)
       expect { vs.deactivate_gpu_partition }.not_to raise_error
     end
