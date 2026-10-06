@@ -1,0 +1,26 @@
+<% pg = @pls.postgres_resource
+hostname = @pls.private_hostname
+data = [
+  ["ID", @pls.ubid],
+  ["Name", @pls.name],
+  ["State", @pls.display_state],
+  ["Location", @pls.display_location],
+  [
+    "Private Subnet",
+    "<a href='#{path(@pls.private_subnet)}' class='text-rose-500 hover:underline'>#{h @pls.private_subnet.name}</a>",
+    { escape: false }
+  ],
+  [
+    "Attached PostgreSQL Resource",
+    pg ? "<a href='#{path(pg)}' class='text-rose-500 hover:underline'>#{h pg.name}</a>" : "None",
+    { escape: false }
+  ],
+  ["Ports", @pls.ports.map { "#{it.port} -> #{it.target_port}" }.join(", ")],
+  ["Private Hostname", hostname || "None", {copyable: !hostname.nil?}],
+  ["IP Address Type", PRIVATE_LINK_SERVICE_IP_ADDRESS_TYPE_LABELS.fetch(@pls.ip_address_type)]
+] %>
+
+<div class="space-y-6">
+  <%== part("components/kv_data_card", data:) %>
+  <%== part("networking/private_link_service/#{@pls.location.provider}/overview", pls: @pls) %>
+</div>

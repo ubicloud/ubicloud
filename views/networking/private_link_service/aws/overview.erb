@@ -1,0 +1,17 @@
+<%# locals: (pls:) %>
+
+<% aws = pls.private_link_service_aws_resource %>
+
+<div>
+  <h3 class="text-base font-semibold leading-6 text-gray-900 pb-2" id="aws-privatelink-heading">AWS PrivateLink</h3>
+
+  <%== part("components/kv_data_card", data: [
+    ["Service Name", aws.service_name || "Provisioning", { copyable: !aws.service_name.nil? }],
+    ["Registered Target IPs", aws.registered_target_ips.empty? ? "None" : aws.registered_target_ips.join(", ")],
+    ["Allowed AWS Principals", pls.allowed_principals.empty? ? "None" : pls.allowed_principals.join(", ")],
+    ["Approved Consumer Endpoints", aws.allowed_endpoints.empty? ? "None" : aws.allowed_endpoints.map { it.description.empty? ? it.vpc_endpoint_id : "#{it.vpc_endpoint_id} (#{it.description})" }.join(", ")],
+    ["Private DNS Name", pls.private_dns_name || "None", { copyable: !pls.private_dns_name.nil? }],
+    ["Private DNS Verification", pls.private_dns_name ? private_link_service_dns_state_label(aws.private_dns_verification_state).first : "Not configured"],
+    ["Supported AWS Regions", ([pls.location.name] + aws.supported_regions.to_a).join(", ")]
+  ]) %>
+</div>

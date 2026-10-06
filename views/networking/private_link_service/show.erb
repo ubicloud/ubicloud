@@ -1,0 +1,20 @@
+<% @page_title = @pls.name
+provider = @pls.location.provider %>
+
+<%== part("object/show",
+  object: @pls,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["PostgreSQL", "postgres", "hero-circle-stack"],
+    ["Connections", "connections", "hero-globe-alt"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
+  ],
+  type: "private-link-service",
+  prefix: "networking/private_link_service",
+  breadcrumbs: [
+    %w[Projects /project].freeze,
+    [@project.name, @project.path],
+    [private_link_service_provider_ui(provider)[:label], "#{@project.path}/private-link-service/#{provider}"],
+    [@pls.name, "#"]
+  ],
+) %>
