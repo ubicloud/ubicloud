@@ -72,6 +72,22 @@ RSpec.describe Clover, "private-link-service" do
     end
 
     describe "feature flag" do
+      it "returns 404 everywhere while the installation has private link services disabled, whatever the project flag says" do
+        pls = assemble_pls("pl-1")
+        allow(Config).to receive(:private_link_service_enabled).and_return(false)
+
+        get "/project/#{project.ubid}/private-link-service"
+        expect(last_response.status).to eq 404
+        get base
+        expect(last_response.status).to eq 404
+        post "#{base}/pl-2", {private_subnet_id: ps.ubid, aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response.status).to eq 404
+        get "#{base}/#{pls.name}"
+        expect(last_response.status).to eq 404
+        get pg_base
+        expect(last_response).to have_api_error(404, "private link services are not enabled for this project")
+      end
+
       it "returns 404 everywhere while the provider is not enabled for the project" do
         pls = assemble_pls("pl-1")
         project.set_ff_private_link_service_aws(false)
@@ -82,6 +98,8 @@ RSpec.describe Clover, "private-link-service" do
         expect(last_response.status).to eq 404
         get "#{base}/#{pls.name}"
         expect(last_response.status).to eq 404
+        get pg_base
+        expect(last_response).to have_api_error(404, "private link services are not enabled for this project")
       end
     end
 
@@ -318,6 +336,57 @@ RSpec.describe Clover, "private-link-service" do
         delete "#{base}/#{pls.name}"
         expect(last_response.status).to eq 403
         expect(pls.reload.destroy_set?).to be false
+      end
+    end
+
+    describe "under a PostgreSQL resource" do
+      it "shows the service exposing the resource" do
+        assemble_pls("pl-pg", pg.private_subnet, postgres_resource_id: pg.id)
+        assemble_pls("pl-other", pg.private_subnet)
+
+        get pg_base
+        expect(last_response.status).to eq 200
+        expect(body["name"]).to eq "pl-pg"
+        expect(body["postgres_resource"]).to eq pg.ubid
+        expect(body["allowed_principals"]).to eq ["arn:aws:iam::123456789012:root"]
+        expect(body["aws"].keys).to include("service_name", "allowed_vpc_endpoints")
+      end
+
+      it "returns 404 while the resource has no service" do
+        get pg_base
+        expect(last_response.status).to eq 404
+      end
+
+      it "refuses a second service for the resource" do
+        assemble_pls("pl-pg", pg.private_subnet, postgres_resource_id: pg.id)
+
+        post pg_base, {name: "pl-second", aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: postgres_resource_id", {"postgres_resource_id" => "PostgreSQL resource already has a private link service"})
+        expect(PrivateLinkService.where(name: "pl-second")).to be_empty
+      end
+
+      it "creates a service attached to the resource in its subnet" do
+        post pg_base, {name: "pl-pg", aws: {allowed_principals: ["*"]}}.to_json
+
+        expect(last_response.status).to eq 200
+        expect(body["name"]).to eq "pl-pg"
+        expect(body["postgres_resource"]).to eq pg.ubid
+        expect(body["private_subnet"]).to eq pg.private_subnet.name
+        expect(body["ports"].map { it["port"] }).to eq [5432, 6432]
+        pls = PrivateLinkService.first(name: "pl-pg")
+        expect(pls.target_vms.map(&:id)).to eq [pg.representative_server.vm_id]
+      end
+
+      it "requires Postgres:edit on the resource and PrivateLinkService:create on the project" do
+        AccessControlEntry.dataset.destroy
+        grant("Postgres:view")
+        grant("PrivateLinkService:create")
+        post pg_base, {name: "pl-pg", aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response.status).to eq 403
+
+        grant("Postgres:edit")
+        post pg_base, {name: "pl-pg", aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response.status).to eq 200
       end
     end
   end

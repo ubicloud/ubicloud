@@ -1147,6 +1147,19 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.destroy }.to hop("wait_children_destroyed")
       expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [child_st.id]
     end
+
+    it "destroys the private link service exposing the resource and allows for its teardown" do
+      postgres_server
+      postgres_resource.update(private_subnet_id: private_subnet.id)
+      pls = PrivateLinkService.create(name: "pl", project_id: postgres_resource.project_id, location_id: private_subnet.location_id, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)
+      Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+      st.update(label: "destroy")
+      nx.incr_destroy
+      expect(nx).to receive(:register_deadline).with(nil, 20 * 60)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(pls.destroy_set?).to be true
+      expect(pls.reload.postgres_resource_id).to eq postgres_resource.id
+    end
   end
 
   describe "#wait_children_destroyed" do
@@ -1183,6 +1196,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq expected_destroy_strands
           expect(postgres_resource).not_to exist
         end
+      end
+
+      it "naps while a private link service is still being torn down" do
+        postgres_server
+        PrivateLinkService.create(name: "pl", project_id: postgres_resource.project_id, location_id: private_subnet.location_id, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)
+        expect { nx.wait_children_destroyed }.to nap(5)
+        expect(postgres_resource).to exist
       end
 
       it "completes destroy even if dns zone is not configured" do

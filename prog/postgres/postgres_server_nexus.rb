@@ -945,6 +945,7 @@ SQL
       postgres_server.reload.update(is_representative: true, synchronization_status: "ready")
       resource.server_incr("configure_metrics", "configure_logs")
       resource.incr_refresh_dns_record
+      resource.reconcile_private_link_service
       hop_configure
     end
 
@@ -955,6 +956,7 @@ SQL
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
       resource.incr_refresh_dns_record
+      resource.reconcile_private_link_service
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_send_failover_notification
