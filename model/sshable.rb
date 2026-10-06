@@ -261,33 +261,6 @@ LOCK
     false
   end
 
-  # Temporary class that does not raise for HostKeyMismatch.
-  # After deployment, if there are no logged sshable_host_key_mismatch entries,
-  # we can remove this and use the verify_host_key: :always option if there are
-  # known host keys.
-  class Verifier < Net::SSH::Verifiers::AcceptNew
-    def initialize(ubid)
-      @ubid = ubid
-    end
-
-    def verify(arguments)
-      rescue_host_key_mismatch { super }
-    end
-
-    def verify_signature
-      rescue_host_key_mismatch { super }
-    end
-
-    private
-
-    def rescue_host_key_mismatch
-      yield
-    rescue Net::SSH::HostKeyMismatch
-      Clog.emit("sshable host key mismatch", {sshable_host_key_mismatch: {ubid: @ubid}})
-      true
-    end
-  end
-
   KnownHosts = Data.define(:host_keys, :new_host_keys) do
     def search_for(host, options = {})
       keys = host_keys.map do |str|
@@ -308,7 +281,7 @@ LOCK
     args = {**COMMON_SSH_ARGS, key_data: keys.map(&:private_key)}
     unless unix_user == "runneradmin"
       args[:known_hosts] = KnownHosts.new(host_keys || [], new_host_keys)
-      args[:verify_host_key] = Verifier.new(ubid) if host_keys
+      args[:verify_host_key] = :always if host_keys
     end
 
     if block

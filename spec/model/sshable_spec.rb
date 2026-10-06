@@ -204,6 +204,7 @@ LOCK
       expect(Net::SSH).to receive(:start).with("test.localhost", "testuser", hash_including(known_hosts: Sshable::KnownHosts)) do |*, **opts, &block|
         verifier = opts[:verify_host_key]
         verifier = Net::SSH::Verifiers::AcceptNew.new if verifier == :accept_new
+        verifier = Net::SSH::Verifiers::Always.new if verifier == :always
         expect(verifier).to be_a(verifier_class)
 
         transport = instance_double(Net::SSH::Transport::Session, host_keys: opts[:known_hosts].search_for("test.localhost", opts))
@@ -261,26 +262,25 @@ LOCK
       other_pub, = host_key
       sa.update(host_keys: [other_pub, pub])
       session = ssh_session
-      expect_ssh_start(server_key, session, verifier_class: Sshable::Verifier)
+      expect_ssh_start(server_key, session, verifier_class: Net::SSH::Verifiers::Always)
       expect(Clog).not_to receive(:emit)
 
       expect(sa.start_fresh_session).to equal(session)
       expect(sa.reload.host_keys).to eq [other_pub, pub]
     end
 
-    it "logs and allows the connection when the host offers an unknown host key" do
+    it "raises HostKeyMismatch when the host offers an unknown host key" do
       pub, = host_key
       _, server_key = host_key
       sa.update(host_keys: [pub])
-      session = ssh_session
-      expect_ssh_start(server_key, session, verifier_class: Sshable::Verifier)
-      expect(Clog).to receive(:emit).with("sshable host key mismatch", {sshable_host_key_mismatch: {ubid: sa.ubid}}).and_call_original
-
-      result = sa.start_fresh_session do |sess|
-        expect(sess).to equal(session)
-        :block_result
+      expect(Net::SSH).to receive(:start).with("test.localhost", "testuser", hash_including(known_hosts: Sshable::KnownHosts, verify_host_key: :always)) do |*, **opts|
+        transport = instance_double(Net::SSH::Transport::Session, host_keys: opts[:known_hosts].search_for("test.localhost", opts))
+        args = {key: server_key, key_blob: server_key.to_blob, fingerprint: "SHA256:test", session: transport}
+        Net::SSH::Verifiers::Always.new.verify(args)
       end
-      expect(result).to eq :block_result
+      expect(Clog).not_to receive(:emit)
+
+      expect { sa.start_fresh_session }.to raise_error(Net::SSH::HostKeyMismatch)
       expect(sa.reload.host_keys).to eq [pub]
     end
 
