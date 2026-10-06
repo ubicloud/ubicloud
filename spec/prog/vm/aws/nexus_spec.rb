@@ -1225,6 +1225,12 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   end
 
   describe "#wait" do
+    it "clears the upgrade_cloud_hypervisor semaphore" do
+      nx.incr_upgrade_cloud_hypervisor
+      expect { nx.wait }.to nap(6 * 60 * 60)
+        .and change { nx.upgrade_cloud_hypervisor_set? }.from(true).to(false)
+    end
+
     it "naps when nothing to do" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
