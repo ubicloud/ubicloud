@@ -17,6 +17,7 @@ class Project < Sequel::Model
   one_to_many :vms, read_only: true
   one_to_many :minio_clusters, read_only: true
   one_to_many :private_subnets, read_only: true
+  one_to_many :private_link_services, read_only: true
   one_to_many :postgres_resources, read_only: true
   one_to_many :firewalls, read_only: true
   one_to_many :load_balancers, read_only: true

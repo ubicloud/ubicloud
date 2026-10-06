@@ -9,6 +9,7 @@ class PrivateSubnet < Sequel::Model
   one_to_one :strand, key: :id
   many_to_many :firewalls, remover: nil
   one_to_many :load_balancers, read_only: true
+  one_to_many :private_link_services, read_only: true
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id, read_only: true
   one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc, read_only: true
