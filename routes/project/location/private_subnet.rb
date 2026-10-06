@@ -47,6 +47,10 @@ class Clover
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
+        unless ps.private_link_services_dataset.empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has private link services, first, delete them.")
+        end
+
         DB.transaction do
           ps.incr_destroy
           audit_log(ps, "destroy")
