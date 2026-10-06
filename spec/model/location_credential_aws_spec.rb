@@ -50,6 +50,15 @@ RSpec.describe LocationCredentialAws do
     expect(location_credential_aws.client).to be(ec2_client)
   end
 
+  it "lists the regions enabled in the account" do
+    creds = instance_double(Aws::AssumeRoleCredentials)
+    expect(Aws::AssumeRoleCredentials).to receive(:new).and_return(creds)
+    ec2_client = Aws::EC2::Client.new(stub_responses: true)
+    expect(Aws::EC2::Client).to receive(:new).with(region: "test-location", credentials: creds).and_return(ec2_client)
+    ec2_client.stub_responses(:describe_regions, regions: [{region_name: "us-west-2"}, {region_name: "eu-west-1"}])
+    expect(location_credential_aws.enabled_regions).to eq ["us-west-2", "eu-west-1"]
+  end
+
   it "returns an IAM client" do
     creds = instance_double(Aws::AssumeRoleCredentials)
     expect(Aws::AssumeRoleCredentials).to receive(:new).and_return(creds)

@@ -117,6 +117,7 @@ module ResourceMethods
       "uuid" => lambda { |v| UBID.to_ubid(v) },
       "cidr" => :to_s.to_proc,
       "inet" => :to_s.to_proc,
+      "inet[]" => lambda { |v| v.map(&:to_s) },
       "numeric" => :to_f.to_proc,
       "timestamp with time zone" => lambda { |v| v.strftime("%F %T") },
     }.freeze
