@@ -23,6 +23,7 @@ class ObjectTag < Sequel::Model
       "Private Subnet" => project.private_subnets,
       "Firewall" => project.firewalls,
       "LoadBalancer" => project.load_balancers,
+      "PrivateLinkService" => project.private_link_services,
       "InferenceApiKey" => project.api_keys,
       "InferenceEndpoint" => project.inference_endpoints,
       "KubernetesCluster" => project.kubernetes_clusters,
@@ -34,7 +35,7 @@ class ObjectTag < Sequel::Model
 
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
+    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer, PrivateLinkService
       object.project_id == project_id
     when Project
       object.id == project_id

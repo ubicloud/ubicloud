@@ -13,6 +13,7 @@ class PostgresResource < Sequel::Model
   one_to_many :metric_destinations, class: :PostgresMetricDestination, remover: nil, clearer: nil
   one_to_many :log_destinations, class: :PostgresLogDestination, remover: nil, clearer: nil
   many_to_one :private_subnet, read_only: true
+  one_to_many :private_link_services, read_only: true
   many_to_one :location, read_only: true
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
   one_to_one :init_script, class: :PostgresInitScript, key: :id, read_only: true

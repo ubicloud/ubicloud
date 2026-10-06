@@ -3,6 +3,7 @@
 require "time"
 require "netaddr"
 require "excon"
+require "aws-sdk-core"
 
 module Validation
   class ValidationFailed < CloverError
@@ -220,6 +221,50 @@ module Validation
     end
   rescue NetAddr::ValidationError
     fail ValidationFailed.new({cidr: "Invalid CIDR"})
+  end
+
+  # "*" or the IAM ARN of an account root, user or role, as a VPC endpoint
+  # service accepts.
+  AWS_PRINCIPAL_RESOURCE = %r{\A(root|(user|role)/[\w+=,.@/-]+)\z}
+
+  def self.validate_aws_principals(principals)
+    invalid = principals.reject { aws_principal?(it) }
+    return if invalid.empty?
+
+    fail ValidationFailed.new({"allowed_principals" => "Each principal must be \"*\" or an IAM ARN of an account root, user or role, like arn:aws:iam::123456789012:root or arn:aws:iam::123456789012:role/name; invalid: #{invalid.join(", ")}"})
+  end
+
+  # An AWS resource id is its type prefix and 17 hexadecimal characters; the
+  # EC2 API model carries no pattern for it.
+  AWS_VPC_ENDPOINT_ID = /\Avpce-[0-9a-f]{17}\z/
+  AWS_VPC_ENDPOINT_DESCRIPTION = /\A[[:print:]]{0,255}\z/
+
+  def self.validate_aws_vpc_endpoints(entries)
+    ids = entries.map(&:first)
+    invalid = ids.grep_v(AWS_VPC_ENDPOINT_ID)
+    unless invalid.empty?
+      fail ValidationFailed.new({"allowed_vpc_endpoints" => "Each entry needs a VPC endpoint id like vpce-0123456789abcdef0; invalid: #{invalid.join(", ")}"})
+    end
+    unless ids.uniq.length == ids.length
+      fail ValidationFailed.new({"allowed_vpc_endpoints" => "Each VPC endpoint can be listed once; repeated: #{ids.tally.select { |_, n| n > 1 }.keys.join(", ")}"})
+    end
+    unless entries.all? { |_, description| description.match?(AWS_VPC_ENDPOINT_DESCRIPTION) }
+      fail ValidationFailed.new({"allowed_vpc_endpoints" => "A description is one line of at most 255 printable characters"})
+    end
+  end
+
+  def self.aws_principal?(principal)
+    return true if principal == "*"
+    return false unless Aws::ARNParser.arn?(principal)
+
+    arn = Aws::ARNParser.parse(principal)
+    Aws::Partitions.partitions.any? { it.name == arn.partition } &&
+      arn.service == "iam" &&
+      arn.region.empty? &&
+      arn.account_id.match?(/\A\d{12}\z/) &&
+      arn.resource.match?(AWS_PRINCIPAL_RESOURCE)
+  rescue Aws::Errors::InvalidARNError
+    false
   end
 
   ALLOWED_PROTOCOLS = %w[tcp udp].freeze
