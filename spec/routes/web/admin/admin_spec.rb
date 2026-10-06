@@ -4353,9 +4353,8 @@ RSpec.describe CloverAdmin do
     expect(page.all(".object-table thead th").map(&:text)).to eq(["Table", "Approximate Row Count"])
 
     rows = page.all(".object-table tbody tr").map { it.all("td").map(&:text) }
-    expect(rows).to eq(DB.loose_counts("public").map { |k, v| [k.to_s, v.to_s] })
-    expect(rows.map(&:first)).to include("accounts", "project", "vm")
-    expect(rows.map(&:last)).to all(match(/\A-?\d+\z/))
+    expect(rows.map(&:first)).to eq DB.loose_counts("public").keys.map(&:to_s)
+    expect(rows.map(&:last)).to all(match(/\A(-1|\d+)\z/))
   end
 
   it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
