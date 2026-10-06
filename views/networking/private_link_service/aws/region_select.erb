@@ -1,0 +1,38 @@
+<%# locals: (selected: [], exclude: [], label: "Additional AWS regions consumers may connect from", description:) %>
+<%# The shared form/select component takes a single value, so the select is written out here. %>
+
+<% error = flash.dig("errors", "aws_supported_regions")
+regions = PrivateLinkServiceAwsResource.supported_regions - exclude
+rows = selected.empty? ? [nil] : selected
+select_class = "block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset text-sm sm:leading-6 " +
+  (error ? "text-red-900 ring-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 focus:ring-orange-600") %>
+
+<div class="space-y-4">
+  <label class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+
+  <div id="aws-supported-regions" class="space-y-2" data-multi-input>
+    <% rows.each_with_index do |region, i| %>
+      <div class="flex gap-2 multi-input-row">
+        <select name="aws_supported_regions[]" id="aws-supported-region-<%= i %>" class="<%= select_class %>">
+          <option value="">Select a region</option>
+
+          <% regions.each do |option| %>
+            <option value="<%= option %>" <%= "selected" if option == region %>><%= option %></option>
+          <% end %>
+        </select>
+
+        <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="flex items-center justify-between">
+    <%== part("components/button", text: "Add another region", extra_class: "add-multi-input", attributes: {"type" => "button", "data-target" => "#aws-supported-regions"}) %>
+  </div>
+
+  <p class="text-sm text-gray-500"><%= description %></p>
+
+  <% if error %>
+    <%== part("components/form/error", name: "aws_supported_regions", error:) %>
+  <% end %>
+</div>

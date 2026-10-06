@@ -94,6 +94,7 @@ class Clover < Roda
     LoadBalancer,
     MachineImage,
     PostgresResource,
+    PrivateLinkService,
     PrivateSubnet,
     SshPublicKey,
     Vm,
@@ -141,6 +142,7 @@ class Clover < Roda
     ObjectTag
     PaymentMethod
     PostgresResource
+    PrivateLinkService
     PrivateSubnet
     SshPublicKey
     SubjectTag
