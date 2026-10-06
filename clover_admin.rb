@@ -497,6 +497,13 @@ class CloverAdmin < Roda
       end
     end
 
+    model BillingInfo do
+      action "validate-vat", "Validate VAT" do
+        flash "ValidateVat prog created"
+        run(&:start_validate_vat_strand_if_needed)
+      end
+    end
+
     model BootImage do
       action "remove_boot_image", "Remove Boot Image" do
         flash "Boot image removal scheduled"

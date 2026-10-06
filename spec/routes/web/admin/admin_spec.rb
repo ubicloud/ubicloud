@@ -632,6 +632,26 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
   end
 
+  it "supports validating VAT for BillingInfo" do
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    customers_service = instance_double(Stripe::CustomerService)
+    allow(StripeClient).to receive(:customers).and_return(customers_service)
+    stripe_customer = {"name" => "ACME Inc.", "metadata" => {"tax_id" => "NL123456789B01"}, "address" => {"line1" => "Main Street 1", "country" => "NL"}}
+    allow(customers_service).to receive(:retrieve).with("cus_vat123").and_return(stripe_customer)
+    billing_info = BillingInfo.create(stripe_id: "cus_vat123")
+    path = "/model/BillingInfo/#{billing_info.ubid}/validate-vat"
+
+    visit "/model/BillingInfo/#{billing_info.ubid}"
+    click_link "Validate VAT"
+    expect(page).to have_current_path path, ignore_query: true
+    expect { click_button "Validate VAT" }.to change { Strand.where(prog: "ValidateVat").count }.from(0).to(1)
+    expect(page).to have_flash_notice("ValidateVat prog created")
+    expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
+    strand = Strand.first(prog: "ValidateVat")
+    expect(strand.label).to eq "start"
+    expect(strand.stack.first["subject_id"]).to eq billing_info.id
+  end
+
   it "shows stripe data for payment method as extra" do
     expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
     payment_methods_service = instance_double(Stripe::PaymentMethodService)
