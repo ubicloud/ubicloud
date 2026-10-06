@@ -72,6 +72,41 @@ RSpec.describe PrivateLinkService do
     end
   end
 
+  describe "#display_state" do
+    it "is deleting without a strand" do
+      expect(pls.display_state).to eq "deleting"
+    end
+
+    it "follows the strand label" do
+      st = Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "start")
+      expect(pls.reload.display_state).to eq "creating"
+
+      st.update(label: "wait")
+      expect(pls.reload.display_state).to eq "available"
+
+      # Background modes run from wait do not make the service unavailable.
+      %w[verify_private_dns reconcile_connections update_permissions].each do |label|
+        st.update(label:)
+        expect(pls.reload.display_state).to eq "available"
+      end
+
+      st.update(label: "destroy")
+      expect(pls.reload.display_state).to eq "deleting"
+
+      # The teardown chain has cleared the destroy semaphore by then.
+      %w[recover_unrecorded_ids delete_nlb].each do |label|
+        st.update(label:)
+        expect(pls.reload.display_state).to eq "deleting"
+      end
+    end
+
+    it "is deleting once destroy is requested" do
+      Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+      pls.incr_destroy
+      expect(pls.reload.display_state).to eq "deleting"
+    end
+  end
+
   def create_vm(ps, name)
     Prog::Vm::Nexus.assemble("k y", project.id, name:, private_subnet_id: ps.id, location_id: ps.location_id).subject
   end
