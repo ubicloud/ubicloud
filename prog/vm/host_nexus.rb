@@ -103,7 +103,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def os_supports_slices?(os_version)
-    os_version == "ubuntu-24.04"
+    ["ubuntu-24.04", "ubuntu-26.04"].include?(os_version)
   end
 
   label def wait_prep

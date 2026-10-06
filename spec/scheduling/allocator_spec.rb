@@ -399,6 +399,16 @@ RSpec.describe Scheduling::Allocator do
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.map { it[:vm_host_id] }).to eq([vmh1.id])
+
+      vmh3 = create_vm_host(os_version: "ubuntu-26.04", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh3.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "3.1.1.0/30", routed_to_host_id: vmh3.id).populate_ipv4_addresses
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh3.id, activated_at: Time.now, size_gib: 3)
+
+      req.os_filter = ["ubuntu-24.04", "ubuntu-26.04"]
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.map { it[:vm_host_id] }).to contain_exactly(vmh1.id, vmh3.id)
     end
 
     it "filters hosts by minimum vhost block backend version" do
