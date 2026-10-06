@@ -452,6 +452,16 @@ RSpec.describe Clover, "private subnet" do
         click_button "Delete"
         expect(page).to have_flash_error("Private subnet '#{private_subnet.name}' has VMs attached, first, delete them.")
       end
+
+      it "can not delete private subnet when it has private link services" do
+        private_subnet
+        PrivateLinkService.create(name: "pl", project_id: project.id, location_id: private_subnet.location_id, private_subnet_id: private_subnet.id)
+
+        visit "#{project.path}#{private_subnet.path}/settings"
+        click_button "Delete"
+        expect(page).to have_flash_error("Private subnet '#{private_subnet.name}' has private link services, first, delete them.")
+        expect(private_subnet.destroy_set?).to be false
+      end
     end
   end
 end

@@ -39,6 +39,24 @@ RSpec.describe Location do
     expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, ["latitude-ai"])).to be true
   end
 
+  describe "#has_resources?" do
+    it "counts PostgreSQL resources and private link services in the location's subnets" do
+      expect(p1_loc.has_resources?).to be false
+
+      ps = PrivateSubnet.create(name: "ps", project_id: p1_id, location_id: p1_loc.id, net4: "10.0.0.0/26", net6: "fdfa::/64")
+      expect(p1_loc.has_resources?).to be false
+
+      pls = PrivateLinkService.create(name: "pl", project_id: p1_id, location_id: ps.location_id, private_subnet_id: ps.id)
+      expect(p1_loc.has_resources?).to be true
+
+      pls.destroy
+      expect(p1_loc.has_resources?).to be false
+
+      PostgresResource.create(name: "pg", project_id: p1_id, location_id: p1_loc.id, target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16", superuser_password: "x", private_subnet_id: ps.id)
+      expect(p1_loc.has_resources?).to be true
+    end
+  end
+
   it "#provider_dispatcher_group_name returns the provider dispatch name" do
     expect(p2_loc.provider_dispatcher_group_name).to eq("aws")
     p2_loc.update(provider: "hetzner")
