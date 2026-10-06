@@ -240,6 +240,66 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_aws_vpc_endpoints" do
+      it "accepts VPC endpoint ids with a one-line description or none" do
+        expect { described_class.validate_aws_vpc_endpoints([["vpce-0123456789abcdef0", ""], ["vpce-fffffffffffffffff", "Analytics team, production VPC (eu-west-1)!"]]) }.not_to raise_error
+      end
+
+      it "rejects anything that is not a VPC endpoint id, naming the offending entries" do
+        ["vpce-", "vpce-01234567", "vpce-0123456789abcdef", "vpce-0123456789abcdef00", "vpce-0123456789ABCDEF0", "vpc-0123456789abcdef0", "i-0123456789abcdef0", "*"].each do |id|
+          expect { described_class.validate_aws_vpc_endpoints([["vpce-0123456789abcdef0", ""], [id, ""]]) }.to raise_error(described_class::ValidationFailed) { |e|
+            expect(e.details["allowed_vpc_endpoints"]).to end_with("invalid: #{id}")
+          }
+        end
+      end
+
+      it "rejects a repeated id and a description that is not one line of at most 255 printable characters" do
+        {
+          [["vpce-0123456789abcdef0", "a"], ["vpce-0123456789abcdef0", "b"]] => /repeated: vpce-0123456789abcdef0/,
+          [["vpce-0123456789abcdef0", "two\nlines"]] => /one line of at most 255 printable characters/,
+          [["vpce-0123456789abcdef0", "x" * 256]] => /at most 255/,
+        }.each do |entries, message|
+          expect { described_class.validate_aws_vpc_endpoints(entries) }.to raise_error(described_class::ValidationFailed) { |e|
+            expect(e.details["allowed_vpc_endpoints"]).to match(message)
+          }
+        end
+      end
+    end
+
+    describe "#validate_aws_principals" do
+      it "accepts * and IAM ARNs of account roots, users and roles in any partition" do
+        expect {
+          described_class.validate_aws_principals([
+            "*",
+            "arn:aws:iam::123456789012:root",
+            "arn:aws:iam::123456789012:user/alice",
+            "arn:aws:iam::123456789012:role/app/reader",
+            "arn:aws-cn:iam::123456789012:role/Admin+Role=x,y.z@w",
+            "arn:aws-us-gov:iam::123456789012:root",
+          ])
+        }.not_to raise_error
+      end
+
+      it "rejects anything else, naming the offending principals" do
+        [
+          "arn:aws:iam::123456789012",
+          "arn:aws:iam::123456789012:",
+          "arn:aws:iam::12345:root",
+          "arn:aws:iam::123456789012:group/admins",
+          "arn:aws:iam::123456789012:role/",
+          "arn:aws:iam:us-east-1:123456789012:root",
+          "arn:aws:sts::123456789012:assumed-role/app/session",
+          "arn:mars:iam::123456789012:root",
+          "123456789012",
+          "**",
+        ].each do |principal|
+          expect { described_class.validate_aws_principals(["*", principal]) }.to raise_error(described_class::ValidationFailed) { |e|
+            expect(e.details["allowed_principals"]).to end_with("invalid: #{principal}")
+          }
+        end
+      end
+    end
+
     describe "#validate_cidr" do
       it "valid cidr" do
         expect { described_class.validate_cidr("0.0.0.0/0") }.not_to raise_error
