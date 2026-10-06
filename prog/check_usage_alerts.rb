@@ -21,8 +21,12 @@ class Prog::CheckUsageAlerts < Prog::Base
       .where { it.id > last_usage_alert_id }
       .all
 
-    alerts.group_by(&:project).each do |project, project_alerts|
-      content = project.current_invoice(since: begin_time).content
+    alerts_by_project = alerts.group_by(&:project)
+    project_ids = alerts_by_project.keys.map!(&:id)
+    discounts_and_credits_hashes = InvoiceGenerator.discounts_and_credits_hashes(begin_time, Time.now.utc, project_ids)
+
+    alerts_by_project.each do |project, project_alerts|
+      content = project.current_invoice(since: begin_time, discounts_and_credits_hashes:).content
       cost = content["subtotal"] - content["discount"]
       project_alerts.each do |alert|
         alert.trigger(cost) if cost > alert.limit
