@@ -34,13 +34,17 @@ class BillingInfo < Sequel::Model
     if tax_id_changed
       DB.transaction do
         billing_info.update(valid_vat: nil)
-        if !tax_id.empty? && ISO3166::Country.new(country).in_eu_vat?
-          Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
-        end
+        billing_info.start_validate_vat_strand_if_needed(tax_id:, country: ISO3166::Country.new(country))
       end
     end
 
     billing_info
+  end
+
+  def start_validate_vat_strand_if_needed(tax_id: stripe_data["tax_id"], country: self.country)
+    if !tax_id.empty? && country.in_eu_vat?
+      Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: id}])
+    end
   end
 
   def stripe_data
