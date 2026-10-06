@@ -218,12 +218,36 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     it "handles checkup when server is available" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
-      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
+      expect(sshable).to receive(:_cmd).with("df --output=pcent /dat/victoria_metrics | tail -n 1").and_return("  42%\n")
+      expect { nx.wait }.to nap(60 * 60)
       expect(victoria_metrics_server.checkup_set?(cached: false)).to be false
     end
 
     it "naps if no action needed" do
-      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
+      expect(sshable).to receive(:_cmd).with("df --output=pcent /dat/victoria_metrics | tail -n 1").and_return("  42%\n")
+      expect { nx.wait }.to nap(60 * 60)
+      expect(Page.all).to eq []
+    end
+
+    it "pages with warning severity when the data disk is 90% full" do
+      expect(sshable).to receive(:_cmd).with("df --output=pcent /dat/victoria_metrics | tail -n 1").and_return("  90%\n")
+      expect { nx.wait }.to nap(60 * 60)
+
+      page = Page.from_tag_parts("VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id)
+      expect(page.summary).to eq("#{victoria_metrics_server.ubid} data disk is 90% full")
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(victoria_metrics_server.id)
+      expect(page.details).to eq({"disk_usage_percent" => 90, "related_resources" => [victoria_metrics_server.ubid]})
+    end
+
+    it "resolves the disk usage page when the data disk is 89% full" do
+      Prog::PageNexus.assemble("#{victoria_metrics_server.ubid} data disk is 90% full", ["VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id], victoria_metrics_server.ubid, resource_id: victoria_metrics_server.id, severity: "warning", extra_data: {disk_usage_percent: 90})
+      page = Page.from_tag_parts("VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id)
+      expect(sshable).to receive(:_cmd).with("df --output=pcent /dat/victoria_metrics | tail -n 1").and_return("  89%\n")
+
+      expect { nx.wait }.to nap(60 * 60)
+
+      expect(page.semaphores_dataset.map(:name)).to eq ["resolve"]
     end
   end
 
@@ -287,6 +311,15 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
       expect(Vm[vm_id].destroy_set?).to be true
       expect(victoria_metrics_server).not_to exist
+    end
+
+    it "resolves the disk usage page" do
+      Prog::PageNexus.assemble("#{victoria_metrics_server.ubid} data disk is 90% full", ["VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id], victoria_metrics_server.ubid, resource_id: victoria_metrics_server.id, severity: "warning", extra_data: {disk_usage_percent: 90})
+      page = Page.from_tag_parts("VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id)
+
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "victoria_metrics server destroyed"})
+
+      expect(page.semaphores_dataset.map(:name)).to eq ["resolve"]
     end
   end
 

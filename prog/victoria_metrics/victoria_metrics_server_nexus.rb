@@ -156,7 +156,14 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       hop_refresh_certificates
     end
 
-    nap 60 * 60 * 24 * 30
+    disk_usage_percent = Integer(vm.sshable.cmd("df --output=pcent /dat/victoria_metrics | tail -n 1").strip.delete("%"), 10)
+    if disk_usage_percent >= 90
+      Prog::PageNexus.assemble("#{victoria_metrics_server.ubid} data disk is #{disk_usage_percent}% full", disk_usage_page_tag_parts, victoria_metrics_server.ubid, resource_id: victoria_metrics_server.id, severity: "warning", extra_data: {disk_usage_percent:})
+    else
+      Page.from_tag_parts(*disk_usage_page_tag_parts)&.incr_resolve
+    end
+
+    nap 60 * 60
   end
 
   label def refresh_certificates
@@ -204,6 +211,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
   label def wait_children_destroyed
     reap(nap: 5) do
+      Page.from_tag_parts(*disk_usage_page_tag_parts)&.incr_resolve
       vm.incr_destroy
       victoria_metrics_server.destroy
 
@@ -218,6 +226,10 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   rescue => ex
     Clog.emit("victoria_metrics server is down", {victoria_metrics_server_down: Util.exception_to_hash(ex, into: {ubid: victoria_metrics_server.ubid})})
     false
+  end
+
+  def disk_usage_page_tag_parts
+    ["VictoriaMetricsDiskUsageHigh", victoria_metrics_server.id]
   end
 
   def create_certificate
