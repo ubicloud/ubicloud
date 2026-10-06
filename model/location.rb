@@ -12,6 +12,7 @@ class Location < Sequel::Model
   one_to_one :location_credential_gcp, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
+  one_to_many :private_link_services, read_only: true
   one_to_many :provider_ip_ranges, read_only: true
 
   plugin :association_dependencies, location_credential_aws: :destroy, location_credential_gcp: :destroy
@@ -52,9 +53,12 @@ class Location < Sequel::Model
     "/private-location/#{ui_name}"
   end
 
-  # Private Locations only support Postgres resources for now
+  # Private locations hold only PostgreSQL resources and the private link
+  # services exposing them.
   def has_resources?
-    !postgres_resources_dataset.empty?
+    return true unless postgres_resources_dataset.empty?
+
+    !private_link_services_dataset.empty?
   end
 
   def aws?

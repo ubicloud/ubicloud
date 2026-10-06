@@ -203,6 +203,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
+
+    # Private link services keep NLB interfaces in the AZ subnets and use the
+    # security groups, so they go first. The delete route refuses a subnet
+    # that has services; this covers the internal path
+    # (PrivateSubnet#incr_destroy_if_only_used_internally).
+    pls_ds = private_subnet.private_link_services_dataset
+    unless pls_ds.empty?
+      Semaphore.incr(pls_ds.exclude(id: Semaphore.where(name: ["destroy", "destroying"]).select(:strand_id)).select(:id), "destroy")
+      Clog.emit("Cannot destroy subnet with private link services, waiting for them to be destroyed", private_subnet)
+
+      nap 5
+    end
     register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)

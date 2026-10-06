@@ -412,6 +412,28 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to nap(5)
     end
 
+    it "raises destroy on private link services once and naps until they are gone" do
+      pls = PrivateLinkService.create(name: "pl", project_id: ps.project_id, location_id: ps.location_id, private_subnet_id: ps.id)
+      Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with private link services, waiting for them to be destroyed", instance_of(PrivateSubnet)).twice.and_call_original
+
+      expect { nx.destroy }.to nap(5)
+      expect(pls.destroy_set?).to be true
+
+      expect { nx.destroy }.to nap(5)
+      expect(Semaphore.where(strand_id: pls.id, name: "destroy").count).to eq 1
+    end
+
+    it "does not raise destroy again on a service already tearing down" do
+      pls = PrivateLinkService.create(name: "pl", project_id: ps.project_id, location_id: ps.location_id, private_subnet_id: ps.id)
+      Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "delete_nlb")
+      Semaphore.incr(pls.id, "destroying")
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with private link services, waiting for them to be destroyed", instance_of(PrivateSubnet)).and_call_original
+
+      expect { nx.destroy }.to nap(5)
+      expect(Semaphore.where(strand_id: pls.id, name: "destroy").count).to eq 0
+    end
+
     it "hops to finish if aws resource not exists" do
       aws_resource.destroy
       nx.private_subnet.reload
