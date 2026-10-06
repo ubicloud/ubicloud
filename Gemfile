@@ -26,6 +26,7 @@ gem "argon2"
 gem "argon2-kdf"
 gem "autoforme", ">= 1.15"
 gem "aws-sdk-ec2", "~> 1.512"
+gem "aws-sdk-elasticloadbalancingv2"
 gem "aws-sdk-iam"
 gem "aws-sdk-s3"
 gem "cgi" # google-cloud-storage requires it; cgi is removed from Ruby 4.0 stdlib
