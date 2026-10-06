@@ -21,10 +21,20 @@ class InvoiceGenerator
     invoices = []
 
     billing_records_by_project = active_billing_records.group_by { |br| br[:project] }
+    billing_record_project_ids = billing_records_by_project.keys.map!(&:id)
     # Collect and cache stripe information outside of the transaction
     billing_records_by_project.each_key { it.billing_info&.stripe_data }
 
     DB.transaction do
+      all_resource_discounts, all_resource_credits = [ResourceDiscount, ResourceCredit].map! do |model|
+        ds = model
+          .for_project(billing_record_project_ids)
+          .active_during(@begin_time, @end_time)
+
+        ds = ds.remaining if model == ResourceCredit
+        ds.to_hash_groups(:project_id)
+      end
+
       billing_records_by_project.each do |project, project_records|
         project_content = {}
         project_content[:project_id] = project.id
@@ -94,23 +104,16 @@ class InvoiceGenerator
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
-        resource_discounts, resource_credits = [ResourceDiscount, ResourceCredit].map! do |model|
-          model
-            .for_project(project.id)
-            .active_during(@begin_time, @end_time)
-        end
-        resource_discounts = resource_discounts.all
-        resource_credits = resource_credits
-          .remaining
-          .all
-          .sort_by! do
-            if it.active_to
-              days = (it.active_to - @end_time) / (60 * 60 * 24)
-              days -= 95
-              days = nil if days > 0
-            end
-            [days || 0, it.broadness, it.active_from, it.created_at]
+        resource_discounts = all_resource_discounts[project.id] || []
+        resource_credits = all_resource_credits[project.id] || []
+        resource_credits.sort_by! do
+          if it.active_to
+            days = (it.active_to - @end_time) / (60 * 60 * 24)
+            days -= 95
+            days = nil if days > 0
           end
+          [days || 0, it.broadness, it.active_from, it.created_at]
+        end
 
         project_content[:resources] = []
         project_content[:subtotal] = 0
