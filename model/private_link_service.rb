@@ -35,6 +35,17 @@ class PrivateLinkService < Sequel::Model
     "/location/#{display_location}/private-link-service/#{name}"
   end
 
+  # The provider nexus classifies its own labels.
+  def display_state
+    return "deleting" if destroy_set? || strand.nil?
+
+    prog = Object.const_get("Prog::#{strand.prog}")
+    return "deleting" if prog::DESTROY_LABELS.include?(strand.label)
+    return "available" if prog::BACKGROUND_LABELS.include?(strand.label)
+
+    "creating"
+  end
+
   # The attached resource's current primary; empty without one.
   def target_vms
     [postgres_resource&.representative_server&.vm].compact
