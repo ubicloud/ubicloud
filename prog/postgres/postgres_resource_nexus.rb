@@ -490,6 +490,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
+    # The services exposing the resource go with it; a subnet teardown waits
+    # for them.
+    PrivateLinkService.incr_destroy(postgres_resource.private_link_services_dataset.select(:id))
+
     PostgresResource.incr_destroy(strand.children_dataset.select(:id))
     hop_wait_children_destroyed
   end

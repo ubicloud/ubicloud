@@ -49,6 +49,11 @@ class PostgresResource < Sequel::Model
     "/location/#{display_location}/postgres/#{name}"
   end
 
+  # The private link services fronting this resource follow its primary.
+  def reconcile_private_link_services
+    Semaphore.incr(private_link_services_dataset.select(:id), "reconcile")
+  end
+
   def vm_size
     representative_server.vm.display_size.gsub("burstable", "hobby")
   end

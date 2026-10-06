@@ -1907,6 +1907,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       end
     end
 
+    it "asks the resource's private link services to reconcile once the promoted standby is the representative" do
+      postgres_server
+      ps = PrivateSubnet.create(name: "pl-ps", project_id: project.id, location_id:, net4: "10.0.0.0/26", net6: "fdfa::/64")
+      pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id: ps.location_id, private_subnet_id: ps.id, postgres_resource_id: postgres_resource.id)
+      Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("InProgress")
+      expect { standby_nx.taking_over }.to nap(5)
+      expect(pls.reconcile_set?).to be false
+
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+      expect { standby_nx.taking_over }.to hop("backfill_wal_archive")
+      expect(standby.reload.is_representative).to be true
+      expect(pls.reload.reconcile_set?).to be true
+    end
+
     it "skips the WAL archive backfill and hops to finalize_taking_over if the server was upgraded in place" do
       postgres_server.update(version: "17")
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
@@ -1943,6 +1962,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(replica_server.synchronization_status).to eq("ready")
         expect(Semaphore.where(strand_id: replica_resource.id, name: "refresh_dns_record").count).to eq(1)
         expect(Semaphore.where(strand_id: replica_server.id, name: "configure_metrics").count).to eq(1)
+      end
+
+      it "asks the replica resource's private link services to reconcile" do
+        replica_resource = create_read_replica_resource(parent: postgres_resource)
+        ps = PrivateSubnet.create(name: "pl-ps", project_id: project.id, location_id:, net4: "10.0.0.0/26", net6: "fdfa::/64")
+        pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id: ps.location_id, private_subnet_id: ps.id, postgres_resource_id: replica_resource.id)
+        Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+        replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
+        replica_nx = described_class.new(replica_server.strand)
+
+        expect { replica_nx.taking_over }.to hop("configure")
+        expect(pls.reconcile_set?).to be true
       end
     end
   end

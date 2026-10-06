@@ -1959,6 +1959,42 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/private-link-service:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: listLocationPostgresPrivateLinkServices
+      summary: List the private link services exposing a PostgreSQL database
+      parameters:
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkServices'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
+    post:
+      operationId: createLocationPostgresPrivateLinkService
+      summary: Create a private link service exposing a PostgreSQL database
+      description: Creates the service in the database's private subnet, attached to the database. Ports default to 5432 and 6432.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostgresPrivateLinkServiceCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLinkService'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Link Service
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4257,6 +4293,35 @@ components:
         - name
         - type
         - url
+    PostgresPrivateLinkServiceCreate:
+      description: Neutral settings at the top level; everything provider-shaped under the provider's key, matching the response. The subnet is the database's.
+      type: object
+      properties:
+        name:
+          type: string
+        ports:
+          description: Ports consumers connect on; default 5432 and 6432
+          type: array
+          items:
+            type: integer
+        target_ports:
+          description: Ports the target listens on, one per entry of ports
+          type: array
+          items:
+            type: integer
+        ip_address_type:
+          description: Address families consumers connect over; default ipv4. IPv6 needs a subnet with IPv6 addressing
+          type: string
+          enum:
+            - ipv4
+            - ipv6
+            - dual
+        aws:
+          $ref: '#/components/schemas/PrivateLinkServiceAwsSettings'
+      additionalProperties: false
+      required:
+        - name
+        - aws
     PrivateLinkService:
       type: object
       properties:
