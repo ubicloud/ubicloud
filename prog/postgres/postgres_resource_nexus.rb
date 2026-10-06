@@ -502,9 +502,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
+    private_link_service = postgres_resource.private_link_service
+    register_deadline(nil, private_link_service ? 20 * 60 : 5 * 60)
 
     decr_destroy
+
+    private_link_service&.incr_destroy
 
     PostgresResource.incr_destroy(strand.children_dataset.select(:id))
     hop_wait_children_destroyed
@@ -512,6 +515,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def wait_children_destroyed
     reap(nap: 5) do
+      nap 5 unless postgres_resource.private_link_service_dataset.empty?
+
       postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
         ubid: postgres_resource.ubid,
         vm_ids: postgres_resource.servers_dataset.select(:vm_id),
