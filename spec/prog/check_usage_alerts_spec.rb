@@ -18,21 +18,99 @@ RSpec.describe Prog::CheckUsageAlerts do
     )
   end
 
+  def create_alert(id, project, limit: 100, last_triggered_at: Time.now.round - 42 * 24 * 60 * 60)
+    UsageAlert.create_with_id(id, project_id: project.id, name: "alert", user_id: Account.create(email: "user-#{id}@example.com").id, limit:, last_triggered_at:)
+  end
+
+  def range_index(alert)
+    alert.id[0].to_i(16)
+  end
+
+  describe "RANGES" do
+    it "partitions the uuid space into 16 ranges by first hex digit" do
+      ranges = described_class::RANGES
+      expect(ranges.size).to eq 16
+      expect(ranges.first).to eq("00000000-0000-0000-0000-000000000000"..."10000000-0000-0000-0000-000000000000")
+      expect(ranges[9]).to eq("90000000-0000-0000-0000-000000000000"..."a0000000-0000-0000-0000-000000000000")
+      expect(ranges.last).to eq("f0000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      ranges.each_cons(2) { |a, b| expect(a.end).to eq b.begin }
+    end
+  end
+
   describe "#wait" do
+    let(:project) { Project.create(name: "project1") }
+
+    it "starts with the first range, only checks alerts in that range, and advances to the next range" do
+      create_billing_record(project, 1_000_000)
+      in_range = create_alert("0fffffff-ffff-8fff-bfff-ffffffffffff", project)
+      out_of_range = create_alert("10000000-0000-8000-8000-000000000000", project)
+      last_triggered_at = in_range.last_triggered_at
+      expect(prog.current_range_index).to be_nil
+
+      expect { prog.wait }.to nap(18)
+      expect(prog.current_range_index).to eq 1
+      expect(in_range.reload.last_triggered_at).to be_within(5).of(Time.now)
+      expect(out_of_range.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
+
+      expect { prog.wait }.to nap(18)
+      expect(prog.current_range_index).to eq 2
+      expect(out_of_range.reload.last_triggered_at).to be_within(5).of(Time.now)
+    end
+
+    it "uses the current range index from the frame" do
+      create_billing_record(project, 1_000_000)
+      in_range = create_alert("a0000000-0000-8000-8000-000000000000", project)
+      before_range = create_alert("9fffffff-ffff-8fff-bfff-ffffffffffff", project)
+      after_range = create_alert("b0000000-0000-8000-8000-000000000000", project)
+      last_triggered_at = in_range.last_triggered_at
+      prog.current_range_index = 10
+
+      expect { prog.wait }.to nap(18)
+      expect(prog.current_range_index).to eq 11
+      expect(in_range.reload.last_triggered_at).to be_within(5).of(Time.now)
+      expect(before_range.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
+      expect(after_range.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
+    end
+
+    it "includes the maximum uuid in the last range" do
+      create_billing_record(project, 1_000_000)
+      alert = create_alert("ffffffff-ffff-ffff-ffff-ffffffffffff", project)
+      prog.current_range_index = 15
+
+      expect { prog.wait }.to nap(18)
+      expect(alert.reload.last_triggered_at).to be_within(5).of(Time.now)
+    end
+
+    it "wraps around to the first range after the last range" do
+      create_billing_record(project, 1_000_000)
+      first_range = create_alert("00000000-0000-8000-8000-000000000000", project)
+      last_triggered_at = first_range.last_triggered_at
+      prog.current_range_index = 15
+
+      expect { prog.wait }.to nap(18)
+      expect(prog.current_range_index).to eq 0
+      expect(first_range.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
+
+      expect { prog.wait }.to nap(18)
+      expect(prog.current_range_index).to eq 1
+      expect(first_range.reload.last_triggered_at).to be_within(5).of(Time.now)
+    end
+
     it "triggers alerts if usage is exceeded given threshold" do
       last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
       user_id = Account.create(email: "user@example.com").id
       project1 = Project.create(name: "project1")
       project2 = Project.create(name: "project2")
       limit = 100
-      alert1 = UsageAlert.create(project_id: project1.id, name: "alert1", user_id:, limit:, last_triggered_at:)
-      alert2 = UsageAlert.create(project_id: project2.id, name: "alert2", user_id:, limit:, last_triggered_at:)
+      alert1 = UsageAlert.create_with_id("50000000-0000-8000-8000-000000000001", project_id: project1.id, name: "alert1", user_id:, limit:, last_triggered_at:)
+      alert2 = UsageAlert.create_with_id("50000000-0000-8000-8000-000000000002", project_id: project2.id, name: "alert2", user_id:, limit:, last_triggered_at:)
+      prog.current_range_index = 5
 
       [[project1, 1_000_000], [project2, 100]].each do |project, amount|
         create_billing_record(project, amount)
       end
 
-      expect { prog.wait }.to nap(5 * 60)
+      expect { prog.wait }.to nap(18)
       expect(alert1.reload.last_triggered_at).not_to eq(last_triggered_at)
       expect(alert2.reload.last_triggered_at).to eq(last_triggered_at)
     end
@@ -42,10 +120,11 @@ RSpec.describe Prog::CheckUsageAlerts do
       user_id = Account.create(email: "user@example.com").id
       project = Project.create(name: "project1")
       alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit: 100, last_triggered_at:)
+      prog.current_range_index = range_index(alert)
       ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Full discount")
       create_billing_record(project, 1000000)
 
-      expect { prog.wait }.to nap(5 * 60)
+      expect { prog.wait }.to nap(18)
       expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
     end
 
@@ -57,10 +136,11 @@ RSpec.describe Prog::CheckUsageAlerts do
 
       usage = project.current_invoice.content["cost"]
       alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit: usage * 0.8, last_triggered_at:)
+      prog.current_range_index = range_index(alert)
       ResourceCredit.create(project_id: project.id, amount: usage * 1.2, active_from: Time.utc(Time.now.year, Time.now.month), name: "Credit")
       expect(project.current_invoice.content["cost"]).to eq 0
 
-      expect { prog.wait }.to nap(5 * 60)
+      expect { prog.wait }.to nap(18)
       expect(alert.reload.last_triggered_at).not_to eq(last_triggered_at)
     end
 
@@ -111,8 +191,9 @@ RSpec.describe Prog::CheckUsageAlerts do
       limit = (current_month_cost + combined_cost) / 2
 
       alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit:, last_triggered_at:)
+      prog.current_range_index = range_index(alert)
 
-      expect { prog.wait }.to nap(5 * 60)
+      expect { prog.wait }.to nap(18)
       expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
     end
   end
