@@ -37,9 +37,16 @@ class Prog::LearnStorage < Prog::Base
   end
 
   def find_underlying_unix_device_names(unix_device)
-    return [unix_device.delete_prefix("/dev/")] unless unix_device.start_with?("/dev/md")
-
-    SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
+    if unix_device.start_with?("/dev/md")
+      SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
+    elsif unix_device.start_with?("/dev/mapper/")
+      sshable.cmd("lsblk -nrso NAME,TYPE :unix_device", unix_device:).each_line.filter_map {
+        name, type = it.split
+        name if type == "disk"
+      }.uniq
+    else
+      [unix_device.delete_prefix("/dev/")]
+    end
   end
 
   label def start
