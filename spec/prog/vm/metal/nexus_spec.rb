@@ -685,30 +685,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
-        family_filter: ["standard"],
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "requires an ubuntu-24.04 host when allocating a vm with a pinned CloudHypervisor version" do
-      st.stack = [{
-        "ch_version" => "53.0",
-        "storage_volumes" => storage_volumes,
-      }]
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
-        allocation_state_filter: ["accepting"],
-        distinct_storage_devices: false,
-        host_filter: [],
-        host_exclusion_filter: [],
-        data_center_exclusion_filter: [],
-        location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
-        gpu_count: 0,
-        gpu_device: nil,
-        os_filter: "ubuntu-24.04",
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -751,7 +727,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -770,7 +745,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -792,7 +766,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -817,7 +790,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -840,7 +812,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -865,7 +836,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -887,7 +857,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard", "premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -909,7 +878,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["premium", "standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -932,7 +900,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -954,7 +921,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -977,7 +943,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: [],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -1000,7 +965,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -1024,7 +988,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -1047,7 +1010,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 3,
         gpu_device: nil,
-        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
