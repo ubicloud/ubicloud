@@ -540,7 +540,7 @@ RSpec.describe VmSetup do
           -machine accel=kvm,type=q35
           -drive if=none,file=/vm/test/cloudinit.img,format=raw,readonly=on,id=cidrive
           -device virtio-blk-pci,drive=cidrive,romfile=
-          -netdev tap,id=net0,ifname=tap0,script=no,downscript=no,queues=5,vhost=on
+          -netdev tap,id=net0,ifname=tap0,script=no,downscript=no,queues=2,vhost=on
           -device virtio-net-pci,mac=02:aa:bb:cc:dd:01,netdev=net0,mq=on,romfile=
           -serial file:/vm/test/serial.log
           -display none
@@ -558,6 +558,28 @@ RSpec.describe VmSetup do
 
     it "raises BUG when cpu_topology contains special characters" do
       expect { vs.send(:install_systemd_unit, 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 0, "ubuntu-noble") }.to raise_error("BUG")
+    end
+
+    it "limits the queue pairs of a QEMU VM's tap device to 256" do
+      vs.instance_variable_set(:@hypervisor, "qemu")
+
+      vps = instance_spy(VmPath,
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      expect(vs).to receive(:cpu_vendor).and_return("GenuineIntel")
+
+      vs.send(:install_systemd_unit, 384, "2:96:1:2", *args[2..])
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("-smp cpus=384,maxcpus=384,threads=2,cores=96,dies=1,sockets=2")
+        expect(content).to include("-netdev tap,id=net0,ifname=tap0,script=no,downscript=no,queues=256,vhost=on")
+      }
     end
 
     it "adds topoext when CPU vendor is AMD" do

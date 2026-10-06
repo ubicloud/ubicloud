@@ -879,9 +879,11 @@ DNSMASQ_SERVICE
       "-machine accel=kvm,type=q35",
     ]
 
+    # QEMU's queues counts queue pairs, and tap devices allow at most 256 queues
+    net_queue_pairs = [max_vcpus, 256].min
     net_parts = nics.each_with_index.flat_map { |nic, i|
       [
-        "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
+        "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{net_queue_pairs},vhost=on",
         "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile=",
       ]
     }
