@@ -196,11 +196,11 @@ class Project < Sequel::Model
     visible && accounts_dataset.exclude(suspended_at: nil).empty?
   end
 
-  def current_invoice(since: nil)
+  def current_invoice(since: nil, discounts_and_credits_hashes: nil)
     end_time = Time.now.utc
     begin_time = since || invoices_dataset.where(Sequel[:end_time] < end_time).get(:end_time) || Time.utc(end_time.year, end_time.month)
 
-    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id]).run.first)
+    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id], discounts_and_credits_hashes:).run.first)
       return invoice
     end
 
