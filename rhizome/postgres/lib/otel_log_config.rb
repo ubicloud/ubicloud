@@ -87,7 +87,7 @@ class OtelLogConfig
 
   def extensions_hash
     {
-      "health_check" => {"endpoint" => "0.0.0.0:13133"},
+      "health_check" => {"endpoint" => "127.0.0.1:13133"},
       "file_storage/state" => {
         "directory" => "/var/lib/otelcol-contrib/state",
         "create_directory" => true,
