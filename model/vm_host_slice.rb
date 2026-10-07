@@ -96,7 +96,8 @@ end
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  vm_host_id        | uuid                     | NOT NULL
 # Indexes:
-#  vm_host_slice_pkey | PRIMARY KEY btree (id)
+#  vm_host_slice_pkey             | PRIMARY KEY btree (id)
+#  vm_host_slice_vm_host_id_index | btree (vm_host_id)
 # Check constraints:
 #  cores_not_negative       | (cores >= 0)
 #  cpu_allocation_limit     | (used_cpu_percent <= total_cpu_percent)

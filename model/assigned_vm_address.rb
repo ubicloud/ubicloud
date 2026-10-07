@@ -19,8 +19,10 @@ end
 #  address_id | uuid |
 #  dst_vm_id  | uuid | NOT NULL
 # Indexes:
-#  assigned_vm_address_pkey   | PRIMARY KEY btree (id)
-#  assigned_vm_address_ip_key | UNIQUE btree (ip)
+#  assigned_vm_address_pkey             | PRIMARY KEY btree (id)
+#  assigned_vm_address_ip_key           | UNIQUE btree (ip)
+#  assigned_vm_address_address_id_index | btree (address_id)
+#  assigned_vm_address_dst_vm_id_index  | btree (dst_vm_id)
 # Foreign key constraints:
 #  assigned_vm_address_address_id_fkey | (address_id) REFERENCES address(id)
 #  assigned_vm_address_dst_vm_id_fkey  | (dst_vm_id) REFERENCES vm(id)

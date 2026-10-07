@@ -51,5 +51,6 @@ end
 #  payment_method_pkey                  | PRIMARY KEY btree (id)
 #  payment_method_preauth_intent_id_key | UNIQUE btree (preauth_intent_id)
 #  payment_method_stripe_id_key         | UNIQUE btree (stripe_id)
+#  payment_method_billing_info_id_index | btree (billing_info_id)
 # Foreign key constraints:
 #  payment_method_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)

@@ -358,6 +358,7 @@ end
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
+#  project_billing_info_id_index     | btree (billing_info_id)
 # Check constraints:
 #  max_discount_amount | (discount <= 100)
 #  min_credit_amount   | (credit >= 0::numeric)

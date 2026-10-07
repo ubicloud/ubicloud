@@ -36,6 +36,7 @@ end
 #  usage_alert_pkey                         | PRIMARY KEY btree (id)
 #  usage_alert_project_id_user_id_name_uidx | UNIQUE btree (project_id, user_id, name)
 #  usage_alert_last_triggered_at_index      | btree (last_triggered_at)
+#  usage_alert_user_id_index                | btree (user_id)
 # Foreign key constraints:
 #  usage_alert_project_id_fkey | (project_id) REFERENCES project(id)
 #  usage_alert_user_id_fkey    | (user_id) REFERENCES accounts(id)

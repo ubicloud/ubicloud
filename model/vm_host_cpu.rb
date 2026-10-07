@@ -15,7 +15,8 @@ end
 #  numa_node        | integer |
 #  io               | boolean | NOT NULL
 # Indexes:
-#  vm_host_cpu_pkey | PRIMARY KEY btree (vm_host_id, cpu_number)
+#  vm_host_cpu_pkey                   | PRIMARY KEY btree (vm_host_id, cpu_number)
+#  vm_host_cpu_vm_host_slice_id_index | btree (vm_host_slice_id)
 # Foreign key constraints:
 #  vm_host_cpu_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
 #  vm_host_cpu_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
