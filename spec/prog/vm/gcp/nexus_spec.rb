@@ -76,6 +76,36 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe ".assemble" do
+    context "with a separate management NIC" do
+      let(:service_project) { Project.create(name: "pg-service") }
+
+      before { allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id) }
+
+      def assemble_dual_nic_vm
+        location_credential
+        gcp_vpc
+        Prog::Vm::Nexus.assemble_with_sshable(project.id,
+          location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+          name: "dualnicvm", size: "c4a-standard-8", arch: "arm64", use_separate_management_nic: true).subject
+      end
+
+      it "puts the management NIC in the location's management subnet" do
+        mgmt_ps = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id,
+          project_id: service_project.id, net6: "fd1b:9793:dcef:cd0e::/64", net4: "100.64.0.0/20", state: "waiting")
+
+        dual_nic_vm = assemble_dual_nic_vm
+
+        expect(dual_nic_vm.management_nic.private_subnet_id).to eq(mgmt_ps.id)
+        expect(dual_nic_vm.management_nic.name).to eq("dualnicvm-mgmt-nic")
+        expect(dual_nic_vm.management_nic.private_ipv4.netmask.prefix_len).to eq(32)
+        expect(dual_nic_vm.user_nic.private_subnet_id).not_to eq(mgmt_ps.id)
+      end
+
+      it "fails when the location has no management subnet" do
+        expect { assemble_dual_nic_vm }.to raise_error(RuntimeError, "No GCP management subnet in gcp-us-central1")
+      end
+    end
+
     it "creates storage volumes for gcp location" do
       expect(vm.vm_storage_volumes.count).to eq(1)
       expect(vm.vm_storage_volumes.first.boot).to be true
