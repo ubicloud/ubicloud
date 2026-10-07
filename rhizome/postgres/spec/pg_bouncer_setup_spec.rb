@@ -81,8 +81,8 @@ RSpec.describe PgBouncerSetup do
   describe "#socket_template_content" do
     let(:content) { pgbouncer_setup.socket_template_content }
 
-    it "listens on port 6432" do
-      expect(content).to include("ListenStream=6432")
+    it "listens on port 6432 and the peer Unix socket only" do
+      expect(content.scan(/^ListenStream=.*$/)).to eq(["ListenStream=6432", "ListenStream=/tmp/.s.PGSQL.%i"])
     end
 
     it "enables ReusePort" do

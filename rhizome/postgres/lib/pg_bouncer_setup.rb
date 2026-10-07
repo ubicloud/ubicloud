@@ -49,7 +49,6 @@ Description=Sockets for PgBouncer
 
 [Socket]
 ListenStream=6432
-ListenStream=%i
 ListenStream=/tmp/.s.PGSQL.%i
 
 ReusePort=true
