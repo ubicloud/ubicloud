@@ -108,6 +108,21 @@ RSpec.describe PostgresServer do
         GcpVpc.create(project_id: project.id, location_id: location.id, name: "dedicated-vpc", dedicated_for_subnet_id: private_subnet.id).add_private_subnet(private_subnet)
         expect(postgres_server.open_session_failure_page_threshold).to eq(2 * MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
       end
+
+      it "ignores the dedicated VPC of a management NIC" do
+        GcpVpc.create(project_id: project.id, location_id: location.id, name: "shared-vpc").add_private_subnet(private_subnet)
+        mgmt_subnet = PrivateSubnet.create(
+          name: "gcp-pg-mgmt-subnet", project:, location:,
+          net4: "100.64.0.0/20", net6: "fd5a:0f1e:2b3c:4d5e::/64",
+        )
+        GcpVpc.create(project_id: project.id, location_id: location.id, name: "mgmt-vpc", dedicated_for_subnet_id: mgmt_subnet.id).add_private_subnet(mgmt_subnet)
+        Nic.create(
+          vm_id: vm.id, private_subnet_id: mgmt_subnet.id, name: "gcp-pg-mgmt-nic", state: "active", is_management: true,
+          private_ipv4: "100.64.0.5", private_ipv6: "fd5a:0f1e:2b3c:4d5e:abc::", mac: "00:00:00:00:00:01",
+          encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        )
+        expect(postgres_server.open_session_failure_page_threshold).to eq(MonitorableResource::OPEN_SESSION_FAILURE_PAGE_THRESHOLD)
+      end
     end
 
     describe "#refresh_walg_blob_storage_credentials" do

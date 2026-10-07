@@ -171,17 +171,16 @@ class PostgresServer < Sequel::Model
       add_provider_configs(configs)
     end
 
+    private_subnet = vm.user_nic.private_subnet
     {
       configs:,
       user_config:,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
-      private_subnets: vm.private_subnets.map {
-        {
-          net4: it.net4.to_s,
-          net6: it.net6.to_s,
-        }
-      },
+      private_subnets: [{
+        net4: private_subnet.net4.to_s,
+        net6: private_subnet.net6.to_s,
+      }],
       cert_auth_users: resource.cert_auth_users,
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.private_hostname}",

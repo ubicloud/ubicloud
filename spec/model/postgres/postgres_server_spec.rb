@@ -193,6 +193,17 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]["max_connections"]).to eq(Validation::PostgresConfigValidator.new(postgres_server.version).default("max_connections").to_s)
     end
 
+    it "lists only the subnet of the user NIC for pg_hba" do
+      mgmt_subnet = PrivateSubnet.create(
+        name: "mgmt-subnet", project: project_service, location:,
+        net4: NetAddr::IPv4Net.parse("100.64.0.0/20"),
+        net6: NetAddr::IPv6Net.parse("fd5a:0f1e:2b3c:4d5e::/64"),
+      )
+      Prog::Vnet::NicNexus.assemble(mgmt_subnet.id, name: "dummy-vm-mgmt-nic", is_management: true).subject.update(vm_id: vm.id)
+
+      expect(postgres_server.configure_hash[:private_subnets]).to eq([{net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"}])
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
