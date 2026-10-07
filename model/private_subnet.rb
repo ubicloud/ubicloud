@@ -143,6 +143,20 @@ class PrivateSubnet < Sequel::Model
     addr
   end
 
+  # A single address anywhere in net4, outside the provider's reserved
+  # addresses. The GCP management subnet holds far more NICs than the
+  # 2**8 blocks that random_private_ipv4 hands out.
+  def random_host_ipv4
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_host_ipv4 }
+  end
+
+  private def _random_host_ipv4
+    leading, trailing = ipv4_reservation
+    addr = net4.nth(SecureRandom.random_number(net4.len - leading - trailing) + leading)
+    host = NetAddr::IPv4Net.new(addr, NetAddr::Mask32.new(32))
+    host if nics_dataset.where(private_ipv4: host.to_s).empty?
+  end
+
   def random_private_ipv6
     addr = net6.nth_subnet(79, SecureRandom.random_number(2**(79 - net6.netmask.prefix_len) - 2).to_i + 1)
     return random_private_ipv6 if nics.any? { |nic| nic.private_ipv6.to_s == addr.to_s }
