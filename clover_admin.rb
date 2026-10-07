@@ -768,6 +768,8 @@ class CloverAdmin < Roda
         param :note, typecast: :str, label: "Note", required: nil, value: stripe_value["note"]
         run do |obj, name, email, country, state, city, postal_code, address, tax_id, company_name, note|
           BillingInfo.update_or_create_stripe_customer(obj, name:, email:, country:, state:, city:, postal_code:, address:, tax_id:, company_name:, note:)
+        rescue Stripe::InvalidRequestError => e
+          fail CloverError.new(400, "StripeError", e.message)
         end
       end
 

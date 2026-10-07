@@ -2384,6 +2384,11 @@ RSpec.describe CloverAdmin do
     expect { click_button "Update Billing Info" }.not_to change { Strand.where(prog: "ValidateVat").count }
     expect(page).to have_flash_notice("Billing info updated")
     expect(billing_info.reload.valid_vat).to be_nil
+
+    visit path
+    fill_in "Billing Email", with: "invalid"
+    expect(customers_service).to receive(:update).and_raise(Stripe::InvalidRequestError.new("Invalid email address: invalid", "email"))
+    expect { click_button "Update Billing Info" }.to raise_error(CloverError, "Invalid email address: invalid")
   end
 
   it "supports charging the card of a Project" do
