@@ -109,7 +109,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     @vpc_firewalls ||= begin
       subnet_ids = DB[:private_subnet_gcp_vpc].where(gcp_vpc_id: gcp_vpc.id).select(:private_subnet_id)
       subnet_fw_ids = DB[:firewalls_private_subnets].where(private_subnet_id: subnet_ids).select(:firewall_id)
-      vm_ids = DB[:nic].where(private_subnet_id: subnet_ids).exclude(vm_id: nil).select(:vm_id)
+      vm_ids = DB[:nic].where(private_subnet_id: subnet_ids, is_management: false).exclude(vm_id: nil).select(:vm_id)
       vm_fw_ids = DB[:firewalls_vms].where(vm_id: vm_ids).select(:firewall_id)
 
       Firewall.eager(:firewall_rules)
