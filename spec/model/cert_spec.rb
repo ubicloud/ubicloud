@@ -41,23 +41,23 @@ RSpec.describe Cert do
     )
   end
 
-  describe ".needing_recert" do
+  describe ".fresh" do
     it "includes certs without expires_at created less than 60 days ago" do
       cert = create_cert(created_days_ago: 59)
       create_cert(created_days_ago: 61)
-      expect(described_class.needing_recert.all).to eq [cert]
+      expect(described_class.fresh.all).to eq [cert]
     end
 
     it "includes certs valid for more than 60 days expiring in more than 30 days" do
       cert = create_cert(created_days_ago: 58, expires_in_days: 31)
       create_cert(created_days_ago: 61, expires_in_days: 29)
-      expect(described_class.needing_recert.all).to eq [cert]
+      expect(described_class.fresh.all).to eq [cert]
     end
 
     it "includes certs valid for 60 days or less expiring in more than 15 days" do
       cert = create_cert(created_days_ago: 10, expires_in_days: 16)
       create_cert(created_days_ago: 30, expires_in_days: 14)
-      expect(described_class.needing_recert.all).to eq [cert]
+      expect(described_class.fresh.all).to eq [cert]
     end
   end
 

@@ -213,7 +213,7 @@ class LoadBalancer < Sequel::Model
   def need_certificates?
     return false unless cert_enabled
 
-    certs_dataset.with_cert.needing_recert.empty?
+    certs_dataset.with_cert.fresh.empty?
   end
 
   def active_cert
