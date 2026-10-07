@@ -496,6 +496,26 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
   end
 
+  describe "vpc_firewalls" do
+    it "leaves out firewalls of VMs that are in the VPC only through a management NIC" do
+      firewall
+      user_fw = Firewall.create(name: "fw-user-vm", location_id: location.id, project_id: project.id)
+      mgmt_fw = Firewall.create(name: "fw-mgmt-vm", location_id: location.id, project_id: project.id)
+      user_vm = create_vm(project_id: project.id, location_id: location.id, name: "vm-user")
+      mgmt_vm = create_vm(project_id: project.id, location_id: location.id, name: "vm-mgmt")
+      Nic.create(private_subnet_id: ps.id, vm_id: user_vm.id, private_ipv4: "10.0.0.5",
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", mac: "00:00:00:00:00:aa",
+        name: "nic-user", state: "active")
+      Nic.create(private_subnet_id: ps.id, vm_id: mgmt_vm.id, private_ipv4: "10.0.0.6",
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abd::", mac: "00:00:00:00:00:ab",
+        name: "nic-mgmt", state: "active", is_management: true)
+      DB[:firewalls_vms].insert(firewall_id: user_fw.id, vm_id: user_vm.id)
+      DB[:firewalls_vms].insert(firewall_id: mgmt_fw.id, vm_id: mgmt_vm.id)
+
+      expect(nx.send(:vpc_firewalls).map(&:id)).to contain_exactly(firewall.id, user_fw.id)
+    end
+  end
+
   describe "ensure_firewall_tag_key" do
     it "naps when CRM operation is not done and saves op name in frame" do
       pending_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false, name: "op-pending")
