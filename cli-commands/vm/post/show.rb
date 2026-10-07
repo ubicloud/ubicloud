@@ -49,7 +49,7 @@ class UbiCli
             end
           end
         when :subnet
-          body << display_key << ": " << data[key].name << "\n"
+          body << display_key << ": " << (data[key]&.name || "") << "\n"
         else
           body << display_key << ": " << data[key].to_s << "\n"
         end

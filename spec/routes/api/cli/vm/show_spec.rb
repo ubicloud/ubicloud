@@ -44,6 +44,14 @@ RSpec.describe Clover, "cli vm show" do
     END
   end
 
+  it "shows empty subnet for VM without a private subnet" do
+    @vm.nics.each(&:destroy)
+    expect(cli(%W[vm #{@ref} show -f id,subnet])).to eq <<~END
+      id: #{@vm.ubid}
+      subnet: 
+    END
+  end
+
   it "-f option controls which fields are shown for VM" do
     expect(cli(%W[vm #{@ref} show -f id,name])).to eq <<~END
       id: #{@vm.ubid}
