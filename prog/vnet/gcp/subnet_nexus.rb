@@ -31,7 +31,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     register_deadline("wait", 5 * 60)
 
     gcp_vpc = private_subnet.gcp_vpc ||
-      (private_subnet.project.gcp_dedicated_subnet_vpcs ? ensure_dedicated_vpc : ensure_shared_vpc)
+      ((private_subnet.gcp_management? || private_subnet.project.gcp_dedicated_subnet_vpcs) ? ensure_dedicated_vpc : ensure_shared_vpc)
     unless private_subnet.gcp_vpc
       gcp_vpc.add_private_subnet(private_subnet)
       # Firewalls attached to this subnet (or to VMs whose NICs live in
@@ -65,7 +65,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         description: "Ubicloud subnet for #{private_subnet.ubid} [Ubicloud=#{Config.provider_resource_tag_value}]",
         ip_cidr_range: private_subnet.net4.to_s,
         network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
-        private_ip_google_access: true,
+        private_ip_google_access: !private_subnet.gcp_management?,
         stack_type: "IPV4_IPV6",
         ipv6_access_type: "EXTERNAL",
       ),
@@ -93,6 +93,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_tag_resources
+    # Management NICs carry no firewall tags: the management VPC's policy
+    # applies its rules to every NIC in it.
+    hop_wait if private_subnet.gcp_management?
+
     self.tag_key_name ||= ensure_tag_key
     # Emit on every entry (including frame re-reads) so a strand that
     # crashed between creating the tag key and the next nap still surfaces

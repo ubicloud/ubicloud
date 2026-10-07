@@ -59,6 +59,25 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "#gcp_management?" do
+    before { allow(Config).to receive(:postgres_service_project_id).and_return(private_subnet.project_id) }
+
+    it "is true for the reserved name in the Postgres service project" do
+      private_subnet.update(name: described_class::GCP_MANAGEMENT_SUBNET_NAME)
+      expect(private_subnet.gcp_management?).to be true
+    end
+
+    it "is false for another name in the Postgres service project" do
+      expect(private_subnet.gcp_management?).to be false
+    end
+
+    it "is false for the reserved name in another project" do
+      private_subnet.update(name: described_class::GCP_MANAGEMENT_SUBNET_NAME)
+      allow(Config).to receive(:postgres_service_project_id).and_return(Project.generate_uuid)
+      expect(private_subnet.gcp_management?).to be false
+    end
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
