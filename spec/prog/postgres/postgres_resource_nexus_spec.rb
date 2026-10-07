@@ -75,8 +75,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "does not allow giving different version than parent for restore" do
       parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject
+      restore_target = Time.now
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target:)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
     end
 
