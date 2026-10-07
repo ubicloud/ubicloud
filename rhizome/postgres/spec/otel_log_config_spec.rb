@@ -20,6 +20,10 @@ RSpec.describe OtelLogConfig do
       expect(parsed["extensions"]).to have_key("file_storage/state")
     end
 
+    it "binds the health_check extension to the loopback address" do
+      expect(parsed["extensions"]["health_check"]["endpoint"]).to eq("127.0.0.1:13133")
+    end
+
     it "configures the pglog filelog receiver with the correct log dir" do
       expect(parsed["receivers"]["filelog/pglog"]["include"]).to include("/dat/17/data/pg_log/postgresql-*.log")
     end
