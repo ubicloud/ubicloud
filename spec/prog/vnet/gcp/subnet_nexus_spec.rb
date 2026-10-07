@@ -50,6 +50,45 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     )
   end
 
+  describe ".assemble_management" do
+    let(:service_project) { Project.create(name: "pg-service") }
+
+    before { allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id) }
+
+    it "creates the location's management subnet and its strand" do
+      st = described_class.assemble_management(location.id)
+
+      expect(st.prog).to eq("Vnet::Gcp::SubnetNexus")
+      expect(st.label).to eq("start")
+      mgmt_ps = st.subject
+      expect(mgmt_ps.gcp_management?).to be true
+      expect(mgmt_ps.location_id).to eq(location.id)
+      expect(mgmt_ps.net4.to_s).to eq("100.64.0.0/20")
+      expect(mgmt_ps.net6.to_s).to end_with("::/64")
+      expect(mgmt_ps.firewalls).to be_empty
+    end
+
+    it "returns the existing strand when the management subnet exists" do
+      st = described_class.assemble_management(location.id)
+
+      expect(described_class.assemble_management(location.id).id).to eq(st.id)
+      expect(PrivateSubnet.where(project_id: service_project.id, location_id: location.id).count).to eq(1)
+    end
+
+    it "fails for a location that is not on GCP" do
+      expect { described_class.assemble_management(Location::HETZNER_FSN1_ID) }.to raise_error(RuntimeError, "No existing GCP location")
+    end
+
+    it "fails for a location that does not exist" do
+      expect { described_class.assemble_management(Location.generate_uuid) }.to raise_error(RuntimeError, "No existing GCP location")
+    end
+
+    it "fails without the Postgres service project" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(Project.generate_uuid)
+      expect { described_class.assemble_management(location.id) }.to raise_error(RuntimeError, "No existing Postgres service project")
+    end
+  end
+
   describe "#start" do
     it "creates a GcpVpc via VpcNexus.assemble when none exists, links it, fires VPC sem, and hops to wait_vpc_ready" do
       DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
