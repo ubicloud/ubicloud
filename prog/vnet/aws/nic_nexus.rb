@@ -15,7 +15,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def create_subnet
-    nap 2 unless private_subnet.strand.label == "wait"
+    unless private_subnet.strand.label == "wait"
+      register_deadline("wait", 5 * 60, allow_extension: true)
+      nap 2
+    end
 
     # AwsSubnet was selected at assemble time and stored in frame
     aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: aws_subnet_id)
