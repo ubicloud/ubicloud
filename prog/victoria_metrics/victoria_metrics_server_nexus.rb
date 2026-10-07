@@ -189,7 +189,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   label def unavailable
     register_deadline("wait", 10 * 60)
 
-    reap
+    reap(fallthrough: true)
     nap 5 unless strand.children.select { it.prog == "VictoriaMetrics::VictoriaMetricsServerNexus" && it.label == "restart" }.empty?
 
     if available?
