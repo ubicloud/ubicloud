@@ -62,7 +62,7 @@
 
   <h2>Tools</h2>
 
-  <ul>
+  <ul id="model-class-list">
     <li><a href="/archived-record-by-id">Find Archived Record by ID</a></li>
     <li><a href="/vm-by-ipv4">Find VM by IPv4 Address</a></li>
     <li><a href="/github-runner-usage">GitHub Runner VM Usage</a></li>
@@ -72,28 +72,21 @@
     <li><a href="/customer-usage">Customer Usage</a></li>
     <li><a href="/accounts-by-ip">Accounts by IP Address</a></li>
     <li><a href="/table-row-counts">Approximate Table Row Counts</a></li>
-
-    <li>
-      <a href="/audit-log">View Audit Logs</a> | <a href="/authentication-audit-log">View Authentication Audit Logs</a>
-      | <a href="/authentication-audit-log/admin">View Admin Authentication Audit Logs</a>
-    </li>
-
     <li><a href="/presigned-certs">Presigned Certs Info</a></li>
     <li><a href="/rollouts">Manage Rollouts</a></li>
     <li><a href="/remove-boot-images">Remove Boot Images</a></li>
     <li><a href="/kubernetes-node-image">Build Kubernetes Node Image</a></li>
     <li><a href="/local-e2e">Manage Local E2E</a></li>
     <li><a href="/admin-list">View Admin List</a></li>
+    <li><a href="/audit-log">View Audit Logs</a></li>
+    <li><a href="/authentication-audit-log">View Authentication Audit Logs</a></li>
+    <li><a href="/authentication-audit-log/admin">View Admin Authentication Audit Logs</a></li>
     <li><a href="/autoforme/Strand/search/1?try=10">Strands with try &gt;= 10</a></li>
 
     <li>
       <a href="/autoforme/Strand/search/1?<%= to_query_string(prog: "Vm::Metal::Nexus", label: "unavailable") %>">Show Unavailable VMs</a>
     </li>
-  </ul>
 
-  <h2>Manage</h2>
-
-  <ul>
     <li><a href="/change-password">Change Password</a></li>
     <li><a href="/multifactor-manage">Manage Multifactor Authentication</a></li>
     <li><a href="/close-account">Close Account</a></li>
