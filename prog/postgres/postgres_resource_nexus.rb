@@ -40,26 +40,34 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
 
+    if restore_from_timeline_id
+      unless (timeline = PostgresTimeline[restore_from_timeline_id])
+        fail "No existing timeline"
+      end
+
+      restore_target &&= validate_restore_target(restore_target, timeline)
+
+      # Invariant: target_image_family must be the family that produced this
+      # backup, because its index bytes assume that OS. The only caller that
+      # sets restore_from_timeline_id (unarchive) passes the archived
+      # representative's family.
+      superuser_password = SecureRandom.urlsafe_base64(15)
+      timeline_id = timeline.id
+      timeline_access = "fetch"
+    elsif parent_id.nil?
+      superuser_password = SecureRandom.urlsafe_base64(15)
+      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id
+      timeline_access = "push"
+    else
+      unless (parent = PostgresResource[parent_id])
+        fail "No existing parent"
+      end
+
+      restore_target &&= validate_restore_target(restore_target, parent.timeline)
+    end
+
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, target_version, target_image_family = if restore_from_timeline_id
-        unless (timeline = PostgresTimeline[restore_from_timeline_id])
-          fail "No existing timeline"
-        end
-
-        restore_target &&= validate_restore_target(restore_target, timeline)
-
-        # Invariant: target_image_family must be the family that produced this
-        # backup, because its index bytes assume that OS. The only caller that
-        # sets restore_from_timeline_id (unarchive) passes the archived
-        # representative's family.
-        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version, target_image_family]
-      elsif parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version, target_image_family]
-      else
-        unless (parent = PostgresResource[parent_id])
-          fail "No existing parent"
-        end
-
+      if parent
         # Serializes the password copy against a concurrent reset
         parent.lock!
 
@@ -67,9 +75,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
-        restore_target &&= validate_restore_target(restore_target, parent.timeline)
-
-        [parent.superuser_password, parent.timeline.id, "fetch", parent.version, parent.representative_server.image_family]
+        superuser_password = parent.superuser_password
+        timeline_id = parent.timeline.id
+        timeline_access = "fetch"
+        target_version = parent.version
+        target_image_family = parent.representative_server.image_family
       end
 
       # Lantern has no image outside ubuntu-2204, so pin it here. This keeps
