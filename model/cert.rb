@@ -18,7 +18,7 @@ class Cert < Sequel::Model
     days = [15, 30, 60, 90].to_h { [it, Sequel.cast("#{it} days", :interval)] }
     expires_at = Sequel[:expires_at]
 
-    where(:needing_recert, Sequel.case(
+    where(:fresh, Sequel.case(
       {
         {expires_at: nil} => current_timestamp - days[60] < :created_at,
         (expires_at - :created_at > days[60]) => expires_at - days[30] > current_timestamp,
