@@ -443,6 +443,10 @@ code {
   align-items: flex-end;
 }
 
+.page-table {
+  overflow-wrap: anywhere;
+}
+
 #theme-switcher {
   display: flex;
   gap: 8px;
