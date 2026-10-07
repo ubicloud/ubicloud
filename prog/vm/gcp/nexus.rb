@@ -308,10 +308,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       end
     end
 
-    if user_nic
-      user_nic.update(vm_id: nil)
-      user_nic.incr_destroy
-    end
+    nics = vm.nics_dataset
+    Semaphore.incr(nics.select(:id), "destroy")
+    nics.update(vm_id: nil)
     vm.destroy
     pop "vm destroyed"
   end
