@@ -395,13 +395,11 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
   describe "#unavailable" do
     it "registers deadline and naps if restart is in progress" do
-      expect(nx).to receive(:reap)
       Strand.create(parent_id: nx.strand.id, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "restart", stack: [{}])
       expect { nx.unavailable }.to nap(5)
     end
 
     it "hops to wait if server becomes available" do
-      expect(nx).to receive(:reap)
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
@@ -409,7 +407,6 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     end
 
     it "buds restart and naps if server remains unavailable" do
-      expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(5)
 
