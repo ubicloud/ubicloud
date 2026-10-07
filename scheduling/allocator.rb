@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
+  class NoSpaceLeft < RuntimeError
+  end
+
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
@@ -41,7 +44,7 @@ module Scheduling::Allocator
       os_filter,
     )
     allocation = Allocation.best_allocation(request)
-    fail "#{vm} no space left on any eligible host" unless allocation
+    fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
 
     allocation.update(vm)
     Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})

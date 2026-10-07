@@ -106,9 +106,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         os_filter:,
         family_filter:,
       )
-    rescue RuntimeError => ex
-      raise unless ex.message.include?("no space left on any eligible host")
-
+    rescue Scheduling::Allocator::NoSpaceLeft
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
 
       Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}})
