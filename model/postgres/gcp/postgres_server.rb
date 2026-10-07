@@ -16,7 +16,7 @@ class PostgresServer < Sequel::Model
     # Via the vm, not the resource: the resource row is deleted before its
     # servers finish destroying, and they stay monitored until then.
     def gcp_open_session_failure_page_threshold
-      private_subnet = vm.private_subnets.first
+      private_subnet = vm.user_nic.private_subnet
       if private_subnet.gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
         DEDICATED_VPC_OPEN_SESSION_FAILURE_PAGE_THRESHOLD
       else
