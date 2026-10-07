@@ -122,6 +122,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)).to eq(gcp_vpc.id)
     end
 
+    it "gives the management subnet a dedicated VPC even when the project uses shared VPCs" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      nx.private_subnet.update(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME)
+      DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+
+      expect { nx.start }.to hop("wait_vpc_ready")
+      new_vpc = GcpVpc[DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)]
+      expect(new_vpc.id).not_to eq(gcp_vpc.id)
+      expect(new_vpc.dedicated_for_subnet_id).to eq(ps.id)
+    end
+
     context "when project.gcp_dedicated_subnet_vpcs is true" do
       before { project.update(gcp_dedicated_subnet_vpcs: true) }
 
@@ -180,6 +191,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_subnet }.to hop("wait_create_subnet")
       expect(st.stack.first.dig("create_subnet", "name")).to eq("op-subnet-123")
     end
+
+    it "creates the management subnet without Private Google Access" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      nx.private_subnet.update(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME)
+      expect(subnetworks_client).to receive(:insert) do |args|
+        expect(args[:subnetwork_resource].private_ip_google_access).to be(false)
+        instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-mgmt")
+      end
+
+      expect { nx.create_subnet }.to hop("wait_create_subnet")
+    end
   end
 
   describe "#wait_create_subnet" do
@@ -233,6 +255,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       stub_fetch_all_via_list(crm_client)
+    end
+
+    it "creates no tag resources or allow rules for the management subnet" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      nx.private_subnet.update(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME)
+      expect(crm_client).not_to receive(:create_tag_key)
+
+      expect { nx.create_tag_resources }.to hop("wait")
     end
 
     it "creates tag key and tag value, stores in frame, and hops to create_subnet_allow_rules" do
