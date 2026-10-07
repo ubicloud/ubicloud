@@ -4,6 +4,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   include GcpLro
 
   subject_is :nic
+  frame_reader :use_eip
   frame_accessor :gcp_address_name
 
   label def start
@@ -19,6 +20,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       subnet_name: "ubicloud-#{ps.ubid}",
     )
 
+    hop_wait if use_eip == false
     hop_allocate_static_ip
   end
 
