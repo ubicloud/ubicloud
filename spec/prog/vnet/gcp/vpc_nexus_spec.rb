@@ -54,6 +54,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(vpc).to be_a(GcpVpc)
       expect(vpc.name).to start_with("ubicloud-")
       expect(vpc.dedicated_for_subnet_id).to be_nil
+      expect(vpc.is_management).to be(false)
     end
 
     it "persists dedicated_for_subnet_id and uses a subnet-keyed GCP-side name when passed" do

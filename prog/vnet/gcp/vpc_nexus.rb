@@ -15,7 +15,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   VERIFY_ASSOC_MAX_TRIES = 5
   DELETE_TAG_VALUE_MAX_TRIES = 30
 
-  def self.assemble(project_id, location_id, dedicated_for_subnet_id: nil)
+  def self.assemble(project_id, location_id, dedicated_for_subnet_id: nil, is_management: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -40,6 +40,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         location_id: location.id,
         name:,
         dedicated_for_subnet_id:,
+        is_management:,
       )
       Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     end

@@ -32,6 +32,8 @@ class PrivateSubnet < Sequel::Model
   DEFAULT_AWS_SUBNET_PREFIX_LEN = 16
   DEFAULT_SUBNET_PREFIX_LEN = 26
 
+  GCP_MANAGEMENT_SUBNET_NAME = "ubicloud-pg-mgmt"
+
   dataset_module Pagination
   include ObjectTag::Cleanup
 
@@ -64,6 +66,10 @@ class PrivateSubnet < Sequel::Model
   def dedicated_mgmt_security_group?
     ps_aws = private_subnet_aws_resource
     !ps_aws.mgmt_security_group_id.nil? && ps_aws.mgmt_security_group_id != ps_aws.user_security_group_id
+  end
+
+  def gcp_management?
+    name == GCP_MANAGEMENT_SUBNET_NAME && project_id == Config.postgres_service_project_id
   end
 
   def before_destroy
