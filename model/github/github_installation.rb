@@ -73,6 +73,7 @@ end
 # Indexes:
 #  github_installation_pkey                  | PRIMARY KEY btree (id)
 #  github_installation_installation_id_index | UNIQUE btree (installation_id)
+#  github_installation_project_id_index      | btree (project_id)
 # Foreign key constraints:
 #  github_installation_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:

@@ -51,8 +51,9 @@ end
 #  is_failover_ip    | boolean | NOT NULL DEFAULT false
 #  routed_to_host_id | uuid    | NOT NULL
 # Indexes:
-#  address_pkey     | PRIMARY KEY btree (id)
-#  address_cidr_key | UNIQUE btree (cidr)
+#  address_pkey                    | PRIMARY KEY btree (id)
+#  address_cidr_key                | UNIQUE btree (cidr)
+#  address_routed_to_host_id_index | btree (routed_to_host_id)
 # Foreign key constraints:
 #  address_routed_to_host_id_fkey | (routed_to_host_id) REFERENCES vm_host(id)
 # Referenced By:

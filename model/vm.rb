@@ -315,7 +315,10 @@ end
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+#  vm_location_id_index                | btree (location_id)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
+#  vm_vm_host_id_index                 | btree (vm_host_id)
+#  vm_vm_host_slice_id_index           | btree (vm_host_slice_id)
 # Check constraints:
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:

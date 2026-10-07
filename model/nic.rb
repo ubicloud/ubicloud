@@ -59,6 +59,8 @@ end
 # Indexes:
 #  nic_pkey                                 | PRIMARY KEY btree (id)
 #  nic_private_subnet_id_private_ipv4_index | UNIQUE btree (private_subnet_id, private_ipv4)
+#  nic_rekey_coordinator_id_not_null_idx    | btree (rekey_coordinator_id) WHERE rekey_coordinator_id IS NOT NULL
+#  nic_vm_id_index                          | btree (vm_id)
 # Check constraints:
 #  rekey_phase_check | (rekey_phase = ANY (ARRAY['idle'::text, 'inbound'::text, 'outbound'::text, 'old_drop'::text]))
 #  state             | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
