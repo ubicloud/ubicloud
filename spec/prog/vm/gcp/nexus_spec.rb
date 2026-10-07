@@ -1058,13 +1058,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(Semaphore.where(strand_id: nic.strand.id, name: "destroy").count).to eq(1)
     end
 
-    it "skips NIC detach when NIC is nil" do
+    it "detaches and destroys every NIC, including a management NIC" do
+      mgmt_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "mgmt-subnet", location_id: location.id).subject
+      mgmt_nic = Prog::Vnet::NicNexus.assemble(mgmt_subnet.id, name: "testvm-mgmt-nic", is_management: true).subject
+      mgmt_nic.update(vm_id: vm.id)
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+      [nic, mgmt_nic].each do |n|
+        expect(n.reload.vm_id).to be_nil
+        expect(Semaphore.where(strand_id: n.id, name: "destroy").count).to eq(1)
+      end
+    end
+
+    it "destroys a VM whose NICs are already gone" do
       vm.nics.each { |n|
         n.strand.destroy
         n.destroy
       }
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+      expect(Vm[vm.id]).to be_nil
     end
 
     it "skips service account deletion when the VM never had one" do
