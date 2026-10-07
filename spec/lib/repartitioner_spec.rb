@@ -75,6 +75,7 @@ RSpec.describe Repartitioner do
       notify_q = Queue.new
       repartition_3q = Queue.new
       repartition_2q = Queue.new
+      partition_2q = Queue.new
       notified = false
       mp.define_singleton_method(:notify) do
         super()
@@ -92,6 +93,11 @@ RSpec.describe Repartitioner do
         when 2
           repartition_2q.push true
         end
+      end
+      partition_times = mp.instance_variable_get(:@partition_times)
+      partition_times.define_singleton_method(:[]=) do |number, time|
+        super(number, time)
+        partition_2q.push true if number == 2
       end
       @th = Thread.new { mp.listen }
 
@@ -114,8 +120,9 @@ RSpec.describe Repartitioner do
       t.join(1)
       expect(t.value).to be true
 
+      expect(partition_2q.pop(timeout: 1)).to be true
       expect(mp).to receive(:repartition).with(2).and_call_original
-      mp.instance_variable_get(:@partition_times)[3] = Time.now - 60
+      partition_times[3] = Time.now - 60
       expect(repartition_2q.pop(timeout: 1)).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."80000000-0000-0000-0000-000000000000")
     end
