@@ -27,6 +27,35 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # See doc/gcp_firewall_architecture.md for the full design.
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
+  # Outside RFC 1918, so it never overlaps a customer subnet: GCE rejects
+  # an instance whose NICs have overlapping subnet ranges, also across VPCs.
+  MANAGEMENT_NET4 = "100.64.0.0/20"
+
+  # Idempotent: the operator runs it once per location, the E2E setup once
+  # per run.
+  def self.assemble_management(location_id)
+    unless (location = Location[location_id])&.gcp?
+      fail "No existing GCP location"
+    end
+
+    unless (project = Project[Config.postgres_service_project_id])
+      fail "No existing Postgres service project"
+    end
+
+    key = {project_id: project.id, location_id: location.id, name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME}
+    DB.transaction do
+      PrivateSubnet.dataset.insert_conflict(target: key.keys).insert(
+        id: PrivateSubnet.generate_uuid,
+        net4: MANAGEMENT_NET4,
+        net6: Prog::Vnet::SubnetNexus.random_private_ipv6(location, project).to_s,
+        state: "waiting",
+        **key,
+      )
+      ps = PrivateSubnet.first(key)
+      ps.strand || Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label: "start")
+    end
+  end
+
   label def start
     register_deadline("wait", 5 * 60)
 
