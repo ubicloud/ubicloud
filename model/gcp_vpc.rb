@@ -15,12 +15,13 @@ end
 
 # Table: gcp_vpc
 # Columns:
-#  id                      | uuid | PRIMARY KEY DEFAULT gen_random_ubid_uuid(539)
-#  project_id              | uuid | NOT NULL
-#  location_id             | uuid | NOT NULL
-#  name                    | text | NOT NULL
-#  network_self_link       | text |
-#  dedicated_for_subnet_id | uuid |
+#  id                      | uuid    | PRIMARY KEY DEFAULT gen_random_ubid_uuid(539)
+#  project_id              | uuid    | NOT NULL
+#  location_id             | uuid    | NOT NULL
+#  name                    | text    | NOT NULL
+#  network_self_link       | text    |
+#  dedicated_for_subnet_id | uuid    |
+#  is_management           | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  gcp_vpc_pkey                               | PRIMARY KEY btree (id)
 #  gcp_vpc_dedicated_for_subnet_id_uidx       | UNIQUE btree (dedicated_for_subnet_id) WHERE dedicated_for_subnet_id IS NOT NULL
