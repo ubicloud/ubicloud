@@ -1,16 +1,7 @@
 # frozen_string_literal: true
 
-# add_unique_constraint has no automatic reverse in Sequel, so up and down
-# are spelled out.
 Sequel.migration do
-  up do
-    # Lets a child table reference a subnet together with its project and
-    # location, so the database guarantees the three agree (see
-    # private_link_service below).
-    alter_table(:private_subnet) do
-      add_unique_constraint [:id, :project_id, :location_id], name: :private_subnet_id_project_id_location_id_key
-    end
-
+  change do
     # project_id and location_id are pinned to the subnet's by the composite
     # foreign key; the name is unique per project and location, as the URL is.
     create_table(:private_link_service) do
@@ -41,14 +32,6 @@ Sequel.migration do
 
       unique [:private_link_service_id, :port]
       constraint(:private_link_service_port_range, Sequel.lit("port BETWEEN 1 AND 65535 AND target_port BETWEEN 1 AND 65535"))
-    end
-  end
-
-  down do
-    drop_table(:private_link_service_port)
-    drop_table(:private_link_service)
-    alter_table(:private_subnet) do
-      drop_constraint :private_subnet_id_project_id_location_id_key
     end
   end
 end

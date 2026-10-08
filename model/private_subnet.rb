@@ -184,7 +184,7 @@ end
 #  firewall_priority | integer                  |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
-#  private_subnet_id_project_id_location_id_key          | UNIQUE btree (id, project_id, location_id)
+#  private_subnet_id_project_id_location_id_uidx         | UNIQUE btree (id, project_id, location_id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
