@@ -286,7 +286,7 @@ end
                   </td>
 
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= money(inv.cost) %>
+                    <%= inv.total_humanized %>
 
                     <% if inv.cost != inv.subtotal %>
                       <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>

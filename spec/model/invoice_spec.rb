@@ -178,6 +178,20 @@ RSpec.describe Invoice do
       expect(Mail::TestMailer.deliveries.first.attachments.length).to eq 1
     end
 
+    it "charges in EUR if invoice has USD to EUR rate" do
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, invoice_version: 2, discounts: [], credits: [], cost: 10.005, usd_to_eur_rate: 0.9)
+      PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(payment_intents_service).to receive(:create).with(hash_including(amount: 900, currency: "eur")).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
+      expect(invoice.charge).to be true
+      expect(invoice.status).to eq("paid")
+      text_part = Mail::TestMailer.deliveries.first.text_part
+      expect(text_part.charset).to eq("UTF-8")
+      expect(text_part.decoded).to include("The invoice amount of €9.00 will be debited")
+    end
+
     it "does not update project reputation if cost is less than 5" do
       update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, cost: 4)
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
@@ -189,6 +203,25 @@ RSpec.describe Invoice do
       expect(invoice.status).to eq("paid")
       expect(project.reload.reputation).to eq("new")
       expect(Mail::TestMailer.deliveries.length).to eq 1
+    end
+  end
+
+  describe ".charge_amount_cents" do
+    it "rounds to cents" do
+      update_content(cost: 1.005)
+      expect(invoice.charge_amount_cents).to eq(101)
+      expect(invoice.total_humanized).to eq("$1.01")
+    end
+
+    it "does not lose a cent to floating point error" do
+      update_content(cost: 0.29)
+      expect(invoice.charge_amount_cents).to eq(29)
+      expect(invoice.total_humanized).to eq("$0.29")
+    end
+
+    it "converts to EUR if invoice has USD to EUR rate" do
+      update_content(cost: 10.0, usd_to_eur_rate: 0.9)
+      expect(invoice.charge_amount_cents).to eq(900)
     end
   end
 
@@ -310,6 +343,24 @@ RSpec.describe Invoice do
       )
       text = pdf_text
       expect(text).to match(/YC Credit[^$]*-\$1\.500/m)
+    end
+
+    it "renders the total in EUR if invoice has USD to EUR rate" do
+      update_content(
+        invoice_version: 2, subtotal: 10.0, cost: 10.0, credit: 0.0, discount: 0.0,
+        discounts: [], credits: [], usd_to_eur_rate: 0.9,
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0)]}],
+      )
+      text = pdf_text
+      expect(text).to match(/Total in USD:\s+\$10\.00/)
+      expect(text).to match(/Exchange rate:\s+1 USD = 0\.9000 EUR/)
+      expect(text).to match(/Total:\s+€9\.00/)
+    end
+
+    it "renders the total in USD if invoice does not have USD to EUR rate" do
+      text = pdf_text
+      expect(text).not_to include("Exchange rate:")
+      expect(text).to match(/Total:\s+\$10\.00/)
     end
   end
 

@@ -578,6 +578,15 @@ RSpec.describe Clover, "billing" do
         expect(find_by_id("invoice-discount").text).to eq "-$1.00"
         expect(find_by_id("invoice-credit").text).to eq "-$2.00"
         expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
+        expect(page.has_css?("#invoice-exchange-rate")).to be false
+
+        content["usd_to_eur_rate"] = 0.5
+        invoice.this.update(content:)
+
+        page.refresh
+        expect(find_by_id("invoice-total-in-usd").text).to eq "$%0.02f" % content["cost"]
+        expect(find_by_id("invoice-exchange-rate").text).to eq "1 USD = 0.5000 EUR"
+        expect(find_by_id("invoice-total").text).to eq "€%0.02f" % (content["cost"] * 0.5)
       end
 
       it "shows a named resource discount and credit on the per-item line" do
@@ -629,7 +638,7 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "current"
         expect(page).to have_content "not finalized"
         expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
-        expect(page).to have_content "$%0.02f" % invoice_previous.content["cost"]
+        expect(page).to have_content "$%0.02f" % invoice_previous.content["cost"].round(2)
 
         click_link href: "#{project.path}/billing/invoice/current"
         expect(page).to have_content "Current Usage Summary"
@@ -794,6 +803,29 @@ RSpec.describe Clover, "billing" do
           expect(page).to have_content "paid"
           expect(page).to have_no_content "Pay Now"
         end
+      end
+
+      it "can pay unpaid EUR invoice" do
+        expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        project.set_ff_invoice_in_eur(true)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 0.5).run.first
+        # rubocop:disable RSpec/VerifiedDoubles
+        expect(checkout_sessions_service).to receive(:create).with(
+          hash_including(line_items: [hash_including(price_data: hash_including(currency: "eur", unit_amount: ((invoice.cost * 0.5).round(2) * 100).round))]),
+        ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
+        # rubocop:enable RSpec/VerifiedDoubles
+        expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content invoice.total_humanized
+          expect(invoice.total_humanized).to start_with("€")
+          click_button "Pay Now"
+        end
+
+        expect(page).to have_flash_notice "Invoice #{invoice.invoice_number} paid successfully"
       end
 
       it "fails if the invoice id doesn’t match the invoice id in the checkout session" do

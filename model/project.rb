@@ -319,6 +319,7 @@ class Project < Sequel::Model
     :free_runner_upgrade_until,
     :github_billing_by_repository,
     :gpu_vm,
+    :invoice_in_eur,
     :ipv6_disabled,
     :postgres_enable_maintenance_window_days,
     :postgres_hostname_override,
