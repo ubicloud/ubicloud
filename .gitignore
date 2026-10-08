@@ -40,6 +40,10 @@
 /cli/ubi
 /cli/ubi-*
 
+# runner-metrics binary and release files
+/runner-metrics/runner-metrics
+/runner-metrics/runner-metrics-*
+
 # mise "local" dependency specification that shouldn't be committed
 mise.local.toml
 mise.local.lock
