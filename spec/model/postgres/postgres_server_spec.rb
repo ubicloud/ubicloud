@@ -887,7 +887,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be(true)
     end
 
-    it "returns true if the diff is less than 80MB" do
+    it "returns true if the diff is under the catch up threshold" do
       expect(postgres_server).to receive(:last_known_lsn).and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
@@ -906,12 +906,12 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be(true)
     end
 
-    it "returns false if the diff is more than 80MB" do
+    it "returns false if the diff is over the catch up threshold" do
       expect(postgres_server).to receive(:last_known_lsn).and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
     end
 
-    it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
+    it "returns true if the diff is under the catch up threshold for not read replica and uses the main representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       resource.update(restore_target: Time.now)
       expect(postgres_server.resource.representative_server).to receive(:last_known_lsn).and_return("F/F")
@@ -927,6 +927,28 @@ RSpec.describe PostgresServer do
     it "returns false when self has no recorded lsn yet" do
       expect(postgres_server).to receive(:last_known_lsn).and_return(nil)
       expect(postgres_server.lsn_caught_up).to be_falsey
+    end
+
+    it "scales the threshold with the parent vm size" do
+      parent_server = resource.parent.representative_server
+      allow(parent_server).to receive(:last_known_lsn).and_return("1/40000000")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("1/2D000000").twice
+      postgres_server.vm.update(vcpus: 16)
+      parent_server.vm.update(vcpus: 4)
+      expect(postgres_server.lsn_caught_up).to be(false)
+      postgres_server.vm.update(vcpus: 2)
+      parent_server.vm.update(vcpus: 8)
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+  end
+
+  describe "#catch_up_lag_threshold" do
+    it "is 64 MiB per parent vcpu clamped to 128 MiB and 1 GiB" do
+      parent_server = instance_double(described_class, vm: instance_double(Vm))
+      expect([1, 2, 8, 16, 64].map { |vcpus|
+        allow(parent_server.vm).to receive(:vcpus).and_return(vcpus)
+        postgres_server.catch_up_lag_threshold(parent_server) / 1024 / 1024
+      }).to eq([128, 128, 512, 1024, 1024])
     end
   end
 
