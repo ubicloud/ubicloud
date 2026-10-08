@@ -126,7 +126,6 @@ end
 #  parseable_resource                 | parseable_resource_location_id_fkey                 | (location_id) REFERENCES location(id)
 #  postgres_resource                  | postgres_resource_location_id_fkey                  | (location_id) REFERENCES location(id)
 #  postgres_timeline                  | postgres_timeline_location_id_fkey                  | (location_id) REFERENCES location(id)
-#  private_link_service               | private_link_service_location_id_fkey               | (location_id) REFERENCES location(id)
 #  private_subnet                     | private_subnet_location_id_fkey                     | (location_id) REFERENCES location(id)
 #  provider_ip_range                  | provider_ip_range_location_id_fkey                  | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  victoria_metrics_resource          | victoria_metrics_resource_location_id_fkey          | (location_id) REFERENCES location(id)

@@ -5,8 +5,8 @@ Sequel.migration do
     create_table(:private_link_service) do
       column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_ubid_uuid(725)") # UBID.to_base32_n("pn") => 725
       column :created_at, :timestamptz, null: false, default: Sequel::CURRENT_TIMESTAMP
-      foreign_key :project_id, :project, type: :uuid, null: false
-      foreign_key :location_id, :location, type: :uuid, null: false
+      column :project_id, :uuid, null: false
+      column :location_id, :uuid, null: false
       column :private_subnet_id, :uuid, null: false
       foreign_key [:private_subnet_id, :project_id, :location_id], :private_subnet, key: [:id, :project_id, :location_id], name: :private_link_service_private_subnet_fkey
       foreign_key :postgres_resource_id, :postgres_resource, type: :uuid, on_delete: :set_null
