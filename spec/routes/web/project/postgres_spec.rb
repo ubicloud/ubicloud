@@ -59,11 +59,19 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "list" do
-      it "can list flavors when there is no pg databases" do
+      it "offers to create a database when there are none" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content "Create PostgreSQL Database"
+        expect(page).to have_content "No PostgreSQL databases"
+
+        click_link "Create PostgreSQL Database"
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+      end
+
+      it "offers to create a database next to the list" do
+        pg
+        visit "#{project.path}/postgres"
 
         click_link "Create PostgreSQL Database"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
@@ -97,7 +105,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "create" do
       it "can create new PostgreSQL database" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -112,6 +120,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
+        expect(PostgresResource.first.flavor).to eq(PostgresResource::Flavor::STANDARD)
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do
@@ -128,7 +137,7 @@ RSpec.describe Clover, "postgres" do
         # Delete seeded aws-us-west-2 location to avoid display_name conflict
         Location.where(display_name: "aws-us-west-2", project_id: nil).destroy
 
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -149,7 +158,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "pre-selects the default version rather than the newest one offered" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         checked = all("input[name=version]", visible: false).select(&:checked?).map { |input| input.value }
         expect(checked).to eq([PostgresResource.default_version])
@@ -157,7 +166,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can specify an init script when creating new PostgreSQL database" do
         project.set_ff_postgres_init_script(true)
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -177,7 +186,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create new PostgreSQL database without firewall rules" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -198,7 +207,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "handles errors when creating new PostgreSQL database" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -216,7 +225,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot create new PostgreSQL database with invalid location" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+        visit "#{project.path}/postgres/create"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
@@ -234,16 +243,6 @@ RSpec.describe Clover, "postgres" do
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         expect(page).to have_flash_error("Validation failed for following fields: location")
-      end
-
-      it "treats invalid flavor as standard flavor when creating" do
-        default_project = Project[name: "Default"]
-        url = "#{default_project.path}/dashboard"
-        Capybara.current_session.driver.header "Referer", url
-        visit "#{project.path}/postgres/create?flavor=invalid"
-
-        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(find("input[name=flavor]", visible: false)[:value]).to eq "standard"
       end
 
       it "can not create PostgreSQL database with same name" do

@@ -6,7 +6,7 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
-    -f, --flavor=type                flavor
+    -f, --flavor=type                flavor (deprecated, standard is the only flavor)
     -h, --ha-type=type               replication type
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
@@ -18,7 +18,6 @@ Options:
     -P, --private-subnet-name=name   override name of created private subnet
 
 Allowed Option Values:
-    Flavor: standard
     Replication Type: none async sync
     Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
           hobby-1 hobby-2 c6gd.large c6gd.xlarge c6gd.2xlarge c6gd.4xlarge
