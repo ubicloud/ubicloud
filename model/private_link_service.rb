@@ -135,8 +135,8 @@ end
 # Check constraints:
 #  private_link_service_ip_address_type_check | (ip_address_type = ANY (ARRAY['ipv4'::text, 'ipv6'::text, 'dual'::text]))
 # Foreign key constraints:
-#  private_link_service_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id) ON DELETE SET NULL
-#  private_link_service_private_subnet_fkey       | (private_subnet_id, project_id, location_id) REFERENCES private_subnet(id, project_id, location_id)
+#  private_link_service_postgres_resource_fkey | (postgres_resource_id, private_subnet_id) REFERENCES postgres_resource(id, private_subnet_id)
+#  private_link_service_private_subnet_fkey    | (private_subnet_id, project_id, location_id) REFERENCES private_subnet(id, project_id, location_id)
 # Referenced By:
 #  private_link_service_aws_resource | private_link_service_aws_resource_id_fkey              | (id) REFERENCES private_link_service(id) ON DELETE CASCADE
 #  private_link_service_port         | private_link_service_port_private_link_service_id_fkey | (private_link_service_id) REFERENCES private_link_service(id) ON DELETE CASCADE

@@ -973,6 +973,7 @@ end
 #  target_storage_configuration    | jsonb                    |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
+#  postgres_resource_id_private_subnet_id_uidx        | UNIQUE btree (id, private_subnet_id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  at_most_one_availability_zone_request  | (preferred_availability_zone_id IS NULL OR required_availability_zone_id IS NULL)
@@ -989,4 +990,4 @@ end
 #  postgres_init_script        | postgres_init_script_id_fkey                          | (id) REFERENCES postgres_resource(id)
 #  postgres_log_destination    | postgres_log_destination_postgres_resource_id_fkey    | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
-#  private_link_service        | private_link_service_postgres_resource_id_fkey        | (postgres_resource_id) REFERENCES postgres_resource(id) ON DELETE SET NULL
+#  private_link_service        | private_link_service_postgres_resource_fkey           | (postgres_resource_id, private_subnet_id) REFERENCES postgres_resource(id, private_subnet_id)

@@ -486,13 +486,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
+    # The services exposing the resource go with it, and the resource row waits
+    # for their teardown, which has its own 15 minute deadline.
+    private_link_services = postgres_resource.private_link_services_dataset
+    register_deadline(nil, private_link_services.empty? ? 5 * 60 : 20 * 60)
 
     decr_destroy
 
-    # The services exposing the resource go with it; a subnet teardown waits
-    # for them.
-    PrivateLinkService.incr_destroy(postgres_resource.private_link_services_dataset.select(:id))
+    PrivateLinkService.incr_destroy(private_link_services.select(:id))
 
     PostgresResource.incr_destroy(strand.children_dataset.select(:id))
     hop_wait_children_destroyed
@@ -500,6 +501,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def wait_children_destroyed
     reap(nap: 5) do
+      # The foreign key from the services keeps the row until the last one is gone.
+      nap 5 unless postgres_resource.private_link_services_dataset.empty?
+
       postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
         ubid: postgres_resource.ubid,
         vm_ids: postgres_resource.servers_dataset.select(:vm_id),

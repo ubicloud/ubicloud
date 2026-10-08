@@ -111,12 +111,15 @@ RSpec.describe PrivateLinkService do
     Prog::Vm::Nexus.assemble("k y", project.id, name:, private_subnet_id: ps.id, location_id: ps.location_id).subject
   end
 
+  # The resource is moved into the service's subnet, as the foreign key requires.
   def create_pg(name = "pg-aws")
     allow(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id)
-    Prog::Postgres::PostgresResourceNexus.assemble(
+    pg = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id, location_id: aws_location.id, name:,
       target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16",
     ).subject
+    pg.update(private_subnet_id: pls.private_subnet_id)
+    pg
   end
 
   def serve_pg_zone(pg)
@@ -225,13 +228,7 @@ RSpec.describe PrivateLinkService do
 
   it "refuses a second PostgreSQL resource while one is attached, keeping the first and its name" do
     Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
-    allow(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id)
-    pg_a, pg_b = %w[pg-a pg-b].map do |name|
-      Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: project.id, location_id: aws_location.id, name:,
-        target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16",
-      ).subject
-    end
+    pg_a, pg_b = %w[pg-a pg-b].map { create_pg(it) }
     serve_pg_zone(pg_a)
 
     pls.attach_postgres_resource(pg_a)
@@ -248,11 +245,7 @@ RSpec.describe PrivateLinkService do
 
   it "attaches a PostgreSQL resource and requests a reconcile" do
     Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
-    allow(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id)
-    pg = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: project.id, location_id: aws_location.id, name: "pg-aws",
-      target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16",
-    ).subject
+    pg = create_pg
 
     aws.update(private_dns_verification_attempted_at: Time.now)
     pls.attach_postgres_resource(pg)

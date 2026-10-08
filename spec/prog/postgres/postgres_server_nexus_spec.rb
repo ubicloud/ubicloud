@@ -1909,8 +1909,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "asks the resource's private link services to reconcile once the promoted standby is the representative" do
       postgres_server
-      ps = PrivateSubnet.create(name: "pl-ps", project_id: project.id, location_id:, net4: "10.0.0.0/26", net6: "fdfa::/64")
-      pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id: ps.location_id, private_subnet_id: ps.id, postgres_resource_id: postgres_resource.id)
+      postgres_resource.update(private_subnet_id: private_subnet.id)
+      pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id:, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)
       Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
@@ -1966,8 +1966,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       it "asks the replica resource's private link services to reconcile" do
         replica_resource = create_read_replica_resource(parent: postgres_resource)
-        ps = PrivateSubnet.create(name: "pl-ps", project_id: project.id, location_id:, net4: "10.0.0.0/26", net6: "fdfa::/64")
-        pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id: ps.location_id, private_subnet_id: ps.id, postgres_resource_id: replica_resource.id)
+        replica_resource.update(private_subnet_id: private_subnet.id)
+        pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id:, private_subnet_id: private_subnet.id, postgres_resource_id: replica_resource.id)
         Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
         replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
         replica_nx = described_class.new(replica_server.strand)

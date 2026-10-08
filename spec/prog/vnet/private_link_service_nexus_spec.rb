@@ -86,6 +86,7 @@ RSpec.describe Prog::Vnet::PrivateLinkServiceNexus do
         project_id: project.id, location_id: aws_location.id, name: "pg-aws",
         target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16",
       ).subject
+      pg.update(private_subnet_id: ps.id)
 
       zone = DnsZone.create(project_id: Config.postgres_service_project_id, name: pg.hostname_suffix)
       bare = assemble(name: "pg-es-bare", postgres_resource_id: pg.id).subject

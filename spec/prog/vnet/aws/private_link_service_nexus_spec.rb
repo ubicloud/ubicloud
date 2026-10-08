@@ -88,6 +88,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       project_id: project.id, location_id: pls.location.id, name: "pg-aws",
       target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16",
     ).subject
+    pg.update(private_subnet_id: pls.private_subnet_id)
     pls.attach_postgres_resource(pg)
     pg.representative_server.vm
   end

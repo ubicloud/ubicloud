@@ -9,7 +9,8 @@ Sequel.migration do
       column :location_id, :uuid, null: false
       column :private_subnet_id, :uuid, null: false
       foreign_key [:private_subnet_id, :project_id, :location_id], :private_subnet, key: [:id, :project_id, :location_id], name: :private_link_service_private_subnet_fkey
-      foreign_key :postgres_resource_id, :postgres_resource, type: :uuid, on_delete: :set_null
+      column :postgres_resource_id, :uuid
+      foreign_key [:postgres_resource_id, :private_subnet_id], :postgres_resource, key: [:id, :private_subnet_id], name: :private_link_service_postgres_resource_fkey
       column :name, :text, collate: '"C"', null: false
       column :allowed_principals, "text[]", collate: '"C"', null: false, default: Sequel.lit("'{}'::text[]")
       column :private_dns_name, :text, collate: '"C"'
