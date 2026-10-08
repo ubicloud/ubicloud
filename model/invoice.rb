@@ -40,6 +40,26 @@ class Invoice < Sequel::Model
     define_method(meth) { content[str] }
   end
 
+  def usd_to_eur_rate
+    content["usd_to_eur_rate"]
+  end
+
+  def total_humanized
+    "#{usd_to_eur_rate ? "€" : "$"}%0.02f" % (charge_amount_cents / 100.0)
+  end
+
+  def charge_currency
+    usd_to_eur_rate ? "eur" : "usd"
+  end
+
+  def charge_amount_cents
+    amount = cost.to_f
+    if (rate = usd_to_eur_rate)
+      amount *= rate
+    end
+    (amount.round(2) * 100).round
+  end
+
   def payable?
     cost > 0 && status == "unpaid" && ubid != "current"
   end
@@ -110,8 +130,8 @@ class Invoice < Sequel::Model
     billing_info.payment_methods.each do |pm|
       begin
         payment_intent = StripeClient.payment_intents.create({
-          amount: (amount * 100).to_i, # 100 cents to charge $1.00
-          currency: "usd",
+          amount: charge_amount_cents,
+          currency: charge_currency,
           confirm: true,
           off_session: true,
           customer: billing_info.stripe_id,
@@ -324,11 +344,13 @@ class Invoice < Sequel::Model
       totals << ((data.credit != "$0.00") ? ["Credit:", "-#{data.credit}"] : nil)
       totals << ((data.free_inference_tokens_credit != "$0.00") ? ["Free Inference Tokens:", "-#{data.free_inference_tokens_credit}"] : nil)
     end
+    total_usd = is_v2 ? data.total_usd : data.total
     totals.concat [
       if data.vat_amount != "$0.00"
         ["VAT (#{data.vat_rate}%):", "(#{data.vat_amount_eur}) #{data.vat_amount}"]
       end,
-      (data.total != "$0.00" && data.vat_reversed) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
+      (total_usd != "$0.00" && data.vat_reversed) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
+      *((is_v2 && data.usd_to_eur_rate) ? [["Total in USD:", data.total_usd], ["Exchange rate:", data.usd_to_eur_rate_string]] : nil),
       ["Total:", data.total],
     ]
     totals.compact!

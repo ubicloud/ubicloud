@@ -180,12 +180,12 @@ class Clover
             mode: "payment",
             line_items: [{
               price_data: {
-                currency: "usd",
+                currency: invoice.charge_currency,
                 product_data: {
                   name: "Invoice Payment",
                   description: invoice.invoice_number,
                 },
-                unit_amount: (invoice.cost.to_f * 100).to_i,  # Stripe expects amount in cents
+                unit_amount: invoice.charge_amount_cents,
               },
               quantity: 1,
             }],

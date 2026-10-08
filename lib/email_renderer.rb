@@ -23,7 +23,10 @@ class EmailRenderer < Roda
         add_file filename: name, content: file
       end
 
-      text_part "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
+      text_part(
+        "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}",
+        "Content-Type" => "text/plain; charset=UTF-8",
+      )
 
       html_part(
         part("email/layout", subject:, greeting:, body:, button_title:, button_link:, author_name:),

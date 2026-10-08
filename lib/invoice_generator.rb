@@ -53,20 +53,29 @@ class InvoiceGenerator
           "in_eu_vat" => !!is_eu,
         })
 
-        project_content[:bank_transfer_info] = if bi && bi.payment_methods.empty?
+        if (convert_usd_to_eur = @eur_rate && project.get_ff_invoice_in_eur)
+          # This duplicates the setting in the VAT section, but this is for a different purpose.
+          # This controls whether the invoice itself is displayed in USD or EUR.
+          # The VAT section rate only affects the VAT calculation.
+          project_content[:usd_to_eur_rate] = @eur_rate
+        end
+
+        if bi && bi.payment_methods.empty?
           project_content[:due_date] = (Date.today + 30).to_s
-          if is_eu
-            {
+          if is_eu || convert_usd_to_eur
+            project_content[:bank_transfer_info] = {
               "Beneficiary" => "Ubicloud B.V.",
               "IBAN" => "NL30REVO6759811127",
               "BIC" => "REVONL22",
-              "Intermediary BIC" => "CHASGB2L",
               "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
               "Bank/Payment institution" => "Revolut Bank UAB",
               "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands",
             }
+            unless convert_usd_to_eur
+              project_content[:bank_transfer_info]["Intermediary BIC"] = "CHASGB2L"
+            end
           else
-            {
+            project_content[:bank_transfer_info] = {
               "Beneficiary" => "Ubicloud Inc.",
               "Beneficiary address" => "310 Santa Ana Ave, San Francisco, CA 94127",
               "ABA/Routing number" => "121145349",

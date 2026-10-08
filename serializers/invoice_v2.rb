@@ -3,12 +3,19 @@
 require "countries"
 
 class Serializers::InvoiceV2 < Serializers::InvoiceV1
-  InvoiceData = Data.define(*Serializers::InvoiceV1::InvoiceData.members, :discounts, :credits)
+  InvoiceData = Data.define(*Serializers::InvoiceV1::InvoiceData.members, :discounts, :credits, :total_usd, :usd_to_eur_rate) do
+    def usd_to_eur_rate_string
+      "1 USD = #{"%0.4f" % usd_to_eur_rate} EUR"
+    end
+  end
   ItemData = Data.define(*Serializers::InvoiceV1::ItemData.members, :discount_name, :credits)
   BreakdownData = Data.define(:name, :amount)
 
   def self.hash_for(inv, options)
     hash = super
+    hash[:total_usd] = hash[:total]
+    hash[:total] = inv.total_humanized
+    hash[:usd_to_eur_rate] = inv.usd_to_eur_rate
     %i[credits discounts].each do |k|
       hash[k] = inv.content[k.to_s].map { |d| BreakdownData.new(name: d["name"], amount: "$%0.02f" % d["amount"]) }
     end
