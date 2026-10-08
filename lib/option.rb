@@ -201,6 +201,7 @@ module Option
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
+    ["gpu-ubuntu-resolute", "Ubuntu 26.04 for GPU VMs"],
     ["gpu-ubuntu-noble", "Ubuntu 24.04 for GPU VMs"],
     ["ubuntu-resolute", "Ubuntu Resolute 26.04 LTS"],
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
