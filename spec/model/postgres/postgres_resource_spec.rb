@@ -789,31 +789,11 @@ RSpec.describe PostgresResource do
       expect(Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD]).to include(PostgresResource::DEFAULT_VERSION)
       expect(described_class.default_version).to eq(PostgresResource::DEFAULT_VERSION)
     end
-
-    it "returns the newest supported version for a flavor without the default" do
-      expect(Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::LANTERN]).not_to include(PostgresResource::DEFAULT_VERSION)
-      expect(described_class.default_version(PostgresResource::Flavor::LANTERN)).to eq("17")
-    end
-
-    it "falls back to the standard list for a flavor that does not exist" do
-      expect(described_class.default_version("bogus")).to eq(PostgresResource::DEFAULT_VERSION)
-    end
   end
 
   describe "#boot_image" do
-    it "returns the standard metal image for the standard flavor" do
-      postgres_resource.update(flavor: PostgresResource::Flavor::STANDARD)
+    it "returns the metal image for the image family" do
       expect(postgres_resource.boot_image("16", "x64", "ubuntu-2204")).to eq("postgres-ubuntu-2204")
-    end
-
-    it "returns the lantern metal image for the lantern flavor" do
-      postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
-      expect(postgres_resource.boot_image("16", "x64", "ubuntu-2204")).to eq("postgres16-lantern-ubuntu-2204")
-    end
-
-    it "raises for an unknown metal flavor" do
-      expect(postgres_resource).to receive(:flavor).twice.and_return("unknown")
-      expect { postgres_resource.boot_image("16", "x64", "ubuntu-2204") }.to raise_error("Unknown PostgreSQL flavor: unknown")
     end
 
     it "delegates to the location's pg_aws_ami for AWS resources" do
@@ -1471,7 +1451,7 @@ RSpec.describe PostgresResource do
     end
 
     it "returns false if the postgres resource cannot be upgraded" do
-      postgres_resource.update(target_version: "17", flavor: PostgresResource::Flavor::LANTERN)
+      postgres_resource.update(target_version: PostgresResource::LATEST_VERSION, flavor: PostgresResource::Flavor::STANDARD)
       expect(postgres_resource.can_upgrade?).to be false
     end
   end

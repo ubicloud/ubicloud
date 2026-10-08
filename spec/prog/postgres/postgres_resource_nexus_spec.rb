@@ -103,11 +103,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.target_image_family).to eq("ubuntu-2604")
     end
 
-    it "pins target_image_family to ubuntu-2204 for the lantern flavor" do
-      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fam-lantern", target_vm_size: "standard-2", target_storage_size_gib: 128, flavor: PostgresResource::Flavor::LANTERN, target_image_family: "ubuntu-2604").subject
-      expect(pg.target_image_family).to eq("ubuntu-2204")
-    end
-
     it "inherits the parent's serving image family for a child resource" do
       parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-fam", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       parent.representative_server.update(image_family: "ubuntu-2604")

@@ -60,12 +60,10 @@ RSpec.describe Clover, "postgres" do
 
     describe "list" do
       it "can list flavors when there is no pg databases" do
-        project.set_ff_postgres_lantern(true)
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
         expect(page).to have_content "Create PostgreSQL Database"
-        expect(page).to have_content "Create Lantern PostgreSQL Database"
 
         click_link "Create PostgreSQL Database"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
@@ -236,35 +234,6 @@ RSpec.describe Clover, "postgres" do
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         expect(page).to have_flash_error("Validation failed for following fields: location")
-      end
-
-      it "can create new Lantern PostgreSQL database when the feature flag is enabled" do
-        project.set_ff_postgres_lantern(true)
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::LANTERN}"
-
-        expect(page.title).to eq("Ubicloud - Create Lantern PostgreSQL Database")
-        name = "new-pg-db"
-        fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_UBID
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
-        check "Accept Terms of Service and Privacy Policy"
-
-        click_button "Create"
-        expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
-        expect(PostgresResource.count).to eq(1)
-        expect(PostgresResource.first.project_id).to eq(project.id)
-      end
-
-      it "can not create new Lantern PostgreSQL database in a customer specific location" do
-        project.set_ff_postgres_lantern(true)
-        private_location = create_private_location(project:)
-
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::LANTERN}"
-
-        expect(page.title).to eq("Ubicloud - Create Lantern PostgreSQL Database")
-        expect(page).to have_no_content private_location.name
       end
 
       it "treats invalid flavor as standard flavor when creating" do

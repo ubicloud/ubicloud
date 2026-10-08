@@ -68,19 +68,6 @@ RSpec.describe CloverAdmin, "PostgresResource" do
     expect(@instance.reload.target_image_family).to eq "ubuntu-2604"
   end
 
-  it "rejects an image family change for the lantern flavor" do
-    @instance.update(flavor: "lantern")
-    click_link "PostgresResource"
-    click_link @instance.admin_label
-    click_link "Set image family"
-    select "ubuntu-2604", from: "image_family"
-    dont_raise_admin_errors do
-      click_button "Set image family"
-      expect(page).to have_content "InvalidRequest: Lantern only has a ubuntu-2204 image"
-    end
-    expect(@instance.reload.target_image_family).to eq "ubuntu-2204"
-  end
-
   it "rejects an image family change while a version upgrade is in progress" do
     create_postgres_server(resource: @instance).update(version: "16")
     @instance.update(target_version: "17")

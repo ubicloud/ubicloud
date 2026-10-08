@@ -9,7 +9,7 @@ class Clover
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
-    version = typecast_params.nonempty_str("version", PostgresResource.default_version(flavor))
+    version = typecast_params.nonempty_str("version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
@@ -56,7 +56,6 @@ class Clover
       ).subject
       audit_log(pg, "create")
     end
-    send_notification_mail_to_partners(pg, current_account.email)
 
     if api?
       Serializers::Postgres.serialize(pg, {detailed: true})
@@ -104,22 +103,6 @@ class Clover
         .group_by { |r| r.read_replica? ? r[:parent_id] : r[:id] }
         .flat_map { |group_id, rs| rs.sort_by { |r| r[:created_at] } }
       view "postgres/index"
-    end
-  end
-
-  def send_notification_mail_to_partners(resource, user_email)
-    if resource.requires_partner_notification_email? && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
-      flavor_name = resource.flavor.capitalize
-      Util.send_email(email, "New #{flavor_name} Postgres database has been created.",
-        greeting: "Hello #{flavor_name} team,",
-        body: ["New #{flavor_name} Postgres database has been created.",
-          "ID: #{resource.ubid}",
-          "Location: #{resource.location.display_name}",
-          "Name: #{resource.name}",
-          "E-mail: #{user_email}",
-          "Instance VM Size: #{resource.target_vm_size}",
-          "Instance Storage Size: #{resource.target_storage_size_gib}",
-          "HA: #{resource.ha_type}"])
     end
   end
 

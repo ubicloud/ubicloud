@@ -782,16 +782,13 @@ class PostgresResource < Sequel::Model
 
     options.add_option(name: "name")
 
-    options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
+    options.add_option(name: "flavor", values: flavor || Option::POSTGRES_FLAVOR_OPTIONS.keys)
 
     available_families_and_sizes_by_location = {}
-    options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
-      available_families_and_sizes_by_location[location.name] ||= available_families_and_sizes(location, project)
-      flavor == PostgresResource.default_flavor || location.metal?
-    end
+    options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor")
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
-      available_families_and_sizes_by_location[location.name].any? { |f, _| f == family }
+      (available_families_and_sizes_by_location[location.name] ||= available_families_and_sizes(location, project)).any? { |f, _| f == family }
     end
 
     options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
@@ -836,10 +833,6 @@ class PostgresResource < Sequel::Model
     update(parseable_password: password)
   end
 
-  def self.postgres_flavors(project)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !project.get_ff_postgres_lantern }
-  end
-
   def self.postgres_locations(project)
     Location.postgres_locations(project.get_ff_visible_postgres_locations) + project.locations
   end
@@ -856,19 +849,10 @@ class PostgresResource < Sequel::Model
 
   module Flavor
     STANDARD = "standard"
-    LANTERN = "lantern"
   end
 
   def self.default_flavor
     Flavor::STANDARD
-  end
-
-  def self.partner_notification_flavors
-    [PostgresResource::Flavor::LANTERN]
-  end
-
-  def requires_partner_notification_email?
-    self.class.partner_notification_flavors.include?(flavor)
   end
 
   # Bumped on its own schedule: a version is offered in POSTGRES_VERSION_OPTIONS
@@ -876,11 +860,8 @@ class PostgresResource < Sequel::Model
   DEFAULT_VERSION = "18"
   LATEST_VERSION = "18"
 
-  def self.default_version(flavor = Flavor::STANDARD)
-    # The flavor is not validated before this runs, so an unknown one falls
-    # back to the standard list.
-    versions = Option::POSTGRES_VERSION_OPTIONS[flavor] || Option::POSTGRES_VERSION_OPTIONS[Flavor::STANDARD]
-    versions.include?(DEFAULT_VERSION) ? DEFAULT_VERSION : versions.max_by(&:to_i)
+  def self.default_version
+    DEFAULT_VERSION
   end
 
   MAINTENANCE_DURATION_IN_HOURS = 2

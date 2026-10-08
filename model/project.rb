@@ -323,7 +323,6 @@ class Project < Sequel::Model
     :postgres_enable_maintenance_window_days,
     :postgres_hostname_override,
     :postgres_init_script,
-    :postgres_lantern,
     :postgres_maintenance_window_platform_only,
     :private_locations,
     :require_mfa_or_omniauth,

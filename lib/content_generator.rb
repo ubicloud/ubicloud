@@ -135,19 +135,6 @@ module ContentGenerator
     def self.restrict_by_default(restrict)
       (restrict == "true") ? ["No access yet", "No firewall rules"] : ["Open to the internet", "Any address"]
     end
-
-    def self.partnership_notice(flavor)
-      notice = {
-        PostgresResource::Flavor::LANTERN => [[
-          "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.",
-          "You can reach to Lantern team for support at <a href='mailto:support@lantern.dev' class='text-orange-600 font-semibold'>support@lantern.dev</a>",
-          "By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern team.",
-        ],
-          "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"],
-      }
-
-      notice[flavor]
-    end
   end
 
   module LoadBalancer
