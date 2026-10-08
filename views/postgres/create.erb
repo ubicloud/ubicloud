@@ -1,6 +1,6 @@
 <% default_flavor = PostgresResource.default_flavor
   @flavor = typecast_params.nonempty_str("flavor", default_flavor)
-  @flavor = default_flavor unless PostgresResource.postgres_flavors(@project).any? { |k,| k == @flavor }
+  @flavor = default_flavor unless Option::POSTGRES_FLAVOR_OPTIONS.key?(@flavor)
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
   effective_quota = @project.effective_quota_value("PostgresVCpu")
@@ -8,8 +8,7 @@
   @enabled_postgres_sizes = Option::VmSizes.select { effective_quota >= current_usage + it.vcpus }.map(&:name)
   @option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @flavor)
 
-  @page_title, logo = PostgresResource.postgres_flavors(@project)[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == default_flavor %>
+  @page_title = "Create #{Option::POSTGRES_FLAVOR_OPTIONS[@flavor].title}" %>
 
 <%== render("components/billing_warning") %>
 
@@ -20,8 +19,7 @@
     [@project.name, @project.path],
     ["PostgreSQL Databases", "#{@project.path}/postgres"],
     %w[Create #].freeze
-  ],
-  right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
+  ]
 ) %>
 
 <% byoc_description_html, additional_element_html = if @project.get_ff_private_locations
@@ -49,10 +47,6 @@
      description_html: "<p class='mt-1 text-sm leading-6 text-gray-600'>Opening the database creates rules for ports 5432 and 6432 from any address. Ubicloud always requires a password and TLS, and you can change the rules later on the Networking tab.</p>"},
   ]
 
-  if PostgresResource.partner_notification_flavors.include?(@flavor)
-    form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
-  end
-
   if @project.get_ff_postgres_init_script
     form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", placeholder: "Enter script to run on database creation"}
   end
@@ -61,6 +55,6 @@
 
   # Without this the form checks the first version offered, which is the newest
   # rather than the one new databases default to.
-  pre_selected_values = {"version" => PostgresResource.default_version(@flavor)} %>
+  pre_selected_values = {"version" => PostgresResource.default_version} %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents, pre_selected_values:, content_generator_class: ContentGenerator::Postgres) %>

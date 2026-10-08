@@ -208,7 +208,6 @@ module Config
   override :postgres_default_image_family, "ubuntu-2604", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
-  optional :postgres_lantern_notification_email, string
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
   override :aws_postgres_blob_storage_iam_sweep, true, bool

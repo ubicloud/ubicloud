@@ -97,16 +97,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(pv.vm.vm_firewalls).to eq [pg.internal_firewall]
     end
 
-    it "picks correct base image for Lantern" do
-      lantern_resource = create_postgres_resource(project: user_project, location_id:)
-      lantern_resource.update(target_version: "16", flavor: PostgresResource::Flavor::LANTERN)
-      Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: service_project)
-      postgres_timeline = create_postgres_timeline(location_id:)
-
-      st = described_class.assemble(resource_id: lantern_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
-      expect(st.subject.vm.boot_image).to eq("postgres16-lantern-ubuntu-2204")
-    end
-
     it "picks correct base image for AWS-pg16" do
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64", family: "ubuntu-2204"]
 

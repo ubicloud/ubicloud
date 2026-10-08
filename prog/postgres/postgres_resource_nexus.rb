@@ -38,7 +38,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "Availability zone requests are only supported for AWS locations"
     end
 
-    target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
+    target_version ||= PostgresResource.default_version if parent_id.nil?
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, target_version, target_image_family = if restore_from_timeline_id
@@ -71,11 +71,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version, parent.representative_server.image_family]
       end
-
-      # Lantern has no image outside ubuntu-2204, so pin it here. This keeps
-      # target_image_family the family every Lantern server runs, even if the
-      # default family flips, which lets callers read the target directly.
-      target_image_family = "ubuntu-2204" if flavor == PostgresResource::Flavor::LANTERN
 
       # Copy of conditions from PostgresResource#uses_publicly_signed_certificates?
       use_publicly_signed_certificates = hostname_version == "v3" &&

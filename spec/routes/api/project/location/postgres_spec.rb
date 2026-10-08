@@ -142,36 +142,11 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
-      it "sends mail to partners" do
-        project.set_ff_postgres_lantern(true)
-        expect(Config).to receive(:postgres_lantern_notification_email).and_return("dummy@mail.com")
-        expect(Util).to receive(:send_email)
-
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
-          size: "standard-2",
-          storage_size: 64,
-          flavor: "lantern",
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
       it "fails if invalid flavor is used" do
-        project.set_ff_postgres_lantern(false)
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-invalid", {
           size: "standard-2",
           storage_size: 64,
           flavor: "invalid",
-        }.to_json
-        expect(last_response.status).to eq(400)
-      end
-
-      it "fails if lantern feature flag is not enabled" do
-        project.set_ff_postgres_lantern(false)
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
-          size: "standard-2",
-          storage_size: 64,
-          flavor: "lantern",
         }.to_json
         expect(last_response.status).to eq(400)
       end

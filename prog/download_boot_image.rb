@@ -205,16 +205,6 @@ class Prog::DownloadBootImage < Prog::Base
         "20261007.1.0" => "83031340fd897412d3b0742e6dd2d5f104470b3a8ab9300b109658d5df1934b9",
       },
     },
-    "postgres16-lantern-ubuntu-2204" => {
-      "x64" => {
-        "20250103.1.0" => "bfb56867513045bc88396d529a3cc186dc44ba4d691acb51dbf45fc5a0eeb7e6",
-      },
-    },
-    "postgres17-lantern-ubuntu-2204" => {
-      "x64" => {
-        "20250103.1.0" => "a95b2e5d03291783dc1753228d7a87949257a06c7b1eca2c94502ab21ffdecdb",
-      },
-    },
     "ai-ubuntu-2404-nvidia" => {
       "x64" => {
         "20250505.1.0" => "8d438d372238d46739ace4337634f3489dc4f18496a970fda6b6e60226307eaa",
