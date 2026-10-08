@@ -5,7 +5,7 @@ class UbiCli
     desc "Create a PostgreSQL database"
 
     options("ubi pg location/pg-name create [options]", key: :pg_create) do
-      on("-f", "--flavor=type", Option::POSTGRES_FLAVOR_OPTIONS.keys, "flavor")
+      on("-f", "--flavor=type", Option::POSTGRES_FLAVOR_OPTIONS.keys, "flavor (deprecated, standard is the only flavor)")
       on("-h", "--ha-type=type", Option::POSTGRES_HA_OPTIONS.keys, "replication type")
       on("-s", "--size=size", Option::POSTGRES_LEGACY_SIZE_OPTIONS.keys, "server size")
       on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS.map(&:to_s), "storage size GB")
@@ -16,7 +16,6 @@ class UbiCli
       on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
       on("-P", "--private-subnet-name=name", "override name of created private subnet")
     end
-    help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
     help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
     help_option_values("Size:", Option::POSTGRES_SIZE_OPTIONS.keys)
     help_option_values("Storage Size:", Option::POSTGRES_STORAGE_SIZE_OPTIONS)

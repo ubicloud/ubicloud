@@ -1359,8 +1359,9 @@ paths:
               type: object
               properties:
                 flavor:
-                  description: Kind of database
+                  description: Deprecated. standard is the only flavor and the default, so omit this.
                   type: string
+                  deprecated: true
                 ha_type:
                   description: High availability type
                   type: string
@@ -3789,8 +3790,9 @@ components:
       type: object
       properties:
         flavor:
-          description: Kind of Postgres database
+          description: Deprecated. Always standard.
           type: string
+          deprecated: true
         ha_type:
           description: High availability type
           type: string

@@ -259,9 +259,9 @@ module Option
   }).freeze
 
   # Postgres Global Options
-  PostgresFlavorOption = Data.define(:name, :brand, :title, :description)
+  PostgresFlavorOption = Data.define(:name, :title)
   POSTGRES_FLAVOR_OPTIONS = [
-    [PostgresResource::Flavor::STANDARD, "ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
+    [PostgresResource::Flavor::STANDARD, "PostgreSQL Database"],
   ].to_h { |args| [args[0], PostgresFlavorOption.new(*args)] }.freeze
 
   PostgresFamilyOption = Data.define(:name, :description, :category)
