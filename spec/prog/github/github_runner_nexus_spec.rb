@@ -1071,6 +1071,42 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.setup_environment }.to hop("register_runner")
     end
+
+    it "restarts the vm and naps on a known kernel boot race" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNREFUSED)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -cE ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log || true").and_return("1\n")
+      expect { nx.setup_environment }.to nap(15)
+      expect(vm.restart_set?(cached: false)).to be true
+    end
+
+    it "reraises a connection error that is not a known kernel boot race" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNREFUSED)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -cE ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log || true").and_return("0\n")
+      expect { nx.setup_environment }.to raise_error(Errno::ECONNREFUSED)
+      expect(vm.restart_set?(cached: false)).to be false
+    end
+  end
+
+  describe "#known_kernel_boot_race?" do
+    before { vm.update(vm_host_id: create_vm_host.id) }
+
+    it "is false when the vm has no host" do
+      vm.update(vm_host_id: nil)
+      expect(nx.known_kernel_boot_race?).to be false
+    end
+
+    it "is true when the serial log shows the race" do
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -cE ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log || true").and_return("1\n")
+      expect(nx.known_kernel_boot_race?).to be true
+    end
+
+    it "is false when the serial log does not show the race" do
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -cE ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log || true").and_return("0\n")
+      expect(nx.known_kernel_boot_race?).to be false
+    end
   end
 
   describe "#register_runner" do
