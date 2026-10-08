@@ -11,6 +11,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
+  frame_accessor :boot_race_checked
+
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
@@ -517,7 +519,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # which lets that run generate the jit config while the vm boots, and
     # again when the vm is ready, so the nap is only a fallback for signals
     # we never receive.
-    nap 10 unless vm.provisioned_at
+    unless vm.provisioned_at
+      if vm.vm_host && !boot_race_checked && Time.now > vm.allocated_at + 5 * 60
+        self.boot_race_checked = true
+        replace_runner_on_known_kernel_boot_race
+      end
+      nap 10
+    end
 
     register_deadline("wait", 10 * 60)
     hop_setup_environment
@@ -584,12 +592,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     begin
       vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
     rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
-      raise unless known_kernel_boot_race?
-
-      Clog.emit("replacing runner vm on known kernel boot race", {known_kernel_boot_race: {github_runner_ubid: github_runner.ubid, repository_name: github_runner.repository_name, vm_ubid: vm.ubid}})
-      github_runner.provision_spare_runner
-      github_runner.incr_destroy
-      nap 0
+      replace_runner_on_known_kernel_boot_race
+      raise
     end
     github_runner.encoded_jit_config ? hop_start_runner : hop_register_runner
   end
@@ -598,6 +602,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     return false unless (host = vm.vm_host)
 
     host.sshable.cmd("sudo grep -qsE :re /vm/:name/serial.log && echo match || true", re: "EXT4-fs error.*ext4_mb_generate_buddy.*block bitmap and bg descriptor inconsistent", name: vm.inhost_name).include?("match")
+  end
+
+  def replace_runner_on_known_kernel_boot_race
+    return unless known_kernel_boot_race?
+
+    Clog.emit("replacing runner vm on known kernel boot race", {known_kernel_boot_race: {github_runner_ubid: github_runner.ubid, repository_name: github_runner.repository_name, vm_ubid: vm.ubid}})
+    github_runner.provision_spare_runner
+    github_runner.incr_destroy
+    nap 0
   end
 
   # The old route, taken when the jit config was not generated at wait_vm

@@ -917,6 +917,42 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.wait_vm }.to hop("setup_environment")
     end
 
+    context "when a metal vm is not sshable yet" do
+      before do
+        runner.update(encoded_jit_config: "AABBCC$")
+        vm.update(vm_host_id: create_vm_host.id, allocated_at: now - 6 * 60, provisioned_at: nil)
+      end
+
+      it "replaces the runner when the host serial log shows the kernel boot race" do
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -qsE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log && echo match || true").and_return("match\n")
+        expect { nx.wait_vm }.to nap(0)
+        expect(nx.boot_race_checked).to be true
+        expect(runner.spare_runner_provisioned_set?(cached: false)).to be true
+        expect(runner.destroy_set?(cached: false)).to be true
+      end
+
+      it "checks the host serial log only once and keeps waiting when it is not the boot race" do
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo grep -qsE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent /vm/#{vm.inhost_name}/serial.log && echo match || true").once.and_return("")
+        expect { nx.wait_vm }.to nap(10)
+        expect(nx.boot_race_checked).to be true
+        expect(runner.destroy_set?(cached: false)).to be false
+        expect { nx.wait_vm }.to nap(10)
+      end
+
+      it "does not check the host before the vm has been unsshable for 5 minutes" do
+        vm.update(allocated_at: now - 4 * 60)
+        expect(vm.vm_host.sshable).not_to receive(:_cmd)
+        expect { nx.wait_vm }.to nap(10)
+        expect(nx.boot_race_checked).to be_nil
+      end
+
+      it "does not check the host for a vm that is not on a metal host" do
+        vm.update(vm_host_id: nil)
+        expect { nx.wait_vm }.to nap(10)
+        expect(nx.boot_race_checked).to be_nil
+      end
+    end
+
     it "deregisters the runner and naps if the generate request fails due to 'already exists with the same name' error" do
       vm.update(allocated_at: now)
       expect(client).to receive(:post)
