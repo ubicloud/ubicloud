@@ -37,6 +37,7 @@ class Clover < Roda
         ::SubjectTag => [:admin_tag?, :options_for_project, :subject_id_map_for_project_and_accounts],
         ::VictoriaMetricsResource => [:client_for_project],
         ::Vm => [:from_runtime_jwt_payload, :maintenance_hour_options],
+        ::VmHost => [:available_to_project],
       }.freeze
       ALLOWED_CALLS.each_value(&:freeze)
       ALLOWED_MODELS = [
