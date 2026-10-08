@@ -180,6 +180,14 @@ class VmHost < Sequel::Model
     assigned_host_addresses_dataset.first { {family(ip) => 4} }
   end
 
+  def self.available_to_project(project_id)
+    dedicated_location_ids = Location.where(dedicated: true).select(:id)
+    Sequel.|(
+      Sequel.&({Sequel[:vm_host][:project_id] => nil}, Sequel.~(Sequel[:vm_host][:location_id] => dedicated_location_ids)),
+      {Sequel[:vm_host][:project_id] => project_id},
+    )
+  end
+
   def io_cpu_count
     if total_cpus <= 64
       2
@@ -544,10 +552,12 @@ end
 #  location_id        | uuid                     | NOT NULL
 #  family             | text                     | NOT NULL
 #  score_offset       | double precision         | NOT NULL DEFAULT 0
+#  project_id         | uuid                     |
 # Indexes:
-#  vm_host_pkey     | PRIMARY KEY btree (id)
-#  vm_host_ip6_key  | UNIQUE btree (ip6)
-#  vm_host_net6_key | UNIQUE btree (net6)
+#  vm_host_pkey             | PRIMARY KEY btree (id)
+#  vm_host_ip6_key          | UNIQUE btree (ip6)
+#  vm_host_net6_key         | UNIQUE btree (net6)
+#  vm_host_project_id_index | btree (project_id) WHERE project_id IS NOT NULL
 # Check constraints:
 #  core_allocation_limit       | (used_cores <= total_cores)
 #  hugepages_allocation_limit  | (used_hugepages_1g <= total_hugepages_1g)
@@ -556,6 +566,7 @@ end
 # Foreign key constraints:
 #  vm_host_id_fkey          | (id) REFERENCES sshable(id)
 #  vm_host_location_id_fkey | (location_id) REFERENCES location(id)
+#  vm_host_project_id_fkey  | (project_id) REFERENCES project(id)
 # Referenced By:
 #  address               | address_routed_to_host_id_fkey        | (routed_to_host_id) REFERENCES vm_host(id)
 #  assigned_host_address | assigned_host_address_host_id_fkey    | (host_id) REFERENCES vm_host(id)
