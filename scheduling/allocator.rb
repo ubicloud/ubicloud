@@ -42,6 +42,7 @@ module Scheduling::Allocator
       family_filter,
       minimum_vhost_block_backend_version,
       os_filter,
+      vm.project_id,
     )
     allocation = Allocation.best_allocation(request)
     fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
@@ -77,6 +78,7 @@ module Scheduling::Allocator
     :family_filter,
     :minimum_vhost_block_backend_version,
     :os_filter,
+    :project_id,
   ) do
     def initialize(*args)
       super
@@ -170,6 +172,8 @@ module Scheduling::Allocator
             .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
             .left_join(:gpu_partitions, vm_host_id: Sequel[:vm_host][:id])
             .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
+            .left_join(:shares, vm_host_id: Sequel[:vm_host][:id])
+            .left_join(:project_usage, vm_host_id: Sequel[:vm_host][:id])
             .select(
               Sequel[:vm_host][:id].as(:vm_host_id),
               :total_cpus,
@@ -191,6 +195,11 @@ module Scheduling::Allocator
               :accepts_slices,
               :family,
               :score_offset,
+              Sequel.~(Sequel[:shares][:vm_host_id] => nil).as(:has_shares),
+              Sequel.function(:coalesce, :share_gpus, 0).as(:share_gpus),
+              Sequel.function(:coalesce, :project_vcpus, 0).as(:project_vcpus),
+              Sequel.function(:coalesce, :project_memory_gib, 0).as(:project_memory_gib),
+              Sequel.function(:coalesce, :project_storage_gib, 0).as(:project_storage_gib),
             )
             .where(arch: request.arch_filter)
             .with(:available_ipv4, DB[:ipv4_address]
@@ -225,6 +234,18 @@ module Scheduling::Allocator
               .select_group(:vm_host_id)
               .select_append { count.function.*.as(vm_provisioning_count) }
               .where(display_state: "creating"))
+            .with(:shares, DB[:gpu_partition]
+              .exclude(project_id: nil)
+              .join(:gpu_partitions_pci_devices, gpu_partition_id: :id)
+              .select_group(:vm_host_id)
+              .select_append { count(:pci_device_id).distinct.filter(project_id: request.project_id).as(:share_gpus) })
+            .with(:project_usage, DB[:vm]
+              .where(project_id: request.project_id)
+              .exclude(vm_host_id: nil)
+              .select_group(:vm_host_id)
+              .select_append { sum(:vcpus).as(:project_vcpus) }
+              .select_append { sum(:memory_gib).as(:project_memory_gib) }
+              .select_append { sum(DB[:vm_storage_volume].where(vm_id: Sequel[:vm][:id]).select { coalesce(sum(:size_gib), 0) }).as(:project_storage_gib) })
         end
 
         ds = if request.use_slices && request.require_shared_slice
@@ -286,7 +307,9 @@ module Scheduling::Allocator
         if request.gpu_count > 0
           apply_filter(:gpu_count) { ds = ds.where { available_gpus >= request.gpu_count } }
         end
-        unless request.host_filter.empty?
+        if request.host_filter.empty?
+          apply_filter(:shares) { ds = ds.where(Sequel.|({Sequel[:shares][:vm_host_id] => nil}, Sequel[:shares][:share_gpus] > 0)) }
+        else
           apply_filter(:host) { ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) }
         end
         unless request.host_exclusion_filter.empty?
@@ -390,7 +413,18 @@ module Scheduling::Allocator
     end
 
     def is_valid
-      @allocations.all? { it.is_valid }
+      @allocations.all? { it.is_valid } && within_share?
+    end
+
+    def within_share?
+      return true unless @candidate_host[:has_shares] && @request.host_filter.empty?
+
+      share = Rational(@candidate_host[:share_gpus], @candidate_host[:num_gpus])
+      vm_cpus = @candidate_host[:total_cpus] - VmHost.io_cpu_count(@candidate_host[:total_cpus])
+
+      @candidate_host[:project_vcpus] + @request.vcpus <= vm_cpus * share &&
+        @candidate_host[:project_memory_gib] + @request.memory_gib <= @candidate_host[:total_hugepages_1g] * share &&
+        @candidate_host[:project_storage_gib] + @request.storage_gib <= @candidate_host[:total_storage_gib] * share
     end
 
     def update(vm)
@@ -638,7 +672,8 @@ module Scheduling::Allocator
       @use_partition = candidate_host[:use_gpu_partition]
 
       if @use_partition
-        @partition = select_partition(candidate_host[:vm_host_id], @requested)
+        share_project_id = request.project_id if candidate_host[:has_shares] && request.host_filter.empty?
+        @partition = select_partition(candidate_host[:vm_host_id], @requested, share_project_id)
         @iommu_groups = pci_iommu_groups_for_partition(@partition)
       else
         @iommu_groups = select_iommu_groups(candidate_host[:available_iommu_groups], @requested)
@@ -675,7 +710,7 @@ module Scheduling::Allocator
       (chosen_group || gpus).take(n).map { |h| h["iommu_group"] }
     end
 
-    def select_partition(vm_host_id, gpu_count)
+    def select_partition(vm_host_id, gpu_count, share_project_id = nil)
       used_pci_device_ids =
         DB[:gpu_partitions_pci_devices]
           .where(
@@ -693,7 +728,7 @@ module Scheduling::Allocator
           .where(vm_host_id:)
           .select(:partition_id)
 
-      GpuPartition
+      ds = GpuPartition
         .where(
           vm_host_id:,
           enabled: true,
@@ -701,6 +736,15 @@ module Scheduling::Allocator
           gpu_count:,
         )
         .exclude(partition_id: blocked_partitions)
+
+      if share_project_id
+        share_pci_device_ids = DB[:gpu_partitions_pci_devices]
+          .where(gpu_partition_id: GpuPartition.where(vm_host_id:, project_id: share_project_id).select(:id))
+          .select(:pci_device_id)
+        ds = ds.exclude(id: DB[:gpu_partitions_pci_devices].exclude(pci_device_id: share_pci_device_ids).select(:gpu_partition_id))
+      end
+
+      ds
         .order(:partition_id)
         .select_map(:id)
         .first

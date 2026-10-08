@@ -15,7 +15,7 @@ RSpec.describe Scheduling::Allocator do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], minimum_vhost_block_backend_version: nil, os_filter: nil)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], minimum_vhost_block_backend_version: nil, os_filter: nil, project_id: nil)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -43,6 +43,7 @@ RSpec.describe Scheduling::Allocator do
       family_filter,
       minimum_vhost_block_backend_version,
       os_filter,
+      project_id,
     )
   end
 
@@ -213,7 +214,39 @@ RSpec.describe Scheduling::Allocator do
                  vm_provisioning_count: 0,
                  accepts_slices: false,
                  family: "standard",
-                 score_offset: 0.0}])
+                 score_offset: 0.0,
+                 has_shares: false,
+                 share_gpus: 0,
+                 project_vcpus: 0,
+                 project_memory_gib: 0,
+                 project_storage_gib: 0}])
+    end
+
+    it "retrieves hosts with GPU partitions owned by projects only for these projects, unless the host is forced" do
+      project_id = Project.create(name: "owner").id
+      shared, owned = Array.new(2) do |i|
+        vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+        StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+        Address.create(cidr: "#{i + 1}.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
+        BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+        pci = PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: 3)
+        gp = GpuPartition.create(vm_host_id: vmh.id, partition_id: 1, gpu_count: 1, project_id: (project_id if i == 1))
+        DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
+        vmh
+      end
+      req.gpu_count = 1
+
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([shared.id])
+      req.project_id = Project.create(name: "other").id
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([shared.id])
+      req.host_filter = [owned.id]
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([owned.id])
+      req.host_filter = []
+      req.project_id = project_id
+      expect(Al::Allocation.candidate_hosts(req).map { it.slice(:vm_host_id, :has_shares, :share_gpus) }).to contain_exactly(
+        {vm_host_id: shared.id, has_shares: false, share_gpus: 0},
+        {vm_host_id: owned.id, has_shares: true, share_gpus: 1},
+      )
     end
 
     it "does not filter out storage devices with >= threshold available for a small request" do
@@ -237,7 +270,7 @@ RSpec.describe Scheduling::Allocator do
 
       expect(req).to receive(:diagnostics).and_return(true).at_least(:once)
       expect(Clog).to receive(:emit).with("Allocator query for vm", instance_of(Hash)) do |_, b|
-        expect(b[:allocator_query][:counts]).to eq [[:base, 1], [:space, 1], [:boot_image, 1], [:ipv4, 1], [:allocation_state, 1], [:non_gpu, 1]]
+        expect(b[:allocator_query][:counts]).to eq [[:base, 1], [:space, 1], [:boot_image, 1], [:ipv4, 1], [:shares, 1], [:allocation_state, 1], [:non_gpu, 1]]
       end
       expect(Al::Allocation.candidate_hosts(req))
         .to eq([{location_id: vmh.location_id,
@@ -259,7 +292,12 @@ RSpec.describe Scheduling::Allocator do
                  vm_provisioning_count: 2,
                  accepts_slices: false,
                  family: "standard",
-                 score_offset: 0.0}])
+                 score_offset: 0.0,
+                 has_shares: false,
+                 share_gpus: 0,
+                 project_vcpus: 0,
+                 project_memory_gib: 0,
+                 project_storage_gib: 0}])
     end
 
     it "applies host filter" do
@@ -707,6 +745,23 @@ RSpec.describe Scheduling::Allocator do
       expect(Al::Allocation.new(vmhds, req).score).to eq(-1)
     end
 
+    it "limits the resources of a project on a host with owned GPU partitions to its share" do
+      allow(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      allow(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      allow(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::Allocation.new(vmhds, req).is_valid).to be true
+
+      vmhds.merge!(total_cpus: 196, num_gpus: 8, total_hugepages_1g: 2000, total_storage_gib: 26000, has_shares: true, share_gpus: 4, project_vcpus: 64, project_memory_gib: 864, project_storage_gib: 12800)
+      expect(Al::Allocation.new(vmhds, req).is_valid).to be true
+
+      [[:project_vcpus, 93], [:project_memory_gib, 990], [:project_storage_gib, 12980]].each do |key, used|
+        expect(Al::Allocation.new(vmhds.merge(key => used), req).is_valid).to be false
+      end
+
+      req.host_filter = [vmhds[:vm_host_id]]
+      expect(Al::Allocation.new(vmhds.merge(project_vcpus: 93), req).is_valid).to be true
+    end
+
     it "respects location preferences" do
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
@@ -1019,6 +1074,40 @@ RSpec.describe Scheduling::Allocator do
       expect {
         described_class.allocate(vm, vol, gpu_count: 4)
       }.to raise_error(Scheduling::Allocator::NoSpaceLeft, /no space left on any eligible host/)
+    end
+
+    it "allocates only GPUs within the GPU partitions owned by the project on hosts with owned partitions" do
+      vm = create_vm
+      vmh = VmHost.first
+
+      pci_devices = (1..4).map do |i|
+        PciDevice.create(vm_host_id: vmh.id, slot: format("0%d:00.0", i), device_class: "0302", vendor: "vd", device: "27b0", numa_node: (i - 1) / 2, iommu_group: i)
+      end
+      partitions = [[1, pci_devices], [2, pci_devices[0, 2]], [3, pci_devices[2, 2]], *pci_devices.map.with_index(4) { |pci, partition_id| [partition_id, [pci]] }]
+      partitions.each do |partition_id, pcis|
+        gp = GpuPartition.create(vm_host_id: vmh.id, partition_id:, gpu_count: pcis.size)
+        pcis.each { DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: it.id) }
+      end
+      GpuPartition.first(partition_id: 3).update(project_id: vm.project_id)
+
+      described_class.allocate(vm, vol, gpu_count: 1)
+      expect(vm.reload.gpu_partition.partition_id).to eq(6)
+
+      vm2 = create_vm(project_id: vm.project_id, name: "test-vm-2")
+      described_class.allocate(vm2, vol, gpu_count: 1)
+      expect(vm2.reload.gpu_partition.partition_id).to eq(7)
+
+      expect {
+        described_class.allocate(create_vm(project_id: vm.project_id, name: "test-vm-3"), vol, gpu_count: 1)
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
+
+      other_vm = create_vm
+      expect {
+        described_class.allocate(other_vm, vol)
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
+
+      described_class.allocate(other_vm, vol, gpu_count: 1, host_filter: [vmh.id])
+      expect(other_vm.reload.gpu_partition.partition_id).to eq(4)
     end
 
     it "allows concurrent allocations" do

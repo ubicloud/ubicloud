@@ -180,12 +180,16 @@ class VmHost < Sequel::Model
     assigned_host_addresses_dataset.first { {family(ip) => 4} }
   end
 
-  def io_cpu_count
+  def self.io_cpu_count(total_cpus)
     if total_cpus <= 64
       2
     else
       4
     end
+  end
+
+  def io_cpu_count
+    VmHost.io_cpu_count(total_cpus)
   end
 
   def create_addresses(ip_records: nil)
