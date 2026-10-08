@@ -498,11 +498,16 @@ class PostgresServer < Sequel::Model
     pulse = aggregate_readings(previous_pulse:, reading:, data: {last_known_lsn:})
 
     DB.transaction do
-      if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
-        begin
-          update_last_known_lsn(last_known_lsn)
-        rescue Sequel::Error => ex
-          Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
+      if pulse[:reading] == "up"
+        minute_tick = pulse[:reading_rpt] % 12 == 1
+        # Report every tick during the catch up phase, to reduce comparison skew.
+        session[:lsn_catch_up_in_progress] = lsn_catch_up_in_progress? if minute_tick
+        if minute_tick || session[:lsn_catch_up_in_progress]
+          begin
+            update_last_known_lsn(last_known_lsn)
+          rescue Sequel::Error => ex
+            Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
+          end
         end
       end
 
@@ -529,6 +534,10 @@ class PostgresServer < Sequel::Model
     end
 
     pulse
+  end
+
+  def lsn_catch_up_in_progress?
+    !resource.servers_dataset.join(:strand, id: :id).where(label: "wait_catch_up").empty?
   end
 
   def update_last_known_lsn(last_known_lsn)
