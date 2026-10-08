@@ -1012,6 +1012,60 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.wait }.to nap(30)
       expect(Semaphore.where(strand_id: st.id, name: "check_disk_usage")).to be_empty
     end
+
+    context "with dns zone and representative server" do
+      let(:checker) { DnsChecker::Checker.new(nil) }
+      let(:vm) { postgres_resource.representative_server.vm }
+
+      before do
+        allow(Config).to receive_messages(postgres_service_project_id: project.id, postgres_service_hostname_v3: "pg.example.com")
+        dns_zone = DnsZone.create(project_id: project.id, name: "pg.example.com")
+        dns_zone.insert_record(record_name: postgres_resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
+        allow(DnsChecker::Checker).to receive(:new).and_return(checker)
+      end
+
+      def expect_dns_checks(times: 1)
+        expect(checker).to receive(:check).with(:A, postgres_resource.hostname, vm.ip4_string).exactly(times).times
+        expect(checker).to receive(:check).with(:AAAA, postgres_resource.hostname, vm.ip6_string).exactly(times).times
+        expect(checker).to receive(:check).with(:A, postgres_resource.private_hostname, vm.private_ipv4_string).exactly(times).times
+        expect(checker).to receive(:check).with(:AAAA, postgres_resource.private_hostname, vm.private_ipv6_string).exactly(times).times
+      end
+
+      it "does not check dns records if they were recently checked" do
+        refresh_frame(nx, new_values: {"dns_checked_at" => (Time.now - 270).to_i})
+        expect(checker).not_to receive(:check)
+        expect { nx.wait }.to nap(30)
+      end
+
+      it "checks dns records and does nothing if they match" do
+        expect_dns_checks
+        expect { nx.wait }.to nap(30)
+        expect(Page.all).to eq []
+      end
+
+      it "checks dns records and pages if they don't match, resolving page when they match again" do
+        expect_dns_checks(times: 2)
+        checker.failures << {type: :A, record_name: postgres_resource.hostname, expected_value: vm.ip4_string, actual_value: "1.2.3.4"}
+        expect { nx.wait }.to nap(30)
+        expect(Page.count).to eq 1
+        page = Page.first
+        expect(page.summary).to eq "PostgreSQL DNS record lookup failure"
+        expect(page.details).to eq({
+          "dns_failures" => [{
+            "type" => "A",
+            "record_name" => postgres_resource.hostname,
+            "actual_value" => "1.2.3.4",
+            "expected_value" => vm.ip4_string,
+          }],
+          "related_resources" => [postgres_resource.ubid],
+        })
+
+        checker.failures.clear
+        refresh_frame(nx, new_values: {"dns_checked_at" => (Time.now - 301).to_i})
+        expect { nx.wait }.to nap(30)
+          .and change { Semaphore.where(strand_id: page.id, name: "resolve").count }.from(0).to(1)
+      end
+    end
   end
 
   describe "#wait", "with postgres_server" do

@@ -8,7 +8,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   frame_reader :initial_cert_id
-  frame_accessor :refresh_cert_id, :current_cert_id
+  frame_accessor :refresh_cert_id, :current_cert_id, :dns_checked_at
 
   extend Forwardable
 
@@ -299,6 +299,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end
+
+      self.dns_checked_at = Time.now.to_i
     end
 
     when_initial_provisioning_set? do
@@ -480,6 +482,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       hop_refresh_certificates
     end
 
+    check_all_dns_records
+
     nap 30
   end
 
@@ -556,5 +560,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.server_cert = cert.cert
     postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
     delete_from_stack(frame_key)
+  end
+
+  def check_all_dns_records
+    return unless postgres_resource.dns_zone
+
+    now = Time.now.to_i
+    return if dns_checked_at&.>(now - 300)
+
+    self.dns_checked_at = now
+    dns_failures = postgres_resource.check_all_dns_records
+    dns_tag = ["PostgreSQL-DNS-Record-Failure", postgres_resource.ubid]
+
+    if dns_failures.empty?
+      Page.from_tag_parts(*dns_tag)&.incr_resolve
+    else
+      Prog::PageNexus.assemble("PostgreSQL DNS record lookup failure", dns_tag, postgres_resource.ubid, resource_id: postgres_resource.id, extra_data: {dns_failures:})
+    end
   end
 end
