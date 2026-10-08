@@ -273,7 +273,7 @@ class Clover
     end
 
     boot_images = Option::BootImages.map(&:name)
-    boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
+    boot_images.reject! { it.start_with?("gpu-") } unless @show_gpu != false
 
     # VM create is currently x64-only, so only surface x64 MIs.
     machine_image_options = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
