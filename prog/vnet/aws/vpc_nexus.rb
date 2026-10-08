@@ -5,6 +5,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
 
   label def start
+    register_deadline("wait", 10 * 60)
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
