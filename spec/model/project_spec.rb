@@ -6,6 +6,16 @@ require "octokit"
 RSpec.describe Project do
   subject(:project) { described_class.create(name: "test") }
 
+  it "#visible_location_names returns feature flagged locations and locations of hosts owned by the project" do
+    expect(project.visible_location_names).to eq []
+    project.set_ff_visible_locations(["latitude-ai"])
+    other_project_id = described_class.create(name: "other").id
+    [["latitude-fra", project.id], ["latitude-ai", project.id], ["us-west-u1-ps", other_project_id], ["tr-ist-u1", nil]].each do |location_name, project_id|
+      create_vm_host(location_id: Location[name: location_name].id, project_id:)
+    end
+    expect(project.visible_location_names).to contain_exactly("latitude-ai", "latitude-fra")
+  end
+
   it "#project_id_match? should return whether the given project_id matches the project's id" do
     expect(project.project_id_match?(project.id)).to be true
     expect(project.project_id_match?(described_class.generate_uuid)).to be false

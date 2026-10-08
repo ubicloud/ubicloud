@@ -402,16 +402,17 @@ class Clover < Roda
     #
     # If location not previously retrieved, require it be visible or tied to the current project
     # when retrieving it.  This is called when creating resources in the web routes.
+    visible_location_names = @project.visible_location_names
     @location ||= if (id = typecast_params.ubid_uuid("location"))
-      Location.visible_or_for_project(@project.id, @project.get_ff_visible_locations).first(id:)
+      Location.visible_or_for_project(@project.id, visible_location_names).first(id:)
     end
-    handle_invalid_location unless @location&.visible_or_for_project?(@project.id, @project.get_ff_visible_locations)
+    handle_invalid_location(visible_location_names) unless @location&.visible_or_for_project?(@project.id, visible_location_names)
   end
 
-  def handle_invalid_location
+  def handle_invalid_location(visible_location_names = @project.visible_location_names)
     if api?
       # Only show locations globally visible or tied to the current project.
-      valid_locations = Location.visible_or_for_project(@project.id, @project.get_ff_visible_locations).select_order_map(:display_name)
+      valid_locations = Location.visible_or_for_project(@project.id, visible_location_names).select_order_map(:display_name)
       response.write({error: {
         code: 404,
         type: "InvalidLocation",

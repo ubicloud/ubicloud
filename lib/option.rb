@@ -6,8 +6,8 @@ module Option
   ai_models = YAML.load_file("config/ai_models.yml")
   AI_MODELS = ai_models.select { it["enabled"] }.freeze
 
-  def self.locations(only_visible: true, feature_flags: {})
-    Location.where(project_id: nil).order(:display_name).all.select { |pl| !only_visible || (pl.visible || feature_flags["visible_locations"]&.include?(pl.name)) }
+  def self.locations(only_visible: true, visible_location_names: [])
+    Location.where(project_id: nil).order(:display_name).all.select { |pl| !only_visible || pl.visible || visible_location_names.include?(pl.name) }
   end
 
   def self.kubernetes_locations
