@@ -7,16 +7,12 @@ Sequel.migration do
       column :nlb_arn, :text, collate: '"C"'
       column :service_id, :text, collate: '"C"'
       column :service_name, :text, collate: '"C"'
-      # Additional regions consumers may connect from; the service's own region
-      # is never stored here.
       column :supported_regions, "text[]", collate: '"C"', null: false, default: Sequel.lit("'{}'::text[]")
       column :registered_target_ips, "inet[]", null: false, default: Sequel.lit("'{}'::inet[]")
       column :private_dns_verification_state, :text, collate: '"C"'
       column :private_dns_verification_name, :text, collate: '"C"'
       column :private_dns_verification_value, :text, collate: '"C"'
       column :private_dns_verification_attempted_at, :timestamptz
-      # The TXT record this service published, fully qualified, so a later run
-      # removes exactly that one.
       column :private_dns_txt_record_name, :text, collate: '"C"'
     end
 

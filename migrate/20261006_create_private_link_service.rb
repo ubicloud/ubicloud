@@ -2,10 +2,7 @@
 
 Sequel.migration do
   change do
-    # project_id and location_id are pinned to the subnet's by the composite
-    # foreign key; the name is unique per project and location, as the URL is.
     create_table(:private_link_service) do
-      # "pn": Crockford base32 has no "l", so "pl" is not a valid ubid prefix.
       column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_ubid_uuid(725)") # UBID.to_base32_n("pn") => 725
       column :created_at, :timestamptz, null: false, default: Sequel::CURRENT_TIMESTAMP
       foreign_key :project_id, :project, type: :uuid, null: false
