@@ -176,7 +176,7 @@ SQL
         server_lsn = server.current_lsn
         parent_lsn = parent_server.current_lsn
         diff_bytes = server.lsn_diff(parent_lsn, server_lsn)
-        Clog.emit("Server #{server.ubid} in wait_catch_up: server_lsn=#{server_lsn.chomp}, parent_lsn=#{parent_lsn.chomp}, diff_bytes=#{diff_bytes}, threshold=#{80 * 1024 * 1024}, parent_server=#{parent_server.ubid}, parent_state=#{parent_server.strand.label}")
+        Clog.emit("Server #{server.ubid} in wait_catch_up: server_lsn=#{server_lsn.chomp}, parent_lsn=#{parent_lsn.chomp}, diff_bytes=#{diff_bytes}, threshold=#{server.catch_up_lag_threshold}, parent_server=#{parent_server.ubid}, parent_state=#{parent_server.strand.label}")
       rescue => ex
         Clog.emit("Failed to fetch LSN info for server #{server.ubid} in wait_catch_up: #{ex.message}")
       end

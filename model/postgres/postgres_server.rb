@@ -357,7 +357,12 @@ class PostgresServer < Sequel::Model
       resource.representative_server
     end
 
-    (parent_lsn = parent_server.last_known_lsn) && (lsn = last_known_lsn) && lsn_diff(parent_lsn, lsn) < 80 * 1024 * 1024
+    (parent_lsn = parent_server.last_known_lsn) && (lsn = last_known_lsn) && lsn_diff(parent_lsn, lsn) < catch_up_lag_threshold
+  end
+
+  # Calculate catch up threshold. Assuming workload proportional to vCPUs.
+  def catch_up_lag_threshold
+    (vm.vcpus * 64).clamp(128, 1024) * 1024 * 1024
   end
 
   def current_lsn
