@@ -795,9 +795,35 @@ SQL
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
     postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout :version", version:)
     postgres_server.vm.sshable.cmd("sudo systemctl stop postgres-metrics.timer")
-    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m fast", version:)
 
-    hop_wait_in_fence
+    hop_wait_fence_stop
+  end
+
+  # Run stop_postgres async through rhizome and retry
+  # until it succeeds or the server is already stopped.
+  label def wait_fence_stop
+    when_lockout_set? do
+      hop_lockout
+    end
+
+    case vm.sshable.d_check("stop_postgres")
+    when "Succeeded"
+      vm.sshable.d_clean("stop_postgres")
+      hop_wait_in_fence
+    when "Failed"
+      vm.sshable.d_clean("stop_postgres")
+      begin
+        vm.sshable.cmd("sudo pg_ctlcluster :version main status", version:)
+      rescue Sshable::SshError => ex
+        # exit_code = 3 => Postgres already stopped. proceed to the next step.
+        raise unless ex.exit_code == 3
+        hop_wait_in_fence
+      end
+    when "NotStarted"
+      vm.sshable.d_run("stop_postgres", "sudo", "pg_ctlcluster", version, "main", "stop", "-m", "fast")
+    end
+
+    nap 5
   end
 
   label def wait_in_fence
