@@ -170,12 +170,14 @@ class Clover
     # nil: Show GPU options, but also show options not valid for GPU configurations
 
     if @show_gpu != false
-      ff_visible_locations = @project.get_ff_visible_locations || []
+      owned_partitions = DB[:gpu_partition].exclude(project_id: nil)
+      project_gpu_ids = DB[:gpu_partitions_pci_devices].where(gpu_partition_id: owned_partitions.where(project_id: @project.id).select(:id)).select(:pci_device_id)
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
         .where(device_class: ["0300", "0302"], vm_id: nil)
-        .where(Sequel.|([:visible], name: ff_visible_locations))
+        .where(Sequel.|([:visible], name: @project.visible_location_names))
+        .where(Sequel.|(Sequel.~(Sequel[:pci_device][:vm_host_id] => owned_partitions.select(:vm_host_id)), {Sequel[:pci_device][:id] => project_gpu_ids}))
         .group_and_count(:vm_host_id, :name, :device)
         .from_self
         .select_group { [name.as(:location_name), device] }
@@ -203,7 +205,7 @@ class Clover
     end
 
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags)) do |location|
+    options.add_option(name: "location", values: Option.locations(visible_location_names: @project.visible_location_names)) do |location|
       !@show_gpu || gpu_locations.include?(location.name)
     end
 
@@ -214,7 +216,7 @@ class Clover
         display_name: it.name,
       }
     }
-    Option.locations(feature_flags: @project.feature_flags).each do |location|
+    Option.locations(visible_location_names: @project.visible_location_names).each do |location|
       subnets << {
         location_id: location.id,
         value: "new-#{location.ubid}",

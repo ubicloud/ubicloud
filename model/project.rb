@@ -261,6 +261,11 @@ class Project < Sequel::Model
     ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
   end
 
+  def visible_location_names
+    owned_host_ids = DB[:gpu_partition].where(project_id: id).select(:vm_host_id)
+    (get_ff_visible_locations || []) | Location.where(id: DB[:vm_host].where(id: owned_host_ids).select(:location_id)).select_map(:name)
+  end
+
   def total_github_amount(begin_time, end_time)
     BillingRecord.total_amount_by_rate(project_id: id, billing_rate_id: Github::MINUTE_BILLING_RATE_IDS, begin_time:, end_time:)
       .sum { |billing_rate_id, total_amount| total_amount * BillingRate.from_id(billing_rate_id)["unit_price"] }
