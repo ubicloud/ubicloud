@@ -136,8 +136,10 @@ class Clover
       end
     end
 
-    requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
-    Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
+    if project.dedicated_location_ids_dataset.where(location_id: @location.id).empty?
+      requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
+      Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
+    end
 
     vm = nil
     DB.transaction do
