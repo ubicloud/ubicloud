@@ -9,7 +9,7 @@ end
 
 # Table: private_link_service_aws_allowed_endpoint
 # Columns:
-#  id                                   | uuid | PRIMARY KEY DEFAULT gen_random_uuid()
+#  id                                   | uuid | PRIMARY KEY DEFAULT gen_random_ubid_uuid(474)
 #  private_link_service_aws_resource_id | uuid | NOT NULL
 #  vpc_endpoint_id                      | text | NOT NULL
 #  description                          | text | NOT NULL DEFAULT ''::text

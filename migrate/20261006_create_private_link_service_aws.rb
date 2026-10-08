@@ -27,7 +27,7 @@ Sequel.migration do
     end
 
     create_table(:private_link_service_aws_allowed_endpoint) do
-      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
+      column :id, :uuid, primary_key: true, default: Sequel.function(:gen_random_ubid_uuid, 474) # UBID.to_base32_n("et") => 474
       foreign_key :private_link_service_aws_resource_id, :private_link_service_aws_resource, type: :uuid, null: false, on_delete: :cascade
       column :vpc_endpoint_id, :text, collate: '"C"', null: false
       column :description, :text, collate: '"C"', null: false, default: ""

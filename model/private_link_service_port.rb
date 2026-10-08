@@ -12,7 +12,7 @@ end
 
 # Table: private_link_service_port
 # Columns:
-#  id                      | uuid                     | PRIMARY KEY DEFAULT gen_random_uuid()
+#  id                      | uuid                     | PRIMARY KEY DEFAULT gen_random_ubid_uuid(474)
 #  created_at              | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  private_link_service_id | uuid                     | NOT NULL
 #  port                    | integer                  | NOT NULL

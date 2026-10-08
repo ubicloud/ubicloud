@@ -33,7 +33,7 @@ Sequel.migration do
     end
 
     create_table(:private_link_service_port) do
-      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
+      column :id, :uuid, primary_key: true, default: Sequel.function(:gen_random_ubid_uuid, 474) # UBID.to_base32_n("et") => 474
       column :created_at, :timestamptz, null: false, default: Sequel::CURRENT_TIMESTAMP
       foreign_key :private_link_service_id, :private_link_service, type: :uuid, null: false, on_delete: :cascade
       column :port, :integer, null: false
