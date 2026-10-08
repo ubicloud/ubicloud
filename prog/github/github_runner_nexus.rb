@@ -581,8 +581,23 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     # Remove comments and empty lines before sending them to the machine
-    vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
+    begin
+      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
+    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
+      raise unless known_kernel_boot_race?
+
+      Clog.emit("replacing runner vm on known kernel boot race", {known_kernel_boot_race: {github_runner_ubid: github_runner.ubid, repository_name: github_runner.repository_name, vm_ubid: vm.ubid}})
+      github_runner.provision_spare_runner
+      github_runner.incr_destroy
+      nap 0
+    end
     github_runner.encoded_jit_config ? hop_start_runner : hop_register_runner
+  end
+
+  def known_kernel_boot_race?
+    return false unless (host = vm.vm_host)
+
+    host.sshable.cmd("sudo grep -qsE :re /vm/:name/serial.log && echo match || true", re: "EXT4-fs error.*ext4_mb_generate_buddy.*block bitmap and bg descriptor inconsistent", name: vm.inhost_name).include?("match")
   end
 
   # The old route, taken when the jit config was not generated at wait_vm
