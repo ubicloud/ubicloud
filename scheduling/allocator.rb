@@ -42,6 +42,7 @@ module Scheduling::Allocator
       family_filter,
       minimum_vhost_block_backend_version,
       os_filter,
+      vm.project_id,
     )
     allocation = Allocation.best_allocation(request)
     fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
@@ -77,6 +78,7 @@ module Scheduling::Allocator
     :family_filter,
     :minimum_vhost_block_backend_version,
     :os_filter,
+    :project_id,
   ) do
     def initialize(*args)
       super
@@ -286,7 +288,9 @@ module Scheduling::Allocator
         if request.gpu_count > 0
           apply_filter(:gpu_count) { ds = ds.where { available_gpus >= request.gpu_count } }
         end
-        unless request.host_filter.empty?
+        if request.host_filter.empty?
+          apply_filter(:owner) { ds = ds.where(VmHost.available_to_project(request.project_id)) }
+        else
           apply_filter(:host) { ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) }
         end
         unless request.host_exclusion_filter.empty?
