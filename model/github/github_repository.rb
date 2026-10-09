@@ -21,7 +21,7 @@ class GithubRepository < Sequel::Model
   end
 
   def bucket_name
-    Config.is_e2e ? "e2e-#{ubid}" : ubid
+    super || (Config.is_e2e ? "e2e-#{ubid}" : ubid)
   end
 
   def repository_name
@@ -36,8 +36,12 @@ class GithubRepository < Sequel::Model
     @url_presigner ||= Aws::S3::Presigner.new(client: blob_storage_client)
   end
 
+  def self.admin_client
+    s3_client(Config.github_cache_blob_storage_access_key, Config.github_cache_blob_storage_secret_key)
+  end
+
   def admin_client
-    @admin_client ||= s3_client(Config.github_cache_blob_storage_access_key, Config.github_cache_blob_storage_secret_key)
+    @admin_client ||= self.class.admin_client
   end
 
   def destroy_blob_storage
@@ -63,7 +67,28 @@ class GithubRepository < Sequel::Model
       Clog.emit("Repository credentials failed to delete Cloudflare token", {failed_cloudflare_token_delete: {bucket_name:}})
     end
 
-    this.update(access_key: nil, secret_key: nil)
+    this.update(bucket_name: nil, access_key: nil, secret_key: nil)
+  end
+
+  def self.create_bucket(bucket_name, rescue_bucket_already_owned: true)
+    begin
+      admin_client.create_bucket({
+        bucket: bucket_name,
+        create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
+      })
+    rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+      raise unless rescue_bucket_already_owned
+    end
+
+    policies = [
+      {
+        "effect" => "allow",
+        "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
+        "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
+      },
+    ]
+
+    CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
   end
 
   def setup_blob_storage
@@ -71,29 +96,30 @@ class GithubRepository < Sequel::Model
       lock!(:no_key_update)
       return if access_key && secret_key
 
-      begin
-        admin_client.create_bucket({
-          bucket: bucket_name,
-          create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
-        })
-      rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+      ds = DB[:github_repository_bucket_pool]
+      bucket = ds
+        .where(id: ds
+          .limit(1)
+          .for_update
+          .skip_locked
+          .select(:id))
+        .returning
+        .delete
+        .first
+
+      if bucket
+        bucket = GithubRepositoryBucketPool.call(bucket)
+        update(bucket_name: bucket.ubid, access_key: bucket.access_key, secret_key: bucket.secret_key)
+        Prog::Github::MaintainRepositoryBucketPool.schedule_strand
+      else
+        token_id, token = self.class.create_bucket(bucket_name)
+        update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+        Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
       end
-
-      policies = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
-        },
-      ]
-
-      token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
-      update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
-      Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
     end
   end
 
-  private def s3_client(access_key_id, secret_access_key)
+  def self.s3_client(access_key_id, secret_access_key)
     Aws::S3::Client.new(
       endpoint: Config.github_cache_blob_storage_endpoint,
       access_key_id:,
@@ -113,6 +139,10 @@ class GithubRepository < Sequel::Model
       retry_limit: 2,
     )
   end
+
+  def s3_client(access_key_id, secret_access_key)
+    self.class.s3_client(access_key_id, secret_access_key)
+  end
 end
 
 # Table: github_repository
@@ -127,6 +157,7 @@ end
 #  access_key      | text                     |
 #  secret_key      | text                     |
 #  no_cache_since  | timestamp with time zone |
+#  bucket_name     | text                     |
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)
