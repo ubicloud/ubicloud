@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  frame_accessor :build_progress, :servers_to_destroy
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -36,17 +36,13 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_for_maintenance_window if postgres_resource.has_enough_ready_servers?
 
     waiting_servers = postgres_resource.servers(eager: [:semaphores, vm: [:vm_storage_volumes, :sshable]]).reject { it.is_representative || it.needs_recycling? }
-    total_disk_usage = waiting_servers.sum(&:data_disk_usage)
 
-    total_lsn = waiting_servers.sum { |s| s.last_known_lsn ? s.lsn2int(s.last_known_lsn) : 0 }
-
-    previous_total_disk_usage = self.total_disk_usage || 0
-    previous_total_lsn = self.total_lsn || 0
-    if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
-      self.total_disk_usage = [total_disk_usage, previous_total_disk_usage].max
-      self.total_lsn = [total_lsn, previous_total_lsn].max
+    previous = build_progress || {}
+    current = waiting_servers.to_h { [it.ubid, it.build_position] }
+    if current.any? { |ubid, position| position && position != previous[ubid] }
       register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
     end
+    self.build_progress = current.to_h { |ubid, position| [ubid, position || previous[ubid]] }
 
     nap 60
   end

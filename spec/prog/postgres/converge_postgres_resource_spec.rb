@@ -274,57 +274,44 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_servers_to_be_ready }.to hop("wait_for_maintenance_window")
     end
 
-    it "waits and extends deadline if disk usage increased" do
+    it "waits and extends deadline if a server wrote to its data volume" do
       pg.update(ha_type: "async")
       create_server(is_representative: true)
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
-      standby.update_last_known_lsn("0/0")
+      expect(standby_from_assoc).to receive(:build_position).and_return("written 1024000")
+      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.stack.first["build_progress"]).to eq({standby.ubid => "written 1024000"})
     end
 
-    it "waits and extends deadline if lsn advanced" do
+    it "waits without extending deadline if no server wrote anything" do
       pg.update(ha_type: "async")
       create_server(is_representative: true)
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
-      standby.update_last_known_lsn("0/1234567")
-      refresh_frame(nx, new_values: {"total_disk_usage" => 2048000})
-      expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
-      expect(strand.stack.first["total_disk_usage"]).to eq(2048000)
-    end
-
-    it "waits without extending deadline if neither disk usage nor lsn increased" do
-      pg.update(ha_type: "async")
-      create_server(is_representative: true)
-      standby = create_server
-      standby.strand.update(label: "wait_catch_up")
-      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
-      standby.update_last_known_lsn("0/1234567")
-      refresh_frame(nx, new_values: {"total_disk_usage" => 2048000, "total_lsn" => standby.lsn2int("0/FFFFFFF")})
+      expect(standby_from_assoc).to receive(:build_position).and_return("written 1024000")
+      refresh_frame(nx, new_values: {"build_progress" => {standby.ubid => "written 1024000"}})
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_servers_to_be_ready }.to nap
     end
 
-    it "treats last_known_lsn as zero when it is nil" do
+    it "keeps the last reading for a server it could not reach" do
       pg.update(ha_type: "async")
       create_server(is_representative: true)
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(0)
+      expect(standby_from_assoc).to receive(:build_position).and_return(nil)
+      refresh_frame(nx, new_values: {"build_progress" => {standby.ubid => "written 1024000"}})
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.stack.first["build_progress"]).to eq({standby.ubid => "written 1024000"})
     end
 
-    it "sums disk usage and lsn across multiple standbys" do
+    it "extends the deadline when only one of several standbys is writing" do
       pg.update(ha_type: "async")
       create_server(is_representative: true)
       standby1 = create_server
@@ -332,15 +319,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby2 = create_server
       standby2.strand.update(label: "wait_catch_up")
 
-      standby1.update_last_known_lsn("0/100")
-      standby2.update_last_known_lsn("0/200")
-
-      servers = nx.postgres_resource.servers
-      expect(servers.reject { it.is_representative }).to all(receive(:data_disk_usage).and_return(512000))
+      servers = nx.postgres_resource.servers.reject { it.is_representative }.sort_by(&:ubid)
+      expect(servers[0]).to receive(:build_position).and_return("written 512000")
+      expect(servers[1]).to receive(:build_position).and_return("written 1024000")
+      refresh_frame(nx, new_values: {"build_progress" => {servers[0].ubid => "written 512000"}})
+      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
 
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
-      expect(strand.stack.first["total_lsn"]).to eq(standby1.lsn2int("0/100") + standby2.lsn2int("0/200"))
+      expect(strand.stack.first["build_progress"]).to eq({servers[0].ubid => "written 512000", servers[1].ubid => "written 1024000"})
     end
 
     it "ignores recycling standbys when checking progress" do
@@ -353,12 +339,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       servers = nx.postgres_resource.servers
       recycling_from_assoc = servers.find { it.id == recycling_standby.id }
       fresh_from_assoc = servers.find { it.id == fresh_standby.id }
-      expect(recycling_from_assoc).not_to receive(:data_disk_usage)
-      recycling_standby.update_last_known_lsn("0/FFFFFFF")
-      expect(fresh_from_assoc).to receive(:data_disk_usage).and_return(1024000)
-      fresh_standby.update_last_known_lsn("0/0")
+      expect(recycling_from_assoc).not_to receive(:build_position)
+      expect(fresh_from_assoc).to receive(:build_position).and_return("written 1024000")
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.stack.first["build_progress"]).to eq({fresh_standby.ubid => "written 1024000"})
     end
   end
 
