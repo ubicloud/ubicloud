@@ -297,6 +297,30 @@ RSpec.describe InvoiceGenerator do
       invoice = described_class.new(begin_time, end_time).run.first
       expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud B.V.")
     end
+
+    it "uses EUR bank info for transfer and saves USD to EUR rate if project uses EUR invoices" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+      p1.set_ff_invoice_in_eur(true)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 0.9).run.first
+      expect(invoice.content["usd_to_eur_rate"]).to eq(0.9)
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud B.V.")
+      expect(invoice.content["bank_transfer_info"]["IBAN"]).to eq("NL30REVO6759811127")
+      expect(invoice.content["bank_transfer_info"]).not_to have_key("Intermediary BIC")
+    end
+
+    it "uses USD if project uses EUR invoices but eur_rate is not provided" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+      p1.set_ff_invoice_in_eur(true)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content).not_to have_key("usd_to_eur_rate")
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud Inc.")
+    end
   end
 
   it "generates invoice for a single project" do
