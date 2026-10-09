@@ -1,0 +1,28 @@
+terraform {
+  required_providers {
+    ubicloud = {
+      source = "ubicloud/ubicloud"
+    }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_firewall" "fw" {
+  project_id = "<%= project_ubid %>"
+  location   = "<%= location %>"
+  name       = "<%= name %>"
+}
+
+data "ubicloud_firewall" "fw" {
+  project_id = "<%= project_ubid %>"
+  location   = "<%= location %>"
+  name       = ubicloud_firewall.fw.name
+}
+
+data "ubicloud_project" "pj" {
+  id = "<%= project_ubid %>"
+}

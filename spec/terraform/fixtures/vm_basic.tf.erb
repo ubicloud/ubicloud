@@ -1,0 +1,20 @@
+terraform {
+  required_providers {
+    ubicloud = { source = "ubicloud/ubicloud" }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_vm" "vm" {
+  project_id = "<%= project_ubid %>"
+  location   = "<%= location %>"
+  name       = "<%= name %>"
+  public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test"
+  size       = "standard-2"
+  enable_ip4 = true
+  storage_size = 40
+}
