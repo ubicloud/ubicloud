@@ -784,13 +784,6 @@ RSpec.describe PostgresResource do
     end
   end
 
-  describe ".default_version" do
-    it "returns the default version, which the standard flavor must offer" do
-      expect(Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD]).to include(PostgresResource::DEFAULT_VERSION)
-      expect(described_class.default_version).to eq(PostgresResource::DEFAULT_VERSION)
-    end
-  end
-
   describe "#boot_image" do
     it "returns the metal image for the image family" do
       expect(postgres_resource.boot_image("16", "x64", "ubuntu-2204")).to eq("postgres-ubuntu-2204")
@@ -1446,12 +1439,12 @@ RSpec.describe PostgresResource do
 
   describe "#can_upgrade?" do
     it "returns true if the postgres resource can be upgraded" do
-      postgres_resource.update(target_version: "16", flavor: PostgresResource::Flavor::STANDARD)
+      postgres_resource.update(target_version: "16")
       expect(postgres_resource.can_upgrade?).to be true
     end
 
     it "returns false if the postgres resource cannot be upgraded" do
-      postgres_resource.update(target_version: PostgresResource::LATEST_VERSION, flavor: PostgresResource::Flavor::STANDARD)
+      postgres_resource.update(target_version: PostgresResource::LATEST_VERSION)
       expect(postgres_resource.can_upgrade?).to be false
     end
   end
