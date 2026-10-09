@@ -69,4 +69,95 @@ RSpec.describe OidcProvider do
     attrs = described_class.discovery_attributes("Test", "https://example.com", client_id: "123", client_secret: "456")
     expect(attrs[:pkce_supported]).to be true
   end
+
+  describe "#refresh_groups" do
+    let(:provider) do
+      described_class.create(
+        display_name: "Test",
+        client_id: "123",
+        client_secret: "456",
+        url: "https://host/issuer",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw",
+        group_prefix: "oidc-",
+        groups_claim: "app:groups",
+      )
+    end
+
+    def id_token(**claims)
+      JWT.encode({sub: "u1", iss: "https://host/issuer", aud: "123"}.merge(claims), nil, "none")
+    end
+
+    it "returns groups from the id token claim and the rotated refresh token" do
+      stub_request(:post, "https://host/tok").with(body: {grant_type: "refresh_token", refresh_token: "old-rt"})
+        .to_return(status: 200, body: {id_token: id_token("app:groups": ["G1", 2]), refresh_token: "new-rt"}.to_json)
+      expect(provider.refresh_groups("old-rt")).to eq [["G1", "2"], "new-rt"]
+    end
+
+    it "returns nil refresh_token when the response doesn't rotate it" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token: id_token("app:groups": "G1")}.to_json)
+      expect(provider.refresh_groups("old-rt")).to eq [["G1"], nil]
+    end
+
+    it "accepts an array aud containing the client_id" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token: id_token(aud: ["other", "123"], "app:groups": ["G1"])}.to_json)
+      expect(provider.refresh_groups("old-rt")).to eq [["G1"], nil]
+    end
+
+    it "falls back to userinfo when the id token lacks the groups claim" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token:, access_token: "at"}.to_json)
+      stub_request(:get, "https://host/ui").with(headers: {"Authorization" => "Bearer at"})
+        .to_return(status: 200, body: {"app:groups" => ["G2"]}.to_json)
+      expect(provider.refresh_groups("old-rt")).to eq [["G2"], nil]
+    end
+
+    it "returns no groups when neither the id token nor userinfo has the claim" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token:, access_token: "at"}.to_json)
+      stub_request(:get, "https://host/ui").to_return(status: 200, body: {sub: "u1"}.to_json)
+      expect(provider.refresh_groups("old-rt")).to eq [[], nil]
+    end
+
+    it "raises RefreshError when userinfo fails" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token:, access_token: "at"}.to_json)
+      stub_request(:get, "https://host/ui").to_return(status: 500, body: "")
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "raises RefreshError when the issuer doesn't match" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token: id_token(iss: "https://evil.example.com")}.to_json)
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "raises RefreshError when the audience doesn't include client_id" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: {id_token: id_token(aud: "someone-else")}.to_json)
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "returns nil when the refresh token is rejected" do
+      stub_request(:post, "https://host/tok").to_return(status: 400, body: {error: "invalid_grant"}.to_json)
+      expect(provider.refresh_groups("old-rt")).to be_nil
+    end
+
+    it "raises RefreshError on a 400 that isn't invalid_grant" do
+      stub_request(:post, "https://host/tok").to_return(status: 400, body: {error: "invalid_client"}.to_json)
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "raises RefreshError on an unexpected status" do
+      stub_request(:post, "https://host/tok").to_return(status: 500, body: "")
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "raises RefreshError on a network error" do
+      stub_request(:post, "https://host/tok").to_timeout
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+
+    it "raises RefreshError on a malformed response" do
+      stub_request(:post, "https://host/tok").to_return(status: 200, body: "not json")
+      expect { provider.refresh_groups("old-rt") }.to raise_error(described_class::RefreshError)
+    end
+  end
 end
