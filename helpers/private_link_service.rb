@@ -17,8 +17,12 @@ class Clover
     PRIVATE_LINK_SERVICE_PROVIDER_UI.fetch(provider)
   end
 
+  # Off unless the installation enables it and the project has the provider's
+  # feature flag; every web and API route for the feature checks this.
   def private_link_service_provider_enabled?(provider)
-    PRIVATE_LINK_SERVICE_PROVIDERS.include?(provider) && @project.public_send(:"get_ff_private_link_service_#{provider}") == true
+    Config.private_link_service_enabled &&
+      PRIVATE_LINK_SERVICE_PROVIDERS.include?(provider) &&
+      @project.public_send(:"get_ff_private_link_service_#{provider}") == true
   end
 
   def private_link_service_enabled_providers

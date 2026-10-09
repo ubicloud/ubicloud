@@ -125,6 +125,7 @@ module Config
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
   override :pg_network_metering_enabled, false, bool
+  override :private_link_service_enabled, false, bool
   optional :git_commit_hash, string
   optional :ip_from_header, string
   optional :ubid_routing_stamp, match?(/\A[0-9a-hj-km-np-tv-z]{2}\z/)

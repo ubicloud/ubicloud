@@ -45,7 +45,7 @@ RSpec.describe Clover, "private-link-service" do
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
       project.set_ff_private_link_service_aws(true)
-      allow(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id)
+      allow(Config).to receive_messages(private_link_service_enabled: true, postgres_service_project_id: Project.create(name: "postgres-service").id)
       pls = assemble_pls("pl-1")
       [
         [:get, "/project/#{project.ubid}/private-link-service"],
@@ -68,10 +68,26 @@ RSpec.describe Clover, "private-link-service" do
     before do
       login_api
       project.set_ff_private_link_service_aws(true)
-      allow(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id)
+      allow(Config).to receive_messages(private_link_service_enabled: true, postgres_service_project_id: Project.create(name: "postgres-service").id)
     end
 
     describe "feature flag" do
+      it "returns 404 everywhere while the installation has private link services disabled, whatever the project flag says" do
+        pls = assemble_pls("pl-1")
+        allow(Config).to receive(:private_link_service_enabled).and_return(false)
+
+        get "/project/#{project.ubid}/private-link-service"
+        expect(last_response.status).to eq 404
+        get base
+        expect(last_response.status).to eq 404
+        post "#{base}/pl-2", {private_subnet_id: ps.ubid, aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response.status).to eq 404
+        get "#{base}/#{pls.name}"
+        expect(last_response.status).to eq 404
+        get pg_base
+        expect(last_response).to have_api_error(404, "private link services are not enabled for this project")
+      end
+
       it "returns 404 everywhere while the provider is not enabled for the project" do
         pls = assemble_pls("pl-1")
         project.set_ff_private_link_service_aws(false)

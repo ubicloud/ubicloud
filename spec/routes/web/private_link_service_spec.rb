@@ -52,9 +52,27 @@ RSpec.describe Clover, "private link service" do
     let(:postgres_project) { Project.create(name: "default") }
 
     before do
-      allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
+      allow(Config).to receive_messages(postgres_service_project_id: postgres_project.id, private_link_service_enabled: true)
       project.set_ff_private_link_service_aws(true)
       login(user.email)
+    end
+
+    it "hides the tab and returns 404 when the installation has private link services disabled, whatever the project flag says" do
+      ps = assemble_ps("ps-aws", aws_location.id)
+      pls = assemble_pls("pl-1", ps)
+      allow(Config).to receive(:private_link_service_enabled).and_return(false)
+
+      visit "#{project.path}/private-subnet"
+      expect(page).to have_no_link "AWS service endpoints"
+
+      visit "#{project.path}/private-link-service/aws"
+      expect(page.status_code).to eq 404
+
+      visit "#{project.path}/private-link-service/aws/create"
+      expect(page.status_code).to eq 404
+
+      visit "#{project.path}#{pls.path}/overview"
+      expect(page.status_code).to eq 404
     end
 
     it "hides the tab and returns 404 when the project feature flag is off" do
