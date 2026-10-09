@@ -522,6 +522,8 @@ GEM
       logger
     thor (1.5.0)
     tilt (2.8.0)
+    time (0.5.0)
+      date
     timeout (0.6.1)
     tpm-key_attestation (0.14.2)
       bindata (~> 2.4)
@@ -643,6 +645,7 @@ DEPENDENCIES
   standard (>= 1.24.3)
   stripe (>= 13)
   tilt (>= 2.6.1)
+  time (>= 0.5)
   turbo_tests
   warning
   webauthn
