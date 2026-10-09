@@ -85,6 +85,9 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     sshable = postgres_timeline.leader.vm.sshable
     case sshable.d_check("take_postgres_backup")
     when "Succeeded"
+      # Update before d_clean, which cannot be rolled back.
+      lsn = postgres_timeline.latest_completed_backup_lsn
+      postgres_timeline.update(latest_backup_lsn: lsn) if lsn
       sshable.d_clean("take_postgres_backup")
       decr_take_backup_for_converge
       hop_wait
