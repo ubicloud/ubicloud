@@ -39,6 +39,14 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    def aws_use_separate_management_nic?
+      true
+    end
+
+    def aws_management_nic_use_eip?
+      !aws_ssh_ipv6?
+    end
+
     def aws_lockout_mechanisms
       ["pg_stop", "hba", "detach_nic"].freeze
     end
