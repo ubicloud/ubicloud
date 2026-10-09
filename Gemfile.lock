@@ -422,7 +422,7 @@ GEM
       uber (< 0.2.0)
     retriable (4.2.0)
     rexml (3.4.4)
-    roda (3.108.0)
+    roda (3.109.0)
       rack
     rodauth (2.48.0)
       roda (>= 2.6.0)
@@ -622,7 +622,7 @@ DEPENDENCIES
   rack-unreloader (>= 1.8)
   rake
   refrigerator (>= 1)
-  roda (>= 3.108)
+  roda (>= 3.109)
   rodauth (>= 2.48)
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
