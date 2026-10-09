@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-GcpDualNicNetplan = Data.define(:mgmt_ip, :mgmt_gateway, :user_ip, :user_gateway)
+GcpDualNicNetplan = Data.define(:mgmt_ip, :mgmt_gateway, :user_ip, :user_gateway, :mgmt_ipv6)
 
 class GcpDualNicNetplan
   VLAN = 2
@@ -11,6 +11,8 @@ class GcpDualNicNetplan
   NETPLAN_PATH = "/etc/netplan/61-ubicloud.yaml"
 
   MGMT_MAC = "@MGMT_MAC@"
+  MGMT_IPV6 = "@MGMT_IPV6@"
+  MGMT_GATEWAY_IPV6 = "@MGMT_GATEWAY_IPV6@"
   USER_MAC = "@USER_MAC@"
   USER_IPV6 = "@USER_IPV6@"
   USER_GATEWAY_IPV6 = "@USER_GATEWAY_IPV6@"
@@ -45,6 +47,10 @@ class GcpDualNicNetplan
     fill #{USER_MAC} vlan-network-interfaces/0/#{VLAN}/mac "$mac"
     fill #{USER_IPV6} vlan-network-interfaces/0/#{VLAN}/ipv6s "$ipv6"
     fill #{USER_GATEWAY_IPV6} vlan-network-interfaces/0/#{VLAN}/gateway-ipv6 "$ipv6"
+    if grep -q #{MGMT_IPV6} "$netplan.new"; then
+      fill #{MGMT_IPV6} network-interfaces/0/ipv6s "$ipv6"
+      fill #{MGMT_GATEWAY_IPV6} network-interfaces/0/gateway-ipv6 "$ipv6"
+    fi
     sync "$netplan.new"
     mv "$netplan.new" "$netplan"
     rm "$netplan.template"
@@ -75,7 +81,7 @@ class GcpDualNicNetplan
   private
 
   def mgmt_ethernet
-    {
+    ethernet = {
       "match" => {"macaddress" => MGMT_MAC},
       "dhcp4" => true,
       "dhcp4-overrides" => {"use-routes" => false},
@@ -85,6 +91,13 @@ class GcpDualNicNetplan
       ],
       "routing-policy" => [{"from" => "#{mgmt_ip}/32", "table" => MGMT_TABLE}],
     }
+    return ethernet unless mgmt_ipv6
+
+    ethernet["accept-ra"] = false
+    ethernet["addresses"] = ["#{MGMT_IPV6}/128"]
+    ethernet["routes"] << {"to" => "::/0", "via" => MGMT_GATEWAY_IPV6, "table" => MGMT_TABLE}
+    ethernet["routing-policy"] << {"from" => "#{MGMT_IPV6}/128", "table" => MGMT_TABLE}
+    ethernet
   end
 
   def user_vlan
