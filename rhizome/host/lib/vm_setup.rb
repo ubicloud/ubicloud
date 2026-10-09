@@ -179,8 +179,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_storage
-    # prep.json doesn't exist, nothing more to do
-    return if !File.exist?(vp.prep_json)
+    # prep.json doesn't exist or is empty, nothing more to do
+    return unless File.size?(vp.prep_json)
 
     storage_roots = []
 
@@ -212,7 +212,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def deactivate_gpu_partition
-    return if !File.exist?(vp.prep_json)
+    return unless File.size?(vp.prep_json)
 
     params = JSON.parse(File.read(vp.prep_json))
 
