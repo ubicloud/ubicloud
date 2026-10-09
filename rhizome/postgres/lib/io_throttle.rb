@@ -20,6 +20,19 @@ class IoThrottle
     [100, 0.80],    # Moderate: 100-499 files -> 80% of baseline
   ].freeze
 
+  # Wait for specified replication slots to connect.
+  # Throttle slots which didn't connect within SLOT_WAIT_GRACE seconds,
+  # for up to the SLOT_WAIT_MAX_AGE seconds.
+  SLOT_WAIT_DIR = "/run/postgresql-slot-wait"
+  SLOT_WAIT_GRACE = 60
+  SLOT_WAIT_MAX_AGE = 5 * 60
+  SLOT_WAIT_RATIO = 0.2
+
+  def self.signal_slot_wait(slot_name)
+    FileUtils.mkdir_p(SLOT_WAIT_DIR)
+    FileUtils.touch(File.join(SLOT_WAIT_DIR, "#{slot_name}.wait_signal"))
+  end
+
   def initialize(instance, logger, disk_throughput_baseline_mbps)
     @instance = instance
     @logger = logger
@@ -31,16 +44,18 @@ class IoThrottle
   end
 
   # Main entry point for the systemd timer: reads the archival backlog
-  # and disk usage, calculates appropriate throttle, and applies it.
+  # ,disk usage, and slot wait, calculates appropriate throttle, and applies it.
   def run
     backlog = Dir.glob("#{@data_dir}/pg_wal/archive_status/*.ready").length
     archival_throttle_mbps = calculate_archival_throttle(backlog)
     disk_usage_throttle_mbps = calculate_disk_usage_throttle
-    throttle_mbps = [archival_throttle_mbps, disk_usage_throttle_mbps].compact.min
+    slot_wait_throttle_mbps = calculate_slot_wait_throttle
+    throttle_mbps = [archival_throttle_mbps, disk_usage_throttle_mbps, slot_wait_throttle_mbps].compact.min
     return unless apply(throttle_mbps)
 
     @logger.info("Archival backlog: #{backlog} files (#{archival_throttle_mbps || "none"}), " \
       "disk usage throttle: #{disk_usage_throttle_mbps || "none"}, " \
+      "slot wait throttle: #{slot_wait_throttle_mbps || "none"}, " \
       "effective: #{throttle_mbps ? "#{throttle_mbps} MB/s" : "none"}")
   end
 
@@ -129,6 +144,35 @@ class IoThrottle
     return nil if disk_usage_percent < 91
     ratio = 1.0 - 0.11 * (disk_usage_percent - 91)
     (@disk_throughput_baseline_mbps * ratio).round
+  end
+
+  def calculate_slot_wait_throttle
+    return nil if !Dir.exist?(SLOT_WAIT_DIR) || in_recovery?
+
+    signals = Dir.glob(File.join(SLOT_WAIT_DIR, "*.wait_signal")).to_h { |path| [File.basename(path, ".wait_signal"), path] }
+    return nil if signals.empty?
+
+    ages = signals.transform_values { |path| Time.now - File.mtime(path) }
+    expired, pending = signals.partition { |slot, _| ages[slot] > SLOT_WAIT_MAX_AGE }
+    expired.each do |slot, path|
+      @logger.warn("Slot #{slot} did not connect within #{SLOT_WAIT_MAX_AGE}s, no longer throttling for it")
+      File.delete(path)
+    end
+
+    connected = connected_slots(pending.map(&:first))
+    connected_signals, waiting = pending.partition { |slot, _| connected.include?(slot) }
+    connected_signals.each do |slot, path|
+      @logger.info("Slot #{slot} connected")
+      File.delete(path)
+    end
+
+    (@disk_throughput_baseline_mbps * SLOT_WAIT_RATIO).round if waiting.any? { |slot, _| ages[slot] > SLOT_WAIT_GRACE }
+  end
+
+  def connected_slots(slots)
+    return [] if slots.empty?
+    names = slots.map { |slot| "'#{slot}'" }.join(",")
+    r("sudo", "-u", "postgres", "psql", "-At", "-c", "SELECT slot_name FROM pg_catalog.pg_replication_slots WHERE active AND slot_name IN (#{names})").split("\n")
   end
 
   # Recovery throttles the startup process and walreceiver, which drive

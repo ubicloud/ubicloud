@@ -1603,13 +1603,63 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server).to receive(:_run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;", user: "postgres", dbname: "postgres")
       expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 18")
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop postgres-metrics.timer")
-      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 18 main stop -m fast")
-      expect { nx.fence }.to hop("wait_in_fence")
+      expect { nx.fence }.to hop("wait_fence_stop")
     end
 
     it "hops to lockout if lockout semaphore is set" do
       nx.incr_lockout
       expect { nx.fence }.to hop("lockout")
+    end
+  end
+
+  describe "#wait_fence_stop" do
+    let(:stop_cmd) { "common/bin/daemonizer2 run stop_postgres sudo pg_ctlcluster 18 main stop -m fast" }
+
+    def expect_stop_state(state)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check stop_postgres").and_return(state)
+    end
+
+    it "starts the stop" do
+      expect_stop_state("NotStarted")
+      expect(sshable).to receive(:_cmd).with(stop_cmd, {log: true, stdin: nil})
+      expect { nx.wait_fence_stop }.to nap(5)
+    end
+
+    it "waits while the stop runs" do
+      expect_stop_state("InProgress")
+      expect { nx.wait_fence_stop }.to nap(5)
+    end
+
+    it "hops to wait_in_fence once stopped" do
+      expect_stop_state("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean stop_postgres")
+      expect { nx.wait_fence_stop }.to hop("wait_in_fence")
+    end
+
+    it "hops to wait_in_fence when pg_ctl gave up but postgres has stopped" do
+      expect_stop_state("Failed")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 18 main status").and_raise(Sshable::SshError.new("status", "", "", 3, nil))
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean stop_postgres")
+      expect { nx.wait_fence_stop }.to hop("wait_in_fence")
+    end
+
+    it "clears the failed stop to run it again when postgres still runs" do
+      expect_stop_state("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean stop_postgres")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 18 main status").and_return("pg_ctl: server is running")
+      expect { nx.wait_fence_stop }.to nap(5)
+    end
+
+    it "raises when the status check fails otherwise" do
+      expect_stop_state("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean stop_postgres")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 18 main status").and_raise(Sshable::SshError.new("status", "", "", 4, nil))
+      expect { nx.wait_fence_stop }.to raise_error(Sshable::SshError)
+    end
+
+    it "hops to lockout if lockout semaphore is set" do
+      nx.incr_lockout
+      expect { nx.wait_fence_stop }.to hop("lockout")
     end
   end
 

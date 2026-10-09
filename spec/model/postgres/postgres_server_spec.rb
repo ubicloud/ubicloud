@@ -882,7 +882,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be(true)
     end
 
-    it "returns true if the diff is less than 80MB" do
+    it "returns true if the diff is under the catch up threshold" do
       expect(postgres_server).to receive(:last_known_lsn).and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
@@ -901,12 +901,12 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be(true)
     end
 
-    it "returns false if the diff is more than 80MB" do
+    it "returns false if the diff is over the catch up threshold" do
       expect(postgres_server).to receive(:last_known_lsn).and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
     end
 
-    it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
+    it "returns true if the diff is under the catch up threshold for not read replica and uses the main representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       resource.update(restore_target: Time.now)
       expect(postgres_server.resource.representative_server).to receive(:last_known_lsn).and_return("F/F")
@@ -922,6 +922,24 @@ RSpec.describe PostgresServer do
     it "returns false when self has no recorded lsn yet" do
       expect(postgres_server).to receive(:last_known_lsn).and_return(nil)
       expect(postgres_server.lsn_caught_up).to be_falsey
+    end
+
+    it "scales the threshold with the vm size" do
+      allow(resource.parent.representative_server).to receive(:last_known_lsn).and_return("1/40000000")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("1/2D000000").twice
+      postgres_server.vm.update(vcpus: 4)
+      expect(postgres_server.lsn_caught_up).to be(false)
+      postgres_server.vm.update(vcpus: 8)
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+  end
+
+  describe "#catch_up_lag_threshold" do
+    it "is 64 MiB per vcpu clamped to 128 MiB and 1 GiB" do
+      expect([1, 2, 8, 16, 64].map { |vcpus|
+        postgres_server.vm.update(vcpus:)
+        postgres_server.catch_up_lag_threshold / 1024 / 1024
+      }).to eq([128, 128, 512, 1024, 1024])
     end
   end
 
@@ -1146,6 +1164,42 @@ RSpec.describe PostgresServer do
     Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait_catch_up")
 
     expect(DB.literal(postgres_server.last_lsn_expression)).to eq("(CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_lsn() END)")
+  end
+
+  describe "lsn persistence during catch up" do
+    let(:standby) {
+      described_class.create(timeline:, resource:, is_representative: false, synchronization_status: "catching_up", timeline_access: "fetch", version: "16")
+    }
+    let(:session) { {db_connection: instance_double(Sequel::Postgres::Database)} }
+
+    after { postgres_server.lsn_monitor_ds.delete }
+
+    def pulse_twice
+      expect(session[:db_connection]).to receive(:get).and_return("1/5", "1/6")
+      pulse = postgres_server.check_pulse(session:, previous_pulse: {})
+      expect(pulse[:reading_rpt]).to eq(1)
+      expect(postgres_server.check_pulse(session:, previous_pulse: pulse)[:reading_rpt]).to eq(2)
+    end
+
+    it "persists every pulse while a standby of the resource is catching up" do
+      Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait_catch_up")
+      pulse_twice
+      expect(session[:lsn_catch_up_in_progress]).to be(true)
+      expect(postgres_server.last_known_lsn).to eq("1/6")
+    end
+
+    it "persists once a minute when no catch up is in progress" do
+      Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
+      pulse_twice
+      expect(session[:lsn_catch_up_in_progress]).to be(false)
+      expect(postgres_server.last_known_lsn).to eq("1/5")
+    end
+
+    it "does not count servers of unrelated resources" do
+      other = described_class.create(timeline:, resource: create_postgres_resource(project:, location_id: location.id), is_representative: false, synchronization_status: "catching_up", timeline_access: "fetch", version: "16")
+      Strand.create_with_id(other, prog: "Postgres::PostgresServerNexus", label: "wait_catch_up")
+      expect(postgres_server.lsn_catch_up_in_progress?).to be(false)
+    end
   end
 
   it "catches Sequel::Error if updating last known lsn fails" do
