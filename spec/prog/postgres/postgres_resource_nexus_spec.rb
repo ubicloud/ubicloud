@@ -1036,7 +1036,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [child_st.id]
     end
 
-    it "destroys the private link services exposing the resource and allows for their teardown" do
+    it "destroys the private link service exposing the resource and allows for its teardown" do
       postgres_server
       postgres_resource.update(private_subnet_id: private_subnet.id)
       pls = PrivateLinkService.create(name: "pl", project_id: postgres_resource.project_id, location_id: private_subnet.location_id, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)

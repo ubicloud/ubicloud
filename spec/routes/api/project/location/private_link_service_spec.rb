@@ -324,15 +324,29 @@ RSpec.describe Clover, "private-link-service" do
     end
 
     describe "under a PostgreSQL resource" do
-      it "lists the services exposing the resource" do
+      it "shows the service exposing the resource" do
         assemble_pls("pl-pg", pg.private_subnet, postgres_resource_id: pg.id)
         assemble_pls("pl-other", pg.private_subnet)
 
         get pg_base
         expect(last_response.status).to eq 200
-        expect(body["items"].map { it["name"] }).to eq ["pl-pg"]
-        expect(body["items"].first["postgres_resource"]).to eq pg.ubid
-        expect(body["items"].first).not_to have_key("aws")
+        expect(body["name"]).to eq "pl-pg"
+        expect(body["postgres_resource"]).to eq pg.ubid
+        expect(body["allowed_principals"]).to eq ["arn:aws:iam::123456789012:root"]
+        expect(body["aws"].keys).to include("service_name", "allowed_vpc_endpoints")
+      end
+
+      it "returns 404 while the resource has no service" do
+        get pg_base
+        expect(last_response.status).to eq 404
+      end
+
+      it "refuses a second service for the resource" do
+        assemble_pls("pl-pg", pg.private_subnet, postgres_resource_id: pg.id)
+
+        post pg_base, {name: "pl-second", aws: {allowed_principals: ["*"]}}.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: postgres_resource_id", {"postgres_resource_id" => "PostgreSQL resource already has a private link service"})
+        expect(PrivateLinkService.where(name: "pl-second")).to be_empty
       end
 
       it "creates a service attached to the resource in its subnet" do

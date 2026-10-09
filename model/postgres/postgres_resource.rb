@@ -13,13 +13,19 @@ class PostgresResource < Sequel::Model
   one_to_many :metric_destinations, class: :PostgresMetricDestination, remover: nil, clearer: nil
   one_to_many :log_destinations, class: :PostgresLogDestination, remover: nil, clearer: nil
   many_to_one :private_subnet, read_only: true
-  one_to_many :private_link_services, read_only: true
+  one_to_one :private_link_service, read_only: true
   many_to_one :location, read_only: true
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
   one_to_one :init_script, class: :PostgresInitScript, key: :id, read_only: true
 
   plugin :association_dependencies, metric_destinations: :destroy, log_destinations: :destroy, init_script: :destroy
   dataset_module Pagination
+  dataset_module do
+    # Resources a private link service can still be created for or attached to.
+    def without_private_link_service
+      exclude(Sequel[:postgres_resource][:id] => PrivateLinkService.exclude(postgres_resource_id: nil).select(:postgres_resource_id))
+    end
+  end
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs, :client_root_cert_1, :client_root_cert_2, :client_cert],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key, :client_root_cert_key_1, :client_root_cert_key_2, :client_cert_key, :parseable_password]
@@ -49,9 +55,9 @@ class PostgresResource < Sequel::Model
     "/location/#{display_location}/postgres/#{name}"
   end
 
-  # The private link services fronting this resource follow its primary.
-  def reconcile_private_link_services
-    Semaphore.incr(private_link_services_dataset.select(:id), "reconcile")
+  # The private link service fronting this resource follows its primary.
+  def reconcile_private_link_service
+    Semaphore.incr(private_link_service_dataset.select(:id), "reconcile")
   end
 
   def vm_size

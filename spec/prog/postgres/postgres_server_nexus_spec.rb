@@ -1907,7 +1907,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       end
     end
 
-    it "asks the resource's private link services to reconcile once the promoted standby is the representative" do
+    it "asks the resource's private link service to reconcile once the promoted standby is the representative" do
       postgres_server
       postgres_resource.update(private_subnet_id: private_subnet.id)
       pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id:, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)
@@ -1964,7 +1964,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(Semaphore.where(strand_id: replica_server.id, name: "configure_metrics").count).to eq(1)
       end
 
-      it "asks the replica resource's private link services to reconcile" do
+      it "asks the replica resource's private link service to reconcile" do
         replica_resource = create_read_replica_resource(parent: postgres_resource)
         replica_resource.update(private_subnet_id: private_subnet.id)
         pls = PrivateLinkService.create(name: "pl", project_id: project.id, location_id:, private_subnet_id: private_subnet.id, postgres_resource_id: replica_resource.id)

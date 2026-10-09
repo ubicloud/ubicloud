@@ -31,7 +31,7 @@ class Clover
 
   def private_link_service_load_options(provider)
     @private_subnets = private_link_service_in_provider(dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view"), :private_subnet, provider).eager(:location).all
-    @postgres_resources = private_link_service_in_provider(dataset_authorize(@project.postgres_resources_dataset, "Postgres:edit"), :postgres_resource, provider).eager(:location).all
+    @postgres_resources = private_link_service_in_provider(dataset_authorize(@project.postgres_resources_dataset, "Postgres:edit"), :postgres_resource, provider).without_private_link_service.eager(:location).all
   end
 
   # table qualifies the columns the join on location would make ambiguous.
@@ -114,6 +114,9 @@ class Clover
 
     if @project.private_link_services_dataset.where(location_id: ps.location_id, name:).any?
       fail Validation::ValidationFailed.new("name" => "A private link service named '#{name}' already exists in location '#{ps.display_location}'")
+    end
+    if pg&.private_link_service
+      fail Validation::ValidationFailed.new("postgres_resource_id" => "PostgreSQL resource already has a private link service")
     end
 
     pls = DB.transaction do
@@ -253,6 +256,7 @@ class Clover
   def private_link_service_attachable_postgres_resources(pls)
     dataset_authorize(@project.postgres_resources_dataset, "Postgres:edit")
       .where(private_subnet_id: pls.private_subnet_id)
+      .without_private_link_service
       .order(:name)
       .all
   end

@@ -265,9 +265,10 @@ class Clover
         fail CloverError.new(404, "NotFound", "private link services are not enabled for this project") unless private_link_service_provider_enabled?(@location.provider)
 
         r.get true do
-          ds = dataset_authorize(pg.private_link_services_dataset, "PrivateLinkService:view")
-            .eager(:location, :private_subnet, :postgres_resource, :ports, :strand, :semaphores, :private_link_service_aws_resource)
-          paginated_result(ds, Serializers::PrivateLinkService)
+          pls = pg.private_link_service
+          check_found_object(pls)
+          authorize("PrivateLinkService:view", pls)
+          Serializers::PrivateLinkService.serialize(pls, {detailed: true})
         end
 
         r.post true do

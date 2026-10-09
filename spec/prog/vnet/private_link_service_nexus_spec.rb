@@ -91,6 +91,7 @@ RSpec.describe Prog::Vnet::PrivateLinkServiceNexus do
       zone = DnsZone.create(project_id: Config.postgres_service_project_id, name: pg.hostname_suffix)
       bare = assemble(name: "pg-es-bare", postgres_resource_id: pg.id).subject
       expect(bare.private_dns_name).to be_nil
+      bare.update(postgres_resource_id: nil)
 
       server = DnsServer.create(name: "ns.#{pg.hostname_suffix}")
       zone.add_dns_server(server)

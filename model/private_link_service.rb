@@ -108,6 +108,9 @@ class PrivateLinkService < Sequel::Model
       if postgres_resource_id
         fail Validation::ValidationFailed.new("postgres_resource_id" => "A PostgreSQL resource is already attached")
       end
+      unless pg.private_link_service_dataset.empty?
+        fail Validation::ValidationFailed.new("postgres_resource_id" => "PostgreSQL resource already has a private link service")
+      end
 
       update(postgres_resource_id: pg.id, private_dns_name: PrivateLinkService.default_private_dns_name(pg))
       forget_private_dns_verification
@@ -130,8 +133,8 @@ end
 #  ip_address_type      | text                     | NOT NULL DEFAULT 'ipv4'::text
 # Indexes:
 #  private_link_service_pkey                            | PRIMARY KEY btree (id)
+#  private_link_service_postgres_resource_id_key        | UNIQUE btree (postgres_resource_id)
 #  private_link_service_project_id_location_id_name_key | UNIQUE btree (project_id, location_id, name)
-#  private_link_service_postgres_resource_id_index      | btree (postgres_resource_id)
 # Check constraints:
 #  private_link_service_ip_address_type_check | (ip_address_type = ANY (ARRAY['ipv4'::text, 'ipv6'::text, 'dual'::text]))
 # Foreign key constraints:

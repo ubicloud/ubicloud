@@ -1965,15 +1965,11 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
-      operationId: listLocationPostgresPrivateLinkServices
-      summary: List the private link services exposing a PostgreSQL database
-      parameters:
-        - $ref: '#/components/parameters/start_after'
-        - $ref: '#/components/parameters/page_size'
-        - $ref: '#/components/parameters/order_column'
+      operationId: getLocationPostgresPrivateLinkService
+      summary: Get the private link service exposing a PostgreSQL database
       responses:
         '200':
-          $ref: '#/components/responses/PrivateLinkServices'
+          $ref: '#/components/responses/PrivateLinkService'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1981,7 +1977,7 @@ paths:
     post:
       operationId: createLocationPostgresPrivateLinkService
       summary: Create a private link service exposing a PostgreSQL database
-      description: Creates the service in the database's private subnet, attached to the database. Ports default to 5432 and 6432.
+      description: Creates the service in the database's private subnet, attached to the database. A database has at most one service. Ports default to 5432 and 6432.
       requestBody:
         required: true
         content:

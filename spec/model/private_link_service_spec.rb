@@ -243,6 +243,17 @@ RSpec.describe PrivateLinkService do
     expect(pls.private_hostname).to be_nil
   end
 
+  it "refuses a PostgreSQL resource that already has a private link service" do
+    Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
+    pg = create_pg
+    pls.attach_postgres_resource(pg)
+
+    pls2 = described_class.create(name: "test-es-2", project_id: project.id, location_id: pls.location_id, private_subnet_id: pls.private_subnet_id)
+    expect { pls2.attach_postgres_resource(pg) }.to raise_error(Validation::ValidationFailed) { expect(it.details).to eq("postgres_resource_id" => "PostgreSQL resource already has a private link service") }
+    expect(pls2.reload.postgres_resource_id).to be_nil
+    expect(pg.reload.private_link_service.id).to eq pls.id
+  end
+
   it "attaches a PostgreSQL resource and requests a reconcile" do
     Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
     pg = create_pg
@@ -256,6 +267,7 @@ RSpec.describe PrivateLinkService do
     expect(pls.reconcile_set?).to be true
 
     serve_pg_zone(pg)
+    pls.update(postgres_resource_id: nil)
     pls2 = described_class.create(name: "test-es-2", project_id: project.id, location_id: pls.location_id, private_subnet_id: pls.private_subnet_id)
     aws2 = PrivateLinkServiceAwsResource.create_with_id(pls2, private_dns_verification_attempted_at: Time.now)
     Strand.create_with_id(pls2, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
@@ -264,7 +276,7 @@ RSpec.describe PrivateLinkService do
     expect(pls2.private_dns_name).to eq "*.#{pg.ubid}.private.#{pg.hostname_suffix}"
     expect(pls2.private_dns_name).to eq pg.cert_private_hostname
     expect(aws2.reload.private_dns_verification_attempted_at).to be_nil
-    expect(pg.private_link_services.map(&:id).sort).to eq [pls.id, pls2.id].sort
+    expect(pg.reload.private_link_service.id).to eq pls2.id
   end
 
   describe "provider dispatch" do

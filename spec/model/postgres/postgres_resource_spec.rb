@@ -2153,4 +2153,12 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.parseable_password).to eq("test-parseable-pass")
     end
   end
+
+  it "without_private_link_service excludes resources that already have one" do
+    postgres_resource.update(private_subnet_id: private_subnet.id)
+    expect(described_class.without_private_link_service.select_map(:id)).to eq [postgres_resource.id]
+
+    PrivateLinkService.create(name: "pl", project_id: project.id, location_id:, private_subnet_id: private_subnet.id, postgres_resource_id: postgres_resource.id)
+    expect(described_class.without_private_link_service).to be_empty
+  end
 end

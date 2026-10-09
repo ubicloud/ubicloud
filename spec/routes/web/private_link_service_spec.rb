@@ -176,9 +176,11 @@ RSpec.describe Clover, "private link service" do
     end
 
     describe "create" do
-      it "offers only AWS private subnets and PostgreSQL resources the user can view" do
+      it "offers only AWS private subnets and PostgreSQL resources the user can view and that have no service yet" do
         assemble_pg("pg-aws", aws_location.id)
         assemble_pg("pg-hetzner", Location::HETZNER_FSN1_ID)
+        pg_taken = assemble_pg("pg-taken", aws_location.id)
+        assemble_pls("pl-taken", pg_taken.private_subnet, postgres_resource_id: pg_taken.id)
         assemble_ps("ps-aws", aws_location.id)
         assemble_ps("ps-hetzner", Location::HETZNER_FSN1_ID)
 
@@ -187,7 +189,7 @@ RSpec.describe Clover, "private link service" do
         expect(page).to have_select("postgres_resource_id", options: ["None", "pg-aws"])
         expect(page).to have_select("private_subnet_id", with_options: ["Select private subnet", "ps-aws"])
         expect(page).to have_no_select("private_subnet_id", with_options: ["ps-hetzner"])
-        expect(page.all("#private_subnet_id option").count).to eq 3
+        expect(page.all("#private_subnet_id option").count).to eq 4
       end
 
       it "creates a private link service with an attached resource and shows its overview" do
@@ -574,6 +576,19 @@ RSpec.describe Clover, "private link service" do
         expect(pls.reconcile_set?).to be true
         expect(page).to have_content "Primary"
         expect(page).to have_no_button "Attach"
+      end
+
+      it "refuses a resource that already has a private link service" do
+        assemble_pls("pl-1", pg.private_subnet, postgres_resource_id: pg.id)
+        pls = assemble_pls("pl-2", pg.private_subnet)
+
+        visit "#{project.path}#{pls.path}/postgres"
+        expect(page).to have_select("postgres_resource_id", options: ["Select a PostgreSQL resource"])
+        _csrf = csrf_token("form-private-link-service-attach")
+        page.driver.post "#{project.path}#{pls.path}/attach-postgres", {postgres_resource_id: pg.ubid, _csrf:}
+        expect(page.status_code).to eq 400
+        expect(page.body).to include "PostgreSQL resource already has a private link service"
+        expect(pls.reload.postgres_resource_id).to be_nil
       end
 
       it "refuses a direct attach while a resource is attached" do

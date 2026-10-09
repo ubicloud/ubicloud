@@ -17,7 +17,7 @@ Sequel.migration do
       column :ip_address_type, :text, collate: '"C"', null: false, default: "ipv4"
 
       unique [:project_id, :location_id, :name]
-      index :postgres_resource_id
+      unique :postgres_resource_id
       constraint(:private_link_service_ip_address_type_check, ip_address_type: %w[ipv4 ipv6 dual])
     end
 
