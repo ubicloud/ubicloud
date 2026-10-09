@@ -674,7 +674,6 @@ RSpec.describe Validation do
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
-            flavor: PostgresResource::Flavor::STANDARD,
           ),
         )
       }.not_to raise_error
@@ -728,13 +727,13 @@ RSpec.describe Validation do
   describe "#validate_postgres_version" do
     it "validates postgres version" do
       expect {
-        described_class.validate_postgres_version("16", PostgresResource::Flavor::STANDARD)
+        described_class.validate_postgres_version("16")
       }.not_to raise_error
     end
 
     it "invalidates postgres version" do
       expect {
-        described_class.validate_postgres_version("15", PostgresResource::Flavor::STANDARD)
+        described_class.validate_postgres_version("15")
       }.to raise_error described_class::ValidationFailed
     end
   end

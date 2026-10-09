@@ -142,13 +142,15 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
-      it "fails if invalid flavor is used" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-invalid", {
+      it "ignores submitted flavor" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
           size: "standard-2",
           storage_size: 64,
           flavor: "invalid",
         }.to_json
-        expect(last_response.status).to eq(400)
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-config")
+        expect(JSON.parse(last_response.body)["flavor"]).to eq("standard")
       end
 
       it "invalid location" do

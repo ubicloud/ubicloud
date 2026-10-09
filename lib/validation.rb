@@ -461,8 +461,8 @@ module Validation
     fail ValidationFailed.new({version: "Database is already at the latest version"}) unless postgres_resource.can_upgrade?
   end
 
-  def self.validate_postgres_version(version, flavor)
-    fail ValidationFailed.new({version: "Version #{version} is not supported for #{flavor} flavor"}) unless Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+  def self.validate_postgres_version(version)
+    fail ValidationFailed.new({version: "Version #{version} is not supported"}) unless Option::POSTGRES_VERSION_OPTIONS.include?(version)
   end
 
   # Hugepages come out of VM memory, so the ceiling is lower on small servers,

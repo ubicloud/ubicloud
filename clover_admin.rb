@@ -1397,10 +1397,9 @@ class CloverAdmin < Roda
       eager do |type, _request|
         [:location, :parent, :project] unless type == :association
       end
-      columns [:name, :project, :location, :flavor, :target_vm_size, :target_storage_size_gib, :ha_type, :target_version, :parent, :created_at]
-      column_options flavor: {type: "select", options: %w[standard].freeze, add_blank: true},
-        ha_type: {type: "select", options: %w[none async sync].freeze, add_blank: true},
-        target_version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
+      columns [:name, :project, :location, :target_vm_size, :target_storage_size_gib, :ha_type, :target_version, :parent, :created_at]
+      column_options ha_type: {type: "select", options: %w[none async sync].freeze, add_blank: true},
+        target_version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS, add_blank: true},
         target_storage_size_gib: {type: "number"},
         project: ubid_input.call("Project"),
         parent: ubid_input.call("Parent"),
@@ -1430,7 +1429,7 @@ class CloverAdmin < Roda
       column_options resource: ubid_input.call("Resource"),
         timeline_access: {type: "select", options: %w[push fetch].freeze, add_blank: true},
         synchronization_status: {type: "select", options: %w[ready catching_up].freeze, add_blank: true},
-        version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
+        version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS, add_blank: true},
         created_at: {type: "text"}
 
       column_search_filter do |ds, column, value|

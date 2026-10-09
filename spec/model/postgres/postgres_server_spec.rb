@@ -44,7 +44,7 @@ RSpec.describe PostgresServer do
 
   describe "#configure" do
     before do
-      resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
+      resource.update(cert_auth_users: [])
       MinioCluster.create(
         project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root",
       )

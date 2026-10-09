@@ -854,7 +854,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
     it "skips chain entries whose project feature flag is disabled and lands on the next enabled one" do
       # vm starts on m6gd; chain is [m6gd, m7gd, m8gd]. m7gd needs ff_enable_m7gd
       # (off by default), so the fallback skips it and lands on m8gd (unconditional).
-      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, location:), ignore_instance_size_mismatch_set?: false)
       allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
       expect(ps).to receive(:incr_ignore_instance_size_mismatch)
       expect { nx.try_postgres_family_fallback }.to change { vm.reload.family }.from("m6gd").to("m8gd")
@@ -862,14 +862,14 @@ RSpec.describe Prog::Vm::Aws::Nexus do
 
     it "picks an earlier chain entry when its feature flag is enabled" do
       project.set_ff_enable_m7gd(true)
-      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, location:), ignore_instance_size_mismatch_set?: false)
       allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
       expect(ps).to receive(:incr_ignore_instance_size_mismatch)
       expect { nx.try_postgres_family_fallback }.to change { vm.reload.family }.from("m6gd").to("m7gd")
     end
 
     it "does not incr ignore_instance_size_mismatch when already set" do
-      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: true)
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, location:), ignore_instance_size_mismatch_set?: true)
       allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
       expect(ps).not_to receive(:incr_ignore_instance_size_mismatch)
       nx.try_postgres_family_fallback
@@ -879,7 +879,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       # r-family chain members all require per-family feature flags; with none
       # enabled the option tree excludes them, so no candidate is allowed.
       vm.update(family: "r6gd")
-      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, location:), ignore_instance_size_mismatch_set?: false)
       allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
       expect(ps).not_to receive(:incr_ignore_instance_size_mismatch)
       expect(nx.try_postgres_family_fallback).to be false

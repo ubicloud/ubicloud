@@ -23,8 +23,9 @@ RSpec.describe Clover, "postgres/capabilities" do
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
       expect(body).to include("option_tree", "metadata")
-      expect(body["option_tree"]).to include("flavor")
-      expect(body["metadata"]).to include("flavor", "location", "family", "size", "ha_type")
+      expect(body["option_tree"]).not_to include("flavor")
+      expect(body["metadata"]).not_to include("flavor")
+      expect(body["metadata"]).to include("location", "family", "size", "ha_type")
     end
 
     it "encodes location dependency chain in the tree" do
@@ -32,10 +33,9 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      standard = tree.dig("flavor", "standard")
-      expect(standard).to include("location", "version")
+      expect(tree).to include("location", "version")
 
-      locations = standard["location"]
+      locations = tree["location"]
       expect(locations.keys).to include("hetzner-fsn1")
 
       families = locations["hetzner-fsn1"]["family"]
@@ -47,7 +47,7 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      family_tree = tree.dig("flavor", "standard", "location", "hetzner-fsn1", "family", "standard")
+      family_tree = tree.dig("location", "hetzner-fsn1", "family", "standard")
       expect(family_tree).to include("size")
 
       size_key = family_tree["size"].keys.first
@@ -59,7 +59,7 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      family_tree = tree.dig("flavor", "standard", "location", "hetzner-fsn1", "family", "standard")
+      family_tree = tree.dig("location", "hetzner-fsn1", "family", "standard")
       size_key = family_tree["size"].keys.first
       storage_key = family_tree["size"][size_key]["storage_size"].keys.first
       ha_types = family_tree["size"][size_key]["storage_size"][storage_key]["ha_type"]
@@ -69,7 +69,7 @@ RSpec.describe Clover, "postgres/capabilities" do
     it "includes version metadata" do
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
-      versions = body.dig("option_tree", "flavor", "standard", "version")
+      versions = body.dig("option_tree", "version")
       expect(versions.keys).to include("16", "17", "18")
     end
 
@@ -78,7 +78,6 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       metadata = body["metadata"]
 
-      expect(metadata.dig("flavor", "standard", "display_name")).to eq("PostgreSQL Database")
       expect(metadata.dig("location", "hetzner-fsn1", "provider")).to eq("hetzner")
       expect(metadata.dig("family", "standard", "display_name")).to eq("Dedicated CPU")
       expect(metadata.dig("ha_type", "none", "standby_count")).to eq(0)
@@ -89,12 +88,12 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      aws_location = tree.dig("flavor", "standard", "location").keys.find { |l|
+      aws_location = tree.dig("location").keys.find { |l|
         Location[name: l]&.provider == "aws"
       }
       next unless aws_location
 
-      families = tree.dig("flavor", "standard", "location", aws_location, "family")
+      families = tree.dig("location", aws_location, "family")
       expect(families).to include("m8gd")
 
       m8gd_sizes = families["m8gd"]["size"].keys
@@ -105,7 +104,7 @@ RSpec.describe Clover, "postgres/capabilities" do
     it "does not filter non-aws locations" do
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
-      families = body.dig("option_tree", "flavor", "standard", "location", "hetzner-fsn1", "family")
+      families = body.dig("option_tree", "location", "hetzner-fsn1", "family")
       expect(families.keys).to include("standard", "hobby")
     end
 
@@ -114,12 +113,12 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      aws_location = tree.dig("flavor", "standard", "location").keys.find { |l|
+      aws_location = tree.dig("location").keys.find { |l|
         Location[name: l]&.provider == "aws"
       }
       next unless aws_location
 
-      families = tree.dig("flavor", "standard", "location", aws_location, "family")
+      families = tree.dig("location", aws_location, "family")
       expect(families.keys).to include("m8gd")
       expect(families.keys).not_to include("i8ge")
     end
@@ -132,7 +131,7 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      families = tree.dig("flavor", "standard", "location", "us-east-2", "family")
+      families = tree.dig("location", "us-east-2", "family")
       expect(families.keys).to include("i8ge")
 
       i8ge_sizes = families["i8ge"]["size"].keys
@@ -149,7 +148,7 @@ RSpec.describe Clover, "postgres/capabilities" do
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
 
-      i8ge_sizes = tree.dig("flavor", "standard", "location", "us-east-2", "family", "i8ge", "size")
+      i8ge_sizes = tree.dig("location", "us-east-2", "family", "i8ge", "size")
       expect(i8ge_sizes.keys).to include("i8ge.24xlarge", "i8ge.48xlarge")
       expect(i8ge_sizes.dig("i8ge.48xlarge", "storage_size").keys).to eq(["120000"])
     end
