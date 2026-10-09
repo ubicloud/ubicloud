@@ -14,6 +14,7 @@ class PostgresTimeline < Sequel::Model
   plugin SemaphoreMethods, :destroy, :take_backup_for_converge, :refresh_blob_storage_policy
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
+  SENTINEL_MAX_BYTES = 64 * 1024
   DOWNLOAD_CREDENTIALS_DURATION_SECONDS = 60 * 60 * 36
 
   def bucket_name
@@ -73,6 +74,21 @@ class PostgresTimeline < Sequel::Model
     raise unless recoverable_errors.any? { ex.message.include?(it) }
 
     @backups = []
+  end
+
+  # The sentinel sits in a bucket the customer can write to, so treat its size
+  # and contents as untrusted. A failed read must not hold up the backup.
+  def latest_completed_backup
+    @backups = nil
+    newest = backups.max_by(&:last_modified)
+    return unless newest&.size&.between?(1, SENTINEL_MAX_BYTES)
+    return unless (body = get_object(newest.key))
+    return unless (finish_lsn = JSON.parse(body)&.dig("FinishLSN")).is_a?(Integer)
+
+    {lsn: PostgresServer.int2lsn(finish_lsn), wal_timeline_id: newest.key[%r{\Abasebackups_005/base_([0-9A-F]{8})}, 1]&.to_i(16)}
+  rescue => ex
+    Clog.emit("Could not read the wal-g backup sentinel", Util.exception_to_hash(ex, into: {ubid:}))
+    nil
   end
 
   def latest_backup_label_before_target(target:)
