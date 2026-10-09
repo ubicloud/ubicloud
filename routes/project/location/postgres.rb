@@ -63,7 +63,6 @@ class Clover
         init_script = typecast_params.nonempty_str("init_script") || pg.init_script&.init_script
 
         postgres_params = {
-          "flavor" => pg.flavor,
           "location" => pg.location,
           "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
           "size" => size,
@@ -422,7 +421,6 @@ class Clover
             target_storage_size_gib: pg.target_storage_size_gib,
             ha_type: PostgresResource.ha_type_none,
             target_version: pg.version,
-            flavor: pg.flavor,
             parent_id: pg.id,
             user_config:,
             pgbouncer_user_config:,
@@ -490,7 +488,6 @@ class Clover
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
             target_version: pg.version,
-            flavor: pg.flavor,
             parent_id: pg.id,
             user_config:,
             pgbouncer_user_config:,

@@ -49,9 +49,6 @@
 
   action = "#{@project.path}/postgres"
 
-  # The option tree is rooted at flavor, which the form does not submit. Without
-  # the version, the form checks the first one offered, which is the newest
-  # rather than the one new databases default to.
-  pre_selected_values = {"flavor" => PostgresResource.default_flavor, "version" => PostgresResource.default_version} %>
+  pre_selected_values = {"version" => PostgresResource.default_version} %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents, pre_selected_values:, content_generator_class: ContentGenerator::Postgres) %>

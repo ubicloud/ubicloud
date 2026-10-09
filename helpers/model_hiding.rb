@@ -33,7 +33,7 @@ class Clover < Roda
         ::ParseableResource => [:client_for_project],
         ::PaymentMethod => [:fraud?],
         ::PostgresLogDestination => [:url_prefix],
-        ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask],
+        ::PostgresResource => [:default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask],
         ::PostgresServer => [:victoria_metrics_client, :restart_sensitive_params],
         ::SubjectTag => [:admin_tag?, :options_for_project, :subject_id_map_for_project_and_accounts],
         ::VictoriaMetricsResource => [:client_for_project],

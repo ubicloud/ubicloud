@@ -247,7 +247,6 @@ def clover_freeze
     Minio,
     Minio::Client::Blob,
     Minio::Crypto::AesGcmCipherProvider,
-    PostgresResource::Flavor,
     PostgresResource::HaType,
     Prog,
     Prog::Ai,
