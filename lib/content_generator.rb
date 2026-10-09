@@ -78,11 +78,11 @@ module ContentGenerator
   end
 
   module Postgres
-    def self.location(flavor, location)
+    def self.location(location)
       location.ui_name
     end
 
-    def self.family(flavor, location, family)
+    def self.family(location, family)
       pg_family = Option::POSTGRES_FAMILY_OPTIONS[family]
 
       [
@@ -91,9 +91,9 @@ module ContentGenerator
       ]
     end
 
-    def self.size(flavor, location, family, size)
+    def self.size(location, family, size)
       size = Option::POSTGRES_SIZE_OPTIONS[size]
-      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)
+      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{PostgresResource::STANDARD_FLAVOR}-#{family}", location.name, location.byoc)
 
       [
         size.name,
@@ -103,8 +103,8 @@ module ContentGenerator
       ]
     end
 
-    def self.storage_size(flavor, location, family, vm_size, storage_size)
-      unit_price = BillingRate.postgres_storage_rate("PostgresStorage", flavor, family, location)["unit_price"].to_f
+    def self.storage_size(location, family, vm_size, storage_size)
+      unit_price = BillingRate.postgres_storage_rate("PostgresStorage", family, location)["unit_price"].to_f
 
       [
         "#{storage_size}GB",
@@ -114,15 +114,15 @@ module ContentGenerator
       ]
     end
 
-    def self.version(flavor, version)
+    def self.version(version)
       "Postgres #{version}"
     end
 
-    def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
+    def self.ha_type(location, family, vm_size, storage_size, ha_type)
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[vm_size].vcpu_count
       ha_type = Option::POSTGRES_HA_OPTIONS[ha_type]
-      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)
-      storage_unit_price = BillingRate.postgres_storage_rate("PostgresStorage", flavor, family, location)["unit_price"].to_f
+      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{PostgresResource::STANDARD_FLAVOR}-#{family}", location.name, location.byoc)
+      storage_unit_price = BillingRate.postgres_storage_rate("PostgresStorage", family, location)["unit_price"].to_f
       standby_count = ha_type.standby_count
 
       [

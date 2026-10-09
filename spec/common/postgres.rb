@@ -15,7 +15,7 @@ module PostgresTestHelpers
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
       target_version: PostgresResource.default_version,
-      flavor: "standard",
+      flavor: PostgresResource::STANDARD_FLAVOR,
       ha_type: "none",
       parent_id: nil,
       restore_target: nil,

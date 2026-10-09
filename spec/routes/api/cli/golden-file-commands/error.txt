@@ -59,7 +59,6 @@ lb eu-central-h1/test2-lb create
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test2-pg create -s bad -S 64
 pg eu-central-h1/test2-pg create -s standard-2 -S bad
-pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -t bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v bad

@@ -1359,7 +1359,7 @@ paths:
               type: object
               properties:
                 flavor:
-                  description: Deprecated. standard is the only flavor and the default, so omit this.
+                  description: Deprecated and ignored.
                   type: string
                   deprecated: true
                 ha_type:
@@ -4375,7 +4375,7 @@ components:
         - version
       x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
-      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
+      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from location -> family -> size -> storage_size -> ha_type'
       type: object
       properties:
         option_tree:
@@ -4387,16 +4387,6 @@ components:
           type: object
           additionalProperties: false
           properties:
-            flavor:
-              type: object
-              additionalProperties:
-                type: object
-                additionalProperties: false
-                properties:
-                  display_name:
-                    type: string
-                required:
-                  - display_name
             location:
               type: object
               additionalProperties:
@@ -4453,7 +4443,6 @@ components:
                   - display_name
                   - standby_count
           required:
-            - flavor
             - location
             - family
             - size
