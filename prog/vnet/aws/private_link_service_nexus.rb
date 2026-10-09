@@ -28,6 +28,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   DESTROY_LABELS = %w[destroy recover_unrecorded_ids delete_endpoint_service wait_service_gone delete_listeners delete_target_groups delete_nlb wait_nlb_gone wait_ports_gone].freeze
 
   NLB_ATTRIBUTES = [
+    # Cross-zone stays on so clients reach the primary whichever AZ it lands in.
     {key: "load_balancing.cross_zone.enabled", value: "true"},
   ].freeze
 
@@ -139,7 +140,6 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_ensure_nlb_attributes
   end
 
-  # Cross-zone stays on so clients reach the primary whichever AZ it lands in.
   label def ensure_nlb_attributes
     current = elbv2_client.describe_load_balancer_attributes(load_balancer_arn: nlb_arn).attributes
     missing = missing_nlb_attributes(current, NLB_ATTRIBUTES)
@@ -180,31 +180,20 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_ensure_endpoint_service
   end
 
-  # Found by tag before creating, so a run that died after the create call
-  # makes no second service; the ubid is the idempotency token too.
   label def ensure_endpoint_service
-    config = if service_id
-      describe_service_configuration
-    else
-      created = find_service_configuration || create_service_configuration
-      record_service_configuration(created)
-      created
-    end
+    record_service_configuration(find_service_configuration || create_service_configuration) unless service_id
+    hop_ensure_service_configuration
+  end
 
-    converge_service_configuration(config)
+  label def ensure_service_configuration
+    converge_service_configuration(describe_service_configuration)
     hop_ensure_permissions
   end
 
-  # Acceptance is always required: the approved endpoint list decides who
-  # connects. The home region is implicit in AWS and never sent.
   def converge_service_configuration(config)
     params = {}
     params[:acceptance_required] = true unless config.acceptance_required
 
-    # AWS keeps a removed region in the list with state Closed (and passes
-    # through Deleting on the way). Those are not supported any more: asking
-    # to remove one again fails with "Cannot remove region", and one the
-    # database wants must be added back, not skipped.
     desired = aws_resource.supported_regions.to_a
     current = config.supported_regions
       .reject { INACTIVE_REGION_STATES.include?(it.service_state) }
@@ -225,7 +214,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
 
   label def ensure_connections
     converge_connections
-    hop_ensure_private_dns
+    hop_ensure_private_dns_name
   end
 
   def converge_permissions
@@ -243,13 +232,11 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     Clog.emit("private link service permissions updated", {private_link_service_permissions: {ubid: private_link_service.ubid, added: add, removed: remove}})
   end
 
-  # AWS checks the TXT record only when asked, and only once it is live on the
-  # DNS servers; verify_private_dns picks up whatever is left.
-  label def ensure_private_dns
-    config = describe_service_configuration
+  label def ensure_private_dns_name
     desired = private_link_service.private_dns_name
+    current = describe_service_configuration.private_dns_name
 
-    if config.private_dns_name != desired
+    if current != desired
       unpublish_private_dns_record
       params = {service_id:}
       if desired
@@ -258,22 +245,16 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
         params[:remove_private_dns_name] = true
       end
       ec2_client.modify_vpc_endpoint_service_configuration(**params)
-      Clog.emit("private link service private DNS name updated", {private_link_service_private_dns: {ubid: private_link_service.ubid, from: config.private_dns_name, to: desired}})
-      config = describe_service_configuration
+      Clog.emit("private link service private DNS name updated", {private_link_service_private_dns: {ubid: private_link_service.ubid, from: current, to: desired}})
     end
 
-    record_private_dns(config)
-
-    if desired && !aws_resource.private_dns_verified?
-      zone = private_link_service.managed_private_dns_zone
-      if zone && publish_private_dns_record(zone) == :live
-        start_private_dns_verification
-        aws_resource.update(private_dns_verification_attempted_at: Time.now)
-      end
+    unless desired
+      unpublish_private_dns_record
+      clear_private_dns
     end
 
     Clog.emit("private link service reconciled", private_link_service)
-    hop_wait
+    hop_verify_private_dns
   end
 
   label def wait
@@ -304,11 +285,9 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_wait
   end
 
+  # Regions and acceptance are converged by the full reconcile chain, not here.
   label def reconcile_connections
-    if service_id
-      converge_service_configuration(describe_service_configuration)
-      converge_connections
-    end
+    converge_connections if service_id
     decr_reconcile_connections
     hop_wait
   end
@@ -599,6 +578,10 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
       private_dns_verification_name: dns[:name],
       private_dns_verification_value: dns[:value],
     )
+  end
+
+  def clear_private_dns
+    aws_resource.update(private_dns_verification_state: nil, private_dns_verification_name: nil, private_dns_verification_value: nil)
   end
 
   def start_private_dns_verification

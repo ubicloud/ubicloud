@@ -295,29 +295,12 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       ids.each { PrivateLinkServiceAwsAllowedEndpoint.create(private_link_service_aws_resource_id: aws.id, vpc_endpoint_id: it, description:) }
     end
 
-    def stub_configuration(acceptance_required: true)
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, service_configurations: [{service_id: "vpce-svc-1", service_state: "Available", acceptance_required:, supported_regions: []}])
-    end
-
-    before { stub_configuration }
-
     it "clears the request and returns to wait without touching AWS before the service exists" do
       nx.incr_reconcile_connections
-      expect(ec2).not_to receive(:describe_vpc_endpoint_service_configurations)
       expect(ec2).not_to receive(:describe_vpc_endpoint_connections)
 
       expect { nx.reconcile_connections }.to hop("wait")
       expect(pls.reconcile_connections_set?).to be false
-    end
-
-    it "turns acceptance back on before applying the list, so a consumer is never auto-accepted" do
-      aws.update(service_id: "vpce-svc-1")
-      stub_configuration(acceptance_required: false)
-      ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
-      ec2.stub_responses(:describe_vpc_endpoint_connections, vpc_endpoint_connections: [])
-      expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(service_id: "vpce-svc-1", acceptance_required: true).and_call_original
-
-      expect { nx.reconcile_connections }.to hop("wait")
     end
 
     it "logs every connection AWS lists with what it means and the owner's note, deciding nothing when nothing needs it" do
@@ -387,7 +370,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       aws.update(service_id: "vpce-svc-1")
       ec2.stub_responses(:describe_vpc_endpoint_connections, vpc_endpoint_connections: [])
 
-      expect { nx.ensure_connections }.to hop("ensure_private_dns")
+      expect { nx.ensure_connections }.to hop("ensure_private_dns_name")
     end
   end
 
@@ -813,17 +796,6 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
   describe "#ensure_endpoint_service" do
     before { aws.update(nlb_arn:) }
 
-    it "treats Closed regions as unsupported: re-adds a wanted one and never tries to remove one" do
-      aws.update(service_id: "vpce-svc-0123456789abcdef0", supported_regions: Sequel.pg_array(["us-east-2"], :text))
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, service_configurations: [service_configuration(regions: ["us-west-2", "us-east-1"], closed_regions: ["us-east-2", "us-west-1"])])
-      ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
-      expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(
-        service_id: "vpce-svc-0123456789abcdef0", add_supported_regions: ["us-east-2"], remove_supported_regions: ["us-east-1"],
-      ).and_call_original
-
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
-    end
-
     it "creates the service configuration on the NLB and records id and name" do
       ec2.stub_responses(:describe_vpc_endpoint_service_configurations, ->(ctx) {
         expect(ctx.params[:filters]).to eq [{name: "tag:ubid", values: [pls.ubid]}]
@@ -840,9 +812,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
         expect(p[:tag_specifications]).to eq [{resource_type: "vpc-endpoint-service", tags: Util.aws_tags("pl-#{pls.ubid[-20..]}", {"ubid" => pls.ubid})}]
         {service_configuration: service_configuration(state: "Pending")}
       })
-      expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_endpoint_service }.to hop("ensure_service_configuration")
       row = aws
       expect(row.service_id).to eq "vpce-svc-0123456789abcdef0"
       expect(row.service_name).to eq "com.amazonaws.vpce.us-west-2.vpce-svc-0123456789abcdef0"
@@ -861,9 +832,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
         expect(p[:supported_regions]).to eq ["eu-west-1", "us-east-1"]
         {service_configuration: service_configuration(regions: ["eu-west-1", "us-east-1"], dns: txt("pendingVerification"))}
       })
-      expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_endpoint_service }.to hop("ensure_service_configuration")
       row = aws
       expect(row.private_dns_verification_state).to eq "pendingVerification"
       expect(row.private_dns_verification_name).to eq "_abc123"
@@ -877,20 +847,29 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       ])
       expect(ec2).not_to receive(:create_vpc_endpoint_service_configuration)
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_endpoint_service }.to hop("ensure_service_configuration")
       expect(aws.service_id).to eq "vpce-svc-0123456789abcdef0"
     end
 
-    it "only describes a recorded service when its configuration already matches the database" do
+    it "asks AWS nothing when the service is already recorded" do
+      aws.update(service_id: "vpce-svc-0123456789abcdef0")
+      expect(ec2).not_to receive(:describe_vpc_endpoint_service_configurations)
+      expect(ec2).not_to receive(:create_vpc_endpoint_service_configuration)
+
+      expect { nx.ensure_endpoint_service }.to hop("ensure_service_configuration")
+    end
+  end
+
+  describe "#ensure_service_configuration" do
+    it "only describes the service when its configuration already matches the database" do
       aws.update(service_id: "vpce-svc-0123456789abcdef0", supported_regions: Sequel.pg_array(["us-east-1"], :text))
       ec2.stub_responses(:describe_vpc_endpoint_service_configurations, ->(ctx) {
         expect(ctx.params[:service_ids]).to eq ["vpce-svc-0123456789abcdef0"]
         {service_configurations: [service_configuration(regions: ["us-east-1"])]}
       })
-      expect(ec2).not_to receive(:create_vpc_endpoint_service_configuration)
       expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_service_configuration }.to hop("ensure_permissions")
     end
 
     it "turns acceptance back on and converges supported regions onto the database in one modify call" do
@@ -901,7 +880,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
         service_id: "vpce-svc-0123456789abcdef0", acceptance_required: true, add_supported_regions: ["eu-west-1"], remove_supported_regions: ["ap-south-1"],
       ).and_call_original
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_service_configuration }.to hop("ensure_permissions")
     end
 
     it "only removes regions when the database has none, ignoring the home region AWS reports" do
@@ -910,7 +889,18 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
       expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(service_id: "vpce-svc-0123456789abcdef0", remove_supported_regions: ["us-east-1"]).and_call_original
 
-      expect { nx.ensure_endpoint_service }.to hop("ensure_permissions")
+      expect { nx.ensure_service_configuration }.to hop("ensure_permissions")
+    end
+
+    it "treats Closed regions as unsupported: re-adds a wanted one and never tries to remove one" do
+      aws.update(service_id: "vpce-svc-0123456789abcdef0", supported_regions: Sequel.pg_array(["us-east-2"], :text))
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, service_configurations: [service_configuration(regions: ["us-west-2", "us-east-1"], closed_regions: ["us-east-2", "us-west-1"])])
+      ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
+      expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(
+        service_id: "vpce-svc-0123456789abcdef0", add_supported_regions: ["us-east-2"], remove_supported_regions: ["us-east-1"],
+      ).and_call_original
+
+      expect { nx.ensure_service_configuration }.to hop("ensure_permissions")
     end
   end
 
@@ -977,141 +967,73 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     end
   end
 
-  describe "#ensure_private_dns" do
+  describe "#ensure_private_dns_name" do
     before { aws.update(service_id: "vpce-svc-1") }
 
-    it "does nothing beyond refreshing the record when the name already matches" do
+    it "leaves the name alone and goes on to verification when it already matches" do
       pls.update(private_dns_name: "db.example.com")
+      aws.update(private_dns_verification_state: "pendingVerification", private_dns_verification_name: "_abc123", private_dns_verification_value: "vpce:xyz789")
       ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.example.com", dns: txt("pendingVerification")))
       expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
 
-      expect { nx.ensure_private_dns }.to hop("wait")
-      row = aws
-      expect(row.private_dns_verification_state).to eq "pendingVerification"
-      expect(row.private_dns_verification_name).to eq "_abc123"
-      expect(row.private_dns_verification_value).to eq "vpce:xyz789"
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
+      expect(aws.private_dns_verification_name).to eq "_abc123"
     end
 
-    it "sets a new name on the service and records the TXT record AWS issues for it" do
+    it "asks AWS nothing beyond the describe when neither side has a name" do
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration)
+      expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
+
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
+      expect(aws.private_dns_verification_state).to be_nil
+    end
+
+    it "removes a TXT record left behind when the name is already gone from the service" do
+      zone = managed_zone
+      zone.insert_record(record_name: "_abc123.db.c0.example.com", type: "TXT", ttl: 60, data: "vpce:xyz789")
+      aws.update(private_dns_verification_state: "verified", private_dns_verification_name: "_abc123", private_dns_verification_value: "vpce:xyz789", private_dns_txt_record_name: "_abc123.db.c0.example.com")
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration)
+      expect(ec2).not_to receive(:modify_vpc_endpoint_service_configuration)
+
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
+      expect(zone.records_dataset.where(tombstoned: true).map { [it.name, it.data] }).to eq [["_abc123.db.c0.example.com.", "vpce:xyz789"]]
+      row = aws
+      expect(row.private_dns_txt_record_name).to be_nil
+      expect([row.private_dns_verification_state, row.private_dns_verification_name, row.private_dns_verification_value]).to all(be_nil)
+    end
+
+    it "sets a new name on the service and leaves recording the TXT record to verification" do
       pls.update(private_dns_name: "db.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration, configuration(private_dns_name: "db.example.com", dns: txt("pendingVerification")))
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration)
       ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
       expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(service_id: "vpce-svc-1", private_dns_name: "db.example.com").and_call_original
+      expect(ec2).to receive(:describe_vpc_endpoint_service_configurations).once.and_call_original
 
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(aws.private_dns_verification_name).to eq "_abc123"
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
+      expect(aws.private_dns_verification_name).to be_nil
     end
 
     it "removes the name from the service and clears the record when the column is empty" do
       aws.update(private_dns_verification_state: "verified", private_dns_verification_name: "_abc123", private_dns_verification_value: "vpce:xyz789")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "old.example.com", dns: txt("verified")), configuration)
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "old.example.com", dns: txt("verified")))
       ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
       expect(ec2).to receive(:modify_vpc_endpoint_service_configuration).with(service_id: "vpce-svc-1", remove_private_dns_name: true).and_call_original
 
-      expect { nx.ensure_private_dns }.to hop("wait")
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
       row = aws
       expect([row.private_dns_verification_state, row.private_dns_verification_name, row.private_dns_verification_value]).to all(be_nil)
-    end
-
-    it "does not start verification when no zone Ubicloud serves contains the name" do
-      pls.update(private_dns_name: "db.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.example.com", dns: txt("pendingVerification")))
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(aws.private_dns_verification_attempted_at).to be_nil
-    end
-
-    it "does not start a check when the name is already verified" do
-      pls.update(private_dns_name: "db.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.example.com", dns: txt("verified")))
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-    end
-
-    it "publishes the TXT record in the zone Ubicloud serves and asks AWS to verify once it has settled" do
-      zone = managed_zone
-      pls.update(private_dns_name: "db.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
-      ec2.stub_responses(:start_vpc_endpoint_service_private_dns_verification, {})
-      expect(ec2).to receive(:start_vpc_endpoint_service_private_dns_verification).with(service_id: "vpce-svc-1").once.and_call_original
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.map { [it.name, it.type, it.ttl, it.data, it.tombstoned] }).to eq [["_abc123.db.c0.example.com.", "TXT", 60, "vpce:xyz789", false]]
-      expect(zone.refresh_dns_servers_set?).to be true
-      row = aws
-      expect(row.private_dns_verification_attempted_at).to be_nil
-      expect(row.private_dns_txt_record_name).to eq "_abc123.db.c0.example.com"
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.count).to eq 1
-      expect(aws.private_dns_verification_attempted_at).to be_nil
-
-      settle_records(zone)
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.count).to eq 1
-      expect(aws.private_dns_verification_attempted_at).not_to be_nil
-    end
-
-    it "tombstones a stale TXT record before publishing the value AWS issued" do
-      zone = managed_zone
-      zone.insert_record(record_name: "_abc123.db.c0.example.com", type: "TXT", ttl: 60, data: "vpce:old")
-      settle_records(zone)
-      pls.update(private_dns_name: "db.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.where(tombstoned: true).select_map(:data)).to eq ["vpce:old"]
-      expect(zone.records_dataset.where(tombstoned: false, data: "vpce:xyz789").count).to eq 1
-    end
-
-    it "does not publish or verify while AWS has not issued the TXT record yet" do
-      zone = managed_zone
-      pls.update(private_dns_name: "db.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com"))
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.count).to eq 0
-    end
-
-    it "publishes nothing and does not ask AWS while the zone has no DNS server VMs" do
-      zone = managed_zone(with_vm: false)
-      pls.update(private_dns_name: "db.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
-      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.count).to eq 0
-      expect(aws.private_dns_verification_attempted_at).to be_nil
     end
 
     it "removes the TXT record published for the previous name when the name changes" do
       zone = managed_zone
       zone.insert_record(record_name: "_abc123.old.c0.example.com", type: "TXT", ttl: 60, data: "vpce:xyz789")
       aws.update(private_dns_verification_state: "verified", private_dns_verification_name: "_abc123", private_dns_verification_value: "vpce:xyz789", private_dns_txt_record_name: "_abc123.old.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "old.c0.example.com", dns: txt("verified")), configuration)
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "old.c0.example.com", dns: txt("verified")))
       ec2.stub_responses(:modify_vpc_endpoint_service_configuration, {})
 
-      expect { nx.ensure_private_dns }.to hop("wait")
+      expect { nx.ensure_private_dns_name }.to hop("verify_private_dns")
       expect(zone.records_dataset.where(tombstoned: true).map { [it.name, it.data] }).to eq [["_abc123.old.c0.example.com.", "vpce:xyz789"]]
       expect(aws.private_dns_txt_record_name).to be_nil
-    end
-
-    it "removes the record published under a previous TXT name before publishing the one AWS issues now" do
-      zone = managed_zone
-      zone.insert_record(record_name: "_old.db.c0.example.com", type: "TXT", ttl: 60, data: "vpce:old")
-      pls.update(private_dns_name: "db.c0.example.com")
-      aws.update(private_dns_txt_record_name: "_old.db.c0.example.com")
-      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
-
-      expect { nx.ensure_private_dns }.to hop("wait")
-      expect(zone.records_dataset.where(tombstoned: true).map { [it.name, it.data] }).to eq [["_old.db.c0.example.com.", "vpce:old"]]
-      expect(zone.records_dataset.where(tombstoned: false, name: "_abc123.db.c0.example.com.").count).to eq 1
-      expect(aws.private_dns_txt_record_name).to eq "_abc123.db.c0.example.com"
     end
   end
 
@@ -1145,6 +1067,18 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect(aws.private_dns_verification_attempted_at).not_to be_nil
     end
 
+    it "asks AWS to check the record and publishes nothing while the zone has no DNS server VMs" do
+      zone = managed_zone(with_vm: false)
+      aws.update(service_id: "vpce-svc-1")
+      pls.update(private_dns_name: "db.c0.example.com")
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
+      ec2.stub_responses(:start_vpc_endpoint_service_private_dns_verification, {})
+      expect(ec2).to receive(:start_vpc_endpoint_service_private_dns_verification).with(service_id: "vpce-svc-1").and_call_original
+
+      expect { nx.verify_private_dns }.to hop("wait")
+      expect(zone.records_dataset.count).to eq 0
+    end
+
     it "does not ask AWS before it issued the TXT record" do
       aws.update(service_id: "vpce-svc-1")
       pls.update(private_dns_name: "db.example.com")
@@ -1155,6 +1089,17 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect(aws.private_dns_verification_attempted_at).not_to be_nil
     end
 
+    it "does not publish in a zone Ubicloud serves before AWS issued the TXT record" do
+      zone = managed_zone
+      aws.update(service_id: "vpce-svc-1")
+      pls.update(private_dns_name: "db.c0.example.com")
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com"))
+      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
+
+      expect { nx.verify_private_dns }.to hop("wait")
+      expect(zone.records_dataset.count).to eq 0
+    end
+
     it "publishes the record in a zone Ubicloud serves and naps until it has settled before asking AWS" do
       zone = managed_zone
       aws.update(service_id: "vpce-svc-1")
@@ -1163,8 +1108,14 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
 
       expect { nx.verify_private_dns }.to nap(described_class::PRIVATE_DNS_RECORD_SETTLE_SECONDS)
-      expect(zone.records_dataset.where(type: "TXT", tombstoned: false).select_map(:data)).to eq ["vpce:xyz789"]
-      expect(aws.private_dns_verification_attempted_at).to be_nil
+      expect(zone.records_dataset.map { [it.name, it.type, it.ttl, it.data, it.tombstoned] }).to eq [["_abc123.db.c0.example.com.", "TXT", 60, "vpce:xyz789", false]]
+      expect(zone.refresh_dns_servers_set?).to be true
+      row = aws
+      expect(row.private_dns_verification_attempted_at).to be_nil
+      expect(row.private_dns_txt_record_name).to eq "_abc123.db.c0.example.com"
+
+      expect { nx.verify_private_dns }.to nap(described_class::PRIVATE_DNS_RECORD_SETTLE_SECONDS)
+      expect(zone.records_dataset.count).to eq 1
     end
 
     it "asks AWS to check a settled record in a zone Ubicloud serves" do
@@ -1182,6 +1133,34 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       row = aws
       expect(row.private_dns_verification_attempted_at).not_to be_nil
       expect(row.private_dns_txt_record_name).to eq "_abc123.db.c0.example.com"
+    end
+
+    it "tombstones a stale TXT record before publishing the value AWS issued" do
+      zone = managed_zone
+      zone.insert_record(record_name: "_abc123.db.c0.example.com", type: "TXT", ttl: 60, data: "vpce:old")
+      settle_records(zone)
+      aws.update(service_id: "vpce-svc-1")
+      pls.update(private_dns_name: "db.c0.example.com")
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
+      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
+
+      expect { nx.verify_private_dns }.to nap(described_class::PRIVATE_DNS_RECORD_SETTLE_SECONDS)
+      expect(zone.records_dataset.where(tombstoned: true).select_map(:data)).to eq ["vpce:old"]
+      expect(zone.records_dataset.where(tombstoned: false, data: "vpce:xyz789").count).to eq 1
+    end
+
+    it "removes the record published under a previous TXT name before publishing the one AWS issues now" do
+      zone = managed_zone
+      zone.insert_record(record_name: "_old.db.c0.example.com", type: "TXT", ttl: 60, data: "vpce:old")
+      aws.update(service_id: "vpce-svc-1", private_dns_txt_record_name: "_old.db.c0.example.com")
+      pls.update(private_dns_name: "db.c0.example.com")
+      ec2.stub_responses(:describe_vpc_endpoint_service_configurations, configuration(private_dns_name: "db.c0.example.com", dns: txt("pendingVerification")))
+      expect(ec2).not_to receive(:start_vpc_endpoint_service_private_dns_verification)
+
+      expect { nx.verify_private_dns }.to nap(described_class::PRIVATE_DNS_RECORD_SETTLE_SECONDS)
+      expect(zone.records_dataset.where(tombstoned: true).map { [it.name, it.data] }).to eq [["_old.db.c0.example.com.", "vpce:old"]]
+      expect(zone.records_dataset.where(tombstoned: false, name: "_abc123.db.c0.example.com.").count).to eq 1
+      expect(aws.private_dns_txt_record_name).to eq "_abc123.db.c0.example.com"
     end
   end
 
