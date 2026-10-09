@@ -66,8 +66,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     ]
 
     network_interfaces = if mgmt_nic
+      mgmt_ipv6 = management_ipv6?(mgmt_nic)
       [
-        network_interface(mgmt_nic, stack_type: "IPV4_ONLY"),
+        network_interface(mgmt_nic, stack_type: mgmt_ipv6 ? "IPV4_IPV6" : "IPV4_ONLY", ipv4_nat: !mgmt_ipv6),
         # At creation GCE takes the vNIC before a Dynamic NIC as its parent
         # and rejects a parent_nic_name.
         network_interface(user_nic, stack_type: "IPV4_IPV6", vlan: GcpDualNicNetplan::VLAN),
@@ -176,7 +177,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Customers reach the user NIC; the control plane reaches the
     # management NIC, nic0 on a dual-NIC VM.
     nis = instance.network_interfaces
-    ssh_ni, user_ni = if vm.management_nic
+    mgmt_nic = vm.management_nic
+    ssh_ni, user_ni = if mgmt_nic
       dynamic_nic_name = "nic0.#{GcpDualNicNetplan::VLAN}"
       [nis.find { it.name == "nic0" }, nis.find { it.name == dynamic_nic_name } || fail("GCE instance #{vm.name} has no Dynamic NIC #{dynamic_nic_name}")]
     else
@@ -184,7 +186,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
     public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
-    ssh_host = ssh_ni&.access_configs&.first&.nat_i_p
+    ssh_host = if mgmt_nic && management_ipv6?(mgmt_nic)
+      ssh_ni.ipv6_access_configs.first.external_ipv6
+    else
+      ssh_ni&.access_configs&.first&.nat_i_p
+    end
 
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4) if public_ipv4
     vm.sshable.update(host: ssh_host) if ssh_host
@@ -323,23 +329,23 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @user_nic ||= vm.user_nic
   end
 
-  def network_interface(nic, stack_type:, vlan: nil)
+  def network_interface(nic, stack_type:, vlan: nil, ipv4_nat: true)
     gcp_res = nic.nic_gcp_resource
     interface = Google::Cloud::Compute::V1::NetworkInterface.new(
       network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
       subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
       network_i_p: nic.private_ipv4.network.to_s,
       stack_type:,
-      access_configs: [
-        Google::Cloud::Compute::V1::AccessConfig.new(
-          name: "External NAT",
-          type: "ONE_TO_ONE_NAT",
-          network_tier: "STANDARD",
-          nat_i_p: gcp_res.static_ip.to_s,
-        ),
-      ],
       vlan:,
     )
+    if ipv4_nat
+      interface.access_configs << Google::Cloud::Compute::V1::AccessConfig.new(
+        name: "External NAT",
+        type: "ONE_TO_ONE_NAT",
+        network_tier: "STANDARD",
+        nat_i_p: gcp_res.static_ip.to_s,
+      )
+    end
     if stack_type == "IPV4_IPV6"
       interface.ipv6_access_configs << Google::Cloud::Compute::V1::AccessConfig.new(
         name: "External IPv6",
@@ -356,7 +362,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       mgmt_gateway: mgmt_nic.private_subnet.net4.nth(1).to_s,
       user_ip: user_nic.private_ipv4.network.to_s,
       user_gateway: user_nic.private_subnet.net4.nth(1).to_s,
+      mgmt_ipv6: management_ipv6?(mgmt_nic),
     )
+  end
+
+  # A management NIC assembled without an EIP has no static IPv4
+  # (Vnet::Gcp::NicNexus), so the control plane reaches it over IPv6.
+  def management_ipv6?(mgmt_nic)
+    mgmt_nic.nic_gcp_resource.static_ip.nil?
   end
 
   def user_nic_default_routes?
