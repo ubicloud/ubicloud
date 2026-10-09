@@ -280,9 +280,13 @@ function redrawChildOptions(name) {
 
           elements2select[0].children[0].checked = true;
           break;
-        case "input_checkbox":
-
+        case "input_checkbox": {
+          let checked = $("input[name=" + child_name + "]:checked").length > 0;
+          let options = $("input[name=" + child_name + "]").parent().parent();
+          options.addClass('hidden').attr('hidden', true).find("input").prop('disabled', true).prop('checked', false);
+          options.filter(classes).removeClass('hidden').removeAttr('hidden').find("input").prop('disabled', false).prop('checked', checked);
           break;
+        }
         case "select":
           $("select[name=" + child_name + "]").children().hide().prop('disabled', true).prop('checked', false).prop('selected', false);
           $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);

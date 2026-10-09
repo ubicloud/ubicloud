@@ -11,7 +11,7 @@
         <% opt_text = h(opt_text) if opt_text && (!opt_options || opt_options[:escape] != false) %>
         <% id = "#{id_prefix}#{name}-#{opt_val}-#{idx}" %>
 
-        <div class="relative flex items-start <%= opt_classes %>">
+        <div class="relative flex items-start <%= opt_classes %>"<%= " hidden" if opt_classes.to_s.split.include?("hidden") %>>
           <div class="flex h-6 items-center">
             <input
               id="<%= id %>"
