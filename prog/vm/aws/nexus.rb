@@ -582,7 +582,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     candidates = Option.postgres_fallback_candidates(vm.family)
     return false if candidates.empty?
 
-    option_tree, parents = PostgresResource.generate_postgres_options(ps.resource.project, flavor: ps.resource.flavor, location: ps.resource.location)
+    option_tree, parents = PostgresResource.generate_postgres_options(ps.resource.project, location: ps.resource.location)
     allowed_families = OptionTreeGenerator.generate_allowed_options("family", option_tree, parents).map { it["family"] }.uniq
 
     next_family = candidates.find { |f| allowed_families.include?(f) }

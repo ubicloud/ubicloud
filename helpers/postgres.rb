@@ -5,7 +5,6 @@ class Clover
     authorize("Postgres:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
@@ -18,7 +17,6 @@ class Clover
     init_script = typecast_params.nonempty_str("init_script")
 
     postgres_params = {
-      "flavor" => flavor,
       "location" => @location,
       "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
@@ -47,7 +45,6 @@ class Clover
         target_version: version,
         ha_type:,
         with_firewall_rules:,
-        flavor:,
         private_subnet_name:,
         user_config:,
         pgbouncer_user_config:,
@@ -121,7 +118,6 @@ class Clover
   def postgres_option_metadata(option_tree)
     valid = OptionTreeGenerator.collect_valid_values(option_tree)
     {
-      flavor: Option::POSTGRES_FLAVOR_OPTIONS.slice(*valid["flavor"]).transform_values { |v| {display_name: v.title} },
       location: (valid["location"] || []).to_h { |l| [l.name, {display_name: l.display_name, ui_name: l.ui_name, provider: l.provider}] },
       family: Option::POSTGRES_FAMILY_OPTIONS.slice(*valid["family"]).transform_values { |v| {display_name: v.description, category: v.category} },
       size: Option::POSTGRES_SIZE_OPTIONS.slice(*valid["size"]).transform_values { |v| {vcpu: v.vcpu_count, memory_gib: v.memory_gib} },
@@ -171,6 +167,6 @@ class Clover
       raise e
     end
 
-    Validation.validate_postgres_version(postgres_params["version"], postgres_params["flavor"])
+    Validation.validate_postgres_version(postgres_params["version"])
   end
 end

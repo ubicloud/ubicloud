@@ -120,7 +120,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
-        expect(PostgresResource.first.flavor).to eq(PostgresResource::Flavor::STANDARD)
+        expect(PostgresResource.first.flavor).to eq(PostgresResource::STANDARD_FLAVOR)
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do

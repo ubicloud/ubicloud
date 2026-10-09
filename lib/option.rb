@@ -259,11 +259,6 @@ module Option
   }).freeze
 
   # Postgres Global Options
-  PostgresFlavorOption = Data.define(:name, :title)
-  POSTGRES_FLAVOR_OPTIONS = [
-    [PostgresResource::Flavor::STANDARD, "PostgreSQL Database"],
-  ].to_h { |args| [args[0], PostgresFlavorOption.new(*args)] }.freeze
-
   PostgresFamilyOption = Data.define(:name, :description, :category)
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU", "dedicated"],
@@ -492,9 +487,7 @@ module Option
 
   POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
 
-  POSTGRES_VERSION_OPTIONS = {
-    PostgresResource::Flavor::STANDARD => ["18", "17", "16"],
-  }
+  POSTGRES_VERSION_OPTIONS = %w[18 17 16].freeze
 
   POSTGRES_IMAGE_FAMILIES = %w[ubuntu-2204 ubuntu-2604].freeze
 
