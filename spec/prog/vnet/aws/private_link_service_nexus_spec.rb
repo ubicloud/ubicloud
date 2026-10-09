@@ -422,6 +422,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       elbv2.stub_responses(:describe_target_groups, ->(ctx) {
         {target_groups: [{target_group_arn: "arn:recovered:#{ctx.params[:names].first}"}]}
       })
+      expect(Clog).to receive(:emit).with("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: pls.ubid, kind: "target_group", id: "arn:recovered:pl-5432-#{pls.ubid[-20..]}", port: 5432}}).and_call_original
+      expect(Clog).to receive(:emit).with("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: pls.ubid, kind: "target_group", id: "arn:recovered:pl-6432-#{pls.ubid[-20..]}", port: 6432}}).and_call_original
 
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
       expect(nlb_port(5432).target_group_arn).to eq "arn:recovered:pl-5432-#{pls.ubid[-20..]}"
@@ -649,6 +651,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     it "recovers an NLB created by an earlier run that died before recording it" do
       elbv2.stub_responses(:create_load_balancer, "DuplicateLoadBalancerName")
       elbv2.stub_responses(:describe_load_balancers, load_balancers: [{load_balancer_arn: nlb_arn}])
+      expect(Clog).to receive(:emit).with("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: pls.ubid, kind: "nlb", id: nlb_arn}}).and_call_original
 
       expect { nx.ensure_nlb }.to hop("ensure_nlb_attributes")
       expect(aws.nlb_arn).to eq nlb_arn
@@ -776,6 +779,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     it "recovers a listener created by an earlier run by matching its port" do
       elbv2.stub_responses(:create_listener, "DuplicateListener")
       elbv2.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:recovered-6432", port: 6432}, {listener_arn: "arn:recovered-5432", port: 5432}])
+      expect(Clog).to receive(:emit).with("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: pls.ubid, kind: "listener", id: "arn:recovered-5432", port: 5432}}).and_call_original
+      expect(Clog).to receive(:emit).with("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: pls.ubid, kind: "listener", id: "arn:recovered-6432", port: 6432}}).and_call_original
 
       expect { nx.ensure_listeners }.to hop("ensure_endpoint_service")
       expect(nlb_port(5432).listener_arn).to eq "arn:recovered-5432"

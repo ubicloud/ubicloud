@@ -131,7 +131,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
       arn = begin
         elbv2_client.create_load_balancer(**params).load_balancers.first.load_balancer_arn
       rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateLoadBalancerName
-        elbv2_client.describe_load_balancers(names: [name]).load_balancers.first.load_balancer_arn
+        elbv2_client.describe_load_balancers(names: [name]).load_balancers.first.load_balancer_arn.tap { log_recovered("nlb", it) }
       end
 
       aws_resource.update(nlb_arn: arn)
@@ -367,6 +367,9 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     log_recovered("endpoint_service", config.service_id)
   end
 
+  # Both for a resource found by name on a Duplicate* error at creation and
+  # for one found while tearing down; either means a run died after the
+  # create call and before recording its id.
   def log_recovered(kind, id, **extra)
     Clog.emit("private link service recovered an unrecorded AWS resource", {private_link_service_recovered: {ubid: private_link_service.ubid, kind:, id:, **extra}})
   end
@@ -482,7 +485,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
         tags: Util.aws_tags(name, {"ubid" => private_link_service.ubid, "port" => port.port.to_s}),
       ).target_groups.first.target_group_arn
     rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateTargetGroupName
-      elbv2_client.describe_target_groups(names: [name]).target_groups.first.target_group_arn
+      elbv2_client.describe_target_groups(names: [name]).target_groups.first.target_group_arn.tap { log_recovered("target_group", it, port: port.port) }
     end
 
     nlb_port(port).update(target_group_arn: arn)
@@ -528,7 +531,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
         tags: Util.aws_tags("#{nlb_name}-#{port.port}", {"ubid" => private_link_service.ubid, "port" => port.port.to_s}),
       ).listeners.first.listener_arn
     rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateListener
-      elbv2_client.describe_listeners(load_balancer_arn: nlb_arn).listeners.find { it.port == port.port }.listener_arn
+      elbv2_client.describe_listeners(load_balancer_arn: nlb_arn).listeners.find { it.port == port.port }.listener_arn.tap { log_recovered("listener", it, port: port.port) }
     end
 
     nlb_port(port).update(listener_arn: arn)
