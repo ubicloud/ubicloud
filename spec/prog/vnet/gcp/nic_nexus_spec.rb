@@ -59,6 +59,14 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(gcp_res.vpc_name).to eq("ubicloud-#{private_subnet.project.ubid}-#{private_subnet.location.ubid}")
       expect(gcp_res.subnet_name).to eq("ubicloud-#{private_subnet.ubid}")
     end
+
+    it "skips the static IP of a NIC assembled with use_eip false" do
+      refresh_frame(nx, new_values: {"use_eip" => false})
+      expect(addresses_client).not_to receive(:insert)
+
+      expect { nx.start }.to hop("wait")
+      expect(NicGcpResource[nic.id].static_ip).to be_nil
+    end
   end
 
   describe "#allocate_static_ip" do

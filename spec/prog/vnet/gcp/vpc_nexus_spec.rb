@@ -511,6 +511,75 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
   end
 
+  context "when the VPC is the management VPC" do
+    let(:mgmt_ps) {
+      PrivateSubnet.create(
+        name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id, project_id: project.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "100.64.0.0/20", state: "waiting",
+      )
+    }
+
+    before do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      gcp_vpc.update(dedicated_for_subnet_id: mgmt_ps.id)
+    end
+
+    def capture_added_rules(count)
+      added = []
+      expect(nfp_client).to receive(:get_rule).exactly(count).times.and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:add_rule).exactly(count).times do |args|
+        expect(args).to include(project: "test-gcp-project", firewall_policy: vpc_name)
+        added << args[:firewall_policy_rule_resource]
+        instance_double(Gapic::GenericLRO::Operation, name: "op-rule")
+      end
+      added
+    end
+
+    it "creates the management rules instead of the VPC-wide deny rules" do
+      expect { nx.create_vpc_deny_rules }.to hop("create_management_rules")
+    end
+
+    it "allows SSH from the control plane CIDRs per address family and denies all egress" do
+      expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.0/24", "2001:db8::/32", "5.6.7.8/32"])
+      added = capture_added_rules(4)
+
+      expect { nx.create_management_rules }.to hop("wait")
+      expect(added.map { [it.priority, it.direction, it.action, it.match.src_ip_ranges.to_a, it.match.dest_ip_ranges.to_a] }).to eq([
+        [1000, "INGRESS", "allow", ["1.2.3.0/24", "5.6.7.8/32"], []],
+        [1001, "INGRESS", "allow", ["2001:db8::/32"], []],
+        [1002, "EGRESS", "deny", [], ["0.0.0.0/0"]],
+        [1003, "EGRESS", "deny", [], ["::/0"]],
+      ])
+      expect(added[0].match.layer4_configs.map { [it.ip_protocol, it.ports.to_a] }).to eq([["tcp", ["22"]]])
+      expect(added[0].target_secure_tags).to be_empty
+    end
+
+    it "removes the SSH rule of an address family that has no control plane CIDR" do
+      expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.0/24"])
+      added = capture_added_rules(3)
+      expect(nfp_client).to receive(:remove_rule).with(project: "test-gcp-project", firewall_policy: vpc_name, priority: 1001)
+        .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-remove"))
+
+      expect { nx.create_management_rules }.to hop("wait")
+      expect(added.map(&:priority)).to eq([1000, 1002, 1003])
+    end
+
+    it "accepts a missing rule when it removes one" do
+      expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["::/0"])
+      capture_added_rules(3)
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 1000)).and_raise(Google::Cloud::NotFoundError.new("not found"))
+
+      expect { nx.create_management_rules }.to hop("wait")
+    end
+
+    it "re-applies the management rules instead of syncing VM firewalls" do
+      st
+      gcp_vpc.incr_update_firewall_rules
+      expect { nx.update_firewall_rules }.to hop("create_management_rules")
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(0)
+    end
+  end
+
   describe "#create_vpc_deny_rules" do
     it "creates four deny rules and hops to wait" do
       expect(nfp_client).to receive(:get_rule).exactly(4).times

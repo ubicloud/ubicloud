@@ -35,6 +35,32 @@ RSpec.describe GcpVpc do
     expect(gcp_vpc.private_subnets.map(&:id)).to eq([ps.id])
   end
 
+  describe "#management?" do
+    let(:ps) {
+      PrivateSubnet.create(
+        name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id, project_id: project.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "100.64.0.0/20", state: "waiting",
+      )
+    }
+
+    before { allow(Config).to receive(:postgres_service_project_id).and_return(project.id) }
+
+    it "is false for a shared VPC" do
+      expect(gcp_vpc.management?).to be false
+    end
+
+    it "is false for the dedicated VPC of another subnet" do
+      ps.update(name: "ps")
+      gcp_vpc.update(dedicated_for_subnet_id: ps.id)
+      expect(gcp_vpc.management?).to be false
+    end
+
+    it "is true for the dedicated VPC of the management subnet" do
+      gcp_vpc.update(dedicated_for_subnet_id: ps.id)
+      expect(gcp_vpc.management?).to be true
+    end
+  end
+
   it "has destroy semaphore" do
     Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     gcp_vpc.incr_destroy

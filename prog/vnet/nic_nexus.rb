@@ -20,7 +20,8 @@ class Prog::Vnet::NicNexus < Prog::Base
         ipv4 = ipv4_addr || (allocate_ipv4_from_aws_subnet(subnet, aws_subnet) if create_network_interface)
         ["Vnet::Aws::NicNexus", ipv4&.to_s, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
-        ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active", nil]
+        ipv4 = ipv4_addr || (subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4)
+        ["Vnet::Gcp::NicNexus", ipv4.to_s, nil, "active", nil]
       else
         ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing", nil]
       end

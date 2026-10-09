@@ -59,6 +59,25 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "#gcp_management?" do
+    before { allow(Config).to receive(:postgres_service_project_id).and_return(private_subnet.project_id) }
+
+    it "is true for the reserved name in the Postgres service project" do
+      private_subnet.update(name: described_class::GCP_MANAGEMENT_SUBNET_NAME)
+      expect(private_subnet.gcp_management?).to be true
+    end
+
+    it "is false for another name in the Postgres service project" do
+      expect(private_subnet.gcp_management?).to be false
+    end
+
+    it "is false for the reserved name in another project" do
+      private_subnet.update(name: described_class::GCP_MANAGEMENT_SUBNET_NAME)
+      allow(Config).to receive(:postgres_service_project_id).and_return(Project.generate_uuid)
+      expect(private_subnet.gcp_management?).to be false
+    end
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
@@ -98,6 +117,31 @@ RSpec.describe PrivateSubnet do
       private_subnet
       expect(SecureRandom).to receive(:random_number).with(32766).and_return(5)
       expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:c::/79"
+    end
+
+    describe "#random_host_ipv4" do
+      let(:gcp_ps) {
+        loc = Location.create(name: "gcp-us-central1", provider: "gcp",
+          display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+        described_class.create(name: "gcp-host-ps", location_id: loc.id,
+          net6: "fd1b:9793:dcef:cd0c::/64", net4: "100.64.0.0/20",
+          state: "waiting", project_id: Project.create(name: "gcp-host-prj").id)
+      }
+
+      it "returns a single address outside the GCP reserved addresses" do
+        gcp_ps
+        expect(SecureRandom).to receive(:random_number).with(4092).and_return(0, 4091)
+        expect(gcp_ps.random_host_ipv4.to_s).to eq "100.64.0.2/32"
+        expect(gcp_ps.random_host_ipv4.to_s).to eq "100.64.15.253/32"
+      end
+
+      it "skips an address that a NIC holds" do
+        Nic.create(private_subnet_id: gcp_ps.id, private_ipv4: "100.64.0.7/32",
+          private_ipv6: "fd1b:9793:dcef:cd0c:2::/79", mac: "00:00:00:00:00:02",
+          name: "held-nic", state: "active")
+        expect(SecureRandom).to receive(:random_number).with(4092).and_return(5, 6)
+        expect(gcp_ps.random_host_ipv4.to_s).to eq "100.64.0.8/32"
+      end
     end
 
     context "when ip exists" do

@@ -32,6 +32,10 @@ class PrivateSubnet < Sequel::Model
   DEFAULT_AWS_SUBNET_PREFIX_LEN = 16
   DEFAULT_SUBNET_PREFIX_LEN = 26
 
+  # Name of the subnet that holds the management NICs of GCP Postgres VMs,
+  # one per location in the Postgres service project.
+  GCP_MANAGEMENT_SUBNET_NAME = "ubicloud-pg-mgmt"
+
   dataset_module Pagination
   include ObjectTag::Cleanup
 
@@ -64,6 +68,10 @@ class PrivateSubnet < Sequel::Model
   def dedicated_mgmt_security_group?
     ps_aws = private_subnet_aws_resource
     !ps_aws.mgmt_security_group_id.nil? && ps_aws.mgmt_security_group_id != ps_aws.user_security_group_id
+  end
+
+  def gcp_management?
+    name == GCP_MANAGEMENT_SUBNET_NAME && project_id == Config.postgres_service_project_id
   end
 
   def before_destroy
@@ -133,6 +141,20 @@ class PrivateSubnet < Sequel::Model
     return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr
+  end
+
+  # A single address anywhere in net4, outside the provider's reserved
+  # addresses. The GCP management subnet holds far more NICs than the
+  # 2**8 blocks that random_private_ipv4 hands out.
+  def random_host_ipv4
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_host_ipv4 }
+  end
+
+  private def _random_host_ipv4
+    leading, trailing = ipv4_reservation
+    addr = net4.nth(SecureRandom.random_number(net4.len - leading - trailing) + leading)
+    host = NetAddr::IPv4Net.new(addr, NetAddr::Mask32.new(32))
+    host if nics_dataset.where(private_ipv4: host.to_s).empty?
   end
 
   def random_private_ipv6
