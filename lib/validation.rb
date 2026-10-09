@@ -187,9 +187,7 @@ module Validation
   end
 
   def self.validate_date(date, param = "date")
-    # I use DateTime.parse instead of Time.parse because it uses UTC as default
-    # timezone but Time.parse uses local timezone
-    DateTime.parse(date.to_s).to_time
+    Time.parse(date.to_s, zone: "UTC")
   rescue ArgumentError
     msg = "\"#{date}\" is not a valid date for \"#{param}\"."
     fail ValidationFailed.new({param => msg})
@@ -431,7 +429,7 @@ module Validation
 
   def self.validate_rfc3339_datetime_str(datetime_str, param = "time")
     # Try parsing as RFC 3339 datetime string
-    DateTime.rfc3339(datetime_str).to_time.utc
+    Time.rfc3339(datetime_str).utc
   rescue ArgumentError
     msg = "\"#{datetime_str}\" is not a valid date for \"#{param}\"."
     fail ValidationFailed.new({param => msg})
