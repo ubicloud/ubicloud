@@ -141,16 +141,18 @@ end
 
 # Table: postgres_timeline
 # Columns:
-#  id                        | uuid                     | PRIMARY KEY
-#  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                 | uuid                     |
-#  access_key                | text                     |
-#  secret_key                | text                     |
-#  latest_backup_started_at  | timestamp with time zone |
-#  location_id               | uuid                     |
-#  cached_earliest_backup_at | timestamp with time zone |
-#  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
-#  latest_backup_size_in_gib | bigint                   |
+#  id                            | uuid                     | PRIMARY KEY
+#  created_at                    | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                     | uuid                     |
+#  access_key                    | text                     |
+#  secret_key                    | text                     |
+#  latest_backup_started_at      | timestamp with time zone |
+#  location_id                   | uuid                     |
+#  cached_earliest_backup_at     | timestamp with time zone |
+#  backup_period_hours           | smallint                 | NOT NULL DEFAULT 24
+#  latest_backup_size_in_gib     | bigint                   |
+#  latest_backup_lsn             | text                     |
+#  latest_backup_wal_timeline_id | integer                  |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
