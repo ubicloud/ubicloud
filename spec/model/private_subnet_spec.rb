@@ -78,6 +78,16 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe ".gcp_management_subnet" do
+    it "finds the management subnet of a location, if any" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(private_subnet.project_id)
+      expect(described_class.gcp_management_subnet(private_subnet.location)).to be_nil
+
+      private_subnet.update(name: described_class::GCP_MANAGEMENT_SUBNET_NAME)
+      expect(described_class.gcp_management_subnet(private_subnet.location).id).to eq(private_subnet.id)
+    end
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
