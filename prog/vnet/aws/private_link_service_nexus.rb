@@ -27,11 +27,20 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   BACKGROUND_LABELS = %w[wait reconcile_connections verify_private_dns update_permissions].freeze
   DESTROY_LABELS = %w[destroy recover_unrecorded_ids delete_endpoint_service wait_service_gone delete_listeners delete_target_groups delete_nlb wait_nlb_gone wait_ports_gone].freeze
 
+  NLB_ATTRIBUTES = [
+    {key: "load_balancing.cross_zone.enabled", value: "true"},
+  ].freeze
+
+  TARGET_GROUP_ATTRIBUTES = [
+    {key: "deregistration_delay.timeout_seconds", value: "0"},
+    {key: "deregistration_delay.connection_termination.enabled", value: "true"},
+  ].freeze
+
   def aws_resource
     private_link_service_aws_resource
   end
 
-  def port_aws(port)
+  def nlb_port(port)
     port.private_link_service_port_aws_resource
   end
 
@@ -70,7 +79,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
 
   label def ensure_target_group_attributes
     private_link_service.ports.each do
-      arn = port_aws(it).target_group_arn
+      arn = nlb_port(it).target_group_arn
       current = elbv2_client.describe_target_group_attributes(target_group_arn: arn).attributes
       missing = missing_nlb_attributes(current, TARGET_GROUP_ATTRIBUTES)
       elbv2_client.modify_target_group_attributes(target_group_arn: arn, attributes: missing) unless missing.empty?
@@ -346,10 +355,10 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def recover_target_group_arn(port)
-    return if port_aws(port).target_group_arn
+    return if nlb_port(port).target_group_arn
 
     arn = elbv2_client.describe_target_groups(names: [target_group_name(port)]).target_groups.first.target_group_arn
-    port_aws(port).update(target_group_arn: arn)
+    nlb_port(port).update(target_group_arn: arn)
     log_recovered("target_group", arn, port: port.port)
   rescue Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound
     nil
@@ -357,14 +366,14 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
 
   # Listeners have no name of their own: they are found by port on the NLB.
   def recover_listener_arns
-    ports = private_link_service.ports.reject { port_aws(it).listener_arn }
+    ports = private_link_service.ports.reject { nlb_port(it).listener_arn }
     return if ports.empty? || !nlb_arn
 
     listeners = elbv2_client.describe_listeners(load_balancer_arn: nlb_arn).listeners
     ports.each do |port|
       next unless (listener = listeners.find { it.port == port.port })
 
-      port_aws(port).update(listener_arn: listener.listener_arn)
+      nlb_port(port).update(listener_arn: listener.listener_arn)
       log_recovered("listener", listener.listener_arn, port: port.port)
     end
   rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
@@ -478,7 +487,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def ensure_target_group(port)
-    return if port_aws(port).target_group_arn
+    return if nlb_port(port).target_group_arn
 
     name = target_group_name(port)
     arn = begin
@@ -497,17 +506,8 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
       elbv2_client.describe_target_groups(names: [name]).target_groups.first.target_group_arn
     end
 
-    port_aws(port).update(target_group_arn: arn)
+    nlb_port(port).update(target_group_arn: arn)
   end
-
-  NLB_ATTRIBUTES = [
-    {key: "load_balancing.cross_zone.enabled", value: "true"},
-  ].freeze
-
-  TARGET_GROUP_ATTRIBUTES = [
-    {key: "deregistration_delay.timeout_seconds", value: "0"},
-    {key: "deregistration_delay.connection_termination.enabled", value: "true"},
-  ].freeze
 
   # Attributes from the desired list whose value AWS does not report yet, so
   # a reconcile with everything in place only describes and never modifies.
@@ -517,7 +517,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def ensure_targets_for(port, desired_ips)
-    return unless (arn = port_aws(port).target_group_arn)
+    return unless (arn = nlb_port(port).target_group_arn)
 
     desired = desired_ips.map { {id: it, port: port.target_port} }
     current = elbv2_client.describe_target_health(target_group_arn: arn).target_health_descriptions
@@ -538,21 +538,21 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def ensure_listener(port)
-    return if port_aws(port).listener_arn
+    return if nlb_port(port).listener_arn
 
     arn = begin
       elbv2_client.create_listener(
         load_balancer_arn: nlb_arn,
         protocol: "TCP",
         port: port.port,
-        default_actions: [{type: "forward", target_group_arn: port_aws(port).target_group_arn}],
+        default_actions: [{type: "forward", target_group_arn: nlb_port(port).target_group_arn}],
         tags: Util.aws_tags("#{nlb_name}-#{port.port}", {"ubid" => private_link_service.ubid, "port" => port.port.to_s}),
       ).listeners.first.listener_arn
     rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateListener
       elbv2_client.describe_listeners(load_balancer_arn: nlb_arn).listeners.find { it.port == port.port }.listener_arn
     end
 
-    port_aws(port).update(listener_arn: arn)
+    nlb_port(port).update(listener_arn: arn)
   end
 
   # Services in Deleting or Deleted state keep showing up in describe results
@@ -691,7 +691,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   # The deletes are idempotent through their NotFound rescues, so a retry
   # after a crash is safe with the ARNs still recorded.
   def delete_listener(port)
-    return unless (arn = port_aws(port).listener_arn)
+    return unless (arn = nlb_port(port).listener_arn)
 
     elbv2_client.delete_listener(listener_arn: arn)
   rescue Aws::ElasticLoadBalancingV2::Errors::ListenerNotFound
@@ -699,7 +699,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def delete_target_group(port)
-    return unless (arn = port_aws(port).target_group_arn)
+    return unless (arn = nlb_port(port).target_group_arn)
 
     elbv2_client.delete_target_group(target_group_arn: arn)
   rescue Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound
@@ -707,7 +707,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   def port_gone?(port)
-    aws = port_aws(port)
+    aws = nlb_port(port)
     (aws.listener_arn.nil? || listener_gone?(aws.listener_arn)) && (aws.target_group_arn.nil? || target_group_gone?(aws.target_group_arn))
   end
 

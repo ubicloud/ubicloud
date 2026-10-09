@@ -49,7 +49,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     PrivateLinkServiceAwsResource[pls.id]
   end
 
-  def port_aws(number)
+  def nlb_port(number)
     port(number).private_link_service_port_aws_resource
   end
 
@@ -205,10 +205,10 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect { nx.recover_unrecorded_ids }.to hop("delete_endpoint_service")
       row = aws
       expect(row.nlb_arn).to eq nlb_arn
-      expect(port_aws(5432).target_group_arn).to eq "arn:tg:pl-5432-#{tail}"
-      expect(port_aws(6432).target_group_arn).to eq "arn:tg:pl-6432-#{tail}"
-      expect(port_aws(5432).listener_arn).to eq "arn:listener:5432"
-      expect(port_aws(6432).listener_arn).to eq "arn:listener:6432"
+      expect(nlb_port(5432).target_group_arn).to eq "arn:tg:pl-5432-#{tail}"
+      expect(nlb_port(6432).target_group_arn).to eq "arn:tg:pl-6432-#{tail}"
+      expect(nlb_port(5432).listener_arn).to eq "arn:listener:5432"
+      expect(nlb_port(6432).listener_arn).to eq "arn:listener:6432"
       expect(row.service_id).to eq "vpce-svc-recovered"
       expect(row.service_name).to eq "com.amazonaws.vpce.us-west-2.vpce-svc-recovered"
       expect(row.private_dns_verification_name).to eq "_abc123"
@@ -223,13 +223,13 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect { nx.recover_unrecorded_ids }.to hop("delete_endpoint_service")
       expect(aws.nlb_arn).to be_nil
       expect(aws.service_id).to be_nil
-      expect(port_aws(5432).target_group_arn).to be_nil
-      expect(port_aws(5432).listener_arn).to be_nil
+      expect(nlb_port(5432).target_group_arn).to be_nil
+      expect(nlb_port(5432).listener_arn).to be_nil
     end
 
     it "asks AWS nothing when every id is recorded" do
       aws.update(nlb_arn:, service_id: "vpce-svc-1")
-      [5432, 6432].each { port_aws(it).update(target_group_arn: "arn:tg:#{it}", listener_arn: "arn:listener:#{it}") }
+      [5432, 6432].each { nlb_port(it).update(target_group_arn: "arn:tg:#{it}", listener_arn: "arn:listener:#{it}") }
       expect(elbv2).not_to receive(:describe_load_balancers)
       expect(elbv2).not_to receive(:describe_target_groups)
       expect(elbv2).not_to receive(:describe_listeners)
@@ -240,21 +240,21 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     it "recovers only the listeners the NLB actually has" do
       aws.update(nlb_arn:, service_id: "vpce-svc-1")
-      [5432, 6432].each { port_aws(it).update(target_group_arn: "arn:tg:#{it}") }
+      [5432, 6432].each { nlb_port(it).update(target_group_arn: "arn:tg:#{it}") }
       elbv2.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:listener:5432", port: 5432}])
 
       expect { nx.recover_unrecorded_ids }.to hop("delete_endpoint_service")
-      expect(port_aws(5432).listener_arn).to eq "arn:listener:5432"
-      expect(port_aws(6432).listener_arn).to be_nil
+      expect(nlb_port(5432).listener_arn).to eq "arn:listener:5432"
+      expect(nlb_port(6432).listener_arn).to be_nil
     end
 
     it "treats a recorded NLB that AWS no longer has as having no listeners" do
       aws.update(nlb_arn:, service_id: "vpce-svc-1")
-      [5432, 6432].each { port_aws(it).update(target_group_arn: "arn:tg:#{it}") }
+      [5432, 6432].each { nlb_port(it).update(target_group_arn: "arn:tg:#{it}") }
       elbv2.stub_responses(:describe_listeners, "LoadBalancerNotFound")
 
       expect { nx.recover_unrecorded_ids }.to hop("delete_endpoint_service")
-      expect(port_aws(5432).listener_arn).to be_nil
+      expect(nlb_port(5432).listener_arn).to be_nil
     end
   end
 
@@ -409,8 +409,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect(elbv2).not_to receive(:modify_target_group_attributes)
 
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
-      expect(port_aws(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
-      expect(port_aws(6432).target_group_arn).to end_with("targetgroup/pl-6432-#{pls.ubid[-20..]}/abc")
+      expect(nlb_port(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
+      expect(nlb_port(6432).target_group_arn).to end_with("targetgroup/pl-6432-#{pls.ubid[-20..]}/abc")
     end
 
     it "creates IPv6 target groups for an IPv6 service" do
@@ -421,17 +421,17 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       })
 
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
-      expect(port_aws(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
+      expect(nlb_port(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
     end
 
     it "skips creation for ports that already have a target group" do
-      port_aws(5432).update(target_group_arn: "arn:existing")
+      nlb_port(5432).update(target_group_arn: "arn:existing")
       elbv2.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:new"}])
       expect(elbv2).to receive(:create_target_group).once.and_call_original
 
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
-      expect(port_aws(5432).target_group_arn).to eq "arn:existing"
-      expect(port_aws(6432).target_group_arn).to eq "arn:new"
+      expect(nlb_port(5432).target_group_arn).to eq "arn:existing"
+      expect(nlb_port(6432).target_group_arn).to eq "arn:new"
     end
 
     it "recovers a target group created by an earlier run that died before recording it" do
@@ -441,14 +441,14 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       })
 
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
-      expect(port_aws(5432).target_group_arn).to eq "arn:recovered:pl-5432-#{pls.ubid[-20..]}"
+      expect(nlb_port(5432).target_group_arn).to eq "arn:recovered:pl-5432-#{pls.ubid[-20..]}"
     end
   end
 
   describe "#ensure_target_group_attributes" do
     before do
-      port_aws(5432).update(target_group_arn: "arn:tg:5432")
-      port_aws(6432).update(target_group_arn: "arn:tg:6432")
+      nlb_port(5432).update(target_group_arn: "arn:tg:5432")
+      nlb_port(6432).update(target_group_arn: "arn:tg:6432")
     end
 
     it "disables the deregistration delay and terminates connections on every target group that lacks them" do
@@ -507,8 +507,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     end
 
     before do
-      port_aws(5432).update(target_group_arn: "arn:tg-5432")
-      port_aws(6432).update(target_group_arn: "arn:tg-6432")
+      nlb_port(5432).update(target_group_arn: "arn:tg-5432")
+      nlb_port(6432).update(target_group_arn: "arn:tg-6432")
     end
 
     it "registers the PostgreSQL primary's private IPv4 on every port's target group and records it" do
@@ -578,7 +578,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     end
 
     it "deregisters everything when there is no target, and skips ports without a target group" do
-      port_aws(6432).update(target_group_arn: nil)
+      nlb_port(6432).update(target_group_arn: nil)
       elbv2.stub_responses(:describe_target_health, health(["172.25.1.233", 5432]))
       elbv2.stub_responses(:deregister_targets, {})
       expect(elbv2).to receive(:describe_target_health).once.and_call_original
@@ -772,8 +772,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
   describe "#ensure_listeners" do
     before do
       aws.update(nlb_arn: "arn:nlb")
-      port_aws(5432).update(target_group_arn: "arn:tg-5432")
-      port_aws(6432).update(target_group_arn: "arn:tg-6432")
+      nlb_port(5432).update(target_group_arn: "arn:tg-5432")
+      nlb_port(6432).update(target_group_arn: "arn:tg-6432")
     end
 
     it "creates one TCP listener per port forwarding to its target group and records the ARNs" do
@@ -786,8 +786,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       })
 
       expect { nx.ensure_listeners }.to hop("ensure_endpoint_service")
-      expect(port_aws(5432).listener_arn).to eq "arn:listener-5432"
-      expect(port_aws(6432).listener_arn).to eq "arn:listener-6432"
+      expect(nlb_port(5432).listener_arn).to eq "arn:listener-5432"
+      expect(nlb_port(6432).listener_arn).to eq "arn:listener-6432"
     end
 
     it "recovers a listener created by an earlier run by matching its port" do
@@ -795,18 +795,18 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       elbv2.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:recovered-6432", port: 6432}, {listener_arn: "arn:recovered-5432", port: 5432}])
 
       expect { nx.ensure_listeners }.to hop("ensure_endpoint_service")
-      expect(port_aws(5432).listener_arn).to eq "arn:recovered-5432"
-      expect(port_aws(6432).listener_arn).to eq "arn:recovered-6432"
+      expect(nlb_port(5432).listener_arn).to eq "arn:recovered-5432"
+      expect(nlb_port(6432).listener_arn).to eq "arn:recovered-6432"
     end
 
     it "skips ports that already have a listener" do
-      port_aws(5432).update(listener_arn: "arn:existing")
+      nlb_port(5432).update(listener_arn: "arn:existing")
       elbv2.stub_responses(:create_listener, listeners: [{listener_arn: "arn:new"}])
       expect(elbv2).to receive(:create_listener).once.and_call_original
 
       expect { nx.ensure_listeners }.to hop("ensure_endpoint_service")
-      expect(port_aws(5432).listener_arn).to eq "arn:existing"
-      expect(port_aws(6432).listener_arn).to eq "arn:new"
+      expect(nlb_port(5432).listener_arn).to eq "arn:existing"
+      expect(nlb_port(6432).listener_arn).to eq "arn:new"
     end
   end
 
@@ -1301,40 +1301,40 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     describe "#delete_listeners" do
       it "deletes recorded listeners, keeps the ARNs and hops on" do
-        port_aws(5432).update(listener_arn: "arn:listener-5432")
+        nlb_port(5432).update(listener_arn: "arn:listener-5432")
         elbv2.stub_responses(:delete_listener, {})
         expect(elbv2).to receive(:delete_listener).with(listener_arn: "arn:listener-5432").once.and_call_original
 
         expect { nx.delete_listeners }.to hop("delete_target_groups")
-        expect(port_aws(5432).listener_arn).to eq "arn:listener-5432"
+        expect(nlb_port(5432).listener_arn).to eq "arn:listener-5432"
       end
 
       it "tolerates a listener that is already gone" do
-        port_aws(5432).update(listener_arn: "arn:listener-5432")
+        nlb_port(5432).update(listener_arn: "arn:listener-5432")
         elbv2.stub_responses(:delete_listener, "ListenerNotFound")
 
         expect { nx.delete_listeners }.to hop("delete_target_groups")
-        expect(port_aws(5432).listener_arn).to eq "arn:listener-5432"
+        expect(nlb_port(5432).listener_arn).to eq "arn:listener-5432"
       end
     end
 
     describe "#delete_target_groups" do
       it "deletes recorded target groups, keeps the ARNs and hops on" do
-        port_aws(5432).update(target_group_arn: "arn:tg-5432")
+        nlb_port(5432).update(target_group_arn: "arn:tg-5432")
         elbv2.stub_responses(:delete_target_group, {})
         expect(elbv2).to receive(:delete_target_group).with(target_group_arn: "arn:tg-5432").once.and_call_original
 
         expect { nx.delete_target_groups }.to hop("delete_nlb")
-        expect(port_aws(5432).target_group_arn).to eq "arn:tg-5432"
-        expect(port_aws(6432).target_group_arn).to be_nil
+        expect(nlb_port(5432).target_group_arn).to eq "arn:tg-5432"
+        expect(nlb_port(6432).target_group_arn).to be_nil
       end
 
       it "tolerates a target group that is already gone" do
-        port_aws(5432).update(target_group_arn: "arn:tg-5432")
+        nlb_port(5432).update(target_group_arn: "arn:tg-5432")
         elbv2.stub_responses(:delete_target_group, "TargetGroupNotFound")
 
         expect { nx.delete_target_groups }.to hop("delete_nlb")
-        expect(port_aws(5432).target_group_arn).to eq "arn:tg-5432"
+        expect(nlb_port(5432).target_group_arn).to eq "arn:tg-5432"
       end
     end
 
@@ -1391,7 +1391,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     describe "#wait_ports_gone" do
       it "naps while AWS still knows a listener" do
-        port_aws(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
+        nlb_port(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
         elbv2.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:listener-5432"}])
         expect(elbv2).not_to receive(:describe_target_groups)
 
@@ -1400,7 +1400,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       end
 
       it "naps while AWS still knows a target group" do
-        port_aws(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
+        nlb_port(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
         elbv2.stub_responses(:describe_listeners, "ListenerNotFound")
         elbv2.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:tg-5432"}])
 
@@ -1410,8 +1410,8 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
       it "destroys the service with its companion rows once AWS answers NotFound for every port, keeping the service's ids in deleted_record" do
         aws.update(nlb_arn: "arn:nlb", service_id: "vpce-svc-1")
-        port_aws(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
-        port_aws(6432).update(listener_arn: "arn:listener-6432", target_group_arn: "arn:tg-6432")
+        nlb_port(5432).update(listener_arn: "arn:listener-5432", target_group_arn: "arn:tg-5432")
+        nlb_port(6432).update(listener_arn: "arn:listener-6432", target_group_arn: "arn:tg-6432")
         elbv2.stub_responses(:describe_listeners, "ListenerNotFound")
         elbv2.stub_responses(:describe_target_groups, "TargetGroupNotFound")
         pls_id = pls.id
