@@ -5,13 +5,12 @@ class Prog::Vm::HostNexus < Prog::Base
   frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false)
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true)
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
       end
 
-      id = VmHost.generate_uuid
       Sshable.create_with_id(id, host: sshable_hostname)
       vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
 
@@ -24,7 +23,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
         # Renaming here fails the assemble for an unknown server identifier.
         # Avoid overriding custom server names for development hosts.
-        vmh.set_server_name unless Config.development?
+        vmh.set_server_name if set_server_name && !Config.development?
       else
         Address.create_with_id(id, cidr: sshable_hostname, routed_to_host_id: id)
         AssignedHostAddress.create(ip: sshable_hostname, address_id: id, host_id: id)
