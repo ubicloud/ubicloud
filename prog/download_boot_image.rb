@@ -321,6 +321,11 @@ class Prog::DownloadBootImage < Prog::Base
         "20251017.1.0" => "b87829c6bc71718ff0dffe2948d2586ca7ff95a02dbb03f68d18ec8c223b312c",
       },
     },
+    "gpu-ubuntu-resolute" => {
+      "x64" => {
+        "20261009.1.0" => "22778c6f8d28d7ff962af60feb892a75af2ab16365b557266a902bd803ad47e0",
+      },
+    },
   }.each_value do |archs|
     archs.each_value(&:freeze)
     archs.freeze

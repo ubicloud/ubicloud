@@ -140,6 +140,26 @@ RSpec.describe UplinkMacPin do
       expect(File).not_to exist(staging_dir)
     end
 
+    context "with a multipath default route" do
+      before do
+        allow(pin).to receive(:_run_command).with("ip", "-j", "route", "show", "default")
+          .and_return(JSON.generate([{dst: "default", nexthops: [{gateway: "169.254.0.1", dev: "p1"}, {gateway: "169.254.0.1", dev: "p2"}]}]))
+      end
+
+      it "leaves uplinks that netplan selects by mac alone" do
+        File.write(path, "network:\n  version: 2\n  ethernets:\n    p1:\n      match:\n        macaddress: 98:b7:85:00:99:9a\n      set-name: p1\n    p2:\n      match:\n        macaddress: 98:b7:85:00:99:9b\n      set-name: p2\n")
+
+        expect(pin.run).to eq "netplan does not select p1, p2 by name, nothing to pin"
+        expect(File).not_to exist(path + ".ubicloud-orig")
+      end
+
+      it "fails when netplan selects one of them by name" do
+        File.write(path, "network:\n  version: 2\n  ethernets:\n    p1: {}\n")
+
+        expect { pin.run }.to raise_error RuntimeError, "netplan selects uplinks p1, p2 of a multipath default route by name, which can't all be pinned as uplink"
+      end
+    end
+
     it "fails when the host has no default route" do
       allow(pin).to receive(:_run_command).with("ip", "-j", "route", "show", "default").and_return("[]")
 

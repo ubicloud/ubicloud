@@ -30,7 +30,7 @@ SDevice:	16fa
 Rev:	a1
 IOMMUGroup:	13
 EOS
-      expect { lp.start }.to exit({"msg" => "created PciDevice records"}).and change {
+      expect { lp.start }.to hop("learn_gpu_partitions").and change {
         PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
         [],
@@ -65,7 +65,7 @@ SDevice:	16fa
 Rev:	a1
 IOMMUGroup:	13
 EOS
-      expect { lp.start }.to exit({"msg" => "created PciDevice records"}).and change {
+      expect { lp.start }.to hop("learn_gpu_partitions").and change {
         PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
         [{vm_host_id: vmh.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3, vm_id: nil}],
@@ -106,6 +106,19 @@ IOMMUGroup:	13
 EOS
 
       expect { lp.make_model_instances }.to raise_error RuntimeError, "BUG: lspci parse failed"
+    end
+  end
+
+  describe "#learn_gpu_partitions" do
+    let(:lp) { described_class.new(Strand.new(stack: [{"subject_id" => Prog::Vm::HostNexus.assemble("::1").id}])) }
+
+    it "pushes the GPU partitions program" do
+      expect { lp.learn_gpu_partitions }.to hop("start", "LearnGpuPartitions")
+    end
+
+    it "exits once LearnGpuPartitions has returned" do
+      lp.strand.retval = {"msg" => "learned GPU partitions"}
+      expect { lp.learn_gpu_partitions }.to exit({"msg" => "created PciDevice records"})
     end
   end
 end

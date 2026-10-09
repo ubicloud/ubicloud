@@ -57,7 +57,7 @@ class Clover
 
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags))
+    options.add_option(name: "location", values: Option.locations(visible_location_names: @project.visible_location_names))
     options.add_option(name: "vm", values: vm_values, parent: "location") { |location, vm|
       vm[:location_id] == location.id
     }

@@ -104,10 +104,20 @@ class Clover
     # Same as above, moved the size validation here to not allow users to
     # pass gpu instance while creating a VM.
     if assemble_params[:size]
-      parsed_size = Validation.validate_vm_size(assemble_params[:size], "x64", only_visible: true)
+      parsed_size = Option::VmSizes.find { it.gpu_count && it.name == assemble_params[:size] } ||
+        Validation.validate_vm_size(assemble_params[:size], "x64", only_visible: true)
     end
 
-    if assemble_params[:storage_size]
+    if parsed_size&.gpu_count
+      gpu = "#{parsed_size.gpu_count}:#{parsed_size.gpu_device}"
+      unless assemble_params.fetch(:gpu, gpu) == gpu
+        fail Validation::ValidationFailed.new({gpu: "#{parsed_size.name} virtual machines have the GPUs #{gpu}"})
+      end
+      assemble_params[:gpu] = gpu
+      storage_size = Validation.validate_vm_storage_size(parsed_size.name, "x64", assemble_params.delete(:storage_size) || parsed_size.storage_size_options.first)
+      assemble_params[:storage_volumes] = Array.new(parsed_size.gpu_count) { {size_gib: storage_size, encrypted: true} }
+      assemble_params[:distinct_storage_devices] = true
+    elsif assemble_params[:storage_size]
       storage_size = Validation.validate_vm_storage_size(assemble_params[:size] || Prog::Vm::Nexus::DEFAULT_SIZE, "x64", assemble_params[:storage_size])
       assemble_params[:storage_volumes] = [{size_gib: storage_size, encrypted: true}]
       assemble_params.delete(:storage_size)
@@ -136,8 +146,10 @@ class Clover
       end
     end
 
-    requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
-    Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
+    if project.dedicated_location_ids_dataset.where(location_id: @location.id).empty?
+      requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
+      Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
+    end
 
     vm = nil
     DB.transaction do
@@ -170,12 +182,14 @@ class Clover
     # nil: Show GPU options, but also show options not valid for GPU configurations
 
     if @show_gpu != false
-      ff_visible_locations = @project.get_ff_visible_locations || []
+      owned_partitions = DB[:gpu_partition].exclude(project_id: nil)
+      project_gpu_ids = DB[:gpu_partitions_pci_devices].where(gpu_partition_id: owned_partitions.where(project_id: @project.id).select(:id)).select(:pci_device_id)
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
         .where(device_class: ["0300", "0302"], vm_id: nil)
-        .where(Sequel.|([:visible], name: ff_visible_locations))
+        .where(Sequel.|([:visible], name: @project.visible_location_names))
+        .where(Sequel.|(Sequel.~(Sequel[:pci_device][:vm_host_id] => owned_partitions.select(:vm_host_id)), {Sequel[:pci_device][:id] => project_gpu_ids}))
         .group_and_count(:vm_host_id, :name, :device)
         .from_self
         .select_group { [name.as(:location_name), device] }
@@ -203,7 +217,7 @@ class Clover
     end
 
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags)) do |location|
+    options.add_option(name: "location", values: Option.locations(visible_location_names: @project.visible_location_names)) do |location|
       !@show_gpu || gpu_locations.include?(location.name)
     end
 
@@ -214,7 +228,7 @@ class Clover
         display_name: it.name,
       }
     }
-    Option.locations(feature_flags: @project.feature_flags).each do |location|
+    Option.locations(visible_location_names: @project.visible_location_names).each do |location|
       subnets << {
         location_id: location.id,
         value: "new-#{location.ubid}",
@@ -233,12 +247,19 @@ class Clover
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
 
-    options.add_option(name: "size", values: Option::VmSizes.select(&:visible).map(&:display_name), parent: "family") do |location, family, size|
+    gpu_size_devices = Option::VmSizes.filter_map(&:gpu_device).uniq
+    options.add_option(name: "size", values: Option::VmSizes.select { it.visible || it.gpu_count }.map(&:display_name), parent: (@show_gpu == false) ? "family" : "gpu") do |location, family, *gpu, size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
-      vm_size.family == family
+      next false unless vm_size.family == family
+
+      if vm_size.gpu_count
+        gpu == ["#{vm_size.gpu_count}:#{vm_size.gpu_device}"]
+      else
+        !gpu_size_devices.include?(gpu.first.to_s.split(":", 2).last)
+      end
     end
 
-    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "1600", "2400", "3200"], parent: "size") do |location, family, *, size, storage_size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.storage_size_options.include?(storage_size.to_i)
     end
@@ -259,7 +280,7 @@ class Clover
     end
 
     boot_images = Option::BootImages.map(&:name)
-    boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
+    boot_images.reject! { it.start_with?("gpu-") } unless @show_gpu != false
 
     # VM create is currently x64-only, so only surface x64 MIs.
     machine_image_options = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")

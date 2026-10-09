@@ -6,8 +6,8 @@ module Option
   ai_models = YAML.load_file("config/ai_models.yml")
   AI_MODELS = ai_models.select { it["enabled"] }.freeze
 
-  def self.locations(only_visible: true, feature_flags: {})
-    Location.where(project_id: nil).order(:display_name).all.select { |pl| !only_visible || (pl.visible || feature_flags["visible_locations"]&.include?(pl.name)) }
+  def self.locations(only_visible: true, visible_location_names: [])
+    Location.where(project_id: nil).order(:display_name).all.select { |pl| !only_visible || pl.visible || visible_location_names.include?(pl.name) }
   end
 
   def self.kubernetes_locations
@@ -201,6 +201,7 @@ module Option
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
+    ["gpu-ubuntu-resolute", "Ubuntu 26.04 for GPU VMs"],
     ["gpu-ubuntu-noble", "Ubuntu 24.04 for GPU VMs"],
     ["ubuntu-resolute", "Ubuntu Resolute 26.04 LTS"],
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
@@ -226,7 +227,7 @@ module Option
   IoLimits = Data.define(:max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
   NO_IO_LIMITS = IoLimits.new(nil, nil)
 
-  VmSize = Struct.new(:name, :family, :vcpus, :cpu_percent_limit, :cpu_burst_percent_limit, :memory_gib, :storage_size_options, :io_limits, :vring_workers, :visible, :arch) do
+  VmSize = Struct.new(:name, :family, :vcpus, :cpu_percent_limit, :cpu_burst_percent_limit, :memory_gib, :storage_size_options, :io_limits, :vring_workers, :visible, :arch, :gpu_count, :gpu_device) do
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
@@ -238,6 +239,9 @@ module Option
   }).concat([2, 4, 8, 16, 30].map {
     storage_size_options = [it * 20, it * 40]
     VmSize.new("premium-#{it}", "premium", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, vring_workers(it), false, "x64")
+  }).concat([1, 2, 4, 8].map { |gpu_count|
+    vcpus = gpu_count * 24
+    VmSize.new("b300-#{gpu_count}", "standard", vcpus, vcpus * 100, 0, gpu_count * 216, [1600, 3200], NO_IO_LIMITS, vring_workers(16), false, "x64", gpu_count, "3182")
   }).concat([1, 2].map {
     storage_size_options = [it * 10, it * 20]
     io_limits = IoLimits.new(it * 50, it * 50)

@@ -28,7 +28,7 @@ module ContentGenerator
       ]
     end
 
-    def self.size(location, family, size)
+    def self.size(location, family, *, size)
       size = Option::VmSizes.find { it.display_name == size }
       unit_price = BillingRate.unit_price_from_resource_properties("VmVCpu", family, location.name)
 
@@ -40,15 +40,16 @@ module ContentGenerator
       ]
     end
 
-    def self.storage_size(location, family, vm_size, storage_size)
+    def self.storage_size(location, family, *, vm_size, storage_size)
       storage_size = storage_size.to_i
+      volume_count = Option::VmSizes.find { it.display_name == vm_size }.gpu_count || 1
       unit_price = BillingRate.unit_price_from_resource_properties("VmStorage", family, location.name)
 
       [
-        "#{storage_size}GB",
+        (volume_count == 1) ? "#{storage_size}GB" : "#{volume_count} × #{storage_size}GB",
         nil,
-        "$#{"%.2f" % (storage_size * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size * unit_price * 60)}/hour",
+        "$#{"%.2f" % (volume_count * storage_size * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (volume_count * storage_size * unit_price * 60)}/hour",
       ]
     end
 

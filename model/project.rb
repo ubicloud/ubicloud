@@ -220,7 +220,7 @@ class Project < Sequel::Model
 
   def current_resource_usage(resource_type)
     case resource_type
-    when "VmVCpu" then vms_dataset.sum(:vcpus) || 0
+    when "VmVCpu" then vms_dataset.exclude(location_id: dedicated_location_ids_dataset).sum(:vcpus) || 0
     when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).exclude(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).metal_active_runner_vcpus
     when "GithubRunnerVCpuArm" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).where(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).metal_active_runner_vcpus
     when "GithubRunnerVCpuAws" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).exclude(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).aws_active_runner_vcpus
@@ -259,6 +259,21 @@ class Project < Sequel::Model
     location_id = location.id
     ps = private_subnets_dataset.first(location_id:, name:)
     ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
+  end
+
+  def visible_location_names
+    owned_host_ids = DB[:gpu_partition].where(project_id: id).select(:vm_host_id)
+    (get_ff_visible_locations || []) | Location.where(id: DB[:vm_host].where(id: owned_host_ids).select(:location_id)).select_map(:name)
+  end
+
+  def dedicated_location_ids_dataset
+    hosts_with_owned_partitions = DB[:gpu_partition].exclude(project_id: nil).select(:vm_host_id)
+    hosts_with_project_partitions = DB[:gpu_partition].where(project_id: id).select(:vm_host_id)
+    DB[:vm_host]
+      .group(:location_id)
+      .having(Sequel.function(:bool_and, Sequel.expr(id: hosts_with_owned_partitions)))
+      .having(Sequel.function(:bool_or, Sequel.expr(id: hosts_with_project_partitions)))
+      .select(:location_id)
   end
 
   def total_github_amount(begin_time, end_time)
@@ -373,6 +388,7 @@ end
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  gcp_vpc                   | gcp_vpc_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)
+#  gpu_partition             | gpu_partition_project_id_fkey             | (project_id) REFERENCES project(id)
 #  inference_endpoint        | inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
 #  inference_router          | inference_router_project_id_fkey          | (project_id) REFERENCES project(id)
 #  kubernetes_cluster        | kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)

@@ -175,5 +175,40 @@ EOS
       expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
       expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme-eui.random-id1", "nvme-eui.random-id2"]])
     end
+
+    it "can find underlying unix devices for mirrored LVM volumes" do
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
+Filesystem          Mounted on                1B-blocks        Avail
+tmpfs               /run                    3331420160   3328692224
+/dev/mapper/os-root /                     105089261568 102861864960
+/dev/nvme7n1p1      /boot/efi               1071628288   1064919040
+/dev/nvme8n1p1      /boot/efi2              1071628288   1064919040
+EOS
+
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem          Mounted on                1B-blocks        Avail
+/dev/mapper/os-root /                     105089261568 102861864960
+EOS
+
+      expect(ls.sshable).to receive(:_cmd).with("lsblk -nrso NAME,TYPE /dev/mapper/os-root").and_return(<<EOS)
+os-root lvm
+os-root_rmeta_0 lvm
+nvme7n1p2 part
+nvme7n1 disk
+os-root_rimage_0 lvm
+nvme7n1p2 part
+nvme7n1 disk
+os-root_rmeta_1 lvm
+nvme8n1p2 part
+nvme8n1 disk
+os-root_rimage_1 lvm
+nvme8n1p2 part
+nvme8n1 disk
+EOS
+
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme7n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme8n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
+      expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme-eui.random-id1", "nvme-eui.random-id2"]])
+    end
   end
 end
