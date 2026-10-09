@@ -34,7 +34,7 @@ class PostgresResource < Sequel::Model
     :destroy, :refresh_certificates, :use_different_az, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
-    :bypass_maintenance_window, :cert_renewed
+    :bypass_maintenance_window, :cert_renewed, :use_dual_nic
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone, :availability_zone_required)
@@ -49,6 +49,10 @@ class PostgresResource < Sequel::Model
   def aws_ssh_ipv6?
     return false unless location.aws? && project.get_ff_postgres_aws_ssh_ipv6
     private_subnet.dedicated_mgmt_security_group?
+  end
+
+  def any_server_has_management_nic?
+    !Nic.where(is_management: true, vm_id: servers_dataset.select(:vm_id)).empty?
   end
 
   def path
