@@ -50,11 +50,13 @@ class IpReachabilityCheck
     r(*command, expect: [0, 1])[/(\d+) received/, 1].to_i > 0
   end
 
+  LABEL = "lo:ipcheck"
+
   def with_address(ip)
     return yield if configured_addresses.include?(ip)
 
     begin
-      r("ip", "addr", "replace", "#{ip}/32", "dev", "lo")
+      r("ip", "addr", "replace", "#{ip}/32", "dev", "lo", "label", LABEL)
       yield
     ensure
       # Exit status 2 means the address was never added.
@@ -64,8 +66,7 @@ class IpReachabilityCheck
 
   def configured_addresses
     @configured_addresses ||= JSON.parse(r("ip", "-j", "-4", "addr", "show")).flat_map do |link|
-      next [] if link["ifname"] == "lo"
-      link.fetch("addr_info", []).map { |info| info["local"] }
+      link.fetch("addr_info", []).filter_map { |info| info["local"] unless info["label"] == LABEL }
     end
   end
 end
