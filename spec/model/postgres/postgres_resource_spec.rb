@@ -325,6 +325,37 @@ RSpec.describe PostgresResource do
       end
     end
 
+    describe "#mgmt_ssh_via_user_security_group?" do
+      let(:ssh_rules) { gcp_resource.internal_firewall_rules.select { it[:port_range].to_range.cover?(22) } }
+
+      before do
+        allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"])
+        gcp_subnet = PrivateSubnet.create(name: "pg-gcp-subnet", project_id: project.id, location_id: gcp_location.id,
+          net4: "172.0.4.0/26", net6: "fdfa:b5aa:14a3:4a41::/64")
+        gcp_resource.update(private_subnet_id: gcp_subnet.id)
+        create_management_subnet
+      end
+
+      it "keeps port 22 in the internal firewall of a single-NIC resource" do
+        expect(gcp_resource.mgmt_ssh_via_user_security_group?).to be true
+        expect(ssh_rules.map { it[:cidr] }).to eq(["1.2.3.4/32"])
+      end
+
+      it "leaves port 22 out of the internal firewall of a new dual-NIC resource" do
+        gcp_resource.project.set_ff_postgres_gcp_dual_nic(true)
+        expect(gcp_resource.mgmt_ssh_via_user_security_group?).to be false
+        expect(ssh_rules).to be_empty
+      end
+
+      it "keeps port 22 while a server of a dual-NIC resource has no management NIC" do
+        add_management_nic(create_gcp_server("pg-gcp-vm1"), PrivateSubnet.gcp_management_subnet(gcp_location))
+        expect(gcp_resource.mgmt_ssh_via_user_security_group?).to be false
+
+        create_gcp_server("pg-gcp-vm2")
+        expect(gcp_resource.reload.mgmt_ssh_via_user_security_group?).to be true
+      end
+    end
+
     describe "#management_nic_use_eip?" do
       it "is false with the IPv6 SSH flag" do
         expect(gcp_resource.management_nic_use_eip?).to be true
