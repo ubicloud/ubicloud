@@ -144,6 +144,30 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.management_nic).to be_nil
     end
 
+    it "requests a management NIC on GCP under the dual-NIC flag, without an EIP in IPv6 mode" do
+      gcp_location = Location[name: "gcp-us-central1"]
+      mgmt_subnet = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, project_id: service_project.id,
+        location_id: gcp_location.id, net4: "100.64.0.0/20", net6: "fd1b:9793:dcef:cd0e::/64")
+      Strand.create_with_id(mgmt_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+      user_project.set_ff_postgres_gcp_dual_nic(true)
+      assemble = lambda do
+        gcp_resource = create_postgres_resource(project: user_project, location_id: gcp_location.id)
+        gcp_resource.update(target_vm_size: "c4a-standard-4")
+        Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+        described_class.assemble(resource_id: gcp_resource.id, timeline_id: create_postgres_timeline(location_id: gcp_location.id).id, timeline_access: "push", is_representative: true).subject.vm
+      end
+
+      vm = assemble.call
+      expect(vm.management_nic.private_subnet_id).to eq(mgmt_subnet.id)
+      expect(vm.management_nic.strand.stack.first["use_eip"]).to be true
+
+      user_project.set_ff_postgres_gcp_ssh_ipv6(true)
+      expect(assemble.call.management_nic.strand.stack.first["use_eip"]).to be false
+
+      user_project.set_ff_postgres_gcp_dual_nic(false)
+      expect(assemble.call.management_nic).to be_nil
+    end
+
     it "sets swap_size_bytes for hobby vm sizes" do
       hobby_resource = create_postgres_resource(project: user_project, location_id:)
       hobby_resource.update(target_vm_size: "hobby-1")

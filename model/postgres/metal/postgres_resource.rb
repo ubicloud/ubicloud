@@ -33,6 +33,18 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    def metal_use_separate_management_nic?
+      false
+    end
+
+    def metal_management_nic_use_eip?
+      true
+    end
+
+    def metal_mgmt_ssh_via_user_security_group?
+      true
+    end
+
     def metal_lockout_mechanisms
       ["pg_stop", "hba", "host_routing"].freeze
     end

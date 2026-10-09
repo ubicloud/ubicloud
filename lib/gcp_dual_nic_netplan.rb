@@ -7,13 +7,15 @@
 # routes, so all VM-initiated traffic leaves through it, and from-source
 # rules send each NIC's replies through its own table (mgmt 100, user 200).
 # The metadata server, which also serves DNS and NTP, stays on nic0. GCE
-# gives /32 addresses, so every IPv4 gateway is on-link.
+# gives /32 addresses, so every IPv4 gateway is on-link. With mgmt_ipv6,
+# nic0 also has an external IPv6 address for control plane SSH, with its
+# default route only in the mgmt table.
 #
-# GCE assigns the MAC addresses and the external IPv6 address of the user
-# NIC at instance creation, and the v1 API does not return them, so the
+# GCE assigns the MAC addresses and the external IPv6 addresses at
+# instance creation, and the v1 API does not return them, so the
 # template carries placeholders that the script fills from the metadata
 # server at first boot.
-GcpDualNicNetplan = Data.define(:mgmt_ip, :mgmt_gateway, :user_ip, :user_gateway)
+GcpDualNicNetplan = Data.define(:mgmt_ip, :mgmt_gateway, :user_ip, :user_gateway, :mgmt_ipv6)
 
 class GcpDualNicNetplan
   VLAN = 2
@@ -25,6 +27,8 @@ class GcpDualNicNetplan
   NETPLAN_PATH = "/etc/netplan/61-ubicloud.yaml"
 
   MGMT_MAC = "@MGMT_MAC@"
+  MGMT_IPV6 = "@MGMT_IPV6@"
+  MGMT_GATEWAY_IPV6 = "@MGMT_GATEWAY_IPV6@"
   USER_MAC = "@USER_MAC@"
   USER_IPV6 = "@USER_IPV6@"
   USER_GATEWAY_IPV6 = "@USER_GATEWAY_IPV6@"
@@ -43,6 +47,10 @@ class GcpDualNicNetplan
                 time.sleep(2)
         raise SystemExit("metadata server did not answer for " + path)
 
+    path = "#{NETPLAN_PATH}"
+    with open(path + ".template") as f:
+        text = f.read()
+
     nic0 = metadata("network-interfaces/0")
     user = metadata("vlan-network-interfaces/0/#{VLAN}")
     values = {
@@ -51,13 +59,13 @@ class GcpDualNicNetplan
         "#{USER_IPV6}": str(ipaddress.IPv6Address(user["ipv6s"][0])),
         "#{USER_GATEWAY_IPV6}": str(ipaddress.IPv6Address(user["gatewayIpv6"])),
     }
+    if "#{MGMT_IPV6}" in text:
+        values["#{MGMT_IPV6}"] = str(ipaddress.IPv6Address(nic0["ipv6s"][0]))
+        values["#{MGMT_GATEWAY_IPV6}"] = str(ipaddress.IPv6Address(nic0["gatewayIpv6"]))
     for key in ("#{MGMT_MAC}", "#{USER_MAC}"):
         if not re.fullmatch(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}", values[key]):
             raise SystemExit("unexpected MAC from metadata: " + values[key])
 
-    path = "#{NETPLAN_PATH}"
-    with open(path + ".template") as f:
-        text = f.read()
     for key, value in values.items():
         text = text.replace(key, value)
     with os.fdopen(os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
@@ -99,7 +107,7 @@ class GcpDualNicNetplan
   private
 
   def mgmt_ethernet
-    {
+    ethernet = {
       "match" => {"macaddress" => MGMT_MAC},
       "dhcp4" => true,
       "dhcp4-overrides" => {"use-routes" => false},
@@ -109,6 +117,15 @@ class GcpDualNicNetplan
       ],
       "routing-policy" => [{"from" => "#{mgmt_ip}/32", "table" => MGMT_TABLE}],
     }
+    return ethernet unless mgmt_ipv6
+
+    # A router advertisement would put an IPv6 default route on nic0 in the
+    # main table, next to the user NIC's.
+    ethernet["accept-ra"] = false
+    ethernet["addresses"] = ["#{MGMT_IPV6}/128"]
+    ethernet["routes"] << {"to" => "::/0", "via" => MGMT_GATEWAY_IPV6, "table" => MGMT_TABLE}
+    ethernet["routing-policy"] << {"from" => "#{MGMT_IPV6}/128", "table" => MGMT_TABLE}
+    ethernet
   end
 
   def user_vlan
