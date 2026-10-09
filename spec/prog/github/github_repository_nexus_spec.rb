@@ -227,11 +227,17 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#wait" do
-    it "checks queued jobs and cache usage then naps" do
+    it "alternates between checking queued jobs and cache usage" do
       repository.update(access_key: "key")
-      expect(nx).to receive(:check_queued_jobs)
-      expect(nx).to receive(:cleanup_cache)
+      called = []
+      expect(nx).to receive(:check_queued_jobs) { called << :check_queued_jobs }.at_least(:once)
+      expect(nx).to receive(:cleanup_cache) { called << :cleanup_cache }
+      expect { nx.wait }.to nap(0)
+      expect(nx.strand.stack[0]["skip_check_queued_jobs"]).to be true
       expect { nx.wait }.to nap(5 * 60)
+      expect(nx.strand.stack[0]["skip_check_queued_jobs"]).to be false
+      expect { nx.wait }.to nap(0)
+      expect(called).to eq [:check_queued_jobs, :cleanup_cache, :check_queued_jobs]
     end
 
     it "does not check queued jobs but check cache usage if 6 hours passed from the last job" do
@@ -239,6 +245,20 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(nx).not_to receive(:check_queued_jobs)
       expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(15 * 60)
+    end
+
+    it "does not check queued jobs or cache usage if 6 hours passed from the last job and there is no access key" do
+      repository.update(last_job_at: now - 7 * 60 * 60)
+      expect(nx).not_to receive(:check_queued_jobs)
+      expect(nx).not_to receive(:cleanup_cache)
+      expect { nx.wait }.to nap(15 * 60)
+    end
+
+    it "checks queued jobs every call if there is no access key" do
+      expect(nx).to receive(:check_queued_jobs).twice
+      expect(nx).not_to receive(:cleanup_cache)
+      expect { nx.wait }.to nap(5 * 60)
+      expect { nx.wait }.to nap(5 * 60)
     end
 
     it "does not destroys repository and if not found but has active runners" do
@@ -257,6 +277,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "does not poll if it is disabled" do
       expect(Config).to receive(:enable_github_workflow_poller).and_return(false)
       expect(nx).not_to receive(:check_queued_jobs)
+
+      expect { nx.wait }.to nap(5 * 60)
+    end
+
+    it "checks cache usage without polling if polling is disabled and there is an access key" do
+      repository.update(access_key: "key")
+      expect(Config).to receive(:enable_github_workflow_poller).and_return(false)
+      expect(nx).not_to receive(:check_queued_jobs)
+      expect(nx).to receive(:cleanup_cache)
 
       expect { nx.wait }.to nap(5 * 60)
     end
