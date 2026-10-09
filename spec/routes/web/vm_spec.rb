@@ -649,6 +649,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "4 × 1600GB"
         expect(page).to have_content "4 × 3200GB"
         expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
+        expect(page.all("input[name=size][value=standard-2]", visible: false).flat_map { it.find(:xpath, "..")[:class].split }).not_to include(start_with("form_gpu_"))
       end
 
       it "cannot create a virtual machine with gpu if feature switch is disabled" do

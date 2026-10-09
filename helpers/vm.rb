@@ -247,9 +247,16 @@ class Clover
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
 
+    gpu_size_devices = Option::VmSizes.filter_map(&:gpu_device).uniq
     options.add_option(name: "size", values: Option::VmSizes.select { it.visible || it.gpu_count }.map(&:display_name), parent: (@show_gpu == false) ? "family" : "gpu") do |location, family, *gpu, size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
-      vm_size.family == family && (vm_size.gpu_count.nil? || gpu == ["#{vm_size.gpu_count}:#{vm_size.gpu_device}"])
+      next false unless vm_size.family == family
+
+      if vm_size.gpu_count
+        gpu == ["#{vm_size.gpu_count}:#{vm_size.gpu_device}"]
+      else
+        !gpu_size_devices.include?(gpu.first.to_s.split(":", 2).last)
+      end
     end
 
     options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "1600", "2400", "3200"], parent: "size") do |location, family, *, size, storage_size|

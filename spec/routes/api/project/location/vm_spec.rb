@@ -376,6 +376,18 @@ RSpec.describe Clover, "vm" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "b300-4 virtual machines have the GPUs 4:3182"})
       end
 
+      it "fails with the gpus of a size and a size without gpus" do
+        create_b300_vm(size: "standard-60", gpu: "1:3182")
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "NVIDIA B300 GPUs are only available with the sizes b300-1, b300-2, b300-4, b300-8"})
+      end
+
+      it "fails with the gpus of a size and no size" do
+        post "/project/#{project.ubid}/location/us-west-u1-dedicated/vm/test-vm", {public_key: "ssh key", gpu: "1:3182"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "NVIDIA B300 GPUs are only available with the sizes b300-1, b300-2, b300-4, b300-8"})
+      end
+
       it "fails with another storage size" do
         create_b300_vm(storage_size: 40)
 
