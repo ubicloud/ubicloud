@@ -253,6 +253,87 @@ RSpec.describe PostgresResource do
     end
   end
 
+  it "requests no management NIC on metal" do
+    expect(postgres_resource.use_separate_management_nic?).to be false
+    expect(postgres_resource.management_nic_use_eip?).to be true
+  end
+
+  context "with a GCP location" do
+    let(:gcp_location) { Location[name: "gcp-us-central1"] }
+    let(:service_project) { Project.create(name: "pg-service-project") }
+    let(:gcp_resource) {
+      described_class.create(
+        name: "pg-gcp", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id: gcp_location.id, project_id: project.id,
+        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "c4a-standard-4",
+        target_storage_size_gib: 64,
+      )
+    }
+
+    def create_management_subnet(label: "wait")
+      ps = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, project_id: service_project.id,
+        location_id: gcp_location.id, net4: "100.64.0.0/20", net6: "fd1b:9793:dcef:cd0e::/64")
+      Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label:)
+      ps
+    end
+
+    def create_gcp_server(name)
+      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, name:, location_id: gcp_location.id,
+        unix_user: "ubi", boot_image: "ubuntu-jammy", size: "c4a-standard-4", arch: "arm64").subject
+      PostgresServer.create(timeline: create_postgres_timeline(location_id: gcp_location.id), resource_id: gcp_resource.id,
+        vm_id: vm.id, synchronization_status: "ready", timeline_access: "push", version: "17")
+      vm
+    end
+
+    def add_management_nic(vm, mgmt_subnet)
+      Prog::Vnet::NicNexus.assemble(mgmt_subnet.id, name: "#{vm.name}-mgmt-nic", is_management: true).subject.update(vm_id: vm.id)
+    end
+
+    before do
+      allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
+    end
+
+    describe "#use_separate_management_nic?" do
+      it "is true with the Config or the project flag once the management subnet is ready" do
+        create_management_subnet
+        expect(gcp_resource.use_separate_management_nic?).to be false
+
+        allow(Config).to receive(:gcp_postgres_dual_nic).and_return(true)
+        expect(gcp_resource.use_separate_management_nic?).to be true
+
+        allow(Config).to receive(:gcp_postgres_dual_nic).and_return(false)
+        gcp_resource.project.set_ff_postgres_gcp_dual_nic(true)
+        expect(gcp_resource.use_separate_management_nic?).to be true
+      end
+
+      it "is false while the management subnet is missing or not ready" do
+        project.set_ff_postgres_gcp_dual_nic(true)
+        expect(gcp_resource.use_separate_management_nic?).to be false
+
+        create_management_subnet(label: "create_subnet")
+        expect(gcp_resource.use_separate_management_nic?).to be false
+      end
+
+      it "stays true once a server has a management NIC, also with the flag off" do
+        mgmt_subnet = create_management_subnet
+        vm = create_gcp_server("pg-gcp-vm1")
+        expect(gcp_resource.use_separate_management_nic?).to be false
+
+        add_management_nic(vm, mgmt_subnet)
+        mgmt_subnet.strand.update(label: "update_firewall_rules")
+        expect(gcp_resource.use_separate_management_nic?).to be true
+      end
+    end
+
+    describe "#management_nic_use_eip?" do
+      it "is false with the IPv6 SSH flag" do
+        expect(gcp_resource.management_nic_use_eip?).to be true
+        gcp_resource.project.set_ff_postgres_gcp_ssh_ipv6(true)
+        expect(gcp_resource.management_nic_use_eip?).to be false
+      end
+    end
+  end
+
   it "client_ca_certificates is nil while either client_root_cert_1 or client_root_cert_2 also nil" do
     postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: "2")
     expect(postgres_resource.client_ca_certificates).not_to be_nil
