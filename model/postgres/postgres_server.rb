@@ -542,6 +542,13 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
+  # psql reads a -d value that contains "=" or starts with a URI prefix as a
+  # connection string. Database names are customer-controlled, so a caller
+  # that connects to one passes it in as a quoted conninfo value.
+  def self.conninfo(dbname)
+    "dbname='#{dbname.gsub(/[\\']/) { "\\#{it}" }}'"
+  end
+
   def run_query(query, user: "postgres", dbname: "postgres", statement_timeout: nil, session: nil)
     if query.is_a?(Sequel::Dataset)
       query = query.no_auto_parameterize.sql

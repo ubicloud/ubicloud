@@ -325,7 +325,7 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
     return database_result(database, collations, []) unless database["connectable"]
 
     begin
-      rows = CSV.parse(server.run_query(DETAILS_SQL, dbname: conninfo(database["name"])))
+      rows = CSV.parse(server.run_query(DETAILS_SQL, dbname: PostgresServer.conninfo(database["name"])))
     rescue Sshable::SshError
       return database_result(database, collations, [], verified: false)
     end
@@ -360,7 +360,7 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
     return none if database["name"] == "template0"
     return none.merge("ctype_verified" => !database["ctype_at_risk"]) unless database["connectable"]
 
-    objects = CSV.parse(server.run_query(CTYPE_SQL, dbname: conninfo(database["name"]))).map { |kind, object, source| {"kind" => kind, "object" => object, "source" => source} }
+    objects = CSV.parse(server.run_query(CTYPE_SQL, dbname: PostgresServer.conninfo(database["name"]))).map { |kind, object, source| {"kind" => kind, "object" => object, "source" => source} }
     {"ctype_verified" => true, "ctype_objects" => objects.first(OBJECT_LIMIT), "ctype_object_count" => objects.length, "ctype_sources" => objects.map { it["source"] }.tally}
   rescue Sshable::SshError
     none.merge("ctype_verified" => false)
@@ -403,13 +403,6 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
       {"name" => row[0], "connectable" => row[1] == "t", "default_unsafe" => row[2] == "t", "default_collation" => row[3], "ctype_at_risk" => row[4] == "t",
        "provider" => row[5], "ctype" => row[6], "icu_locale" => row[7]}
     end
-  end
-
-  # psql reads a -d value that contains "=" or starts with a URI prefix as a
-  # connection string. Database names are customer-controlled, so each one goes
-  # in as a quoted conninfo value.
-  def conninfo(dbname)
-    "dbname='#{dbname.gsub(/[\\']/) { "\\#{it}" }}'"
   end
 
   def pop_unreachable(error)
