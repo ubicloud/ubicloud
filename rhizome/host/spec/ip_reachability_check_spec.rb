@@ -8,8 +8,8 @@ RSpec.describe IpReachabilityCheck do
   let(:ips) { ["10.0.0.1", "10.0.0.2"] }
   let(:ip_addr_show) {
     [
-      {"ifname" => "lo", "addr_info" => [{"local" => "127.0.0.1"}, {"local" => "10.0.0.2"}]},
-      {"ifname" => "eth0", "addr_info" => [{"local" => "10.0.0.9"}]},
+      {"ifname" => "lo", "addr_info" => [{"local" => "127.0.0.1", "label" => "lo"}, {"local" => "10.0.0.2", "label" => "lo:ipcheck"}, {"local" => "10.0.0.8", "label" => "lo"}]},
+      {"ifname" => "eth0", "addr_info" => [{"local" => "10.0.0.9", "label" => "eth0"}]},
       {"ifname" => "eth1"},
     ].to_json
   }
@@ -33,7 +33,7 @@ RSpec.describe IpReachabilityCheck do
         ping(replies[[nil, target]])
       in ["ip", "-j", "-4", "addr", "show"]
         ip_addr_show
-      in ["ip", "addr", "replace" | "del", _, "dev", "lo"]
+      in ["ip", "addr", "replace", _, "dev", "lo", "label", "lo:ipcheck"] | ["ip", "addr", "del", _, "dev", "lo"]
         ""
       end
     end
@@ -43,7 +43,7 @@ RSpec.describe IpReachabilityCheck do
     expect(check.run).to eq []
 
     expect(commands).to include(
-      ["ip", "addr", "replace", "10.0.0.1/32", "dev", "lo"],
+      ["ip", "addr", "replace", "10.0.0.1/32", "dev", "lo", "label", "lo:ipcheck"],
       ["ping", "-n", "-q", "-c", "5", "-i", "0.2", "-W", "2", "-I", "10.0.0.1", "1.1.1.1"],
       ["ping", "-n", "-q", "-c", "5", "-i", "0.2", "-W", "2", "-I", "10.0.0.1", "8.8.8.8"],
       ["ip", "addr", "del", "10.0.0.1/32", "dev", "lo"],
@@ -52,12 +52,12 @@ RSpec.describe IpReachabilityCheck do
     expect(commands).to include(["ip", "addr", "del", "10.0.0.2/32", "dev", "lo"])
   end
 
-  context "with an address the host configured" do
-    let(:ips) { ["10.0.0.9"] }
+  context "with addresses the host configured" do
+    let(:ips) { ["10.0.0.9", "10.0.0.8"] }
 
-    it "uses it as it is" do
+    it "uses them as they are, also on lo" do
       expect(check.run).to eq []
-      expect(commands.map(&:first).uniq).to eq ["ping", "ip"]
+      expect(commands).not_to include(["ip", "addr", "replace", anything, "dev", "lo", "label", "lo:ipcheck"], ["ip", "addr", "del", anything, "dev", "lo"])
     end
   end
 
