@@ -213,6 +213,7 @@ module Config
   override :aws_postgres_iam_access, false, bool
   override :aws_postgres_blob_storage_iam_sweep, true, bool
   override :gcp_postgres_iam_access, false, bool
+  override :gcp_postgres_dual_nic, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
 
   # Logging
