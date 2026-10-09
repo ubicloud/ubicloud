@@ -441,11 +441,13 @@ class PostgresServer < Sequel::Model
   # primary's, otherwise pg_upgrade on a promoted standby rejects it for pending WAL.
   # Returns [] when the primary is fenced (stopped). Callers relying on this during
   # a fenced-primary failover (e.g. upgrade) must verify sync before the fence.
+  # Invalidated slots are skipped. Slotsync does not sync them, and they cannot be used again.
   def unsynced_logical_failover_slots(standby)
     return [] if read_replica? || version.to_i < 17
     return [] if strand.label == "wait_in_fence"
 
-    primary_slots = run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND failover", user: "ubi_monitoring", dbname: "ubi_admin").split("\n").map { it.split(",") }
+    invalid_slots, primary_slots = run_query("SELECT slot_name, confirmed_flush_lsn, invalidation_reason FROM pg_replication_slots WHERE slot_type = 'logical' AND failover", user: "ubi_monitoring", dbname: "ubi_admin").split("\n").map { it.split(",") }.partition { it[2] }
+    Clog.emit("Skipping invalidated logical failover slots", {ubid:, invalid_slots: invalid_slots.map(&:first)}) unless invalid_slots.empty?
     return [] if primary_slots.empty?
 
     synced = standby.run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary", user: "ubi_monitoring", dbname: "ubi_admin").split("\n").to_h { it.split(",") }

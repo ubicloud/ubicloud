@@ -818,6 +818,26 @@ RSpec.describe PostgresServer do
       expect(standby.vm.sshable).to receive(:_cmd).with(monitoring_psql_command, stdin: a_string_including("synced AND NOT temporary")).and_return("slot1,0/100")
       expect(postgres_server.unsynced_logical_failover_slots(standby)).to eq(["slot1"])
     end
+
+    it "skips invalidated primary slots and logs them" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(monitoring_psql_command, stdin: a_string_including("AND failover")).and_return("slot1,0/100\nslot2,,wal_removed\nslot3,0/300,rows_removed")
+      expect(standby.vm.sshable).to receive(:_cmd).with(monitoring_psql_command, stdin: a_string_including("synced AND NOT temporary")).and_return("slot1,0/100")
+      expect(Clog).to receive(:emit).with("Skipping invalidated logical failover slots", {ubid: postgres_server.ubid, invalid_slots: ["slot2", "slot3"]})
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
+    it "returns empty without querying the standby when all primary slots are invalidated" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(monitoring_psql_command, stdin: a_string_including("AND failover")).and_return("slot1,,wal_removed")
+      expect(standby.vm.sshable).not_to receive(:_cmd)
+      expect(Clog).to receive(:emit).with("Skipping invalidated logical failover slots", {ubid: postgres_server.ubid, invalid_slots: ["slot1"]})
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
   end
 
   describe "#failover_target read_replica" do
