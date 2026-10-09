@@ -67,6 +67,14 @@ PGDATA=/dat/#{version}/data
       )
     end
 
+    def aws_get_object(key)
+      # The location credential is not always allowed to read objects, so use
+      # the timeline's own user when it has one.
+      credentials = access_key ? ::Aws::Credentials.new(access_key, secret_key) : location.location_credential_aws.credentials
+      client = ::Aws::S3::Client.new(region: location.name, credentials:, endpoint: blob_storage_endpoint, force_path_style: true)
+      client.get_object(bucket: ubid, key:).body.read
+    end
+
     def aws_list_objects(prefix, delimiter: "")
       response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:)
       objects = response.contents
