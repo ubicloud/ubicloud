@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "logger"
+require "tmpdir"
 require_relative "../lib/io_throttle"
 
 RSpec.describe IoThrottle do
@@ -292,18 +293,18 @@ RSpec.describe IoThrottle do
 
     it "applies no throttle when backlog is below threshold and no disk usage throttle" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil, calculate_slot_wait_throttle: nil)
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=52428800 riops=max wiops=max\n")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
-      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: none, effective: none")
+      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: none, slot wait throttle: none, effective: none")
 
       throttle.run
     end
 
     it "stays quiet when the limit is unchanged" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil, calculate_slot_wait_throttle: nil)
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
@@ -317,7 +318,7 @@ RSpec.describe IoThrottle do
 
     it "applies throttle tier based on backlog count" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil, calculate_slot_wait_throttle: nil)
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
@@ -326,7 +327,7 @@ RSpec.describe IoThrottle do
 
       # 150 files hits moderate tier (100+): 80% of baseline 100 MB/s = 80 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
-      expect(logger).to receive(:info).with("Archival backlog: 150 files (80), disk usage throttle: none, effective: 80 MB/s")
+      expect(logger).to receive(:info).with("Archival backlog: 150 files (80), disk usage throttle: none, slot wait throttle: none, effective: 80 MB/s")
 
       throttle.run
     end
@@ -334,7 +335,7 @@ RSpec.describe IoThrottle do
     it "scales throttle values with the disk throughput baseline" do
       throttle_leaseweb = described_class.new("17-main", logger, 35)
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle_leaseweb).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      expect(throttle_leaseweb).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil, calculate_slot_wait_throttle: nil)
 
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
@@ -350,7 +351,7 @@ RSpec.describe IoThrottle do
 
     it "applies disk usage throttle when disk is high and no archival backlog" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle).to receive_messages(find_device_id: "8:0")
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_slot_wait_throttle: nil)
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
@@ -359,14 +360,14 @@ RSpec.describe IoThrottle do
       expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
 
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
-      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: 55, effective: 55 MB/s")
+      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: 55, slot wait throttle: none, effective: 55 MB/s")
 
       throttle.run
     end
 
     it "uses more restrictive throttle when both apply" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      expect(throttle).to receive_messages(find_device_id: "8:0")
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_slot_wait_throttle: nil)
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       # Archival: 80 MB/s, disk usage: 55 MB/s -> pick 55
@@ -379,6 +380,94 @@ RSpec.describe IoThrottle do
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
 
       throttle.run
+    end
+
+    it "applies the slot wait throttle while a new slot has not connected" do
+      expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil, calculate_slot_wait_throttle: 20)
+      expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
+      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{20 * 1024 * 1024}")
+      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: none, slot wait throttle: 20, effective: 20 MB/s")
+
+      throttle.run
+    end
+  end
+
+  describe "slot wait" do
+    let(:signal_dir) { Dir.mktmpdir }
+    let(:signal) { File.join(signal_dir, "pvslot.wait_signal") }
+
+    before do
+      stub_const("IoThrottle::SLOT_WAIT_DIR", signal_dir)
+      allow(throttle).to receive(:in_recovery?).and_return(false)
+    end
+
+    after { FileUtils.rm_rf(signal_dir) }
+
+    it "drops a signal for a new slot" do
+      FileUtils.rm_rf(signal_dir)
+      described_class.signal_slot_wait("pvslot")
+      expect(File.exist?(signal)).to be true
+    end
+
+    it "does not look for signals before any were dropped" do
+      FileUtils.rm_rf(signal_dir)
+      expect(throttle).not_to receive(:in_recovery?)
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+    end
+
+    it "does not throttle without signals" do
+      expect(throttle).not_to receive(:connected_slots)
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+    end
+
+    it "does not throttle a recovering server" do
+      FileUtils.touch(signal)
+      allow(throttle).to receive(:in_recovery?).and_return(true)
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+    end
+
+    it "gives a new slot time to connect before throttling" do
+      FileUtils.touch(signal)
+      expect(throttle).to receive(:connected_slots).with(["pvslot"]).and_return([])
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+      expect(File.exist?(signal)).to be true
+    end
+
+    it "throttles while a slot stays unconnected past the grace period" do
+      FileUtils.touch(signal, mtime: Time.now - described_class::SLOT_WAIT_GRACE - 1)
+      expect(throttle).to receive(:connected_slots).with(["pvslot"]).and_return([])
+      expect(throttle.send(:calculate_slot_wait_throttle)).to eq(20)
+      expect(File.exist?(signal)).to be true
+    end
+
+    it "clears the signal once the slot connects" do
+      FileUtils.touch(signal, mtime: Time.now - described_class::SLOT_WAIT_GRACE - 1)
+      expect(throttle).to receive(:connected_slots).with(["pvslot"]).and_return(["pvslot"])
+      expect(logger).to receive(:info).with("Slot pvslot connected")
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+      expect(File.exist?(signal)).to be false
+    end
+
+    it "gives up on a slot that does not connect in time" do
+      FileUtils.touch(signal, mtime: Time.now - described_class::SLOT_WAIT_MAX_AGE - 1)
+      expect(throttle).to receive(:connected_slots).with([]).and_return([])
+      expect(logger).to receive(:warn).with("Slot pvslot did not connect within 300s, no longer throttling for it")
+      expect(throttle.send(:calculate_slot_wait_throttle)).to be_nil
+      expect(File.exist?(signal)).to be false
+    end
+
+    it "reads which of the slots are active" do
+      expect(throttle).to receive(:_run_command).with("sudo", "-u", "postgres", "psql", "-At", "-c", "SELECT slot_name FROM pg_catalog.pg_replication_slots WHERE active AND slot_name IN ('pva','pvb')").and_return("pva\n")
+      expect(throttle.send(:connected_slots, ["pva", "pvb"])).to eq(["pva"])
+    end
+
+    it "does not query without slots" do
+      expect(throttle).not_to receive(:_run_command)
+      expect(throttle.send(:connected_slots, [])).to eq([])
     end
   end
 end
