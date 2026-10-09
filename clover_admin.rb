@@ -1923,14 +1923,23 @@ class CloverAdmin < Roda
             fail CloverError.new(400, "InvalidRequest", "invalid IPv4 address: #{host}")
           end
 
-          [server_identifier, host]
+          [server_identifier, host, VmHost.generate_uuid]
+        end
+
+        hosts.each do |server_identifier, _, id|
+          HostProvider.new do |hp|
+            hp.id = id
+            hp.provider_name = provider_name
+            hp.server_identifier = server_identifier
+          end.api.set_server_name(UBID.to_ubid(id))
         end
 
         started = DB.ignore_duplicate_queries do
           DB.transaction do
-            hosts.map do |server_identifier, host|
+            hosts.map do |server_identifier, host, id|
               st = Prog::Vm::HostNexus.assemble(host, location_id:, family:, provider_name:,
-                server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:)
+                server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:,
+                id:, set_server_name: false)
               "#{st.ubid} (#{provider_name} #{server_identifier})"
             end
           end
