@@ -64,7 +64,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       location_az_id: LocationAz[location_id: vm.location_id, az: suffix].id)
   end
 
-  def add_management_nic
+  def add_management_nic(static_ip: "35.212.0.9")
     service_project = Project.create(name: "pg-service")
     allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
     mgmt_ps = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id,
@@ -73,7 +73,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     mgmt_nic = Prog::Vnet::NicNexus.assemble(mgmt_ps.id, name: "testvm-mgmt-nic", is_management: true).subject
     mgmt_nic.update(vm_id: vm.id)
     mgmt_nic.strand.update(label: "wait")
-    NicGcpResource.create_with_id(mgmt_nic, vpc_name: "ubicloud-vpc-#{mgmt_ps.ubid}", subnet_name: "ubicloud-#{mgmt_ps.ubid}", static_ip: "35.212.0.9")
+    NicGcpResource.create_with_id(mgmt_nic, vpc_name: "ubicloud-vpc-#{mgmt_ps.ubid}", subnet_name: "ubicloud-#{mgmt_ps.ubid}", static_ip:)
     mgmt_nic
   end
 
@@ -273,10 +273,36 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         user_data = args[:instance_resource].metadata.items.find { it.key == "user-data" }.value
         netplan = GcpDualNicNetplan.new(
           mgmt_ip: mgmt_nic.private_ipv4.network.to_s, mgmt_gateway: "100.64.0.1",
-          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s,
+          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s, mgmt_ipv6: false,
         )
         expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))["runcmd"]).to eq([netplan.script])
         instance_double(Gapic::GenericLRO::Operation, name: "op-dual")
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "gives nic0 an external IPv6 address and no IPv4 NAT when the management NIC has no static IPv4" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic, static_ip: "35.192.0.1")
+      mgmt_nic = add_management_nic(static_ip: nil)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+
+      expect(compute_client).to receive(:insert) do |args|
+        mgmt_ni, user_ni = args[:instance_resource].network_interfaces.to_a
+        expect(mgmt_ni.stack_type).to eq("IPV4_IPV6")
+        expect(mgmt_ni.access_configs).to be_empty
+        expect(mgmt_ni.ipv6_access_configs.map { [it.type, it.network_tier] }).to eq([["DIRECT_IPV6", "PREMIUM"]])
+        expect(user_ni.access_configs.map(&:nat_i_p)).to eq(["35.192.0.1"])
+        expect(user_ni.ipv6_access_configs.map(&:type)).to eq(["DIRECT_IPV6"])
+
+        user_data = args[:instance_resource].metadata.items.find { it.key == "user-data" }.value
+        netplan = GcpDualNicNetplan.new(
+          mgmt_ip: mgmt_nic.private_ipv4.network.to_s, mgmt_gateway: "100.64.0.1",
+          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s, mgmt_ipv6: true,
+        )
+        expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))["runcmd"]).to eq([netplan.script])
+        instance_double(Gapic::GenericLRO::Operation, name: "op-dual-ipv6")
       end
 
       expect { nx.start }.to hop("wait_create_op")
@@ -905,6 +931,30 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(vm.reload.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
         expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
         expect(vm.sshable.reload.host).to eq("35.212.0.9")
+      end
+
+      it "takes the SSH host from the external IPv6 address of nic0 when the management NIC has no static IPv4" do
+        vm.reload.management_nic.nic_gcp_resource.update(static_ip: nil)
+        instance = Google::Cloud::Compute::V1::Instance.new(
+          status: "RUNNING",
+          network_interfaces: [
+            Google::Cloud::Compute::V1::NetworkInterface.new(
+              name: "nic0",
+              ipv6_access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:7::")],
+            ),
+            Google::Cloud::Compute::V1::NetworkInterface.new(
+              name: "nic0.2",
+              access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")],
+              ipv6_access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1")],
+            ),
+          ],
+        )
+        expect(compute_client).to receive(:get).and_return(instance)
+
+        expect { nx.wait_instance_created }.to hop("wait_sshable")
+        expect(vm.reload.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
+        expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
+        expect(vm.sshable.reload.host).to eq("2600:1900:4000:7::")
       end
 
       it "fails when the instance has no Dynamic NIC" do
