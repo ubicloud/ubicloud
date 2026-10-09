@@ -397,6 +397,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
         p = ctx.params
         expect(p[:protocol]).to eq "TCP"
         expect(p[:target_type]).to eq "ip"
+        expect(p[:ip_address_type]).to eq "ipv4"
         expect(p[:vpc_id]).to eq "vpc-0123456789abcdef0"
         expect(p[:health_check_protocol]).to eq "TCP"
         expect(p[:health_check_port]).to eq p[:port].to_s
@@ -410,6 +411,17 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
       expect(port_aws(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
       expect(port_aws(6432).target_group_arn).to end_with("targetgroup/pl-6432-#{pls.ubid[-20..]}/abc")
+    end
+
+    it "creates IPv6 target groups for an IPv6 service" do
+      pls.update(ip_address_type: "ipv6")
+      elbv2.stub_responses(:create_target_group, ->(ctx) {
+        expect(ctx.params[:ip_address_type]).to eq "ipv6"
+        {target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/#{ctx.params[:name]}/abc"}]}
+      })
+
+      expect { nx.ensure_target_groups }.to hop("ensure_target_group_attributes")
+      expect(port_aws(5432).target_group_arn).to end_with("targetgroup/pl-5432-#{pls.ubid[-20..]}/abc")
     end
 
     it "skips creation for ports that already have a target group" do
@@ -511,12 +523,34 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect(aws.registered_target_ips.map(&:to_s)).to eq [ip]
     end
 
-    it "registers nothing for a primary whose VM has no user NIC yet" do
-      attach_postgres_primary.user_nic.update(vm_id: nil)
+    it "registers the primary's IPv6 on an IPv6 service" do
+      pls.update(ip_address_type: "ipv6")
+      attach_postgres_primary.update(ephemeral_net6: "2600:1f14:abc:de00::10/128")
+      ip = "2600:1f14:abc:de00::10"
       elbv2.stub_responses(:describe_target_health, health)
-      expect(elbv2).not_to receive(:register_targets)
+      elbv2.stub_responses(:register_targets, {})
+      expect(elbv2).to receive(:register_targets).with(target_group_arn: "arn:tg-5432", targets: [{id: ip, port: 5432}]).and_call_original
+      expect(elbv2).to receive(:register_targets).with(target_group_arn: "arn:tg-6432", targets: [{id: ip, port: 6432}]).and_call_original
 
       expect { nx.ensure_targets }.to hop("ensure_nlb")
+      expect(aws.registered_target_ips.map(&:to_s)).to eq [ip]
+    end
+
+    it "waits for the primary's IPv6 on an IPv6 service, which lands only once the instance runs" do
+      pls.update(ip_address_type: "ipv6")
+      attach_postgres_primary.update(ephemeral_net6: nil)
+      expect(elbv2).not_to receive(:describe_target_health)
+      expect(elbv2).not_to receive(:register_targets)
+
+      expect { nx.ensure_targets }.to nap(10)
+      expect(aws.registered_target_ips).to eq []
+    end
+
+    it "waits for a primary whose VM has no user NIC yet" do
+      attach_postgres_primary.user_nic.update(vm_id: nil)
+      expect(elbv2).not_to receive(:register_targets)
+
+      expect { nx.ensure_targets }.to nap(10)
       expect(aws.registered_target_ips).to eq []
     end
 

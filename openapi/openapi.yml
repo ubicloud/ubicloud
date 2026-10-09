@@ -4306,7 +4306,7 @@ components:
           items:
             type: integer
         ip_address_type:
-          description: Address families consumers connect over; default ipv4. IPv6 needs a subnet with IPv6 addressing
+          description: Address families consumers connect over; default ipv4. An ipv6 service reaches its targets over IPv6, the others over IPv4
           type: string
           enum:
             - ipv4
@@ -4472,7 +4472,7 @@ components:
           items:
             type: integer
         ip_address_type:
-          description: Address families consumers connect over; default ipv4. IPv6 needs a subnet with IPv6 addressing
+          description: Address families consumers connect over; default ipv4. An ipv6 service reaches its targets over IPv6, the others over IPv4
           type: string
           enum:
             - ipv4

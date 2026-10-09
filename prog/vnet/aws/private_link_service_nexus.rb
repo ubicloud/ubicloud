@@ -78,13 +78,21 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_ensure_targets
   end
 
-  # The primary's user-NIC private IPv4; empty without an attached resource.
+  # The primary's address in the target groups' family; empty without an
+  # attached resource or while the VM has no address yet.
   def desired_target_ips
-    private_link_service.target_vms.filter_map { it.private_ipv4&.to_s }.uniq.sort
+    private_link_service.target_vms.filter_map { private_link_service.target_ip(it)&.to_s }.uniq.sort
   end
 
+  # An attached resource whose primary has no address yet is waited for: the
+  # IPv6 lands only once the instance runs, later than the private IPv4.
   label def ensure_targets
     desired_ips = desired_target_ips
+    if desired_ips.empty? && private_link_service.postgres_resource
+      Clog.emit("private link service waiting for the primary's address", private_link_service)
+      nap 10
+    end
+
     private_link_service.ports.each { ensure_targets_for(it, desired_ips) }
     aws_resource.update(registered_target_ips: Sequel.pg_array(desired_ips, :inet))
     hop_ensure_nlb
@@ -480,6 +488,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
         port: port.target_port,
         vpc_id:,
         target_type: "ip",
+        ip_address_type: private_link_service.target_ip_address_type,
         health_check_protocol: "TCP",
         health_check_port: port.target_port.to_s,
         tags: Util.aws_tags(name, {"ubid" => private_link_service.ubid, "port" => port.port.to_s}),

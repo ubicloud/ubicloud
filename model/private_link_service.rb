@@ -51,6 +51,14 @@ class PrivateLinkService < Sequel::Model
     [postgres_resource&.representative_server&.vm].compact
   end
 
+  def target_ip_address_type
+    (ip_address_type == "ipv6") ? "ipv6" : "ipv4"
+  end
+
+  def target_ip(vm)
+    (target_ip_address_type == "ipv6") ? vm.ip6 : vm.private_ipv4
+  end
+
   def update_allowed_principals(principals)
     update(allowed_principals: Sequel.pg_array(principals.map(&:strip).uniq, :text))
     incr_update_permissions

@@ -130,6 +130,25 @@ RSpec.describe PrivateLinkService do
     zone
   end
 
+  describe "#target_ip" do
+    it "is the VM's private IPv4 for an IPv4 or dual-stack service and its IPv6 for an IPv6 service" do
+      pg = create_pg
+      vm = pg.representative_server.vm
+      vm.update(ephemeral_net6: "2600:1f14:abc:de00::10/128")
+
+      expect(pls.target_ip_address_type).to eq "ipv4"
+      expect(pls.target_ip(vm)).to eq vm.private_ipv4
+
+      pls.update(ip_address_type: "dual")
+      expect(pls.target_ip_address_type).to eq "ipv4"
+      expect(pls.target_ip(vm)).to eq vm.private_ipv4
+
+      pls.update(ip_address_type: "ipv6")
+      expect(pls.target_ip_address_type).to eq "ipv6"
+      expect(pls.target_ip(vm).to_s).to eq "2600:1f14:abc:de00::10"
+    end
+  end
+
   describe "#target_vms" do
     it "is empty without an attached resource" do
       expect(pls.target_vms).to eq []

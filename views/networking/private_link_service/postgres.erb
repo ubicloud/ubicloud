@@ -2,7 +2,7 @@
 pg = @pls.postgres_resource
 primary = pg&.representative_server
 primary_vm = primary&.vm
-primary_ip = primary_vm&.private_ipv4
+primary_ip = primary_vm && @pls.target_ip(primary_vm)
 hostname = @pls.private_hostname
 rows = if pg
   [
@@ -26,7 +26,7 @@ end %>
   <%== part(
     "components/table_card",
     title: "Attached PostgreSQL resource",
-    headers: ["Name", "State", "Primary Server", "Primary VM", "Private IPv4", "Private Hostname"],
+    headers: ["Name", "State", "Primary Server", "Primary VM", "Target IP", "Private Hostname"],
     rows:,
     empty_state: {
       icon: "hero-circle-stack",
