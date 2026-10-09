@@ -21,12 +21,8 @@ class Prog::Vm::HostNexus < Prog::Base
           hp.provider_name = provider_name
           hp.server_identifier = server_identifier
         end
-      end
 
-      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
-        vmh.create_addresses
-        vmh.set_data_center
-        vmh.create_inventory
+        # Renaming here fails the assemble for an unknown server identifier.
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
       else
@@ -42,6 +38,21 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
+    hop_create_addresses if vm_host.provider
+    hop_install_host_os if install_os
+
+    hop_setup_ssh_keys
+  end
+
+  label def create_addresses
+    register_deadline("setup_ssh_keys", 10 * 60)
+    vm_host.create_addresses
+    hop_pull_server_info
+  end
+
+  label def pull_server_info
+    vm_host.set_data_center
+    vm_host.create_inventory unless vm_host.inventory
     hop_install_host_os if install_os
 
     hop_setup_ssh_keys
@@ -50,7 +61,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def install_host_os
     hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
 
-    register_deadline("setup_ssh_keys", 2 * 60 * 60)
+    register_deadline("setup_ssh_keys", 2 * 60 * 60, allow_extension: true)
     hop_setup_ssh_keys if retval&.dig("msg") == "operating system installed"
 
     push Prog::Hetzner::InstallOs
