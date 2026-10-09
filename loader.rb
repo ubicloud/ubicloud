@@ -183,6 +183,7 @@ if force_autoload
 
   Clover.models_loaded
   UbiCli.models_loaded
+  UbiMcp.models_loaded
 end
 
 case Config.mail_driver
@@ -298,6 +299,13 @@ def clover_freeze
     Serializers,
     Serializers::Base,
     Sshable::SshError,
+    UbiMcp::Context,
+    UbiMcp::DirectModelAccess,
+    UbiMcp::ReadOnlyAdapter,
+    UbiMcp::Tool,
+    UbiMcp::Tool::Invalid,
+    UbiMcp::Tools,
+    *UbiMcp::TOOLS,
     Validation,
     Validation::ValidationFailed,
   ].each(&:freeze)
