@@ -482,6 +482,14 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       ]
     end
 
+    it "configures a swap file when swap_size_bytes is set" do
+      refresh_frame(nx, new_values: {"swap_size_bytes" => 4294963200})
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expect { nx.create_instance }.to hop("wait_instance_created")
+      user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
+      expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))["swap"]).to eq("filename" => "/swapfile", "size" => 4294963200)
+    end
+
     it "skips instance profile creation for runner instances" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
