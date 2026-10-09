@@ -131,9 +131,17 @@ end
 #  remote_storage_server_id | uuid    |
 #  network_volume_id        | uuid    |
 # Indexes:
-#  vm_storage_volume_pkey                    | PRIMARY KEY btree (id)
-#  vm_storage_volume_network_volume_id_index | UNIQUE btree (network_volume_id)
-#  vm_storage_volume_vm_id_disk_index_key    | UNIQUE btree (vm_id, disk_index)
+#  vm_storage_volume_pkey                                  | PRIMARY KEY btree (id)
+#  vm_storage_volume_network_volume_id_index               | UNIQUE btree (network_volume_id)
+#  vm_storage_volume_vm_id_disk_index_key                  | UNIQUE btree (vm_id, disk_index)
+#  vm_storage_volume_boot_image_id_index                   | btree (boot_image_id)
+#  vm_storage_volume_key_encryption_key_1_id_index         | btree (key_encryption_key_1_id)
+#  vm_storage_volume_key_encryption_key_2_id_not_null_idx  | btree (key_encryption_key_2_id) WHERE key_encryption_key_2_id IS NOT NULL
+#  vm_storage_volume_machine_image_version_id_not_null_idx | btree (machine_image_version_id) WHERE machine_image_version_id IS NOT NULL
+#  vm_storage_volume_remote_storage_server_id_not_null_idx | btree (remote_storage_server_id) WHERE remote_storage_server_id IS NOT NULL
+#  vm_storage_volume_spdk_installation_id_index            | btree (spdk_installation_id)
+#  vm_storage_volume_storage_device_id_index               | btree (storage_device_id)
+#  vm_storage_volume_vhost_block_backend_id_index          | btree (vhost_block_backend_id)
 # Check constraints:
 #  vm_storage_volume_single_source  | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
 #  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)

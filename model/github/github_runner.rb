@@ -149,9 +149,11 @@ end
 #  location_id        | uuid                     |
 #  encoded_jit_config | text                     |
 # Indexes:
-#  github_runner_pkey                  | PRIMARY KEY btree (id)
-#  github_runner_vm_id_key             | UNIQUE btree (vm_id)
-#  github_runner_installation_id_index | btree (installation_id)
+#  github_runner_pkey                    | PRIMARY KEY btree (id)
+#  github_runner_vm_id_key               | UNIQUE btree (vm_id)
+#  github_runner_installation_id_index   | btree (installation_id)
+#  github_runner_location_id_private_idx | btree (location_id) WHERE location_id IS NOT NULL AND (location_id <> ALL (ARRAY['caa7a807-36c5-8420-a75c-f906839dad71'::uuid, '1f214853-0bc4-8020-b910-dffb867ef44f'::uuid, '6b9ef786-b842-8420-8c65-c25e3d4bdf3d'::uuid, 'e0865080-9a3d-8020-a812-f5817c7afe7f'::uuid]))
+#  github_runner_repository_id_index     | btree (repository_id)
 # Check constraints:
 #  location_id_and_vm_id_set_together | (location_id IS NOT NULL AND vm_id IS NOT NULL OR location_id IS NULL AND vm_id IS NULL)
 # Foreign key constraints:

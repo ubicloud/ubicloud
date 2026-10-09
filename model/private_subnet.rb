@@ -185,6 +185,7 @@ end
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
+#  private_subnet_location_id_private_idx                | btree (location_id) WHERE location_id <> ALL (ARRAY['caa7a807-36c5-8420-a75c-f906839dad71'::uuid, '1f214853-0bc4-8020-b910-dffb867ef44f'::uuid, '6b9ef786-b842-8420-8c65-c25e3d4bdf3d'::uuid, 'e0865080-9a3d-8020-a812-f5817c7afe7f'::uuid])
 # Check constraints:
 #  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
 # Foreign key constraints:

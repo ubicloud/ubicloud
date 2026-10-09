@@ -15,5 +15,6 @@ end
 # Indexes:
 #  account_identities_pkey             | PRIMARY KEY btree (id)
 #  account_identities_provider_uid_key | UNIQUE btree (provider, uid)
+#  account_identities_account_id_index | btree (account_id)
 # Foreign key constraints:
 #  account_identities_account_id_fkey | (account_id) REFERENCES accounts(id)

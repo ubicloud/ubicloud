@@ -98,6 +98,7 @@ end
 # Indexes:
 #  firewall_pkey                             | PRIMARY KEY btree (id)
 #  firewall_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+#  firewall_location_id_private_idx          | btree (location_id) WHERE location_id <> ALL (ARRAY['caa7a807-36c5-8420-a75c-f906839dad71'::uuid, '1f214853-0bc4-8020-b910-dffb867ef44f'::uuid, '6b9ef786-b842-8420-8c65-c25e3d4bdf3d'::uuid, 'e0865080-9a3d-8020-a812-f5817c7afe7f'::uuid])
 # Foreign key constraints:
 #  firewall_location_id_fkey | (location_id) REFERENCES location(id)
 #  firewall_project_id_fkey  | (project_id) REFERENCES project(id)

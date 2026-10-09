@@ -11,7 +11,8 @@ end
 #  private_subnet_id | uuid |
 #  firewall_id       | uuid |
 # Indexes:
-#  firewalls_private_subnets_pkey | PRIMARY KEY btree (private_subnet_id, firewall_id)
+#  firewalls_private_subnets_pkey              | PRIMARY KEY btree (private_subnet_id, firewall_id)
+#  firewalls_private_subnets_firewall_id_index | btree (firewall_id)
 # Foreign key constraints:
 #  firewalls_private_subnets_firewall_id_fkey       | (firewall_id) REFERENCES firewall(id)
 #  firewalls_private_subnets_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
