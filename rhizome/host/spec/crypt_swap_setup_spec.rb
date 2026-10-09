@@ -65,11 +65,11 @@ RSpec.describe CryptSwapSetup do
       expect { described_class.run }.to output(/already configured/).to_stdout
     end
 
-    it "fails if no swap entry is found in fstab" do
+    it "skips cryptswap setup when there is no swap" do
       expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
         UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
       FSTAB
-      expect { described_class.run }.to raise_error("No swap entry found in /etc/fstab")
+      expect { described_class.run }.to output(/no swap entry in \/etc\/fstab; skipping cryptswap setup/).to_stdout
     end
   end
 
