@@ -41,6 +41,10 @@ class PostgresResource < Sequel::Model
       true
     end
 
+    def metal_mgmt_ssh_via_user_security_group?
+      true
+    end
+
     def metal_lockout_mechanisms
       ["pg_stop", "hba", "host_routing"].freeze
     end

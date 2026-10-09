@@ -260,6 +260,22 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       ]
     end
 
+    it "gives a new dual-NIC GCP resource a management NIC and no SSH rule in the internal firewall" do
+      # Not called on success; with it, a wrong check would add a port 22 rule.
+      allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"])
+      gcp_location = Location[name: "gcp-us-central1"]
+      mgmt_subnet = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, project_id: postgres_project.id,
+        location_id: gcp_location.id, net4: "100.64.0.0/20", net6: "fd1b:9793:dcef:cd0e::/64")
+      Strand.create_with_id(mgmt_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+      customer_project.set_ff_postgres_gcp_dual_nic(true)
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id: gcp_location.id, name: "pg-name",
+        target_vm_size: "c4a-standard-4", target_storage_size_gib: 375).subject
+
+      expect(pg.representative_server.vm.management_nic.private_subnet_id).to eq(mgmt_subnet.id)
+      expect(pg.internal_firewall.firewall_rules.map { it.port_range.to_range }).not_to include(22...23)
+    end
+
     it "applies Config.postgres_internal_firewall_cidrs to the internal firewall" do
       expect(Config).to receive(:postgres_internal_firewall_cidrs).and_return(["3.143.188.173/32", "18.224.223.229/32"]).at_least(:once)
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject

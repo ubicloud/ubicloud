@@ -54,6 +54,13 @@ class PostgresResource < Sequel::Model
       !mgmt_subnet.nil? && mgmt_subnet.strand.label == "wait"
     end
 
+    # Tag rules reach only the NICs in the tag key's VPC, so the internal
+    # firewall opens port 22 only on the user NIC. Keep it while some
+    # server has no management NIC; a new dual-NIC resource has none.
+    def gcp_mgmt_ssh_via_user_security_group?
+      !use_separate_management_nic? || servers.any? { it.vm.management_nic.nil? }
+    end
+
     def gcp_management_nic_use_eip?
       !project.get_ff_postgres_gcp_ssh_ipv6
     end
