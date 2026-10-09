@@ -460,9 +460,26 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#download_cloud_hypervisor" do
+    it "hops to downloading the version" do
+      expect { nx.download_cloud_hypervisor }.to hop("start", "DownloadCloudHypervisor")
+    end
+
+    it "hops to wait when downloaded" do
+      st.update(retval: {"msg" => "cloud hypervisor downloaded"})
+      expect { nx.download_cloud_hypervisor }.to hop("wait")
+    end
+  end
+
   describe "#wait" do
     it "naps" do
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to download_cloud_hypervisor when needed" do
+      nx.incr_download_cloud_hypervisor
+      expect { nx.wait }.to hop("download_cloud_hypervisor")
+        .and change { vm_host.download_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
     end
 
     it "hops to prep_graceful_reboot when needed" do

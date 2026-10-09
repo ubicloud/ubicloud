@@ -45,7 +45,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
     end
 
     it "uses known sha256s" do
-      strand.update(stack: [{"version" => "35.1", "sha256_ch_bin" => nil, "sha256_ch_remote" => nil}])
+      strand.update(stack: [{"version" => "35.1"}])
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4\\ 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0 download_ch_35.1")
       expect { df.download }.to nap(15)

@@ -383,6 +383,12 @@ TIMER
     nap 60
   end
 
+  label def download_cloud_hypervisor
+    hop_wait if retval
+
+    push Prog::DownloadCloudHypervisor, {"version" => Prog::Vm::Metal::Nexus::UPGRADE_CH_VERSION}
+  end
+
   label def wait
     hardware_reset_and_reboot_checks
 
@@ -395,6 +401,12 @@ TIMER
     when_configure_metrics_set? do
       decr_configure_metrics
       hop_configure_metrics
+    end
+
+    when_download_cloud_hypervisor_set? do
+      decr_download_cloud_hypervisor
+      register_deadline("wait", 30 * 60)
+      hop_download_cloud_hypervisor
     end
 
     when_patch_set? do

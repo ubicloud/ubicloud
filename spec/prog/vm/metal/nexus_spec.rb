@@ -1393,6 +1393,153 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "upgrade_cloud_hypervisor" do
+    let(:ch53) { Hypervisor.first!(name: "ch", version: "53.0") }
+    let(:window_hour) { Time.now.utc.hour }
+
+    before do
+      ch53
+      vm.incr_upgrade_cloud_hypervisor
+      vm.update(maintenance_window_start_at: window_hour)
+      vm_host.update(os_version: "ubuntu-24.04")
+    end
+
+    describe "#wait" do
+      it "hops inside the maintenance window" do
+        expect { nx.wait }.to hop("upgrade_cloud_hypervisor")
+      end
+
+      it "naps until the maintenance window opens" do
+        vm.update(maintenance_window_start_at: (window_hour + 3) % 24)
+        expect { nx.wait }.to nap((2 * 60 * 60 - 60)..(3 * 60 * 60 + 60))
+      end
+
+      it "naps at most the regular interval" do
+        vm.update(maintenance_window_start_at: (window_hour + 12) % 24)
+        expect { nx.wait }.to nap(6 * 60 * 60)
+      end
+    end
+
+    describe "#upgrade_cloud_hypervisor" do
+      it "skips a vm already on the version" do
+        vm.update(hypervisor_id: ch53.id)
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+
+      it "skips a vm without a maintenance window" do
+        vm.update(maintenance_window_start_at: nil)
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+
+      it "skips a vm of a service project" do
+        expect(Config).to receive(:postgres_service_project_id).and_return(project.id)
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+
+      it "skips a qemu vm" do
+        refresh_frame(nx, new_values: {"hypervisor" => "qemu"})
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+
+      it "skips a vm on a host with the wrong OS" do
+        vm_host.update(os_version: "ubuntu-22.04")
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+
+      it "returns to wait if the maintenance window closed" do
+        vm.update(maintenance_window_start_at: (window_hour + 12) % 24)
+        expect { nx.upgrade_cloud_hypervisor }.to hop("wait")
+        expect(vm.upgrade_cloud_hypervisor_set?(cached: false)).to be true
+      end
+
+      it "asks the host to download the version if it is missing" do
+        Strand.create_with_id(vm_host, prog: "Vm::HostNexus", label: "wait")
+        expect(sshable).to receive(:_cmd).with("test -x /opt/cloud-hypervisor/v53.0/cloud-hypervisor && test -x /opt/cloud-hypervisor/v53.0/ch-remote && echo downloaded || echo missing").and_return("missing\n")
+        expect { nx.upgrade_cloud_hypervisor }.to nap(30)
+        expect(vm_host.download_cloud_hypervisor_set?(cached: false)).to be true
+      end
+
+      it "hops to soft stop once downloaded" do
+        expect(sshable).to receive(:_cmd).with("test -x /opt/cloud-hypervisor/v53.0/cloud-hypervisor && test -x /opt/cloud-hypervisor/v53.0/ch-remote && echo downloaded || echo missing").and_return("downloaded\n")
+        expect { nx.upgrade_cloud_hypervisor }.to hop("soft_stop_for_cloud_hypervisor")
+      end
+    end
+
+    describe "#soft_stop_for_cloud_hypervisor" do
+      let(:is_active) { "systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq" }
+
+      it "hops to install if the vm is stopped" do
+        expect(sshable).to receive(:_cmd).with(is_active).and_return("inactive\nactive\n")
+        expect { nx.soft_stop_for_cloud_hypervisor }.to hop("install_cloud_hypervisor")
+      end
+
+      it "presses the power button and naps if the vm is running" do
+        expect(sshable).to receive(:_cmd).with(is_active).and_return("active\nactive\n")
+        expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm #{vm.inhost_name}")
+        expect { nx.soft_stop_for_cloud_hypervisor }.to nap(10)
+        expect(frame_value(nx, "soft_stop_started_at")).to be_within(5).of(Time.now.to_i)
+      end
+
+      it "stops the vm hard after 60 seconds" do
+        refresh_frame(nx, new_values: {"soft_stop_started_at" => Time.now.to_i - 61})
+        expect(sshable).to receive(:_cmd).with(is_active).and_return("active\nactive\n")
+        expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
+        expect { nx.soft_stop_for_cloud_hypervisor }.to hop("install_cloud_hypervisor")
+        expect(frame_value(nx, "soft_stop_started_at")).to be_nil
+      end
+    end
+
+    describe "#install_cloud_hypervisor" do
+      it "pins the version and reinstalls the systemd units" do
+        expect(nx).to receive(:write_params_json)
+        expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
+        expect { nx.install_cloud_hypervisor }.to hop("restart_with_new_cloud_hypervisor")
+        expect(nx.ch_version).to eq "53.0"
+      end
+    end
+
+    describe "#restart_with_new_cloud_hypervisor" do
+      it "restarts the vm" do
+        expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
+        expect { nx.restart_with_new_cloud_hypervisor }.to hop("learn_cloud_hypervisor")
+      end
+    end
+
+    describe "#learn_cloud_hypervisor" do
+      it "hops to learning the hypervisor" do
+        expect { nx.learn_cloud_hypervisor }.to hop("start", "LearnHypervisor")
+      end
+
+      it "hops to finish when learned" do
+        st.update(retval: {"msg" => "learned ch 53.0"})
+        expect { nx.learn_cloud_hypervisor }.to hop("finish_cloud_hypervisor_upgrade")
+      end
+    end
+
+    describe "#finish_cloud_hypervisor_upgrade" do
+      before { refresh_frame(nx, new_values: {"ch_version" => "53.0"}) }
+
+      it "pages and clears the semaphore if the vm runs another version" do
+        vm.update(hypervisor_id: Hypervisor.first!(name: "ch", version: "46.0").id)
+        expect { nx.finish_cloud_hypervisor_upgrade }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+        expect(Page.from_tag_parts("VmCloudHypervisorUpgrade", vm.ubid).summary).to eq("#{vm.ubid} runs ch \"46.0\" after upgrade to 53.0")
+        expect(Page.from_tag_parts("VmCloudHypervisorUpgrade", vm.ubid).severity).to eq("info")
+      end
+
+      it "clears the semaphore when the vm runs the version" do
+        vm.update(hypervisor_id: ch53.id)
+        expect { nx.finish_cloud_hypervisor_upgrade }.to hop("wait")
+          .and change { vm.upgrade_cloud_hypervisor_set?(cached: false) }.from(true).to(false)
+      end
+    end
+  end
+
   describe "#start_after_stop" do
     it "starts VM if start semaphore is set" do
       vm.incr_start

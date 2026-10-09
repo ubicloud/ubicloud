@@ -5,11 +5,11 @@ class Prog::DownloadCloudHypervisor < Prog::Base
   frame_reader :version
 
   def sha256_ch_bin
-    @sha256_ch_bin ||= frame.fetch("sha256_ch_bin") || sha_256("ch-bin")
+    @sha256_ch_bin ||= frame["sha256_ch_bin"] || sha_256("ch-bin")
   end
 
   def sha256_ch_remote
-    @sha256_ch_remote ||= frame.fetch("sha256_ch_remote") || sha_256("ch-remote")
+    @sha256_ch_remote ||= frame["sha256_ch_remote"] || sha_256("ch-remote")
   end
 
   label def start
