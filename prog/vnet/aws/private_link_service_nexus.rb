@@ -27,6 +27,8 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   BACKGROUND_LABELS = %w[wait reconcile_connections verify_private_dns update_permissions].freeze
   DESTROY_LABELS = %w[destroy recover_unrecorded_ids delete_endpoint_service wait_service_gone delete_listeners delete_target_groups delete_nlb wait_nlb_gone wait_ports_gone].freeze
 
+  NLB_PROVISION_ATTEMPTS = 3
+
   NLB_ATTRIBUTES = [
     # Cross-zone stays on so clients reach the primary whichever AZ it lands in.
     {key: "load_balancing.cross_zone.enabled", value: "true"},
@@ -147,22 +149,32 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_wait_nlb_active
   end
 
-  # active_impaired still serves; failed never recovers on its own, so it
-  # pages with the reason AWS gives.
+  # active_impaired still serves. A failed NLB never recovers on its own: it
+  # is deleted and recreated, and once that has failed NLB_PROVISION_ATTEMPTS
+  # times it pages with the reason AWS gives.
   label def wait_nlb_active
     state = elbv2_client.describe_load_balancers(load_balancer_arns: [nlb_arn]).load_balancers.first.state
     case state.code
     when "active", "active_impaired"
       Clog.emit("private link service NLB active but impaired", {private_link_service_nlb_impaired: {ubid: private_link_service.ubid, arn: nlb_arn, reason: state.reason}}) if state.code == "active_impaired"
       nlb_failed_page&.incr_resolve
+      forget_nlb_failures
       hop_ensure_listeners
     when "failed"
-      Prog::PageNexus.assemble(
-        "Private link service #{private_link_service.ubid} NLB failed to provision: #{state.reason}",
-        ["PrivateLinkServiceNlbFailed", private_link_service.id], [private_link_service.ubid],
-        resource_id: private_link_service.id, extra_data: {"arn" => nlb_arn, "reason" => state.reason},
-      )
-      nap 60
+      failures = nlb_failures + 1
+      Clog.emit("private link service NLB failed to provision", {private_link_service_nlb_failed: {ubid: private_link_service.ubid, arn: nlb_arn, reason: state.reason, attempt: failures}})
+      if failures >= NLB_PROVISION_ATTEMPTS
+        Prog::PageNexus.assemble(
+          "Private link service #{private_link_service.ubid} NLB failed to provision #{failures} times: #{state.reason}",
+          ["PrivateLinkServiceNlbFailed", private_link_service.id], [private_link_service.ubid],
+          resource_id: private_link_service.id, extra_data: {"arn" => nlb_arn, "reason" => state.reason, "attempts" => failures},
+        )
+        nap 60
+      end
+
+      record_nlb_failures(failures)
+      elbv2_client.delete_load_balancer(load_balancer_arn: nlb_arn)
+      hop_recreate_nlb
     when "provisioning"
       nap 10
     else
@@ -173,6 +185,33 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
 
   def nlb_failed_page
     Page.from_tag_parts("PrivateLinkServiceNlbFailed", private_link_service.id)
+  end
+
+  label def recreate_nlb
+    begin
+      elbv2_client.describe_load_balancers(load_balancer_arns: [nlb_arn])
+      nap 10
+    rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
+      Clog.emit("private link service failed NLB gone, recreating", {private_link_service_nlb_recreate: {ubid: private_link_service.ubid, arn: nlb_arn}})
+    end
+
+    aws_resource.update(nlb_arn: nil)
+    hop_ensure_nlb
+  end
+
+  def nlb_failures
+    strand.stack.first["nlb_failures"] || 0
+  end
+
+  def record_nlb_failures(count)
+    strand.stack.first["nlb_failures"] = count
+    strand.modified!(:stack)
+  end
+
+  def forget_nlb_failures
+    return unless strand.stack.first.delete("nlb_failures")
+
+    strand.modified!(:stack)
   end
 
   label def ensure_listeners

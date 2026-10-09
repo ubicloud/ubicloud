@@ -738,13 +738,37 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect { nx.wait_nlb_active }.to nap(30)
     end
 
-    it "pages with AWS's reason when provisioning failed, and resolves the page once the NLB is active" do
+    it "deletes a failed NLB and goes to recreate it, counting the failure and logging AWS's reason, without paging yet" do
       elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "failed", reason: "Insufficient capacity in subnet-a"}}])
+      elbv2.stub_responses(:delete_load_balancer, {})
+      expect(elbv2).to receive(:delete_load_balancer).with(load_balancer_arn: "arn:nlb").twice.and_call_original
+      expect(Clog).to receive(:emit).with("private link service NLB failed to provision", {private_link_service_nlb_failed: {ubid: pls.ubid, arn: "arn:nlb", reason: "Insufficient capacity in subnet-a", attempt: 1}}).and_call_original
+      expect(Clog).to receive(:emit).with("private link service NLB failed to provision", hash_including(private_link_service_nlb_failed: hash_including(attempt: 2))).and_call_original
+
+      expect { nx.wait_nlb_active }.to hop("recreate_nlb")
+      expect(st.stack.first["nlb_failures"]).to eq 1
+      expect(failed_page).to be_nil
+
+      expect { nx.wait_nlb_active }.to hop("recreate_nlb")
+      expect(st.stack.first["nlb_failures"]).to eq 2
+      expect(failed_page).to be_nil
+    end
+
+    it "pages with AWS's reason once the NLB has failed NLB_PROVISION_ATTEMPTS times, keeps it, and resolves the page and forgets the count once active" do
+      st.stack.first["nlb_failures"] = described_class::NLB_PROVISION_ATTEMPTS - 1
+      st.modified!(:stack)
+      st.save_changes
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "failed", reason: "Insufficient capacity in subnet-a"}}])
+      expect(elbv2).not_to receive(:delete_load_balancer)
+
       expect { nx.wait_nlb_active }.to nap(60)
       page = failed_page
-      expect(page.summary).to eq "Private link service #{pls.ubid} NLB failed to provision: Insufficient capacity in subnet-a"
+      expect(page.summary).to eq "Private link service #{pls.ubid} NLB failed to provision 3 times: Insufficient capacity in subnet-a"
       expect(page.details["reason"]).to eq "Insufficient capacity in subnet-a"
       expect(page.details["arn"]).to eq "arn:nlb"
+      expect(page.details["attempts"]).to eq 3
+      expect(aws.nlb_arn).to eq "arn:nlb"
+      expect(st.stack.first["nlb_failures"]).to eq 2
 
       expect { nx.wait_nlb_active }.to nap(60)
       expect(Page.active.where(tag: page.tag).count).to eq 1
@@ -752,6 +776,27 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active"}}])
       expect { nx.wait_nlb_active }.to hop("ensure_listeners")
       expect(page.reload.resolve_set?).to be true
+      expect(st.stack.first).not_to have_key("nlb_failures")
+    end
+  end
+
+  describe "#recreate_nlb" do
+    before { aws.update(nlb_arn: "arn:nlb") }
+
+    it "naps while AWS still knows the deleted NLB, keeping the ARN so the name is not reused while taken" do
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{load_balancer_arn: "arn:nlb", state: {code: "failed"}}])
+      expect(elbv2).not_to receive(:create_load_balancer)
+
+      expect { nx.recreate_nlb }.to nap(10)
+      expect(aws.nlb_arn).to eq "arn:nlb"
+    end
+
+    it "forgets the ARN once the NLB is gone and goes back to create a new one" do
+      elbv2.stub_responses(:describe_load_balancers, "LoadBalancerNotFound")
+      expect(Clog).to receive(:emit).with("private link service failed NLB gone, recreating", {private_link_service_nlb_recreate: {ubid: pls.ubid, arn: "arn:nlb"}}).and_call_original
+
+      expect { nx.recreate_nlb }.to hop("ensure_nlb")
+      expect(aws.nlb_arn).to be_nil
     end
   end
 
