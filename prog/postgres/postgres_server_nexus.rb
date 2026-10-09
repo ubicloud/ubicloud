@@ -56,9 +56,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         availability_zone_required:,
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
-        use_separate_management_nic: postgres_resource.location.aws?,
+        use_separate_management_nic: postgres_resource.use_separate_management_nic?,
         waiting_strand_id: (is_representative ? [uuid, resource_id] : uuid),
-        management_nic_use_eip: !postgres_resource.aws_ssh_ipv6?,
+        management_nic_use_eip: postgres_resource.management_nic_use_eip?,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"

@@ -44,6 +44,10 @@ class PostgresResource < Sequel::Model
     private_subnet.dedicated_mgmt_security_group?
   end
 
+  def any_server_has_management_nic?
+    !Nic.where(is_management: true, vm_id: servers_dataset.select(:vm_id)).empty?
+  end
+
   def path
     "/location/#{display_location}/postgres/#{name}"
   end
