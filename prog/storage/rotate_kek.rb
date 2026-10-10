@@ -4,19 +4,20 @@ require "json"
 
 class Prog::Storage::RotateKek < Prog::Base
   subject_is :vm_storage_volume
+  alias_method :volume, :vm_storage_volume
 
-  def self.assemble(vm_storage_volume_id, parent_id: nil)
+  def self.assemble(volume_id, parent_id: nil)
     DB.transaction do
       # Lock the row so two rotations can't start at once.
-      vm_storage_volume = VmStorageVolume.where(id: vm_storage_volume_id).for_update.first
-      fail "storage volume not found" unless vm_storage_volume
-      fail "storage volume is not encrypted" unless vm_storage_volume.key_encryption_key_1_id
-      fail "a key rotation is already in progress" if vm_storage_volume.key_encryption_key_2_id
+      volume = VmStorageVolume.for_update.first(id: volume_id)
+      fail "storage volume not found" unless volume
+      fail "storage volume is not encrypted" unless volume.key_encryption_key_1_id
+      fail "a key rotation is already in progress" if volume.key_encryption_key_2_id
 
-      key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: vm_storage_volume.device_id)
-      vm_storage_volume.update(key_encryption_key_2_id: key_encryption_key.id)
+      key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: volume.device_id)
+      volume.update(key_encryption_key_2_id: key_encryption_key.id)
 
-      Strand.create_with_id(vm_storage_volume, prog: "Storage::RotateKek", label: "back_up_key", parent_id:)
+      Strand.create(prog: "Storage::RotateKek", label: "back_up_key", parent_id:, stack: [{"subject_id" => volume.id}])
     end
   end
 
@@ -28,7 +29,7 @@ class Prog::Storage::RotateKek < Prog::Base
   end
 
   label def rotate
-    host_tool("rotate", {old_key: old_key_hash, new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash})
+    host_tool("rotate", {old_key: old_key_hash, new_key: volume.key_encryption_key_2.secret_key_material_hash})
 
     hop_retire_old_key
   end
@@ -37,9 +38,9 @@ class Prog::Storage::RotateKek < Prog::Base
     # Delete the backup before swapping keys in the database, while key_1 is still
     # the old key so the host can name the backup file.
     host_tool("retire-backup", {old_key: old_key_hash})
-    retired_key = vm_storage_volume.key_encryption_key_1
-    vm_storage_volume.update({
-      key_encryption_key_1_id: vm_storage_volume.key_encryption_key_2_id,
+    retired_key = volume.key_encryption_key_1
+    volume.update({
+      key_encryption_key_1_id: volume.key_encryption_key_2_id,
       key_encryption_key_2_id: nil,
     })
     retired_key.destroy
@@ -48,7 +49,7 @@ class Prog::Storage::RotateKek < Prog::Base
   end
 
   def vm
-    @vm ||= vm_storage_volume.vm
+    @vm ||= volume.vm
   end
 
   def sshable
@@ -59,10 +60,10 @@ class Prog::Storage::RotateKek < Prog::Base
 
   def host_tool(action, stdin)
     sshable.cmd("sudo host/bin/storage-key-tool :vm_name :disk_index :action",
-      vm_name: vm.inhost_name, disk_index: vm_storage_volume.disk_index, action:, stdin: JSON.generate(stdin))
+      vm_name: vm.inhost_name, disk_index: volume.disk_index, action:, stdin: JSON.generate(stdin))
   end
 
   def old_key_hash
-    @old_key_hash ||= vm_storage_volume.key_encryption_key_1.secret_key_material_hash
+    @old_key_hash ||= volume.key_encryption_key_1.secret_key_material_hash
   end
 end

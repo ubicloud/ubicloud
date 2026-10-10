@@ -117,18 +117,6 @@ class StorageVolume
     vhost_backend_create_service_file
   end
 
-  def write_new_file(path, user)
-    rm_if_exists(path)
-
-    safe_write_to_file(path) do |file|
-      File.chmod(0o600, file.path)
-      FileUtils.chown user, user, file.path
-      yield file
-    end
-
-    sync_parent_dir(path)
-  end
-
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
       write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if has_source?
@@ -141,16 +129,18 @@ class StorageVolume
   end
 
   def write_config_file(path, content)
-    write_new_file(path, @vm_name) do |file|
+    safe_write_to_file(path, perm: 0o600, owner: @vm_name) do |file|
       file.write(content)
       fsync_or_fail(file)
     end
+
+    sync_parent_dir(path)
   end
 
   def vhost_backend_create_metadata(key_wrapping_secrets)
     metadata_path = sp.vhost_backend_metadata
 
-    write_new_file(metadata_path, @vm_name) do |file|
+    safe_write_to_file(metadata_path, perm: 0o600, owner: @vm_name) do |file|
       file.truncate(8 * 1024 * 1024)
     end
 
@@ -266,12 +256,6 @@ class StorageVolume
       .join("\n")
   end
 
-  def wrap_key_b64(storage_key_encryption, key)
-    key_bytes = [key].pack("H*")
-    wrapped_key = storage_key_encryption.wrap_key(key_bytes).join
-    Base64.strict_encode64(wrapped_key).strip
-  end
-
   def vhost_backend_config(encryption_key, key_wrapping_secrets)
     config = {
       "path" => disk_file,
@@ -293,8 +277,8 @@ class StorageVolume
     end
 
     key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
-    key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
-    key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
+    key1_wrapped_b64 = key_encryption.wrap_key_b64(encryption_key[:key])
+    key2_wrapped_b64 = key_encryption.wrap_key_b64(encryption_key[:key2])
     config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
 
     config
@@ -547,118 +531,6 @@ class StorageVolume
 
   def read_encrypted_dek(path, kek)
     StorageKeyEncryption.new(kek).read_encrypted_dek(path)
-  end
-
-  def back_up_key(old_kek)
-    write_config_file(key_file_backup(old_kek), File.read(config_key_file))
-  end
-
-  def rewrite_secrets(old_kek, new_kek)
-    live = config_key_file
-    old_secrets_backup = key_file_backup(old_kek)
-    new = "#{live}.new"
-
-    remove_stale_spdk_key
-    write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
-    verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
-    File.rename(new, live)
-    sync_parent_dir(live)
-  end
-
-  def remove_stale_spdk_key
-    # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
-    return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
-
-    rm_if_exists(sp.data_encryption_key)
-    sync_parent_dir(sp.data_encryption_key)
-  end
-
-  def retire_key_backup(old_kek)
-    path = key_file_backup(old_kek)
-    rm_if_exists(path)
-    sync_parent_dir(path)
-  end
-
-  def key_file_backup(kek)
-    "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
-  end
-
-  def config_key_file
-    if !@vhost_backend_version
-      data_encryption_key_path
-    elsif use_config_v2?
-      sp.vhost_backend_secrets_config
-    else
-      sp.vhost_backend_config
-    end
-  end
-
-  def read_config_dek(path, kek)
-    if !@vhost_backend_version
-      read_encrypted_dek(path, kek)
-    else
-      ke = StorageKeyEncryption.new(kek)
-      key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64|
-        blob = Base64.decode64(b64)
-        ke.unwrap_key([blob[0...-16], blob[-16..]]).unpack1("H*")
-      }
-      {cipher: "AES_XTS", key: key1, key2: key2}
-    end
-  end
-
-  def write_rotated_secrets(new, source, old_kek, new_kek)
-    write_config_file(new, rotated_secrets(source, old_kek, new_kek))
-  end
-
-  def rotated_secrets(source, old_kek, new_kek)
-    if !@vhost_backend_version
-      StorageKeyEncryption.new(new_kek).encrypted_dek_json(read_config_dek(source, old_kek))
-    elsif use_config_v2?
-      rewrap_config_v2_secrets(source, old_kek, new_kek)
-    else
-      dek = read_config_dek(source, old_kek)
-      ke = StorageKeyEncryption.new(new_kek)
-      config = YAML.safe_load_file(source)
-      config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
-      config.to_yaml
-    end
-  end
-
-  def unwrap_encrypted_inline_secret(name, secret, kek_key)
-    fail "config-v2 secret #{name} is not wrapped by the kek" unless secret.dig("encrypted_by", "ref") == "kek"
-    fail "config-v2 secret #{name} is not base64 encoded" unless secret["encoding"] == "base64"
-    inline = secret.dig("source", "inline")
-    fail "config-v2 secret #{name} has no inline value" unless inline
-    StorageKeyEncryption.aes256gcm_decrypt(kek_key, name, Base64.strict_decode64(inline))
-  end
-
-  def rewrap_config_v2_secrets(source, old_kek, new_kek)
-    old_key = Base64.decode64(old_kek["key"])
-    new_key = Base64.decode64(new_kek["key"])
-    config = PerfectTOML.load_file(source)
-    config.fetch("secrets").each do |name, secret|
-      next if name == "kek"
-
-      plaintext = unwrap_encrypted_inline_secret(name, secret, old_key)
-      secret["source"]["inline"] = Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(new_key, name, plaintext))
-    end
-    PerfectTOML.generate(config)
-  end
-
-  def config_v2_secret_plaintexts(path, kek)
-    key = Base64.decode64(kek["key"])
-    PerfectTOML.load_file(path).fetch("secrets").filter_map { |name, secret|
-      [name, unwrap_encrypted_inline_secret(name, secret, key)] unless name == "kek"
-    }.to_h
-  end
-
-  def verify_rotated_secrets(source, old_kek, new, new_kek)
-    changed = if use_config_v2?
-      config_v2_secret_plaintexts(source, old_kek) != config_v2_secret_plaintexts(new, new_kek)
-    else
-      read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
-    end
-    fail "secrets changed after rotation" if changed
   end
 
   def verify_imaged_disk_size

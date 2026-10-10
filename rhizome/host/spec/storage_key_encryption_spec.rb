@@ -21,6 +21,13 @@ RSpec.describe StorageKeyEncryption do
     expect(sek.unwrap_key(sek.wrap_key(key))).to eq(key)
   end
 
+  it "round-trips a hex key through wrap_key_b64/unwrap_key_b64" do
+    key = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")[..63]
+    wrapped = sek.wrap_key_b64(key)
+    expect(Base64.decode64(wrapped).bytesize).to eq(48)
+    expect(sek.unwrap_key_b64(wrapped)).to eq(key)
+  end
+
   it "round-trips a secret through aes256gcm_encrypt/decrypt" do
     key = OpenSSL::Cipher.new("aes-256-gcm").random_key
     plaintext = "the-xts-key-material"

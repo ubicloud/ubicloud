@@ -3,6 +3,7 @@
 # simplecov:disable
 require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir__))
 # simplecov:enable
+require "fileutils"
 require "open3"
 require "shellwords"
 require "openssl"
@@ -108,7 +109,7 @@ def sync_parent_dir(f)
   }
 end
 
-def safe_write_to_file(filename, content = nil, perm: nil)
+def safe_write_to_file(filename, content = nil, perm: nil, owner: nil)
   raise ArgumentError, "must provide either content or block" if content.nil? ^ block_given?
 
   temp_filename = filename + ".tmp"
@@ -130,6 +131,7 @@ def safe_write_to_file(filename, content = nil, perm: nil)
     end
     # Creation masks the mode by umask; force the exact perm before publishing.
     File.chmod(perm, temp_filename) if perm
+    FileUtils.chown(owner, owner, temp_filename) if owner
     File.rename(temp_filename, filename)
   end
 end
