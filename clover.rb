@@ -673,7 +673,9 @@ class Clover < Roda
 
     after_omniauth_login do
       if (email = omniauth_email) && (acc = Account[account_id]) && acc.email != email
-        acc.update(email: email)
+        if !has_password? && acc.identities_dataset.count == 1
+          acc.update(email: email)
+        end
       end
     end
 
