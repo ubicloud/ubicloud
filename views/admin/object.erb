@@ -66,6 +66,7 @@
     assoc_count = assoc_objs.count %>
 
     <div class="association">
+      <% if collapsible = assoc_count > 10 %><details><summary><% end %>
       <h3>
         <%= assoc %>
         <%= "(#{(assoc_count > 100) ? "100+" : assoc_count})" if assoc_count > 1 %>
@@ -74,6 +75,7 @@
           <a href="/autoforme/<%= associated_class %>/search/1?<%= table_param %>=<%= @obj.id %>">(table)</a>
         <% end %>
       </h3>
+      <% if collapsible %></summary><% end %>
 
       <ul>
         <% assoc_objs.each do %>
@@ -82,6 +84,7 @@
           </li>
         <% end %>
       </ul>
+      <% if collapsible %></details><% end %>
     </div>
   <% end %>
 </div>

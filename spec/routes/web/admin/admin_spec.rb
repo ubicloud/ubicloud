@@ -520,13 +520,21 @@ RSpec.describe CloverAdmin do
     within(".association", text: "ssh_public_keys") do
       expect(find("h3").text).to eq "ssh_public_keys (2)"
       expect(page.all("ul li").length).to eq 2
+      expect(page).to have_no_css("details")
     end
 
-    Array.new(100) { |i| SshPublicKey.create(name: "key-#{i + 2}", public_key: "k v", project_id: project.id) }
+    Array.new(9) { |i| SshPublicKey.create(name: "key-#{i + 2}", public_key: "k v", project_id: project.id) }
     page.refresh
     within(".association", text: "ssh_public_keys") do
-      expect(find("h3").text).to eq "ssh_public_keys (100+)"
-      expect(page.all("ul li").length).to eq 101
+      expect(find("details summary h3").text).to eq "ssh_public_keys (11)"
+      expect(page.all("details:not([open]) ul li", visible: false).length).to eq 11
+    end
+
+    Array.new(90) { |i| SshPublicKey.create(name: "key-#{i + 11}", public_key: "k v", project_id: project.id) }
+    page.refresh
+    within(".association", text: "ssh_public_keys") do
+      expect(find("details summary h3").text).to eq "ssh_public_keys (100+)"
+      expect(page.all("details ul li", visible: false).length).to eq 101
     end
   end
 
