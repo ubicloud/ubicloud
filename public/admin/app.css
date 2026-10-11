@@ -305,6 +305,11 @@ code {
     list-style-type: none;
     padding: 0;
   }
+
+  & summary {
+    cursor: pointer;
+    & h3 { display: inline; }
+  }
 }
 
 .extras {
