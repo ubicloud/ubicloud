@@ -59,6 +59,19 @@ RSpec.describe Github do
     described_class.installation_client(installation_id)
   end
 
+  it "parses API responses with installation client" do
+    expect(described_class).to receive(:app_client).and_return(Octokit::Client.new(bearer_token: "jwt"))
+    stub_request(:post, "https://api.github.com/app/installations/123/access_tokens")
+      .to_return(status: 201, headers: {"Content-Type" => "application/json"}, body: {token: "abcdefg"}.to_json)
+    stub_request(:get, "https://api.github.com/repos/ubicloud/ubicloud")
+      .with(headers: {"Authorization" => "token abcdefg"})
+      .to_return(status: 200, headers: {"Content-Type" => "application/json"}, body: {full_name: "ubicloud/ubicloud", pushed_at: "2026-10-12T13:37:29Z"}.to_json)
+
+    repository = described_class.installation_client(123).repository("ubicloud/ubicloud")
+    expect(repository[:full_name]).to eq("ubicloud/ubicloud")
+    expect(repository[:pushed_at]).to eq(Time.utc(2026, 10, 12, 13, 37, 29))
+  end
+
   it "can map alias to actual label" do
     labels = described_class.runner_labels
     expect(labels["ubicloud"]).to eq(labels["ubicloud-standard-2-ubuntu-2404"])

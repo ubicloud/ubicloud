@@ -32,4 +32,14 @@ RSpec.describe KmsKeyDecryptor do
     end
     expect(described_class.gcp_kms(key_id, ciphertext)).to eq(plaintext)
   end
+
+  it "decrypts via GCP Cloud KMS API" do
+    key_id = "projects/test-project/locations/us-central1/keyRings/test-ring/cryptoKeys/test-key"
+    expect(Google::Auth).to receive(:get_application_default).with(["https://www.googleapis.com/auth/cloudkms"]).and_return(nil)
+    stub_request(:post, "https://cloudkms.googleapis.com/v1/#{key_id}:decrypt")
+      .with(body: {ciphertext: Base64.strict_encode64(ciphertext)}.to_json)
+      .to_return(status: 200, headers: {"Content-Type" => "application/json"}, body: {plaintext: Base64.strict_encode64(plaintext)}.to_json)
+
+    expect(described_class.gcp_kms(key_id, ciphertext)).to eq(plaintext)
+  end
 end
