@@ -110,11 +110,12 @@ class PrivateSubnet < Sequel::Model
   # provider contributes only the addresses it actually reserves instead of
   # the union of every provider's constraints.
   #
-  # Each NIC gets a block of nic_ipv4_prefix_len, a /32 for a plain VM, or
-  # a bigger block when the guest hands out addresses itself, e.g. the
-  # Kubernetes pod range of a node. Subnets created before the column
-  # existed have it NULL and keep the old rule of a /(prefix + 8) block,
-  # capped at /32.
+  # Each NIC gets a block of nic_ipv4_prefix_len: a /32, unless the guests
+  # of the subnet hand out addresses themselves, e.g. the /24 pod range of a
+  # Kubernetes node. The size is a property of the subnet, so a plain VM
+  # that a customer attaches to a Kubernetes subnet gets a /24 as well.
+  # Subnets created before the column existed have it NULL and keep the old
+  # rule of a /(prefix + 8) block, capped at /32.
   def random_private_ipv4
     cidr_size = nic_ipv4_prefix_len || [32, (net4.netmask.prefix_len + 8)].min
     block_size = 2**(32 - cidr_size)
