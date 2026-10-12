@@ -234,10 +234,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   end
 
   describe "#update_vm_load_balancers" do
-    it "updates load balancers for all vms" do
+    it "decrements update_load_balancer and updates load balancers for all vms" do
       vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(it) }
+      nx.incr_update_load_balancer
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
+      expect(st.subject.update_load_balancer_set?).to be false
       expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode", label: "update_load_balancer").count).to eq 3
     end
   end
@@ -255,10 +257,16 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
         expect { nx.wait_update_vm_load_balancers }.to nap(1)
       end
 
-      it "decrements update_load_balancer and hops to wait if all children are done" do
+      it "hops to wait if all children are done" do
         st.children.map(&:destroy)
-        expect(nx).to receive(:decr_update_load_balancer)
         expect { nx.wait_update_vm_load_balancers }.to hop("wait")
+      end
+
+      it "keeps update_load_balancer set if it is incremented while children are running" do
+        nx.incr_update_load_balancer
+        st.children.map(&:destroy)
+        expect { nx.wait_update_vm_load_balancers }.to hop("wait")
+        expect(st.subject.update_load_balancer_set?).to be true
       end
     end
 
