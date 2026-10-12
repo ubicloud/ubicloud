@@ -26,6 +26,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     unless nic_ipv4_prefix_len.between?(subnet_prefix_len + 1, 32)
       fail "nic_ipv4_prefix_len must be longer than the subnet prefix and at most 32"
     end
+    if nic_ipv4_prefix_len != 32 && !location.metal?
+      fail "Only metal locations support a nic_ipv4_prefix_len other than 32"
+    end
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do

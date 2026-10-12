@@ -93,6 +93,14 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.nic_ipv4_prefix_len).to eq(32)
     end
 
+    it "fails if nic_ipv4_prefix_len is not 32 outside metal locations" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      expect(described_class).not_to receive(:random_private_ipv4)
+      expect {
+        described_class.assemble(prj.id, location_id: loc.id, ipv4_range: "10.0.0.0/16", nic_ipv4_prefix_len: 24)
+      }.to raise_error RuntimeError, "Only metal locations support a nic_ipv4_prefix_len other than 32"
+    end
+
     it "fails if nic_ipv4_prefix_len does not fit the subnet prefix" do
       expect(described_class).not_to receive(:random_private_ipv4)
       expect {
