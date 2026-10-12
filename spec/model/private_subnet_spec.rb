@@ -103,10 +103,13 @@ RSpec.describe PrivateSubnet do
     end
 
     it "returns a block of nic_ipv4_prefix_len, skipping the edge blocks" do
+      # A /20 with /24 blocks: the old /(prefix + 8) rule would draw a /28
+      # from 254 blocks instead, so this example fails if the column is
+      # ignored.
       ps = described_class.create(name: "k8s-ps", location_id: Location::HETZNER_FSN1_ID,
-        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16", nic_ipv4_prefix_len: 24,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/20", nic_ipv4_prefix_len: 24,
         state: "waiting", project_id: Project.create(name: "k8s-net-prj").id)
-      expect(SecureRandom).to receive(:random_number).with(254).and_return(5)
+      expect(SecureRandom).to receive(:random_number).with(14).and_return(5)
       expect(ps.random_private_ipv4.to_s).to eq "10.9.6.0/24"
     end
 
