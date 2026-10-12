@@ -21,6 +21,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     Validation.validate_name(name)
     ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
+    nic_ipv4_prefix_len ||= 32
+    subnet_prefix_len = ipv4_range ? NetAddr::IPv4Net.parse(ipv4_range.to_s).netmask.prefix_len : ipv4_range_size
+    unless nic_ipv4_prefix_len.between?(subnet_prefix_len + 1, 32)
+      fail "nic_ipv4_prefix_len must be longer than the subnet prefix and at most 32"
+    end
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do

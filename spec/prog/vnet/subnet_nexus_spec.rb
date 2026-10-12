@@ -88,6 +88,24 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.nic_ipv4_prefix_len).to eq(24)
     end
 
+    it "treats a nil nic_ipv4_prefix_len as 32" do
+      ps = described_class.assemble(prj.id, ipv4_range: "10.0.0.0/16", nic_ipv4_prefix_len: nil)
+      expect(ps.subject.nic_ipv4_prefix_len).to eq(32)
+    end
+
+    it "fails if nic_ipv4_prefix_len does not fit the subnet prefix" do
+      expect(described_class).not_to receive(:random_private_ipv4)
+      expect {
+        described_class.assemble(prj.id, ipv4_range: "10.1.2.3/32")
+      }.to raise_error RuntimeError, "nic_ipv4_prefix_len must be longer than the subnet prefix and at most 32"
+      expect {
+        described_class.assemble(prj.id, ipv4_range_size: 20, nic_ipv4_prefix_len: 20)
+      }.to raise_error RuntimeError, "nic_ipv4_prefix_len must be longer than the subnet prefix and at most 32"
+      expect {
+        described_class.assemble(prj.id, nic_ipv4_prefix_len: 33)
+      }.to raise_error RuntimeError, "nic_ipv4_prefix_len must be longer than the subnet prefix and at most 32"
+    end
+
     it "uses firewall if provided" do
       fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
       ps = described_class.assemble(prj.id, firewall_id: fw.id)
