@@ -110,6 +110,13 @@ RSpec.describe PrivateSubnet do
       expect(ps.random_private_ipv4.to_s).to eq "10.9.6.0/24"
     end
 
+    it "fails when the block size leaves no block outside the reserved addresses" do
+      ps = described_class.create(name: "tight-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16", nic_ipv4_prefix_len: 17,
+        state: "waiting", project_id: Project.create(name: "tight-net-prj").id)
+      expect { ps.random_private_ipv4 }.to raise_error(RuntimeError, "10.9.0.0/16 has no /17 block outside the reserved addresses")
+    end
+
     it "skips a block that overlaps an existing NIC's bigger block" do
       ps = described_class.create(name: "overlap-ps", location_id: Location::HETZNER_FSN1_ID,
         net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16", nic_ipv4_prefix_len: 32,

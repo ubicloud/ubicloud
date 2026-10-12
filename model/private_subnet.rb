@@ -117,13 +117,14 @@ class PrivateSubnet < Sequel::Model
   # capped at /32.
   def random_private_ipv4
     cidr_size = nic_ipv4_prefix_len || [32, (net4.netmask.prefix_len + 8)].min
-    total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
+    block_size = 2**(32 - cidr_size)
 
-    # Skip the sub-blocks overlapping the addresses the provider reserves at
-    # the edges of the subnet, e.g. the first /24 of a /16 parent contains
-    # the reserved gateway/DNS addresses and must not be leased to a VM.
-    leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1].freeze
-    free_blocks = total_hosts - leading - trailing
+    # Skip the blocks that overlap the addresses the provider reserves at the
+    # edges of the subnet, e.g. the first /24 of a /16 parent contains the
+    # reserved gateway/DNS addresses and must not be leased to a VM.
+    leading, trailing = ipv4_reservation.map { (it + block_size - 1) / block_size }
+    free_blocks = 2**(cidr_size - net4.netmask.prefix_len) - leading - trailing
+    fail "#{net4} has no /#{cidr_size} block outside the reserved addresses" unless free_blocks > 0
 
     # A block must not overlap an existing NIC's block of any size, so a /32
     # never lands inside the pod range of a Kubernetes node. NetAddr#rel is
