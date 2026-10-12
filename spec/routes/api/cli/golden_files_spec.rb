@@ -91,7 +91,7 @@ RSpec.describe Clover, "cli" do
         enable_ip4: true,
       ).subject
     end
-    PrivateSubnet.first(name: "#{kubernetes_cluster.ubid}-subnet").update(net4: "10.147.206.0/26", net6: "fdab:de77:9a94:fa71::/64")
+    PrivateSubnet.first(name: "#{kubernetes_cluster.ubid}-subnet").update(net4: "10.147.206.0/26", net6: "fdab:de77:9a94:fa71::/64", nic_ipv4_prefix_len: 32)
     vms[0].update(ephemeral_net6: "ccab:de77:9a94:fa69::/64")
     vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
     vms[2].update(ephemeral_net6: "abab:de77:9a94:fa69::/64")

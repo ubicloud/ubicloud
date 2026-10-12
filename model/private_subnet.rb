@@ -110,17 +110,17 @@ class PrivateSubnet < Sequel::Model
   # provider contributes only the addresses it actually reserves instead of
   # the union of every provider's constraints.
   #
-  # Requirements:
-  # - The parent subnet mask can range from /16 to /26.
-  # - The VM's assigned subnet must allow:
-  #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
-  #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
+  # Each NIC gets a block of nic_ipv4_prefix_len, a /32 for a plain VM, or
+  # a bigger block when the guest hands out addresses itself, e.g. the
+  # Kubernetes pod range of a node. Subnets created before the column
+  # existed have it NULL and keep the old rule of a /(prefix + 8) block,
+  # capped at /32.
   def random_private_ipv4
     Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
   end
 
   private def _random_private_ipv4
-    cidr_size = [32, (net4.netmask.prefix_len + 8)].min
+    cidr_size = nic_ipv4_prefix_len || [32, (net4.netmask.prefix_len + 8)].min
     total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
 
     # Skip the sub-blocks overlapping the addresses the provider reserves at
@@ -172,21 +172,23 @@ end
 
 # Table: private_subnet
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  net6              | cidr                     | NOT NULL
-#  net4              | cidr                     | NOT NULL
-#  state             | text                     | NOT NULL DEFAULT 'creating'::text
-#  name              | text                     | NOT NULL
-#  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id        | uuid                     | NOT NULL
-#  location_id       | uuid                     | NOT NULL
-#  firewall_priority | integer                  |
+#  id                  | uuid                     | PRIMARY KEY
+#  net6                | cidr                     | NOT NULL
+#  net4                | cidr                     | NOT NULL
+#  state               | text                     | NOT NULL DEFAULT 'creating'::text
+#  name                | text                     | NOT NULL
+#  last_rekey_at       | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id          | uuid                     | NOT NULL
+#  location_id         | uuid                     | NOT NULL
+#  firewall_priority   | integer                  |
+#  nic_ipv4_prefix_len | integer                  |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
-#  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
+#  private_subnet_firewall_priority_check   | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
+#  private_subnet_nic_ipv4_prefix_len_check | (nic_ipv4_prefix_len IS NULL OR nic_ipv4_prefix_len > masklen(net4::inet) AND nic_ipv4_prefix_len <= 32) NOT VALID
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)

@@ -78,6 +78,16 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.net4.to_s).to eq("10.0.0.0/26")
     end
 
+    it "gives each NIC a /32 by default" do
+      ps = described_class.assemble(prj.id, ipv4_range: "10.0.0.0/20")
+      expect(ps.subject.nic_ipv4_prefix_len).to eq(32)
+    end
+
+    it "uses nic_ipv4_prefix_len if passed" do
+      ps = described_class.assemble(prj.id, ipv4_range: "10.0.0.0/16", nic_ipv4_prefix_len: 24)
+      expect(ps.subject.nic_ipv4_prefix_len).to eq(24)
+    end
+
     it "uses firewall if provided" do
       fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
       ps = described_class.assemble(prj.id, firewall_id: fw.id)
