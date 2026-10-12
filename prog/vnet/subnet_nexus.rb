@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_ids: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -11,7 +11,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     unless (location = Location[location_id])
       fail "No existing location"
     end
-    if allow_only_ssh && firewall_id
+    if allow_only_ssh && (firewall_id || firewall_ids)
       fail "Cannot specify both allow_only_ssh and firewall_id"
     end
 
@@ -27,9 +27,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
-      if firewall_id
-        unless (firewall = firewall_dataset.first(Sequel[:firewall][:id] => firewall_id))
-          fail "Firewall with id #{firewall_id} and location #{location.name} does not exist"
+      firewall_ids ||= [firewall_id] if firewall_id
+      if firewall_ids
+        firewalls = firewall_dataset.where(Sequel[:firewall][:id] => firewall_ids).all
+        if (missing = firewall_ids - firewalls.map(&:id)).any?
+          fail "Firewall with id #{missing.first} and location #{location.name} does not exist"
         end
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
@@ -52,8 +54,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
             %w[0.0.0.0/0 ::/0].freeze.map { |cidr| [FirewallRule.generate_uuid, firewall.id, cidr, pg_port_range, protocol] }
           },
         )
+        firewalls = [firewall]
       end
-      firewall.associate_with_private_subnet(ps, apply_firewalls: false)
+      firewalls.each { it.associate_with_private_subnet(ps, apply_firewalls: false) }
 
       prog = if location.aws?
         # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ

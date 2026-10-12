@@ -85,6 +85,17 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.firewalls.first).to eq(fw)
     end
 
+    it "uses every firewall in firewall_ids" do
+      fws = Array.new(2) { Firewall.create(name: "fw-#{it}", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id) }
+      ps = described_class.assemble(prj.id, firewall_ids: fws.map(&:id))
+      expect(ps.subject.firewalls.map(&:id).sort).to eq(fws.map(&:id).sort)
+    end
+
+    it "attaches no firewall for an empty firewall_ids" do
+      ps = described_class.assemble(prj.id, firewall_ids: [])
+      expect(ps.subject.firewalls).to be_empty
+    end
+
     it "fails if provided firewall does not exist" do
       expect {
         described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")

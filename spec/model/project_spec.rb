@@ -170,6 +170,128 @@ RSpec.describe Project do
       gcp = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: project.id, display_name: "gcp-us-east4", ui_name: "GCP US East 4", visible: true)
       expect(project.default_private_subnet(gcp).net4.netmask.prefix_len).to eq 26
     end
+
+    it "does not overflow outside metal, where subnets cannot be connected" do
+      gcp = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: project.id, display_name: "gcp-us-east4", ui_name: "GCP US East 4", visible: true)
+      first = project.default_private_subnet(gcp)
+      first.update(net4: "10.9.39.0/29")
+      (2..5).each do |i|
+        Nic.create(private_subnet_id: first.id, private_ipv4: "10.9.39.#{i}/32", private_ipv6: "fd1b:9793:dcef:cd0a:#{i * 2}::/79",
+          mac: format("00:00:00:00:00:%02x", i), name: "gcp-nic-#{i}", state: "active")
+      end
+      expect(PrivateSubnet[first.id].ipv4_full?).to be true
+      expect(project.default_private_subnet(gcp).id).to eq first.id
+      expect(project.private_subnets_dataset.where(location_id: gcp.id).count).to eq 1
+    end
+
+    def fill(ps)
+      ps.update(net4: "10.9.39.0/29")
+      3.times do |i|
+        Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.39.#{4 + i}/32", private_ipv6: "fd1b:9793:dcef:cd0a:#{2 + i * 2}::/79",
+          mac: format("00:00:00:00:00:%02x", i), name: "#{ps.name}-nic-#{i}", state: "active")
+      end
+    end
+
+    it "uses the subnet that a concurrent create made while it waited for the project lock" do
+      expect(project).to receive(:this).once.and_wrap_original do |m|
+        Prog::Vnet::SubnetNexus.assemble(project.id, name: "default-#{location.display_name}", location_id: location.id)
+        m.call
+      end
+      expect(project.default_private_subnet(location).name).to eq "default-#{location.display_name}"
+      expect(project.private_subnets_dataset.where(location_id: location.id).count).to eq 1
+    end
+
+    it "keeps unsaved changes of the project when it locks the project row" do
+      project.name = "renamed"
+      project.default_private_subnet(location)
+      expect(project.name).to eq "renamed"
+    end
+
+    it "creates the next default subnet when every existing one is full, and reuses one with room" do
+      first = project.default_private_subnet(location)
+      fill(first)
+      second = project.default_private_subnet(location)
+      expect(second.name).to eq "default-#{location.display_name}-2"
+      expect(second.net4.netmask.prefix_len).to eq 24
+      expect(project.default_private_subnet(location).id).to eq second.id
+      fill(second)
+      expect(project.default_private_subnet(location).name).to eq "default-#{location.display_name}-3"
+      Nic.first(private_subnet_id: first.id).destroy
+      expect(project.default_private_subnet(location).id).to eq first.id
+    end
+
+    it "uses a later default subnet with room across a gap, and numbers a new one after the highest" do
+      first = project.default_private_subnet(location)
+      fill(first)
+      second = project.default_private_subnet(location)
+      fill(second)
+      third = project.default_private_subnet(location)
+      Nic.where(private_subnet_id: second.id).destroy
+      second.destroy
+      expect(project.default_private_subnet(location).id).to eq third.id
+      fill(third)
+      expect(project.default_private_subnet(location).name).to eq "default-#{location.display_name}-4"
+    end
+
+    it "walks the default subnets without repeating a query" do
+      fill(project.default_private_subnet(location))
+      fill(project.default_private_subnet(location))
+      l = proc { project.default_private_subnet(location) }
+      third = Config.frozen_test? ? l.call : DB.detect_duplicate_queries(backtrace_filter: %r{\A#{Regexp.escape(Dir.pwd)}/(?!spec/)}, &l)
+      expect(third.name).to eq "default-#{location.display_name}-3"
+    end
+
+    it "checks the room again under the row lock" do
+      fill(project.default_private_subnet(location))
+      expect(project).to receive(:default_private_subnets).at_least(:once).and_wrap_original do |m, *args|
+        m.call(*args).each_value { allow(it).to receive(:ipv4_full?).and_return(false) }
+      end
+      expect(project.default_private_subnet(location).name).to eq "default-#{location.display_name}-2"
+    end
+
+    it "ignores a non-default subnet whose name looks like an overflow name elsewhere" do
+      gcp = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: project.id, display_name: "gcp-us-east4", ui_name: "GCP US East 4", visible: true)
+      Prog::Vnet::SubnetNexus.assemble(project.id, name: "default-gcp-us-east4-2", location_id: gcp.id)
+      expect(project.default_private_subnet(gcp).name).to eq "default-gcp-us-east4"
+    end
+
+    it "skips a default subnet that is being destroyed" do
+      first = project.default_private_subnet(location)
+      first.incr_destroy
+      expect(project.default_private_subnet(location).name).to eq "default-#{location.display_name}-2"
+    end
+
+    it "does not take the firewalls of a default subnet that is being destroyed" do
+      first = project.default_private_subnet(location)
+      first.incr_destroy
+      first.remove_all_firewalls
+      second = project.default_private_subnet(location)
+      expect(second.firewalls.map(&:name)).to eq ["#{second.name}-default"]
+    end
+
+    it "gives an overflow subnet the firewalls of the first default subnet" do
+      first = project.default_private_subnet(location)
+      Firewall.create(name: "extra-fw", location_id: location.id, project_id: project.id).associate_with_private_subnet(first)
+      fill(first)
+      second = project.default_private_subnet(location)
+      expect(second.firewalls.map(&:id).sort).to eq first.firewalls.map(&:id).sort
+      expect(project.firewalls_dataset.where(name: "#{second.name}-default").count).to eq 0
+    end
+
+    it "gives an overflow subnet no firewall when the first default subnet has none" do
+      first = project.default_private_subnet(location)
+      first.firewalls.each { it.disassociate_from_private_subnet(first) }
+      fill(first)
+      expect(project.default_private_subnet(location).firewalls).to be_empty
+    end
+
+    it "cuts the location name so that an overflow name fits in 63 characters" do
+      long = Location.create(name: "long-loc", provider: "hetzner", project_id: project.id, display_name: "l" * 60, ui_name: "Long", visible: true)
+      first = project.default_private_subnet(long)
+      expect(first.name).to eq "default-#{"l" * 55}"
+      fill(first)
+      expect(project.default_private_subnet(long).name).to eq "default-#{"l" * 53}-2"
+    end
   end
 
   describe "#current_invoice" do
