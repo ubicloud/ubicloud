@@ -190,7 +190,7 @@ end
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
 #  private_subnet_firewall_priority_check   | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
-#  private_subnet_nic_ipv4_prefix_len_check | (nic_ipv4_prefix_len IS NULL OR nic_ipv4_prefix_len > masklen(net4::inet) AND nic_ipv4_prefix_len <= 32) NOT VALID
+#  private_subnet_nic_ipv4_prefix_len_check | (nic_ipv4_prefix_len IS NULL OR nic_ipv4_prefix_len > masklen(net4::inet) AND nic_ipv4_prefix_len <= 32)
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
