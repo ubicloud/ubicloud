@@ -11,3 +11,4 @@ Commands:
 
 Post Commands:
     list-repositories    List GitHub repositories for an installation
+    list-runners         List active GitHub Actions runners for an installation
