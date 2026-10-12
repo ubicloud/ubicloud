@@ -382,6 +382,26 @@ RSpec.describe Clover, "vm" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"b300-4\" is not a valid virtual machine size. Available sizes: #{Option::VmSizes.select { it.visible && it.arch == "x64" }.map(&:name)}"})
       end
 
+      it "fails with the gpus of a size and a size without gpus" do
+        create_b300_vm(size: "standard-60", gpu: "1:3182")
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "NVIDIA B300 GPUs are only available with the sizes b300-1, b300-2, b300-4, b300-8"})
+      end
+
+      it "succeeds with the gpus of a size and a size without gpus outside dedicated locations" do
+        project.set_ff_visible_locations(["us-west-u1-ps"])
+        post "/project/#{project.ubid}/location/us-west-u1-ps/vm/test-vm", {public_key: "ssh key", size: "standard-30", gpu: "4:3182"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(Vm.first(name: "test-vm").strand.stack.first.slice("gpu_count", "gpu_device")).to eq("gpu_count" => 4, "gpu_device" => "3182")
+      end
+
+      it "fails with the gpus of a size and no size" do
+        post "/project/#{project.ubid}/location/us-west-u1-dedicated/vm/test-vm", {public_key: "ssh key", gpu: "1:3182"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "NVIDIA B300 GPUs are only available with the sizes b300-1, b300-2, b300-4, b300-8"})
+      end
+
       it "fails with another storage size" do
         create_b300_vm(storage_size: 40)
 

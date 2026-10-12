@@ -119,7 +119,7 @@ module Validation
     storage_size
   end
 
-  def self.validate_vm_gpu(gpu, location, project, vm_size)
+  def self.validate_vm_gpu(gpu, location, project, vm_size, require_gpu_size: false)
     if (match = gpu.match(/^(\d+):(.*)$/))
       gpu_count, gpu_device = match[1].to_i, match[2]
     else
@@ -134,6 +134,10 @@ module Validation
     fail ValidationFailed.new({gpu: "gpu not available for this project"}) unless project.get_ff_gpu_vm
     fail ValidationFailed.new({gpu: "gpu type must be specified when gpu count is greater than 0."}) if gpu_device.nil? || gpu_device.empty?
     fail ValidationFailed.new({gpu: "gpu type unsupported"}) unless !!BillingRate.from_resource_properties("Gpu", gpu_device, location)
+    gpu_sizes = Option::VmSizes.select { it.gpu_device == gpu_device }.map(&:name)
+    if require_gpu_size && !gpu_sizes.empty? && vm_size&.gpu_device != gpu_device
+      fail ValidationFailed.new({size: "#{PciDevice.device_name(gpu_device)} GPUs are only available with the sizes #{gpu_sizes.join(", ")}"})
+    end
 
     [gpu_count, gpu_device]
   end
