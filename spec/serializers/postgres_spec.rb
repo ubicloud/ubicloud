@@ -109,4 +109,29 @@ RSpec.describe Serializers::Postgres do
     data = described_class.serialize(pg)
     expect(data[:fallback_active]).to be false
   end
+
+  it "leaves needs_convergence out of the list serialization" do
+    create_representative_server(primary: true)
+    expect(described_class.serialize(pg)).not_to have_key(:needs_convergence)
+  end
+
+  context "when a standby is missing" do
+    let(:pg) {
+      Prog::Postgres::PostgresResourceNexus.assemble(
+        project_id: project.id, location_id:, name: "pg-standby",
+        target_vm_size: "standard-2", target_storage_size_gib: 64, ha_type: PostgresResource::HaType::ASYNC,
+      ).subject
+    }
+
+    before do
+      expect(Config).to receive(:postgres_service_project_id).and_return(Project.create(name: "postgres-service").id).at_least(:once)
+    end
+
+    it "reports needs_convergence until the standby is provisioned" do
+      expect(described_class.serialize(pg, {detailed: true})[:needs_convergence]).to be true
+
+      pg.provision_new_standby
+      expect(described_class.serialize(pg, {detailed: true})[:needs_convergence]).to be false
+    end
+  end
 end
