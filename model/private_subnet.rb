@@ -116,10 +116,6 @@ class PrivateSubnet < Sequel::Model
   # existed have it NULL and keep the old rule of a /(prefix + 8) block,
   # capped at /32.
   def random_private_ipv4
-    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
-  end
-
-  private def _random_private_ipv4
     cidr_size = nic_ipv4_prefix_len || [32, (net4.netmask.prefix_len + 8)].min
     total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
 
@@ -127,12 +123,17 @@ class PrivateSubnet < Sequel::Model
     # the edges of the subnet, e.g. the first /24 of a /16 parent contains
     # the reserved gateway/DNS addresses and must not be leased to a VM.
     leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1].freeze
-    random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
+    free_blocks = total_hosts - leading - trailing
 
-    addr = net4.nth_subnet(cidr_size, random_offset)
-    return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
+    # A block must not overlap an existing NIC's block of any size, so a /32
+    # never lands inside the pod range of a Kubernetes node. NetAddr#rel is
+    # nil only for unrelated blocks.
+    taken = nics.filter_map(&:private_ipv4)
 
-    addr
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") do
+      addr = net4.nth_subnet(cidr_size, SecureRandom.random_number(free_blocks) + leading)
+      addr unless taken.any? { it.rel(addr) }
+    end
   end
 
   def random_private_ipv6

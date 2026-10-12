@@ -110,6 +110,19 @@ RSpec.describe PrivateSubnet do
       expect(ps.random_private_ipv4.to_s).to eq "10.9.6.0/24"
     end
 
+    it "skips a block that overlaps an existing NIC's bigger block" do
+      ps = described_class.create(name: "overlap-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16", nic_ipv4_prefix_len: 32,
+        state: "waiting", project_id: Project.create(name: "overlap-net-prj").id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.6.0/24",
+        private_ipv6: "fd1b:9793:dcef:cd0a:c::/79", mac: "00:00:00:00:00:02",
+        name: "node-nic", state: "active")
+      # Offset 1537 plus the 4 reserved addresses is 10.9.6.5, inside the
+      # node's /24, so the allocator must draw again.
+      expect(SecureRandom).to receive(:random_number).with(65531).and_return(1537, 2000)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.7.212/32"
+    end
+
     it "rejects a nic_ipv4_prefix_len that is not longer than the subnet prefix or is longer than 32" do
       [16, 33].each do |nic_ipv4_prefix_len|
         expect {
