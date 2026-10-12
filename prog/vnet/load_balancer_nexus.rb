@@ -132,6 +132,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def update_vm_load_balancers
+    decr_update_load_balancer
     load_balancer.vms.each do |vm|
       bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     end
@@ -140,10 +141,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait_update_vm_load_balancers
-    reap(nap: 1) do
-      decr_update_load_balancer
-      hop_wait
-    end
+    reap(:wait, nap: 1)
   end
 
   label def destroy
