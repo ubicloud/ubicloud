@@ -258,7 +258,7 @@ class Project < Sequel::Model
     name = "default-#{location.display_name[0, 55]}"
     location_id = location.id
     ps = private_subnets_dataset.first(location_id:, name:)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:, ipv4_range_size: (24 if location.metal?)).subject
   end
 
   def total_github_amount(begin_time, end_time)

@@ -148,6 +148,30 @@ RSpec.describe Project do
     end
   end
 
+  describe "#default_private_subnet" do
+    let(:location) { Location[Location::HETZNER_FSN1_ID] }
+
+    it "creates a /24 subnet named after the location and returns it afterwards" do
+      ps = project.default_private_subnet(location)
+      expect(ps.name).to eq "default-#{location.display_name}"
+      expect(ps.net4.netmask.prefix_len).to eq 24
+      expect(project.default_private_subnet(location).id).to eq ps.id
+    end
+
+    it "keeps the /16 VPC on AWS" do
+      aws = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationAz.create(location_id: aws.id, az: "a", zone_id: "usw2-az1")
+      ps = project.default_private_subnet(aws)
+      expect(ps.name).to eq "default-aws-us-west-2"
+      expect(ps.net4.netmask.prefix_len).to eq 16
+    end
+
+    it "keeps the /26 default on GCP" do
+      gcp = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: project.id, display_name: "gcp-us-east4", ui_name: "GCP US East 4", visible: true)
+      expect(project.default_private_subnet(gcp).net4.netmask.prefix_len).to eq 26
+    end
+  end
+
   describe "#current_invoice" do
     it "works even if most recent invoice end date is in the future" do
       project = described_class.create(name: "dummy-name")
