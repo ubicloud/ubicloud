@@ -320,6 +320,7 @@ class Project < Sequel::Model
     :github_billing_by_repository,
     :gpu_vm,
     :ipv6_disabled,
+    :no_alien_runners,
     :postgres_enable_maintenance_window_days,
     :postgres_hostname_override,
     :postgres_init_script,

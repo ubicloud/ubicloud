@@ -210,6 +210,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
     end
 
+    it "uses metal vms if alien runners are disabled for the project" do
+      project.set_ff_no_alien_runners(true)
+      project.set_ff_aws_alien_runners_ratio(1.0)
+      runner.incr_spill_over
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("standard")
+      expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
+    end
+
+    it "uses the pool vm if spilled over by hand and alien runners are disabled for the project" do
+      installation.update(allocator_preferences: {})
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running")
+      project.set_ff_no_alien_runners(true)
+      runner.incr_spill_over
+      picked_vm = nx.pick_vm
+      expect(picked_vm.id).to eq(vm.id)
+    end
+
     it "creates a private subnet for each alien vm unless the project shares a VPC between them" do
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
@@ -529,6 +548,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
 
+    it "waits if the spill over semaphore is set manually and alien runners are disabled for the project" do
+      runner.incr_spill_over
+      project.set_ff_no_alien_runners(true)
+      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+      expect { nx.wait_concurrency_limit }.to nap
+    end
+
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
@@ -621,6 +647,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         project.set_ff_spill_to_alien_runners(true)
         runner.update(label: "ubicloud-standard-60", created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "waits if utilization is high and alien runners are disabled for the project" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+        project.set_ff_no_alien_runners(true)
+        runner.update(created_at: now - 40)
 
         expect { nx.wait_concurrency_limit }.to nap
         expect(runner.spill_over_set?).to be(false)
@@ -845,6 +881,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       it "does not spill over if the feature flag is disabled" do
         project.set_ff_spill_to_alien_runners(false)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "keeps waiting for metal capacity if alien runners are disabled for the project" do
+        project.set_ff_no_alien_runners(true)
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
       end
