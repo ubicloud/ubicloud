@@ -134,8 +134,20 @@ def safe_write_to_file(filename, content = nil, perm: nil)
   end
 end
 
+# The options are spelled long because curl bundles short ones: "-L3" is
+# --location --sslv3, not a redirect limit (curl's own table reads
+# "-3, --sslv3"). --sslv3 asks for a protocol RFC 7568 withdrew and curl has
+# ignored outright since 7.77.0, so it is dropped rather than translated.
+# --max-redirs is deliberately not substituted for the digit: no limit was ever
+# set here, and curl's default of 50 is what these downloads have followed.
+#
+# pipefail, so curl's failure is the pipeline's failure. Without it the
+# pipeline exits with tee's status, curl can die mid-stream, and the only thing
+# that notices is the caller's digest comparison -- which then reports a
+# checksum mismatch and blames the bytes rather than the transfer that stopped
+# early.
 def curl_file(url, path)
-  inner = cmd("curl -f -L3 :url | tee >(openssl dgst -sha256) > :path", url: url, path: path)
+  inner = cmd("set -o pipefail; curl --fail --location :url | tee >(openssl dgst -sha256) > :path", url: url, path: path)
   r("bash -c :inner", inner: inner).split(" ").last
 end
 
