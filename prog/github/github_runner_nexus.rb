@@ -428,6 +428,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap rand(5..15)
     end
 
+    if project.get_ff_hard_runner_concurrency_limit
+      Clog.emit("not allowed because of hard concurrency limit", {hard_concurrency_limit: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      nap rand(5..15)
+    end
+
     # check utilization, if it's high, wait for it to go down. Some hosts run
     # out of hugepages before cores, so use the more utilized resource.
     family_utilization = VmHost.where(allocation_state: "accepting", location_id: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID], arch:)
