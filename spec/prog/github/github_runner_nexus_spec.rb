@@ -107,6 +107,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.id).to eq(picked_vm.id)
     end
 
+    it "provisions a fresh VM when the matching pool is retiring" do
+      installation.update(allocator_preferences: {})
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      create_vm(pool_id: pool.id, display_state: "running")
+      Strand.create_with_id(pool, prog: "Vm::VmPool", label: "wait")
+      pool.incr_destroy
+
+      picked_vm = nx.pick_vm
+
+      expect(picked_vm.pool_id).to be_nil
+      expect(picked_vm.vcpus).to eq(4)
+      expect(picked_vm.sshable.unix_user).to eq("runneradmin")
+    end
+
     it "uses the premium vm pool if the installation prefers premium runners" do
       pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
       vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
