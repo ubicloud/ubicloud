@@ -599,18 +599,30 @@ module Scheduling::Allocator
     end
 
     def select_cpuset(vm_host_id, n)
-      # select the cpuset for the new slice
-      cpus = VmHostCpu
-        .where(vm_host_id:, io: false, vm_host_slice_id: nil)
-        .order_by(:cpu_number)
-        .to_hash_groups(:numa_node)
+      free_cpus = VmHostCpu.where(vm_host_id:, io: false, vm_host_slice_id: nil)
+
+      # Concurrent allocations on the same host see the same free cpus. Lock
+      # the chosen cpus and skip the ones locked by other transactions, so
+      # concurrent allocations get disjoint cpusets instead of queueing on
+      # the same rows. Prefer the smallest numa node with enough free cpus.
+      free_cpus.order_by(:cpu_number)
+        .select_hash_groups(:numa_node, :cpu_number)
         .values
+        .select { it.size >= n }
+        .sort_by { [it.size, it.first] }
+        .each do |numa_cpus|
+          cpus = lock_cpuset(free_cpus.where(cpu_number: numa_cpus), n)
+          return cpus if cpus.size == n
+        end
 
-      chosen = cpus.select { |arr| arr.size >= n }.min_by(&:size) || cpus.flatten
+      cpus = lock_cpuset(free_cpus, n)
+      fail "failed to allocate cpus" if cpus.size < n
 
-      fail "failed to allocate cpus" if chosen.size < n
+      cpus
+    end
 
-      chosen.first(n).map!(&:cpu_number)
+    def lock_cpuset(ds, n)
+      ds.order_by(:numa_node, :cpu_number).limit(n).for_update.skip_locked.select_map(:cpu_number)
     end
 
     def select_existing_slice
