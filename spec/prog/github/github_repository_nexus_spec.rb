@@ -76,6 +76,25 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(nx.polling_interval).to eq(5 * 60)
     end
 
+    %w[destroy destroying].each do |semaphore|
+      it "replaces runners marked #{semaphore} while counting healthy pending and ready runners" do
+        nx
+        pending, ready, retiring = Array.new(3) do
+          Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: repository.name, label: "ubicloud-standard-4").subject
+        end
+        ready.update(ready_at: now)
+        retiring.public_send("incr_#{semaphore}")
+
+        expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [{id: 1, run_attempt: 1, created_at: now}]})
+        expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100))
+        expect(client).to receive(:workflow_run_attempt_jobs).with(repository.name, 1, 1).and_return({jobs: Array.new(3) { {status: "queued", labels: ["ubicloud-standard-4"]} }})
+
+        expect { nx.check_queued_jobs }.to change(GithubRunner, :count).from(3).to(4)
+        expect(pending.refresh.ready_at).to be_nil
+        expect(ready.refresh.ready_at).to eq(now)
+      end
+    end
+
     it "raises if runtime is too long" do
       expect(nx).to receive(:clock_time).and_return(0, 81)
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
