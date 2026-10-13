@@ -51,7 +51,7 @@ class Vm < Sequel::Model
   plugin ResourceMethods, redacted_columns: :public_key
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs, :admin_stop, :stopping, :prepare_to_move, :clean_prep
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs, :admin_stop, :stopping, :prepare_to_move, :clean_prep, :upgrade_cloud_hypervisor
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
@@ -239,6 +239,12 @@ class Vm < Sequel::Model
     return true if maintenance_window_start_at.nil?
     offset = Time.now.utc.hour - maintenance_window_start_at
     (offset % 24) < MAINTENANCE_DURATION_IN_HOURS
+  end
+
+  def seconds_until_maintenance_window
+    return 0 if in_maintenance_window?
+    now = Time.now.utc
+    ((maintenance_window_start_at - now.hour) % 24) * 3600 - now.min * 60 - now.sec
   end
 
   def validate

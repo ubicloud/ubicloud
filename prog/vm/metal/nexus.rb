@@ -10,10 +10,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   # must be allocated to a matching host.
   CH_VERSION_OS_VERSIONS = {"46.0" => "ubuntu-24.04", "53.0" => "ubuntu-24.04"}.freeze
 
+  UPGRADE_CH_VERSION = "53.0"
+
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes, :ch_version
-  frame_accessor :reason_determined
+    :force_host_id, :storage_volumes
+  frame_accessor :reason_determined, :ch_version, :soft_stop_started_at
 
   def vm_name
     @vm_name ||= vm.inhost_name
@@ -316,6 +318,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_restart
     end
 
+    when_upgrade_cloud_hypervisor_set? do
+      if vm.in_maintenance_window?
+        register_deadline("wait", 30 * 60)
+        hop_upgrade_cloud_hypervisor
+      end
+    end
+
     when_checkup_set? do
       unless available?
         self.reason_determined = false
@@ -334,7 +343,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_rotate_storage_keys
     end
 
-    nap 6 * 60 * 60
+    nap_time = 6 * 60 * 60
+    nap_time = nap_time.clamp(nil, vm.seconds_until_maintenance_window) if upgrade_cloud_hypervisor_set?
+    nap(nap_time)
   end
 
   label def rotate_storage_keys
@@ -374,8 +385,91 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def restart
     decr_restart
-    host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
+    restart_vm
     hop_wait
+  end
+
+  label def upgrade_cloud_hypervisor
+    version = UPGRADE_CH_VERSION
+    hypervisor = Hypervisor.first!(name: "ch", version:)
+
+    if skip_cloud_hypervisor_upgrade?(hypervisor, version)
+      decr_upgrade_cloud_hypervisor
+      hop_wait
+    end
+
+    hop_wait unless vm.in_maintenance_window?
+
+    hop_soft_stop_for_cloud_hypervisor if cloud_hypervisor_downloaded?(version)
+
+    host.incr_download_cloud_hypervisor
+    nap 30
+  end
+
+  label def soft_stop_for_cloud_hypervisor
+    unless vm_process_running_map[vm_name]
+      delete_from_stack("soft_stop_started_at")
+      hop_install_cloud_hypervisor
+    end
+
+    now = Time.now.to_i
+    self.soft_stop_started_at ||= now
+    if now - soft_stop_started_at > 60
+      hard_stop
+      delete_from_stack("soft_stop_started_at")
+      hop_install_cloud_hypervisor
+    end
+
+    soft_stop
+    nap 10
+  end
+
+  label def install_cloud_hypervisor
+    self.ch_version = UPGRADE_CH_VERSION
+    write_params_json
+    host.sshable.cmd("sudo host/bin/setup-vm reinstall-systemd-units :vm_name", vm_name:)
+    hop_restart_with_new_cloud_hypervisor
+  end
+
+  label def restart_with_new_cloud_hypervisor
+    restart_vm
+    hop_learn_cloud_hypervisor
+  end
+
+  label def learn_cloud_hypervisor
+    hop_finish_cloud_hypervisor_upgrade if retval
+
+    push Prog::LearnHypervisor
+  end
+
+  label def finish_cloud_hypervisor_upgrade
+    learned_version = vm.reload.hypervisor.version
+    unless learned_version == ch_version
+      Prog::PageNexus.assemble(
+        "#{vm.ubid} runs ch #{learned_version.inspect} after upgrade to #{ch_version}",
+        ["VmCloudHypervisorUpgrade", vm.ubid], vm.ubid,
+        resource_id: vm.id, extra_data: {vm_host: host.ubid}, severity: "info",
+      )
+    end
+
+    decr_upgrade_cloud_hypervisor
+    hop_wait
+  end
+
+  def cloud_hypervisor_downloaded?(version)
+    host.sshable.cmd("test -x /opt/cloud-hypervisor/v:version/cloud-hypervisor && test -x /opt/cloud-hypervisor/v:version/ch-remote && echo downloaded || echo missing", version:).strip == "downloaded"
+  end
+
+  def restart_vm
+    host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
+  end
+
+  def skip_cloud_hypervisor_upgrade?(hypervisor, version)
+    vm.hypervisor_id == hypervisor.id ||
+      vm.maintenance_window_start_at.nil? ||
+      Project.service_project?(vm.project_id) ||
+      frame["hypervisor"] == "qemu" ||
+      host.os_version != CH_VERSION_OS_VERSIONS[version]
   end
 
   label def start_after_stop

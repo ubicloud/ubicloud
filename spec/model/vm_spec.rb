@@ -704,5 +704,16 @@ RSpec.describe Vm do
       expect(vm.in_maintenance_window?).to be(false)
       expect(vm.in_maintenance_window?).to be(false)
     end
+
+    it "returns seconds_until_maintenance_window correctly" do
+      vm.update(maintenance_window_start_at: nil)
+      expect(vm.seconds_until_maintenance_window).to eq(0)
+
+      vm.update(maintenance_window_start_at: 5)
+      expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 5, 30), Time.utc(2025, 5, 1, 7, 10, 20), Time.utc(2025, 5, 1, 7, 10, 20), Time.utc(2025, 5, 1, 4, 59, 59), Time.utc(2025, 5, 1, 4, 59, 59)).at_least(:once)
+      expect(vm.seconds_until_maintenance_window).to eq(0)
+      expect(vm.seconds_until_maintenance_window).to eq(21 * 3600 + 49 * 60 + 40)
+      expect(vm.seconds_until_maintenance_window).to eq(1)
+    end
   end
 end

@@ -240,6 +240,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def wait
+    when_upgrade_cloud_hypervisor_set? do
+      decr_upgrade_cloud_hypervisor
+    end
+
     when_update_firewall_rules_set? do
       register_deadline("wait", 5 * 60)
       hop_update_firewall_rules
