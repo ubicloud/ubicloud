@@ -812,6 +812,42 @@ RSpec.describe CloverAdmin do
     expect { visit "/model/Invoice/#{invoice.ubid}/download_pdf" }.to raise_error(CloverError, "Action link is not available")
   end
 
+  it "supports charging an unpaid invoice" do
+    billing_info = BillingInfo.create(stripe_id: "cus_123")
+    PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1")
+    invoice = Invoice.create(
+      project: Project.create(name: "stuff"),
+      invoice_number: "2411-charge-01",
+      content: {cost: 10, subtotal: 10, credit: 0, discount: 0, resources: [], billing_info: {id: billing_info.id, name: "ACME", email: "billing@example.com", country: "NL"}},
+      begin_time: "2024-11-01 00:00:00",
+      end_time: "2024-12-01 00:00:00",
+    )
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    payment_intents_service = instance_double(Stripe::PaymentIntentService)
+    expect(StripeClient).to receive(:payment_intents).and_return(payment_intents_service).at_least(:once)
+
+    visit "/model/Invoice/#{invoice.ubid}"
+    expect(payment_intents_service).to receive(:create).and_raise(Stripe::CardError.new("Your card was declined.", {}))
+    click_link "Charge"
+    path = page.current_path
+    click_button "Charge"
+    expect(page).to have_flash_error("Invoice couldn't be charged")
+    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
+    expect(invoice.reload.status).to eq "unpaid"
+
+    expect(payment_intents_service).to receive(:create).and_return(Stripe::PaymentIntent.construct_from(id: "pi_123", status: "succeeded", created: Time.now.to_i))
+    client = instance_double(Aws::S3::Client)
+    expect(Invoice).to receive(:blob_storage_client).and_return(client)
+    expect(client).to receive(:put_object).with(hash_including(key: invoice.blob_key))
+    click_link "Charge"
+    click_button "Charge"
+    expect(page).to have_flash_notice("Invoice charged")
+    expect(invoice.reload.status).to eq "paid"
+
+    # Action is unavailable once the invoice is no longer unpaid
+    expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
+  end
+
   it "shows quotas for project as extra" do
     project = Project.create(name: "test")
     project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
