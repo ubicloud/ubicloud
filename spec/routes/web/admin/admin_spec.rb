@@ -840,6 +840,24 @@ RSpec.describe CloverAdmin do
     expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
   end
 
+  it "supports updating invoice status" do
+    invoice = Invoice.create(
+      project: Project.create(name: "stuff"),
+      invoice_number: "2411-status-01",
+      content: {cost: 10},
+      begin_time: "2024-11-01 00:00:00",
+      end_time: "2024-12-01 00:00:00",
+    )
+
+    visit "/model/Invoice/#{invoice.ubid}"
+    click_link "Update Status"
+    expect(page).to have_select("status", selected: "unpaid")
+    select "doubtful", from: "status"
+    click_button "Update Status"
+    expect(page).to have_flash_notice("Invoice status updated")
+    expect(invoice.reload.status).to eq "doubtful"
+  end
+
   it "shows quotas for project as extra" do
     project = Project.create(name: "test")
     project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)

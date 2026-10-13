@@ -470,6 +470,8 @@ class CloverAdmin < Roda
 
   MAX_PAGE_SNOOZE_MINUTES = 2 * 24 * 60
 
+  INVOICE_STATUSES = %w[unpaid paid fraud doubtful waiting_transfer below_minimum_threshold].freeze
+
   BILLING_COUNTRY_OPTIONS = ISO3166::Country.all.reject { Config.sanctioned_countries.include?(it.alpha2) }.sort_by!(&:common_name).map! { [it.common_name, it.alpha2].freeze }.freeze
 
   Object.new.instance_exec do
@@ -625,6 +627,14 @@ class CloverAdmin < Roda
             request.scope.flash["error"] = "Invoice couldn't be charged"
             request.redirect("/model/Invoice/#{obj.ubid}")
           end
+        end
+      end
+
+      action "update_status", "Update Status" do
+        flash "Invoice status updated"
+        param :status, typecast: :nonempty_str!, type: "select", options: INVOICE_STATUSES, value: :status.to_proc
+        run do |obj, status|
+          obj.update(status:)
         end
       end
     end
@@ -1354,7 +1364,7 @@ class CloverAdmin < Roda
           [:invoice_number, :project, :status, :subtotal, :cost]
         end
       end
-      column_options status: {type: "select", options: %w[unpaid paid fraud waiting_transfer below_minimum_threshold].freeze, add_blank: true},
+      column_options status: {type: "select", options: INVOICE_STATUSES, add_blank: true},
         project: ubid_input.call("Project")
 
       column_search_filter do |ds, column, value|
