@@ -1,0 +1,8 @@
+<% @page_title = "Unpaid Invoices" %>
+
+<% form({id: "unpaid-invoices-search"}, wrapper: :div) do |f| %>
+  <%== f.input(:select, key: "month", label: "Month", options: @months, value: @month) %>
+  <%== f.button("Search") %>
+<% end %>
+
+<%== part("components/table", title: "Unpaid Invoices (#{@data.count})", table_class: "unpaid-invoice-table", data: @data, use_admin_label: false) %>
