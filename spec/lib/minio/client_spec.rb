@@ -264,4 +264,19 @@ RSpec.describe Minio::Client do
       expect(minio_client.set_lifecycle_policy("test", "testid", 8)).to eq(200)
     end
   end
+
+  describe "get_object" do
+    it "sends a GET request for the object and returns its body" do
+      stub_request(:get, "#{endpoint}/test-bucket/basebackups_005/x_backup_stop_sentinel.json").to_return(status: 200, body: "{}")
+
+      expect(minio_client.get_object("test-bucket", "basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+    end
+
+    it "returns nil for a missing object instead of its error body" do
+      stub_request(:get, "#{endpoint}/test-bucket/gone.json")
+        .to_return(status: 404, body: "<Error><Code>NoSuchKey</Code></Error>")
+
+      expect(minio_client.get_object("test-bucket", "gone.json")).to be_nil
+    end
+  end
 end

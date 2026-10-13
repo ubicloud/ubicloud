@@ -2,7 +2,7 @@
 
 class PostgresTimeline < Sequel::Model
   GcsBlobStorage = Data.define(:url)
-  GcsFileWrapper = Data.define(:key, :last_modified)
+  GcsFileWrapper = Data.define(:key, :last_modified, :size)
 
   module Gcp
     private
@@ -40,6 +40,10 @@ PGDATA=/dat/#{version}/data
       @blob_storage_client ||= location.location_credential_gcp.storage_client
     end
 
+    def gcp_get_object(key)
+      blob_storage_client.bucket(ubid, skip_lookup: true).file(key, skip_lookup: true).download.tap(&:rewind).read
+    end
+
     def gcp_list_objects(prefix, delimiter: "")
       bucket = blob_storage_client.bucket(ubid)
       return [] unless bucket
@@ -52,7 +56,7 @@ PGDATA=/dat/#{version}/data
         all_files.concat(files.to_a)
       end
 
-      all_files.map! { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
+      all_files.map! { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time, f.size) }
     end
 
     def gcp_create_bucket

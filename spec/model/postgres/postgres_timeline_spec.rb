@@ -789,4 +789,131 @@ PGDATA=/dat/17/data
       expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
     end
   end
+
+  describe "#latest_completed_backup" do
+    def sentinel(name, age, size: 392) = instance_double(Minio::Client::Blob, key: "basebackups_005/#{name}_backup_stop_sentinel.json", last_modified: Time.now - age, size:)
+
+    def mock_store(objects, body = :none)
+      create_minio_cluster
+      client = instance_double(Minio::Client)
+      expect(client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return(objects)
+      expect(client).to receive(:get_object).and_return(body) unless body == :none
+      expect(Minio::Client).to receive(:new).and_return(client)
+    end
+
+    it "reads FinishLSN from the newest sentinel and the WAL timeline from its key" do
+      older = sentinel("base_00000003000000BD00000024", 100)
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      mock_store([newest, older], '{"LSN":812352799064,"FinishLSN":836545544480,"PgVersion":170000}')
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: 4})
+    end
+
+    it "re-lists the bucket rather than reusing a memoized listing" do
+      newest = sentinel("base_00000004000000C2000000C6", 0)
+      create_minio_cluster
+      client = instance_double(Minio::Client)
+      expect(client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return([], [newest])
+      expect(client).to receive(:get_object).and_return('{"FinishLSN":836545544480}')
+      expect(Minio::Client).to receive(:new).and_return(client)
+
+      expect(postgres_timeline.backups).to eq([])
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: 4})
+    end
+
+    it "still reports the LSN when the key carries no WAL timeline" do
+      mock_store([sentinel("0001", 0)], '{"FinishLSN":836545544480}')
+
+      expect(postgres_timeline.latest_completed_backup).to eq({lsn: "C2/C6000120", wal_timeline_id: nil})
+    end
+
+    it "returns nil when the store holds no backups" do
+      mock_store([])
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "skips a sentinel too large to be one" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0, size: 64 * 1024 + 1)])
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "skips a listing entry with no size" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0, size: nil)])
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "returns nil when the object is gone by the time it is read" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0)], nil)
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "returns nil when the sentinel body is null" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0)], "null")
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "returns nil when the newest sentinel carries no FinishLSN" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0)], '{"LSN":812352799064}')
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "returns nil when FinishLSN is not an integer" do
+      mock_store([sentinel("base_00000004000000C2000000C6", 0)], '{"FinishLSN":"x"}')
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+
+    it "logs and returns nil when the read fails" do
+      create_minio_cluster
+      client = instance_double(Minio::Client)
+      expect(client).to receive(:list_objects).and_return([sentinel("base_00000004000000C2000000C6", 0)])
+      expect(client).to receive(:get_object).and_raise(RuntimeError.new("AccessDenied"))
+      expect(Minio::Client).to receive(:new).and_return(client)
+      expect(Clog).to receive(:emit).with("Could not read the wal-g backup sentinel", anything).and_call_original
+
+      expect(postgres_timeline.latest_completed_backup).to be_nil
+    end
+  end
+
+  it "reads an object body" do
+    create_minio_cluster
+    minio_client = instance_double(Minio::Client)
+    expect(minio_client).to receive(:get_object).with(postgres_timeline.ubid, "basebackups_005/x_backup_stop_sentinel.json").and_return("{}")
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+
+    expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+  end
+
+  it "reads an object body with the timeline's own user for AWS regions" do
+    postgres_timeline.update(location_id: create_aws_location.id)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:get_object, {body: "{}"})
+    expect(Aws::S3::Client).to receive(:new) { |args|
+      expect(args[:credentials].access_key_id).to eq("dummy-access-key")
+      s3_client
+    }
+
+    expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+  end
+
+  it "falls back to the location credential when the timeline has no user" do
+    postgres_timeline.update(location_id: create_aws_location.id, access_key: nil, secret_key: nil)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:get_object, {body: "{}"})
+    expect(Aws::S3::Client).to receive(:new) { |args|
+      expect(args[:credentials].access_key_id).to eq("aws-access-key")
+      s3_client
+    }
+
+    expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+  end
 end
