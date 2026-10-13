@@ -62,7 +62,22 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "counts a workflow once when it starts between listing requests" do
-      allow(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
+      allow(client).to receive_messages(
+        repository_workflow_runs: {workflow_runs: [{id: 1, run_attempt: 2, created_at: now}]},
+        rate_limit: instance_double(Octokit::RateLimit, remaining: 100, limit: 100),
+      )
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).once.and_return({jobs: [
+        {status: "queued", labels: ["ubicloud"]},
+      ]})
+
+      expect { nx.check_queued_jobs }.to change { GithubRunner.where(label: "ubicloud").count }.by(1)
+    end
+
+    it "uses the latest attempt when a workflow is rerun between listing requests" do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
+        {id: 1, run_attempt: 1, created_at: now},
+      ]})
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, created_at: now},
       ]})
       allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100))
@@ -71,6 +86,16 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       ]})
 
       expect { nx.check_queued_jobs }.to change { GithubRunner.where(label: "ubicloud").count }.by(1)
+    end
+
+    it "backs off when the queued listing exhausts the API quota" do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: []})
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_raise(Octokit::TooManyRequests)
+      allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 100, resets_at: now + 10 * 60))
+
+      nx.check_queued_jobs
+
+      expect(nx.polling_interval).to eq(10 * 60)
     end
 
     it "creates extra runner if needed" do
