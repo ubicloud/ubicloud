@@ -79,6 +79,7 @@ input[type=submit] {
   font-weight: bold;
 
   #ubid_form & { font-size: 0.9em; }
+  .unpaid-invoice-table & { padding: 2px 6px; font-size: 0.85em; }
 }
 
 .rollout-forms {
@@ -222,7 +223,8 @@ h3 { font-size: 1.1em; }
   gap: 3em;
 }
 
-#cogs-rate-form {
+#cogs-rate-form,
+#unpaid-invoices-search {
   display: flex;
   gap: 5px;
 }
