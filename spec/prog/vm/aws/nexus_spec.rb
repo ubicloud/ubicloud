@@ -963,6 +963,39 @@ RSpec.describe Prog::Vm::Aws::Nexus do
         .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
     end
 
+    it "provisions one spare runner and destroys the runner when Spot terminates before allocation" do
+      vm.update(unix_user: "runneradmin")
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+      runner = GithubRunner.create(label: "ubicloud-standard-2-arm", actual_label: "ubicloud-standard-2-arm", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination", message: "Spot capacity reclaimed"}}]}])
+
+      expect { nx.wait_instance_created }.to nap(60 * 60)
+        .and change(GithubRunner, :count).from(1).to(2)
+        .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
+
+      spare = installation.runners_dataset.exclude(id: runner.id).first
+      expect(spare.label).to eq(runner.label)
+      expect(spare.repository_name).to eq(runner.repository_name)
+      expect(spare.strand.label).to eq("start")
+      expect { nx.wait_instance_created }.to nap(60 * 60)
+        .and not_change(GithubRunner, :count)
+        .and not_change { runner.destroy_set?(cached: false) }
+    end
+
+    it "does not recreate Spot instances that are not runners" do
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination"}}]}])
+      expect { nx.wait_instance_created }.to nap(1)
+        .and not_change(GithubRunner, :count)
+    end
+
+    it "does not recreate Spot runners after their runner record is gone" do
+      vm.update(unix_user: "runneradmin")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination"}}]}])
+      expect { nx.wait_instance_created }.to nap(1)
+        .and not_change(GithubRunner, :count)
+    end
+
     it "does not provision another spare runner if one was already provisioned" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
