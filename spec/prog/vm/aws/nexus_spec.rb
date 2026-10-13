@@ -957,7 +957,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
-      expect(Clog).to receive(:emit).with("aws internal error on launch", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("aws runner terminated before allocation", {aws_runner_terminated_before_allocation: {vm:, reason_code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}).and_call_original
       expect { nx.wait_instance_created }.to nap(60 * 60)
         .and change(GithubRunner, :count).from(1).to(2)
         .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
@@ -969,6 +969,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       runner = GithubRunner.create(label: "ubicloud-standard-2-arm", actual_label: "ubicloud-standard-2-arm", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination", message: "Spot capacity reclaimed"}}]}])
+      expect(Clog).to receive(:emit).with("aws runner terminated before allocation", {aws_runner_terminated_before_allocation: {vm:, reason_code: "Server.SpotInstanceTermination", message: "Spot capacity reclaimed"}}).and_call_original
 
       expect { nx.wait_instance_created }.to nap(60 * 60)
         .and change(GithubRunner, :count).from(1).to(2)
