@@ -28,6 +28,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(LocationCredentialAws[location_id].access_key).to eq("access_key")
       project = GithubInstallation.first.project
       expect(project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
+      expect(project.get_ff_aws_alien_runners_shared_vpc).to be(true)
       expect(project.billing_info.stripe_id).to eq "0"
     end
 

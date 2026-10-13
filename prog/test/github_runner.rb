@@ -21,6 +21,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     if provider == "aws"
       customer_project.set_ff_aws_alien_runners_ratio(1)
+      customer_project.set_ff_aws_alien_runners_shared_vpc(true)
       location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
       Prog::Test::Base.ensure_aws_e2e_credential(location)
     end
