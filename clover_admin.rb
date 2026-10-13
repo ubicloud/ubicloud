@@ -615,6 +615,18 @@ class CloverAdmin < Roda
           obj.generate_download_link
         end
       end
+
+      action "charge", "Charge" do
+        flash "Invoice charged"
+        pass_request!
+        allow_if { it.status == "unpaid" }
+        run do |obj, request:|
+          unless obj.charge
+            request.scope.flash["error"] = "Invoice couldn't be charged"
+            request.redirect("/model/Invoice/#{obj.ubid}")
+          end
+        end
+      end
     end
 
     model OidcProvider do
