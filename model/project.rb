@@ -331,6 +331,7 @@ class Project < Sequel::Model
     :free_runner_upgrade_until,
     :github_billing_by_repository,
     :gpu_vm,
+    :hard_runner_concurrency_limit,
     :invoice_in_eur,
     :ipv6_disabled,
     :no_alien_runners,
