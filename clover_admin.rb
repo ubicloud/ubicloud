@@ -2353,6 +2353,35 @@ class CloverAdmin < Roda
       view("customer_usage")
     end
 
+    r.get "unpaid-invoices" do
+      unpaid = DB[:invoice].where(status: "unpaid")
+      month = Sequel.function(:to_char, Sequel.function(:timezone, "UTC", :begin_time), "YYYY-MM")
+      @months = unpaid.distinct.reverse(month).select_map(month)
+      @month = typecast_params.str("month")
+      @month = @months.first unless @months.include?(@month)
+
+      unpaid_counts = unpaid.group_and_count(:project_id)
+      cost = Sequel.cast(Sequel.pg_jsonb_op(:content).get_text("cost"), :numeric)
+      @data = Invoice
+        .where(status: "unpaid").where(month => @month)
+        .join(unpaid_counts.as(:uc), project_id: :project_id)
+        .select_all(:invoice)
+        .select_append(Sequel[:uc][:count].as(:unpaid_count))
+        .reverse(cost, Sequel[:invoice][:id])
+        .map do |invoice|
+          {
+            "Invoice" => table_link(invoice.ubid, "/model/Invoice/#{invoice.ubid}"),
+            "Name" => invoice.content.dig("billing_info", "name"),
+            "Email" => invoice.content.dig("billing_info", "email"),
+            "Amount" => table_cost(invoice.cost),
+            "Unpaid Invoices" => invoice[:unpaid_count],
+            "Charge" => table_form_button("Charge", action: "/model/Invoice/#{invoice.ubid}/charge", method: "post"),
+          }
+        end
+
+      view("unpaid_invoices")
+    end
+
     r.on "accounts-by-ip" do
       @days = (typecast_params.pos_int("days") || 30).clamp(1, 365)
       audit_logs = DB[:account_authentication_audit_log].where(at: (Time.now - @days * 24 * 60 * 60)..)

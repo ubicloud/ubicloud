@@ -4303,6 +4303,47 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content("internal-service")
   end
 
+  it "lists unpaid invoices by month and supports charging them" do
+    rows = -> { page.all(".unpaid-invoice-table tbody tr").map { it.all("td").map(&:text) } }
+
+    click_link "Unpaid Invoices"
+    expect(page.title).to eq "Ubicloud Admin - Unpaid Invoices"
+    expect(page).to have_content("No data available")
+
+    acme = Project.create(name: "acme")
+    other = Project.create(name: "other")
+    create_invoice = lambda do |project, number, month, cost, status: "unpaid", name: "ACME", email: "billing@acme.com"|
+      Invoice.create(project:, invoice_number: number, status:, begin_time: Time.utc(2026, month), end_time: Time.utc(2026, month + 1),
+        content: {cost:, subtotal: cost, credit: 0, discount: 0, resources: [], billing_info: {name:, email:, country: "NL"}})
+    end
+    acme_sep = create_invoice.call(acme, "2609-acme", 9, 10.5)
+    create_invoice.call(acme, "2608-acme", 8, 7)
+    create_invoice.call(acme, "2607-acme", 7, 3, status: "paid")
+    other_sep = create_invoice.call(other, "2609-other", 9, 1250, name: "Other", email: "billing@other.com")
+    create_invoice.call(other, "2608-other", 8, 20, status: "paid")
+
+    visit "/unpaid-invoices"
+    expect(page.all("#unpaid-invoices-search option").map(&:text)).to eq ["2026-09", "2026-08"]
+    expect(page.all(".unpaid-invoice-table thead th").map(&:text)).to eq ["Invoice", "Name", "Email", "Amount", "Unpaid Invoices", "Charge"]
+    expect(rows.call).to eq [
+      [other_sep.ubid, "Other", "billing@other.com", "$1,250.00", "1", ""],
+      [acme_sep.ubid, "ACME", "billing@acme.com", "$10.50", "2", ""],
+    ]
+
+    select "2026-08", from: "Month"
+    click_button "Search"
+    expect(rows.call).to eq [[Invoice.first(invoice_number: "2608-acme").ubid, "ACME", "billing@acme.com", "$7.00", "2", ""]]
+
+    # Unknown months fall back to the latest month with unpaid invoices
+    visit "/unpaid-invoices?month=2026-07"
+    expect(rows.call.map(&:first)).to eq [other_sep.ubid, acme_sep.ubid]
+
+    expect(Config).to receive(:stripe_secret_key).and_return(nil)
+    within(".unpaid-invoice-table tbody tr:first-child") { click_button "Charge" }
+    expect(page).to have_flash_notice("Invoice charged")
+    expect(page.title).to eq "Ubicloud Admin - Invoice #{other_sep.ubid}"
+  end
+
   it "shows accounts grouped by IP address, ordered by last account creation" do
     fraud1 = create_account("fraud1@ibi.com", with_project: false)
     fraud2 = create_account("fraud2@ibi.com", with_project: false)
