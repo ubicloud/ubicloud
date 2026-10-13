@@ -1495,6 +1495,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
+    it "recovers a custom-label runner through its quota and matching registration label" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-build", alias_for: runner.label, concurrent_runner_count_limit: 2, allocated_runner_count: 1)
+      runner.update(actual_label: custom_label.name)
+      expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND).and_return("failed")
+
+      expect { nx.wait }.to nap(0)
+      spare_runner = GithubRunner.exclude(id: runner.id).first
+      spare_nexus = described_class.new(spare_runner.strand)
+
+      expect { spare_nexus.start }.to hop("apply_custom_label_quota")
+      expect { spare_nexus.apply_custom_label_quota }.to hop("allocate_vm")
+      expect(custom_label.refresh.allocated_runner_count).to eq(2)
+      expect(client).to receive(:post).with("/repos/test-repo/actions/runners/generate-jitconfig", hash_including(labels: ["custom-build"]))
+        .and_return({runner: {id: 456}, encoded_jit_config: "spare-jit-config"})
+
+      expect(spare_nexus.generate_jit_config).to eq("spare-jit-config")
+      expect(spare_runner.refresh.runner_id).to eq(456)
+    end
+
     it "naps if the runner-script is running" do
       expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND).and_return("running")
 
