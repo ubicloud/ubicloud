@@ -65,7 +65,10 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
 
     queued_labels.each do |(actual_label, label), count|
-      idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
+      idle_runner_count = github_repository.runners_dataset
+        .where(actual_label:, workflow_job: nil)
+        .exclude(id: Semaphore.where(name: %w[destroy destroying]).select(:strand_id))
+        .count
       # The calculation of the required_runner_count isn't atomic because it
       # requires multiple API calls and database queries. However, it will
       # eventually settle on the correct value. If we create more runners than
