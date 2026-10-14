@@ -567,6 +567,65 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       st.stack = [{"storage_volumes" => [volume].map { it.transform_keys(&:to_s) }}]
     end
 
+    describe "with resources held for reuse" do
+      let(:runner_project) { Project.create(name: "runner-service") }
+      let(:runner_host) { create_vm_host(net6: "2a01:4f8:173:1ed3::/64", ip6: "2a01:4f8:173:1ed3::2") }
+      let(:held_vm) {
+        held = create_vm(name: "held", project_id: runner_project.id, location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2404",
+          vm_host_id: runner_host.id, display_state: "deleting", local_vetho_ip: "169.254.0.2/32")
+        sd = StorageDevice.create(vm_host_id: runner_host.id, name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 925)
+        VmStorageVolume.create(vm_id: held.id, boot: true, size_gib: 75, disk_index: 0, storage_device_id: sd.id)
+        held
+      }
+
+      before do
+        allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
+        BootImage.create(name: "github-ubuntu-2404", version: "20260101", vm_host_id: runner_host.id, activated_at: Time.now, size_gib: 75)
+        create_vhost_block_backend(vm_host_id: runner_host.id)
+        vm.update(project_id: runner_project.id, location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2404", vm_host_id: nil)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 75, disk_index: 0)
+        Sshable.create_with_id(vm, host: "temp_#{vm.id}")
+        st.stack = [{"storage_volumes" => [{"size_gib" => 75, "boot" => true, "vring_workers" => 1}]}]
+        GithubRunnerVmAllocation.create(vm_id: held_vm.id, label: "ubicloud-standard-2-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, vm_host_id: runner_host.id)
+      end
+
+      it "reuses held resources instead of allocating" do
+        expect(Scheduling::Allocator).not_to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(vm.reload.vm_host_id).to eq(runner_host.id)
+        expect(held_vm).not_to exist
+      end
+
+      it "allocates when there are no held resources to reuse" do
+        runner_host.update(allocation_state: "draining")
+        expect(Scheduling::Allocator).to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(held_vm).to exist
+      end
+
+      it "does not reuse held resources for installations with allocator preferences" do
+        installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: runner_project.id, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID]})
+        GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, location_id: vm.location_id)
+        expect(Scheduling::Allocator).to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(held_vm).to exist
+      end
+
+      it "does not reuse held resources when hosts are excluded" do
+        refresh_frame(nx, new_values: {"exclude_host_ids" => [vm_host.id]})
+        expect(Scheduling::Allocator).to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(held_vm).to exist
+      end
+
+      it "does not reuse held resources when forced to a host" do
+        refresh_frame(nx, new_values: {"force_host_id" => vm_host.id})
+        expect(Scheduling::Allocator).to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(held_vm).to exist
+      end
+    end
+
     it "creates a page if no capacity left and naps" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(Scheduling::Allocator::NoSpaceLeft.new("no space left on any eligible host")).twice
       vm.created_at = Time.now - 11 * 60
@@ -1754,6 +1813,61 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.destroy }.to hop("destroy_slice")
     end
 
+    describe "of a runner VM" do
+      let(:runner_project) { Project.create(name: "runner-service") }
+      let(:slice) { VmHostSlice.create(vm_host_id: vm_host.id, enabled: true, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8) }
+      let(:dev) { StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500) }
+
+      before do
+        allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
+        vm.update(project_id: runner_project.id, location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2404", vm_host_slice_id: slice.id, ip4_enabled: true)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 75, disk_index: 0, storage_device_id: dev.id)
+        AssignedVmAddress.create(dst_vm_id: vm.id, address_id: Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id).id, ip: "1.1.1.1")
+        expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+        expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+        expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
+      end
+
+      it "holds the host resources for reuse" do
+        pool = VmPool.create(size: 1, vm_size: "standard-2", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 75, arch: "x64")
+        vm.update(pool_id: pool.id)
+        nic.update(vm_id: vm.id)
+        Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "start")
+
+        expect { nx.destroy }.to exit({"msg" => "vm held for reuse"})
+
+        allocation = GithubRunnerVmAllocation[vm.id]
+        expect(allocation.label).to eq("ubicloud-standard-2-ubuntu-2404")
+        expect(allocation.location_id).to eq(Location::GITHUB_RUNNERS_ID)
+        expect(allocation.vm_host_id).to eq(vm_host.id)
+        expect(vm.reload.pool_id).to be_nil
+        expect(nic.reload.vm_id).to be_nil
+        expect(nic.destroy_set?).to be(true)
+        expect(vm.assigned_vm_address.ip.to_s).to eq("1.1.1.1/32")
+        expect(dev.reload.available_storage_gib).to eq(500)
+        expect([slice.reload.used_cpu_percent, slice.used_memory_gib, slice.enabled]).to eq([200, 8, true])
+      end
+
+      it "releases the host resources if the host is not accepting" do
+        vm_host.update(allocation_state: "draining")
+        expect { nx.destroy }.to hop("destroy_slice")
+        expect(GithubRunnerVmAllocation.count).to eq(0)
+        expect(dev.reload.available_storage_gib).to eq(575)
+      end
+
+      it "releases the host resources if the VM has no IPv4 address" do
+        AssignedVmAddress.where(dst_vm_id: vm.id).destroy
+        expect { nx.destroy }.to hop("destroy_slice")
+        expect(GithubRunnerVmAllocation.count).to eq(0)
+      end
+
+      it "releases the host resources if the VM does not match a runner label" do
+        vm.update(boot_image: "ubuntu-jammy")
+        expect { nx.destroy }.to hop("destroy_slice")
+        expect(GithubRunnerVmAllocation.count).to eq(0)
+      end
+    end
+
     it "waits for an in-flight KEK rotation before tearing the VM down" do
       create_rotate_kek_strand(create_stale_kek_volume)
       expect { nx.destroy }.to nap(10)
@@ -1765,6 +1879,24 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       child = create_rotate_kek_strand(create_stale_kek_volume, finished: true)
       expect { nx.destroy }.to hop("destroy_slice")
       expect(child).not_to exist
+    end
+  end
+
+  describe "#release_held_allocation" do
+    it "releases the host resources and destroys the VM" do
+      dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 75, disk_index: 0, storage_device_id: dev.id)
+      slice = VmHostSlice.create(vm_host_id: vm_host.id, enabled: true, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
+      Strand.create_with_id(slice.id, prog: "Vm::VmHostSliceNexus", label: "wait")
+      vm.update(vm_host_slice_id: slice.id)
+
+      expect { nx.release_held_allocation }.to hop("destroy_slice")
+      expect(dev.reload.available_storage_gib).to eq(575)
+      expect([slice.reload.used_cpu_percent, slice.used_memory_gib]).to eq([0, 0])
+
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(slice.reload.destroy_set?).to be(true)
+      expect(vm).not_to exist
     end
   end
 

@@ -1812,17 +1812,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
   describe "#wait_vm_destroy" do
     it "naps if vm not destroyed yet" do
+      Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "destroy")
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 
+    it "pops if vm is held for reuse after its strand exited" do
+      expect(runner).to receive(:destroy)
+      expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+      expect(vm).to exist
+    end
+
     it "extends deadline if vm prevents destroy" do
+      Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "destroy")
       expect(runner.vm).to receive(:prevent_destroy_set?).and_return(true)
       expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 
     it "pops if vm destroyed" do
-      expect(nx).to receive(:vm).and_return(nil).twice
+      expect(nx).to receive(:vm).and_return(nil)
       expect(runner).to receive(:destroy)
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
