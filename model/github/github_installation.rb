@@ -16,6 +16,18 @@ class GithubInstallation < Sequel::Model
   plugin ResourceMethods
   dataset_module Pagination
 
+  VCPU_QUOTA_RESOURCE_TYPES = {
+    ["metal", "x64"] => "GithubRunnerVCpu",
+    ["metal", "arm64"] => "GithubRunnerVCpuArm",
+    ["aws", "x64"] => "GithubRunnerVCpuAws",
+    ["aws", "arm64"] => "GithubRunnerVCpuArmAws",
+  }.freeze
+
+  def after_create
+    super
+    DB[:github_installation_vcpu_usage].import([:installation_id, :provider, :arch, :used_vcpus], VCPU_QUOTA_RESOURCE_TYPES.keys.map { |provider, arch| [id, provider, arch, 0] })
+  end
+
   def self.with_github_installation_id(installation_id)
     first(installation_id:)
   end
@@ -78,5 +90,6 @@ end
 # Referenced By:
 #  github_custom_label                | github_custom_label_installation_id_fkey                       | (installation_id) REFERENCES github_installation(id)
 #  github_installation_private_subnet | github_installation_private_subnet_github_installation_id_fkey | (github_installation_id) REFERENCES github_installation(id)
+#  github_installation_vcpu_usage     | github_installation_vcpu_usage_installation_id_fkey            | (installation_id) REFERENCES github_installation(id) ON DELETE CASCADE
 #  github_repository                  | github_repository_installation_id_fkey                         | (installation_id) REFERENCES github_installation(id)
 #  github_runner                      | github_runner_installation_id_fkey                             | (installation_id) REFERENCES github_installation(id)

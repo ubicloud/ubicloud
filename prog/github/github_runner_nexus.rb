@@ -11,7 +11,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  frame_accessor :boot_race_checked
+  frame_accessor :boot_race_checked, :reserved_quota_provider
 
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
@@ -360,26 +360,47 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
-    hop_wait_concurrency_limit unless quota_available?
+    # Check the custom label limit first, so runners that wait for it do not
+    # hold quota that other labels of the installation could use.
     hop_apply_custom_label_quota if github_runner.custom_label
+    hop_wait_concurrency_limit unless reserve_quota("metal")
     hop_allocate_vm
   end
 
-  def quota_available?
-    # In existing Github quota calculations, we compare total allocated cpu count
-    # with the cpu limit and allow passing the limit once. This is because we
-    # check quota and allocate VMs in different labels hence transactions and it
-    # is difficult to enforce quotas in the environment with lots of concurrent
-    # requests. There are some remedies, but it would require some refactoring
-    # that I'm not keen to do at the moment. Although it looks weird, passing 0
-    # as requested_additional_usage keeps the existing behavior.
-    resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
-    project.quota_available?(resource_type, 0)
+  def reserve_quota(provider, force: false)
+    return true if reserved_quota_provider == provider
+
+    vcpus = label_data["vcpus"]
+    ds = vcpu_usage_dataset(provider)
+    ds = ds.where(Sequel[:used_vcpus] + vcpus <= quota_value(provider)) unless force
+    return false unless ds.update(used_vcpus: Sequel[:used_vcpus] + vcpus) == 1
+
+    # Release the previous reservation if the runner already has one, such as
+    # metal quota when the runner spills over to AWS.
+    release_quota
+    self.reserved_quota_provider = provider
+    true
   end
 
+  def release_quota
+    return unless (provider = reserved_quota_provider)
+
+    vcpu_usage_dataset(provider).update(used_vcpus: Sequel[:used_vcpus] - label_data["vcpus"])
+    self.reserved_quota_provider = nil
+  end
+
+  def vcpu_usage_dataset(provider)
+    DB[:github_installation_vcpu_usage].where(installation_id: github_runner.installation_id, provider:, arch:)
+  end
+
+  def quota_value(provider)
+    (@quota_values ||= {})[provider] ||= project.effective_quota_value(GithubInstallation::VCPU_QUOTA_RESOURCE_TYPES.fetch([provider, arch]))
+  end
+
+  # A cheap check before the global spill capacity query. reserve_quota makes
+  # the decision, as the usage can change after this check.
   def aws_quota_available?
-    resource_type = x64? ? "GithubRunnerVCpuAws" : "GithubRunnerVCpuArmAws"
-    project.quota_available?(resource_type, 0)
+    vcpu_usage_dataset("aws").get(:used_vcpus) + label_data["vcpus"] <= quota_value("aws")
   end
 
   def aws_spill_capacity_available?
@@ -413,10 +434,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # An operator can set the spill over semaphore by hand to override the checks below.
     hop_allocate_vm if spill_over_set?
 
-    if quota_available?
-      hop_apply_custom_label_quota if github_runner.custom_label
-      hop_allocate_vm
-    end
+    hop_allocate_vm if reserve_quota("metal")
 
     if project.reputation == "limited"
       Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
@@ -458,9 +476,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           nap rand(5..15)
         end
 
-        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
-        github_runner.incr_spill_over
-        hop_allocate_vm
+        if reserve_quota("aws")
+          Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+          github_runner.incr_spill_over
+          hop_allocate_vm
+        end
       end
 
       Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
@@ -471,30 +491,33 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.incr_not_upgrade_premium
     end
     Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
-
-    hop_apply_custom_label_quota if github_runner.custom_label
+    reserve_quota("metal", force: true)
     hop_allocate_vm
   end
 
   label def apply_custom_label_quota
-    custom_label = github_runner.custom_label
-    hop_allocate_vm unless custom_label.concurrent_runner_count_limit
+    if github_runner.custom_label.concurrent_runner_count_limit
+      new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
+      updated_rows = GithubCustomLabel
+        .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
+        .where(new_allocated_runner_count <= Sequel[:concurrent_runner_count_limit])
+        .update(allocated_runner_count: new_allocated_runner_count)
 
-    new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
-    updated_rows = GithubCustomLabel
-      .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
-      .where(new_allocated_runner_count <= Sequel[:concurrent_runner_count_limit])
-      .update(allocated_runner_count: new_allocated_runner_count)
-
-    if updated_rows != 1
-      Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
-      nap rand(5..15)
+      if updated_rows != 1
+        Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
+        nap rand(5..15)
+      end
     end
+
+    hop_wait_concurrency_limit unless reserve_quota("metal")
     hop_allocate_vm
   end
 
   label def allocate_vm
     picked_vm = pick_vm
+    # Some runners go to AWS without a check, such as the random alien ones, so
+    # move their reservation to the provider of the picked vm.
+    reserve_quota((picked_vm.location_id == Location::GITHUB_RUNNERS_ID) ? "metal" : "aws", force: true)
     github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
     github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
@@ -503,7 +526,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm
-    if spill_unallocated_vm?
+    if spill_unallocated_vm? && reserve_quota("aws")
       Clog.emit("spilled over unallocated runner", {spilled_over_unallocated_runner: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       destroy_vm
       github_runner.update(vm_id: nil, location_id: nil, allocated_at: nil)
@@ -869,6 +892,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       end
     end
+    release_quota
     hop_wait_vm_destroy
   end
 
