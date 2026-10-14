@@ -248,10 +248,11 @@
   // a host (19 in 20 customers wait less), the worse of those still waiting
   // and those placed in the last minute. Counting recent placements keeps the
   // mood from snapping back to happy the moment a backlog drains.
-  const MOOD_LIMITS = [[60, "happy"], [120, "meh"]]; // seconds; above both is angry
+  // Under 2 minutes is happy, 2 up to 4 minutes is meh, 4 minutes or more is angry.
+  const MOOD_LIMITS = [[120, "happy"], [240, "meh"]]; // seconds, exclusive upper bounds
 
   function moodFrom(seconds) {
-    for (const [limit, mood] of MOOD_LIMITS) if (seconds <= limit) return mood;
+    for (const [limit, mood] of MOOD_LIMITS) if (seconds < limit) return mood;
     return "angry";
   }
 
