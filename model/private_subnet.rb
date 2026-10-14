@@ -136,10 +136,12 @@ class PrivateSubnet < Sequel::Model
   end
 
   def random_private_ipv6
-    addr = net6.nth_subnet(79, SecureRandom.random_number(2**(79 - net6.netmask.prefix_len) - 2).to_i + 1)
-    return random_private_ipv6 if nics.any? { |nic| nic.private_ipv6.to_s == addr.to_s }
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv6 after 1000 iterations") { _random_private_ipv6 }
+  end
 
-    addr
+  private def _random_private_ipv6
+    addr = net6.nth_subnet(79, SecureRandom.random_number(2**(79 - net6.netmask.prefix_len) - 2).to_i + 1)
+    addr if nics_dataset.where(private_ipv6: addr).empty?
   end
 
   def incr_destroy_if_only_used_internally(ubid:, vm_ids:)
