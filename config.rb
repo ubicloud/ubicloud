@@ -152,6 +152,8 @@ module Config
   override :simulation_mode, false, bool
   optional :github_simulator_url, string
   override :simulated_runner_idle_seconds, 30, int
+  override :scheduler_metrics_name, "current", string
+  override :scheduler_metrics_display_name, "Current · per-runner polling", string
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string

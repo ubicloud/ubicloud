@@ -31,6 +31,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         actual_label: actual_label || label,
       )
 
+      SchedulerMetrics.increment("requests_received_total")
       Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
     end
   end
@@ -57,6 +58,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if (picked_vm = pool&.pick_vm)
+      SchedulerMetrics.record_allocation(github_runner)
       return picked_vm
     end
 
@@ -410,6 +412,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_concurrency_limit
+    SchedulerMetrics.increment("scheduling_checks_total")
+
     # An operator can set the spill over semaphore by hand to override the checks below.
     hop_allocate_vm if spill_over_set?
 

@@ -92,6 +92,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
       os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
+      SchedulerMetrics.increment("scheduling_checks_total") if runner
       Scheduling::Allocator.allocate(
         vm, storage_volumes,
         distinct_storage_devices:,
@@ -125,6 +126,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
     end
 
+    SchedulerMetrics.record_allocation(runner) if runner
     vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
     wakeup_waiting_strand("allocated_waiting_strand_id")

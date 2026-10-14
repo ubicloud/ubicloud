@@ -87,9 +87,11 @@ class Clover
 
     case data["action"]
     when "in_progress"
+      SchedulerMetrics.increment("started_total")
       runner.log_duration("runner_started", Time.new(job["started_at"]) - Time.new(job["created_at"]))
       {message: "GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}"}
     when "completed"
+      SchedulerMetrics.increment("completed_total")
       runner.incr_destroy
 
       {message: "GithubRunner[#{runner.ubid}] deleted"}

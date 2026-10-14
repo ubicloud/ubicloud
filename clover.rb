@@ -1135,6 +1135,14 @@ class Clover < Roda
         r.hash_branches(:webhook_prefix)
       end
 
+      # Polled by the scheduler dashboard of the runner simulation.
+      r.get "scheduler", "metrics" do
+        response["access-control-allow-origin"] = "*"
+        response["cache-control"] = "no-store"
+        response.content_type = :json
+        SchedulerMetrics.snapshot.to_json
+      end
+
       r.get "auth", :ubid_uuid do |id|
         next unless (@oidc_provider = OidcProvider[id])
 
