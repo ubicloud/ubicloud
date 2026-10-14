@@ -170,7 +170,7 @@
 
   root.replaceChildren();
   const head = el("div", "card-head");
-  head.append(el("h2", null, "Customer impact"), el("span", "fun-note", "Just for fun: simulated customers"));
+  head.append(el("h2", null, "Customer impact"));
   const grid = el("div", "fun-grid");
   root.append(head, grid);
 
@@ -190,7 +190,7 @@
   moodPanel.append(moodPair);
 
   const tweetHead = el("h4");
-  tweetHead.append(who(SIDES[1]), document.createTextNode(" · Simulated customer chatter"));
+  tweetHead.append(who(SIDES[1]), document.createTextNode(" · Customer chatter"));
   const feed = el("ol", "fun-feed");
   feed.setAttribute("aria-label", "Simulated customer tweets about Central");
   tweetPanel.append(tweetHead, feed);
