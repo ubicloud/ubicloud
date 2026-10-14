@@ -244,24 +244,14 @@
 
   // ---------------------------------------------------------------- mood
 
-  // Customers' mood follows the slow tail, not the median: the p95 wait for
-  // a host (19 in 20 customers wait less), the worse of those still waiting
-  // and those placed in the last minute. Counting recent placements keeps the
-  // mood from snapping back to happy the moment a backlog drains.
-  // Under 2 minutes is happy, 2 up to 4 minutes is meh, 4 minutes or more is angry.
-  const MOOD_LIMITS = [[120, "happy"], [240, "meh"]]; // seconds, exclusive upper bounds
-
-  function moodFrom(seconds) {
-    for (const [limit, mood] of MOOD_LIMITS) if (seconds < limit) return mood;
-    return "angry";
-  }
+  // Customers' mood follows how many requests are waiting for a host:
+  // under 2,000 is happy, under 5,000 is meh, 5,000 or more is angry.
+  const MOOD_LIMITS = [[2000, "happy"], [5000, "meh"]]; // waiting requests, exclusive upper bounds
 
   function currentMood(m) {
-    const waits = [];
-    if (m.waiting?.count > 0) waits.push(Number(m.waiting.p95_seconds) || 0);
-    const placed = m.latency?.queue_to_allocated;
-    if (placed?.count > 0) waits.push(Number(placed.p95_seconds) || 0);
-    return moodFrom(Math.max(0, ...waits));
+    const waiting = Number(m.waiting?.count) || 0;
+    for (const [limit, mood] of MOOD_LIMITS) if (waiting < limit) return mood;
+    return "angry";
   }
 
   function renderMood(key) {
