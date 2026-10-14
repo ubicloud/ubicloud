@@ -4,7 +4,8 @@ class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, is_management: false, use_eip: true, create_network_interface: true)
-    unless (subnet = PrivateSubnet.for_update.with_pk(private_subnet_id))
+    ds = create_network_interface ? PrivateSubnet.dataset.for_no_key_update : PrivateSubnet
+    unless (subnet = ds.with_pk(private_subnet_id))
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
 
