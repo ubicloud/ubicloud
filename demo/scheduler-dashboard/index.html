@@ -172,13 +172,22 @@
   .col-head h2 { font-size: 16px; }
   .col-head p { margin: 0; font-size: 12px; color: var(--muted); }
 
-  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; min-width: 0; }
-  .stat .label { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stat .value { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
-  .stat .delta { font-size: 12px; font-weight: 600; min-height: 18px; color: var(--muted); }
-  .stat .delta.better { color: var(--good-text); }
-  .stat .delta.worse { color: var(--critical); }
+  /* Scoreboard */
+  .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  @media (max-width: 1100px) {
+    .scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .score.primary { grid-column: 1 / -1; }
+  }
+  .score { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; min-width: 0; display: grid; gap: 4px; align-content: start; }
+  .score .label { font-size: 12px; color: var(--ink-2); }
+  .score .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .score .who { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .score .who i { width: 10px; height: 3px; border-radius: 2px; }
+  .score .num { display: block; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; }
+  .score.primary .num { font-size: 40px; }
+  .score .cmp { font-size: 12px; font-weight: 600; color: var(--muted); min-height: 18px; }
+  .score .cmp.better { color: var(--good-text); }
+  .score .cmp.worse { color: var(--critical); }
 
   .chart { position: relative; width: 100%; }
   .chart svg { display: block; width: 100%; overflow: visible; }
@@ -255,6 +264,8 @@
       </form>
     </details>
   </div>
+
+  <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>
 
   <section class="card" id="burst-race" aria-live="polite"></section>
 

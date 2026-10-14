@@ -513,6 +513,7 @@
         ends.push({ y: Y(total), label: fmtInt(total) });
       }
     } else {
+      drawOverlapOutline(c, x0, x1, X, Y, gap, plot);
       for (const se of c.series) {
         const samples = visibleSamples(se.side, x0, x1).filter((s) => se.value(s) != null);
         for (const run of runs(samples, gap)) {
@@ -525,11 +526,7 @@
           }
           const pts = run.map((s) => [X(s.t), Y(se.value(s))]);
           if (c.wash) el("path", { d: `${pathOf(pts)}L${pts.at(-1)[0].toFixed(1)},${Y(0)}L${pts[0][0].toFixed(1)},${Y(0)}Z`, style: `fill: ${se.color}`, "fill-opacity": 0.1 }, plot);
-          // In head-to-head charts the first side is drawn wider underneath, so
-          // when both sides report the same values it shows as an outline
-          // instead of disappearing behind the second line.
-          const under = c.series.length > 1 && se === c.series[0] && c.series.every((x) => x.side !== se.side || x === se);
-          el("path", { d: pathOf(pts), fill: "none", style: `stroke: ${se.color}`, "stroke-width": under ? 5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, plot);
+          el("path", { d: pathOf(pts), fill: "none", style: `stroke: ${se.color}`, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, plot);
         }
         const last = samples.at(-1);
         if (!se.lo && last && x1 - last.t <= gap) {
@@ -586,6 +583,33 @@
     }
     if (!tipShown) c.tip.style.display = "none";
     mount(c, svg);
+  }
+
+  // In a head-to-head chart, wherever both sides' lines coincide, outline the
+  // first side's line underneath so the second doesn't hide it. Lines that
+  // are apart stay the same width.
+  function drawOverlapOutline(c, x0, x1, X, Y, gap, plot) {
+    const [a, b] = c.series;
+    if (c.series.length !== 2 || a.side === b.side || a.lo || b.lo) return;
+    const other = state.sides[b.side].hist;
+    const close = (s) => {
+      const o = nearest(other, s.t);
+      const va = a.value(s);
+      const vb = o && Math.abs(o.t - s.t) <= gap ? b.value(o) : null;
+      return va != null && vb != null && Math.abs(Y(va) - Y(vb)) < 2;
+    };
+    for (const run of runs(visibleSamples(a.side, x0, x1).filter((s) => a.value(s) != null), gap)) {
+      let seg = [];
+      const flush = () => {
+        if (seg.length > 1) el("path", { d: pathOf(seg), fill: "none", style: `stroke: ${a.color}`, "stroke-width": 5, "stroke-linejoin": "round", "stroke-linecap": "round" }, plot);
+        seg = [];
+      };
+      for (const s of run) {
+        if (close(s)) seg.push([X(s.t), Y(a.value(s))]);
+        else flush();
+      }
+      flush();
+    }
   }
 
   // Waiting requests by age bucket over time. Each column is one moment;
@@ -770,11 +794,62 @@
     parent.appendChild(div);
   }
 
-  const STATS = [
-    { key: "waiting", label: "Waiting now", value: (s) => s.m.waiting.count, fmt: fmtInt, min: 5 },
-    { key: "oldest", label: "Oldest wait", value: (s) => s.m.waiting.oldest_seconds, fmt: fmtDur, min: 2 },
-    { key: "p95", label: "p95 wait for host (last 60s)", value: (s) => s.m.latency.queue_to_allocated.p95_seconds, fmt: fmtDur, min: 2 },
+  // Headline numbers at the top of the page. `better` says which direction
+  // favors central; "match" means both sides should report the same value.
+  const SCORES = [
+    { key: "waiting", label: "Requests waiting for a host", value: (s) => s.m.waiting.count, fmt: fmtInt, better: "lower", min: 5, primary: true },
+    { key: "oldest", label: "Oldest wait", value: (s) => s.m.waiting.oldest_seconds, fmt: fmtDur, better: "lower", min: 2 },
+    { key: "p95", label: "p95 wait for a host (last 60s)", value: (s) => s.m.latency.queue_to_allocated.p95_seconds, fmt: fmtDur, better: "lower", min: 2 },
+    { key: "placed", label: "Placed on a host / min", value: (s) => s.rates.allocations, fmt: fmtRate, better: "higher", min: 5 },
+    { key: "incoming", label: "Incoming / min", value: (s) => s.rates.arrivals, fmt: fmtRate, better: "match", min: 5 },
   ];
+
+  function buildScoreboard() {
+    const host = document.getElementById("scoreboard");
+    for (const k of SCORES) {
+      const tile = document.createElement("div");
+      tile.className = `score${k.primary ? " primary" : ""}`;
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = k.label;
+      const pair = document.createElement("div");
+      pair.className = "pair";
+      for (const side of SIDES) {
+        const cell = document.createElement("div");
+        const who = document.createElement("span");
+        who.className = "who";
+        const key = document.createElement("i");
+        key.style.background = SIDE_INFO[side].color;
+        who.append(key, document.createTextNode(SIDE_INFO[side].name));
+        const num = document.createElement("b");
+        num.className = "num";
+        num.id = `score-${k.key}-${side}`;
+        num.textContent = "—";
+        cell.append(who, num);
+        pair.appendChild(cell);
+      }
+      const cmp = document.createElement("div");
+      cmp.className = "cmp";
+      cmp.id = `score-${k.key}-cmp`;
+      tile.append(label, pair, cmp);
+      host.appendChild(tile);
+    }
+  }
+
+  // How central compares with current, in words, plus a good/bad class.
+  function compare(k, cur, cen) {
+    if (cur == null || cen == null) return ["", ""];
+    if (Math.max(cur, cen) < k.min) return k.better === "match" ? ["No incoming requests", ""] : ["Both near zero", ""];
+    const d = cur > 0 ? (cen - cur) / cur : Infinity;
+    const pct = Number.isFinite(d) ? `${Math.round(Math.abs(d) * 100)}%` : "";
+    if (k.better === "match") {
+      return Math.abs(d) < 0.05 ? ["✓ Same feed to both", "better"] : [`● Feeds differ by ${pct || "100%"}`, "worse"];
+    }
+    if (Math.abs(d) < 0.05) return ["≈ Central same as current", ""];
+    const higher = d > 0;
+    const good = higher === (k.better === "higher");
+    return [`${higher ? "▲" : "▼"} Central ${pct ? `${pct} ` : ""}${higher ? "higher" : "lower"}`, good ? "better" : "worse"];
+  }
 
   function buildColumns() {
     const cols = document.getElementById("cols");
@@ -800,18 +875,6 @@
       titles.append(h2, p, err);
       head.append(bar, titles);
       col.appendChild(head);
-
-      const stats = document.createElement("div");
-      stats.className = "stats";
-      for (const k of STATS) {
-        const tile = document.createElement("div");
-        tile.className = "stat";
-        tile.id = `stat-${side}-${k.key}`;
-        tile.innerHTML = '<div class="label"></div><div class="value">—</div><div class="delta"></div>';
-        tile.querySelector(".label").textContent = k.label;
-        stats.appendChild(tile);
-      }
-      col.appendChild(stats);
 
       card(col, "Wait time spread", `spread-${side}`, [
         { label: "p50–p95", color: info.color, kind: "wash" },
@@ -883,28 +946,18 @@
     for (const c of sizeCharts) renderSizeChart(c, sizeScale);
   }
 
-  function renderStats() {
-    const baseline = sampleAt("current");
-    for (const side of SIDES) {
-      const s = sampleAt(side);
-      for (const k of STATS) {
-        const tile = document.getElementById(`stat-${side}-${k.key}`);
-        const v = s ? k.value(s) : null;
-        tile.querySelector(".value").textContent = v == null ? "—" : k.fmt(v);
-        const delta = tile.querySelector(".delta");
-        delta.className = "delta";
-        delta.textContent = "";
-        if (side !== "central" || !s || !baseline) continue;
-        const lv = k.value(baseline);
-        if (v == null || lv == null || Math.max(v, lv) < k.min) continue;
-        const d = lv > 0 ? (v - lv) / lv : 1;
-        if (Math.abs(d) < 0.05) {
-          delta.textContent = "≈ same as current";
-        } else {
-          delta.className = `delta ${d < 0 ? "better" : "worse"}`;
-          delta.textContent = `${d < 0 ? "▼" : "▲"} ${Math.round(Math.abs(d) * 100)}% vs current`;
-        }
+  function renderScoreboard() {
+    const samples = Object.fromEntries(SIDES.map((side) => [side, sampleAt(side)]));
+    for (const k of SCORES) {
+      const values = {};
+      for (const side of SIDES) {
+        values[side] = samples[side] ? k.value(samples[side]) : null;
+        document.getElementById(`score-${k.key}-${side}`).textContent = values[side] == null ? "—" : k.fmt(values[side]);
       }
+      const [text, cls] = compare(k, values.current, values.central);
+      const cmp = document.getElementById(`score-${k.key}-cmp`);
+      cmp.textContent = text;
+      cmp.className = `cmp ${cls}`;
     }
   }
 
@@ -1051,7 +1104,7 @@
   function render() {
     renderConnections();
     renderBurst();
-    renderStats();
+    renderScoreboard();
     renderCharts();
     renderTable();
   }
@@ -1167,6 +1220,7 @@
     });
   }
 
+  buildScoreboard();
   buildColumns();
   bindControls();
   render();
