@@ -192,10 +192,10 @@
   @media (max-width: 640px) { .size-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .size-grid h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
 
-  /* Traffic */
-  .traffic { margin-bottom: 12px; }
-  .traffic-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px 24px; }
-  @media (max-width: 960px) { .traffic-row { grid-template-columns: minmax(0, 1fr); } }
+  /* Traffic (dropdown in the toolbar) */
+  details.settings[open] .traffic-panel { width: min(360px, calc(100vw - 32px)); gap: 16px; }
+  .traffic-panel input[type="range"] { width: 100%; padding: 0; border: 0; background: none; }
+  .tctl .spacer { flex: 1; }
   .tgroup { display: grid; gap: 6px; align-content: start; min-width: 0; }
   .tgroup > label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
   .tctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -318,6 +318,32 @@
     <button id="clear">Clear</button>
     <span class="spacer"></span>
     <details class="settings">
+      <summary>Traffic</summary>
+      <div class="panel traffic-panel" aria-label="Traffic controls">
+        <div class="tgroup">
+          <label for="rate-input">Steady rate <span class="muted" id="rate-now"></span></label>
+          <div class="tctl">
+            <input type="range" id="rate-slider" min="0" max="7200" step="60" aria-label="Steady rate per minute">
+          </div>
+          <div class="tctl">
+            <input type="number" id="rate-input" min="0" step="60" inputmode="numeric">
+            <span class="muted">/ min</span>
+            <span class="spacer"></span>
+            <button id="rate-set" class="primary">Set rate</button>
+          </div>
+        </div>
+        <div class="tgroup">
+          <label for="burst-input">Burst</label>
+          <div class="tctl">
+            <input type="number" id="burst-input" min="1" max="20000" value="1000" inputmode="numeric">
+            <span class="muted">requests</span>
+            <span class="spacer"></span>
+            <button id="burst-send" class="primary">Send burst</button>
+          </div>
+        </div>
+      </div>
+    </details>
+    <details class="settings">
       <summary>Endpoints</summary>
       <form class="panel" id="settings">
         <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"></label>
@@ -332,29 +358,6 @@
   <section class="scoreboard" id="scoreboard" aria-label="Current vs Sorting Hat, now"></section>
 
   <section class="card fun" id="fun" aria-label="Customer impact, just for fun"></section>
-
-  <section class="card traffic" aria-label="Traffic controls">
-    <div class="card-head"><h2>Traffic</h2></div>
-    <div class="traffic-row">
-      <div class="tgroup">
-        <label for="rate-input">Steady rate <span class="muted" id="rate-now"></span></label>
-        <div class="tctl">
-          <input type="range" id="rate-slider" min="0" max="7200" step="60" aria-label="Steady rate per minute">
-          <input type="number" id="rate-input" min="0" step="60" inputmode="numeric">
-          <span class="muted">/ min</span>
-          <button id="rate-set" class="primary">Set rate</button>
-        </div>
-      </div>
-      <div class="tgroup">
-        <label for="burst-input">Burst</label>
-        <div class="tctl">
-          <input type="number" id="burst-input" min="1" max="20000" value="1000" inputmode="numeric">
-          <span class="muted">requests</span>
-          <button id="burst-send" class="primary">Send burst</button>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <h3 class="section">Head to head</h3>
   <section class="grid2">

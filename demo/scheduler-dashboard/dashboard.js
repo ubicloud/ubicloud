@@ -1206,6 +1206,11 @@
     });
     document.getElementById("settings-reset").addEventListener("click", () => fill(DEFAULTS));
 
+    // Close an open dropdown (Traffic, Endpoints) on a click outside it.
+    document.addEventListener("click", (e) => {
+      for (const d of document.querySelectorAll("details.settings[open]")) if (!d.contains(e.target)) d.open = false;
+    });
+
     let resizeRaf = 0;
     window.addEventListener("resize", () => {
       cancelAnimationFrame(resizeRaf);
