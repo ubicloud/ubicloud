@@ -21,8 +21,6 @@ class VmHost < Sequel::Model
   many_to_one :location, read_only: true
   one_to_many :gpu_partitions, read_only: true
 
-  many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
-
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy, vhost_block_backends: :destroy, gpu_partitions: :destroy
 
   plugin ResourceMethods
@@ -144,7 +142,17 @@ class VmHost < Sequel::Model
     res = DB[:ipv4_address]
       .join(:address, [:cidr])
       .where(cidr: assigned_subnets_dataset.select(:cidr))
-      .exclude(assigned_vm_addresses_dataset.where(ip: Sequel[:ipv4_address][:ip]).select(1).exists)
+      # A trigger sets assigned when assigned_vm_address gets the address.
+      # Test it on this row, not by a join. An allocation that commits after
+      # this query's snapshot has updated the row. Under READ COMMITTED, the
+      # lock below then goes to the row's latest version, and that version
+      # is tested against the WHERE again. So the pick skips an address that
+      # was assigned after its snapshot, but keeps the lock on it until the
+      # transaction ends. A test through a join would not see the new
+      # assignment in the second test.
+      .where(Sequel[:ipv4_address][:assigned] => false)
+      .select_all(:address)
+      .select_append(Sequel[:ipv4_address][:ip])
       .order { random.function }
       # Concurrent allocations on the host see the same free addresses until
       # one of them commits. Lock the chosen address and skip the ones other

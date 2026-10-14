@@ -24,3 +24,5 @@ end
 # Foreign key constraints:
 #  assigned_vm_address_address_id_fkey | (address_id) REFERENCES address(id)
 #  assigned_vm_address_dst_vm_id_fkey  | (dst_vm_id) REFERENCES vm(id)
+# Triggers:
+#  ipv4_address_assigned | AFTER INSERT OR DELETE OR UPDATE OF ip ON assigned_vm_address FOR EACH ROW EXECUTE FUNCTION ipv4_address_assigned_by_vm_address()
