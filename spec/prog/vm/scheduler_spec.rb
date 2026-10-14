@@ -125,6 +125,47 @@ RSpec.describe Prog::Vm::Scheduler do
         expect(st.stack.first["reservations"]).to eq({})
       end
 
+      it "tries the vms that hold reservations first in every round" do
+        holder = create_waiting_vm(vcpus: 16)
+        holder.incr_waiting_for_capacity
+        st.update(stack: [{"reservations" => {vmh.id => holder.id}, "retry_cursor" => [0, "ffffffff-ffff-ffff-ffff-ffffffffffff"]}])
+        vmh.update(used_cores: 0)
+
+        expect { nx.wait }.to nap(5)
+        expect(holder.reload.vm_host_id).to eq(vmh.id)
+        expect(st.stack.first["reservations"]).to eq({})
+      end
+
+      it "keeps the reservation while its host lacks memory for the holder" do
+        holder = create_waiting_vm(vcpus: 16)
+        st.update(stack: [{"reservations" => {vmh.id => holder.id}}])
+        vmh.update(used_cores: 0, used_hugepages_1g: 150)
+
+        expect { nx.wait }.to nap(5)
+        expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
+      end
+
+      it "releases the reservation of a holder that does not fit on its drained host" do
+        holder = create_waiting_vm(vcpus: 16)
+        holder.update(boot_image: "other-image")
+        st.update(stack: [{"reservations" => {vmh.id => holder.id}}])
+        vmh.update(used_cores: 0)
+        expect(Clog).to receive(:emit).with("central vm scheduler released reservation", {central_vm_scheduler_release: {vm: holder.ubid, vm_host: vmh.ubid, reason: "unfitting"}}).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(holder.reload.vm_host_id).to be_nil
+      end
+
+      it "releases the reservation of a host that no longer exists" do
+        holder = create_waiting_vm(vcpus: 16)
+        gone_host_id = VmHost.generate_uuid
+        st.update(stack: [{"reservations" => {gone_host_id => holder.id}}])
+        expect(Clog).to receive(:emit).with("central vm scheduler released reservation", {central_vm_scheduler_release: {vm: holder.ubid, vm_host: UBID.to_ubid(gone_host_id), reason: "host gone"}}).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
+      end
+
       it "gives the reservation of a spilled runner to the next large vm" do
         spilled = create_waiting_vm(vcpus: 16)
         spilled.update(created_at: Time.now - 60)
