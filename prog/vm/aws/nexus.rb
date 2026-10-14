@@ -213,7 +213,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name) + Util.aws_tag_specifications("volume", vm.name),
-      client_token: "#{vm.id}-#{vm.family}",
+      client_token:,
       instance_market_options:,
     }
     params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
@@ -411,6 +411,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
 
       aws_instance.destroy
+    else
+      reservations = client.describe_instances(filters: [{name: "client-token", values: [client_token]}]).reservations
+      if (instance = reservations.flat_map(&:instances).first)
+        client.terminate_instances(instance_ids: [instance.instance_id])
+      end
     end
 
     if is_runner?
@@ -485,6 +490,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def client
     @client ||= vm.location.location_credential_aws.client
+  end
+
+  def client_token
+    "#{vm.id}-#{vm.family}"
   end
 
   def iam_client
