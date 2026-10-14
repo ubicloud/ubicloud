@@ -105,8 +105,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     }
   end
 
+  def allocation_request
+    Scheduling::Allocator.request(vm, storage_volumes, **allocation_filters)
+  end
+
   def queued_vms
-    Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
+    Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => ["start", "wait_allocation"])
   end
 
   def report_lack_of_capacity
@@ -141,6 +145,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start
+    if Config.central_vm_scheduler
+      Strand.where(id: Prog::Vm::Scheduler::STRAND_ID).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
+      hop_wait_allocation
+    end
+
     begin
       Scheduling::Allocator.allocate(vm, storage_volumes, **allocation_filters)
     rescue Scheduling::Allocator::NoSpaceLeft
@@ -150,6 +159,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     finish_allocation
+  end
+
+  label def wait_allocation
+    finish_allocation if vm.vm_host_id
+    report_lack_of_capacity if vm.waiting_for_capacity_set?
+    nap 60
   end
 
   label def create_unix_user

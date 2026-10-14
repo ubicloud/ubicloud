@@ -1,0 +1,93 @@
+# frozen_string_literal: true
+
+require_relative "../../model/spec_helper"
+
+RSpec.describe Prog::Vm::Scheduler do
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.create_with_id(described_class::STRAND_ID, prog: "Vm::Scheduler", label: "wait") }
+  let(:project) { Project.create(name: "default") }
+  let(:storage_volumes) { [{"size_gib" => 11, "use_bdev_ubi" => false, "boot" => true}] }
+
+  def create_host(**)
+    vmh = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, **)
+    BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+    StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+    SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
+    vmh
+  end
+
+  def create_waiting_vm(**)
+    vm = create_vm(project_id: project.id, name: "vm#{Vm.count}")
+    vm.create_storage_volumes(storage_volumes.map { it.transform_keys(&:to_sym) })
+    Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "wait_allocation", stack: [{"storage_volumes" => storage_volumes}], schedule: Time.now + 60, **)
+    vm
+  end
+
+  describe "#wait" do
+    it "allocates the waiting vms and wakes their strands" do
+      vmh = create_host
+      vms = Array.new(2) { create_waiting_vm }
+
+      expect { nx.wait }.to nap(5)
+      expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
+      expect(vms.map { it.strand.schedule }).to all(be < Time.now)
+    end
+
+    it "marks the vms without capacity as waiting for capacity once" do
+      vm = create_waiting_vm
+
+      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(5)
+      expect(vm.reload.vm_host_id).to be_nil
+      expect(Semaphore.where(strand_id: vm.id, name: "waiting_for_capacity").count).to eq(1)
+    end
+
+    it "skips the vms it allocated whose strands did not run yet" do
+      vmh = create_host
+      vm = create_waiting_vm
+
+      expect { nx.wait }.to nap(5)
+      expect(vm.reload.vm_host_id).to eq(vmh.id)
+      expect { described_class.new(st).wait }.to nap(5)
+      expect(vmh.reload.used_cores).to eq(1 + vm.reload.cores)
+    end
+
+    it "skips the vms whose strands run" do
+      create_host
+      vm = create_waiting_vm(lease: Time.now + 60)
+
+      expect { nx.wait }.to nap(5)
+      expect(vm.reload.vm_host_id).to be_nil
+    end
+
+    it "allocates the oldest vms first, not in id order, and continues after the last vm of a full batch" do
+      create_host
+      second, first = Array.new(2) { create_waiting_vm }.sort_by(&:id)
+      first.update(created_at: Time.now - 60)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(1).exactly(6).times
+
+      expect { nx.wait }.to nap(0)
+      expect(st.stack.first["cursor"]).to eq([first.reload.created_at.utc.iso8601(6), first.id])
+      expect(first.vm_host_id).not_to be_nil
+      expect(second.reload.vm_host_id).to be_nil
+
+      expect { described_class.new(st).wait }.to nap(0)
+      expect(st.stack.first["cursor"]).to eq([second.reload.created_at.utc.iso8601(6), second.id])
+      expect(second.vm_host_id).not_to be_nil
+
+      expect { described_class.new(st).wait }.to nap(5)
+      expect(st.stack.first["cursor"]).to be_nil
+    end
+
+    it "logs the vms it fails to allocate and allocates the rest" do
+      create_host(accepts_slices: true)
+      vms = Array.new(2) { create_waiting_vm }
+      expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vms.first.ubid})).and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vms.last.ubid})).and_call_original
+
+      expect { nx.wait }.to nap(5)
+      expect(vms.map { it.reload.vm_host_id }).to eq([nil, nil])
+    end
+  end
+end
