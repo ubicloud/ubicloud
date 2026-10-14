@@ -46,6 +46,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     !!project_id && !Project.service_project?(project_id)
   end
 
+  def capacity_wait_seconds
+    waiting_seconds = Time.now - vm.created_at
+    (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
+  end
+
   def before_destroy
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
@@ -122,7 +127,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
-      nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
+      nap capacity_wait_seconds
     end
 
     vm.nics.each(&:incr_vm_allocated)
