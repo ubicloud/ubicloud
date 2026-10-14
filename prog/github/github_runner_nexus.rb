@@ -8,7 +8,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   extend Forwardable
 
-  def_delegators :github_runner, :installation, :vm, :label_data
+  def_delegators :github_runner, :installation, :vm, :label_data, :arch, :x64?, :support_alien?, :aws_quota_available?, :aws_vcpus
   def_delegators :installation, :project
 
   frame_accessor :boot_race_checked
@@ -68,14 +68,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
-      # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
-      # instance, but the customer is still billed for 30 vCPUs.
-      vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
       if x64?
-        size = Option.aws_instance_type_name("m8a", vcpus)
+        size = Option.aws_instance_type_name("m8a", aws_vcpus)
         alternative_families = ["m8i", "m7a", "m7i", "m6a"]
       else
-        size = Option.aws_instance_type_name("m9g", vcpus)
+        size = Option.aws_instance_type_name("m9g", aws_vcpus)
         alternative_families = ["m8g", "m7g"]
       end
     end
@@ -334,20 +331,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     raise
   end
 
-  def arch
-    label_data["arch"]
-  end
-
-  def x64?
-    arch == "x64"
-  end
-
   def runners_path(suffix = nil)
     "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
-  end
-
-  def support_alien?
-    label_data["vcpus"] <= 30
   end
 
   def before_destroy
@@ -374,11 +359,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # that I'm not keen to do at the moment. Although it looks weird, passing 0
     # as requested_additional_usage keeps the existing behavior.
     resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
-    project.quota_available?(resource_type, 0)
-  end
-
-  def aws_quota_available?
-    resource_type = x64? ? "GithubRunnerVCpuAws" : "GithubRunnerVCpuArmAws"
     project.quota_available?(resource_type, 0)
   end
 
