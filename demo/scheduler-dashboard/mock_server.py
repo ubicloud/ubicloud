@@ -31,6 +31,8 @@ import math
 import random
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -377,7 +379,7 @@ class World:
                 self.advance()
 
 
-def make_handler(world):
+def make_handler(world, upstreams):
     root = Path(__file__).resolve().parent
 
     class Handler(BaseHTTPRequestHandler):
@@ -400,6 +402,9 @@ def make_handler(world):
 
         def do_GET(self):
             path = self.path.split("?")[0]
+            side = path.split("/")[1]
+            if path in ("/current/scheduler/metrics", "/central/scheduler/metrics") and upstreams.get(side):
+                return self.proxy(upstreams[side])
             if path in ("/current/scheduler/metrics", "/central/scheduler/metrics"):
                 with world.lock:
                     sim = world.current if path.startswith("/current") else world.central
@@ -409,6 +414,15 @@ def make_handler(world):
                 ctype = "text/html; charset=utf-8" if name.endswith(".html") else "text/javascript; charset=utf-8"
                 return self.send(200, (root / name).read_bytes(), ctype)
             self.send(404, {"error": "not found"})
+
+        def proxy(self, url):
+            # Serving a real control plane's metrics from this origin keeps
+            # the dashboard working over HTTPS (no mixed content) and CORS.
+            try:
+                with urllib.request.urlopen(url, timeout=3) as resp:
+                    return self.send(200, resp.read())
+            except (urllib.error.URLError, OSError) as e:
+                return self.send(502, {"error": f"upstream {url}: {e}"})
 
         def do_POST(self):
             length = int(self.headers.get("Content-Length") or 0)
@@ -446,14 +460,18 @@ def main():
     p.add_argument("--speed", type=float, default=1.0, help="simulated seconds per real second")
     p.add_argument("--warmup", type=float, default=600, help="simulated seconds to run before serving")
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--current-url", help="serve /current/scheduler/metrics from this real endpoint instead of the simulation")
+    p.add_argument("--central-url", help="serve /central/scheduler/metrics from this real endpoint instead of the simulation")
     args = p.parse_args()
+    upstreams = {"current": args.current_url, "central": args.central_url}
 
     world = World(args)
     threading.Thread(target=world.run, daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world))
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world, upstreams))
     print(f"Dashboard:  http://localhost:{args.port}/")
-    print(f"Metrics:    http://localhost:{args.port}/current/scheduler/metrics")
-    print(f"            http://localhost:{args.port}/central/scheduler/metrics")
+    for side in ("current", "central"):
+        source = f"proxied from {upstreams[side]}" if upstreams[side] else "simulated"
+        print(f"Metrics:    http://localhost:{args.port}/{side}/scheduler/metrics ({source})")
     print(f"Inject:     python3 {Path(__file__).parent / 'inject.py'} --count 300")
     server.serve_forever()
 

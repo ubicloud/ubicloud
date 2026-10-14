@@ -62,14 +62,33 @@ At runtime, `inject.py` options adjust the load:
 
 ## Point it at real control planes
 
-Use the **Endpoints** menu in the top bar, or URL parameters:
+**Recommended:** have the server proxy the real endpoint, so the dashboard
+keeps fetching from its own origin:
+
+```bash
+python3 demo/scheduler-dashboard/mock_server.py \
+  --current-url http://144.76.171.226:9292/scheduler/metrics \
+  --hosts 6 --host-vcpus 48 --rate 0
+```
+
+- **Why proxy:** this avoids CORS, and avoids the browser blocking plain-HTTP
+  endpoints when the page is served over HTTPS (e.g. through a Cloudflare
+  tunnel).
+- **The other side:** pass `--central-url` too once the central scheduler
+  has an endpoint. Until then that side stays simulated.
+- **Sizing the simulation:** match `--hosts` and `--host-vcpus` to the real
+  fleet. Pass `--rate 0` so the simulated side only gets the bursts you
+  inject, not made-up background traffic.
+
+**Alternatively, fetch directly from the browser.** Use the **Endpoints** menu
+in the top bar, or URL parameters:
 
 ```
 http://localhost:8787/?current=http://cp-current:3000/scheduler/metrics&central=http://cp-central:3000/scheduler/metrics&interval=1000
 ```
 
-Settings are remembered in the browser. You can open `index.html` from any
-static server; it doesn't need to be served by the mock.
+Settings are remembered in the browser. This only works when the endpoints
+send CORS headers and use the same scheme (HTTP or HTTPS) as the page.
 
 ## The Burst and Load buttons
 
