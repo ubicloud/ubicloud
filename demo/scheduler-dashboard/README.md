@@ -97,8 +97,8 @@ send CORS headers and use the same scheme (HTTP or HTTPS) as the page.
 
 The **Traffic** panel sets the load generator's steady rate (slider or number,
 then **Set rate**) and sends bursts (**Send burst**; bursts of 2,000
-or more take a second click to confirm). It also shows how many events the
-generator has sent to each control plane, and whether any failed.
+or more take a second click to confirm). Next to the rate it shows the
+generator's current rate, or a warning when it can't be reached.
 
 Start the server with the load generator's address:
 

@@ -171,7 +171,7 @@
 
   /* Traffic */
   .traffic { margin-bottom: 12px; }
-  .traffic-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; }
+  .traffic-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px 24px; }
   @media (max-width: 960px) { .traffic-row { grid-template-columns: minmax(0, 1fr); } }
   .tgroup { display: grid; gap: 6px; align-content: start; min-width: 0; }
   .tgroup > label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
@@ -182,9 +182,7 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
   }
   button:disabled { opacity: 0.5; cursor: progress; }
-  .trow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .trow .failed { color: var(--critical); font-weight: 600; }
-  .tstatus-err { margin: 0; font-size: 12px; color: var(--critical); font-weight: 600; }
+  #rate-now.err { color: var(--critical); }
 
   /* Scoreboard */
   .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
@@ -275,7 +273,7 @@
   <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>
 
   <section class="card traffic" aria-label="Traffic controls">
-    <div class="card-head"><h2>Traffic</h2><span class="muted" id="traffic-source"></span></div>
+    <div class="card-head"><h2>Traffic</h2></div>
     <div class="traffic-row">
       <div class="tgroup">
         <label for="rate-input">Steady rate <span class="muted" id="rate-now"></span></label>
@@ -293,10 +291,6 @@
           <span class="muted">requests</span>
           <button id="burst-send" class="primary">Send burst</button>
         </div>
-      </div>
-      <div class="tgroup">
-        <label>Sent by the load generator</label>
-        <div id="traffic-status" aria-live="polite"></div>
       </div>
     </div>
   </section>

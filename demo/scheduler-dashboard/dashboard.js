@@ -95,7 +95,6 @@
   for (const s of SIDES) state.sides[s] = { hist: [], error: null, lastOk: 0 };
   // Real endpoints the serving process proxies each default path to (GET /config).
   let upstreams = {};
-  let controlUrl = null; // load generator the server relays traffic controls to
 
   // ---------------------------------------------------------------- format
 
@@ -293,7 +292,7 @@
   async function loadServerConfig() {
     try {
       const r = await fetch("/config", { cache: "no-store" });
-      if (r.ok) ({ upstreams = {}, control: controlUrl = null } = await r.json());
+      if (r.ok) upstreams = (await r.json()).upstreams || {};
       // A real endpoint saved by hand earlier is the one this server proxies:
       // go through the server so it also works over HTTPS.
       for (const side of SIDES) if (upstreams[side] && cfg[side] === upstreams[side]) cfg[side] = DEFAULTS[side];
@@ -1062,40 +1061,13 @@
 
   function renderTraffic() {
     const st = traffic.status;
-    document.getElementById("traffic-source").textContent = controlUrl ? `via ${controlUrl}` : "driving this server's simulation";
     const now = document.getElementById("rate-now");
-    now.textContent = st ? `Now ${fmtInt(st.rate_per_min)} / min (${fmtRate(st.rate_per_min / 60)} / s)` : traffic.error ? "" : "…";
+    now.classList.toggle("err", !!traffic.error);
+    now.title = traffic.error || "";
+    now.textContent = traffic.error
+      ? "▲ Load generator unreachable"
+      : st ? `Now ${fmtInt(st.rate_per_min)} / min (${fmtRate(st.rate_per_min / 60)} / s)` : "…";
     if (st && !traffic.rateDirty && document.activeElement?.id !== "rate-input") setRateInputs(st.rate_per_min);
-
-    const host = document.getElementById("traffic-status");
-    host.replaceChildren();
-    if (traffic.error) {
-      const p = document.createElement("p");
-      p.className = "tstatus-err";
-      p.textContent = `Load generator unreachable: ${traffic.error}`;
-      host.appendChild(p);
-      return;
-    }
-    if (st?.simulated) {
-      const p = document.createElement("p");
-      p.className = "muted";
-      p.textContent = "Both simulated control planes receive these directly.";
-      host.appendChild(p);
-    }
-    for (const t of st?.targets || []) {
-      const ev = t.events?.workflow_job || {};
-      const row = document.createElement("div");
-      row.className = "trow";
-      const name = document.createElement("span");
-      name.textContent = t.name;
-      const sent = document.createElement("b");
-      sent.textContent = `${fmtInt(ev.sent)} sent`;
-      const failed = document.createElement("span");
-      failed.className = ev.failed ? "failed" : "muted";
-      failed.textContent = ev.failed ? `▲ ${fmtInt(ev.failed)} failed` : "0 failed";
-      row.append(name, sent, failed);
-      host.appendChild(row);
-    }
   }
 
   function setRateInputs(v) {
