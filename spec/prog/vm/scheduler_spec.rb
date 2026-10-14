@@ -33,6 +33,17 @@ RSpec.describe Prog::Vm::Scheduler do
     runner
   end
 
+  describe "#free_provisionings" do
+    it "uses the configured value" do
+      expect(nx.free_provisionings).to eq(4)
+    end
+
+    it "uses the value an operator set in the frame" do
+      st.update(stack: [{"free_provisionings" => 7}])
+      expect(nx.free_provisionings).to eq(7)
+    end
+  end
+
   describe "#wait" do
     it "allocates the waiting vms and wakes their strands" do
       vmh = create_host
