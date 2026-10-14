@@ -23,6 +23,7 @@ class Prog::Vm::Scheduler < Prog::Base
 
     Strand.where(id: allocated_ids).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
     Semaphore.incr(no_capacity_ids - Semaphore.where(strand_id: no_capacity_ids, name: "waiting_for_capacity").select_map(:strand_id), :waiting_for_capacity)
+    Scheduling::RunnerSpiller.new.spill(no_capacity_ids) unless no_capacity_ids.empty?
 
     if strands.size == Config.central_vm_scheduler_batch_size
       self.cursor = strands.last.id
@@ -36,12 +37,14 @@ class Prog::Vm::Scheduler < Prog::Base
   # The scheduler locks the strands of the VMs it allocates, and skips the
   # ones that run, so a VM strand never runs while it gets a host. A VM
   # stays in wait_allocation after it gets a host until its strand runs, so
-  # only VMs without a host wait. Strand ids are VM ids, which are ordered
-  # by their creation millisecond.
+  # only VMs without a host wait. It also skips the VMs of spilled runners,
+  # which the runner replaces. Strand ids are VM ids, which are ordered by
+  # their creation millisecond.
   def waiting_strands
     ds = Strand.where(prog: "Vm::Metal::Nexus", label: "wait_allocation", exitval: nil)
       .where { lease < Sequel::CURRENT_TIMESTAMP }
       .where(Vm.where(id: Sequel[:strand][:id], vm_host_id: nil).exists)
+      .exclude(id: GithubRunner.where(id: Semaphore.where(name: "spill_over").select(:strand_id)).exclude(vm_id: nil).select(:vm_id))
       .order(:id)
       .limit(Config.central_vm_scheduler_batch_size)
     ds = ds.where(Sequel[:id] > cursor) if cursor

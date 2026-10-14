@@ -372,9 +372,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   # Large runners may not fit on a fragmented metal fleet even at low
   # utilization, so spill them over to AWS once, after a short wait.
   def spill_unallocated_vm?
+    return false unless vm.location_id == Location::GITHUB_RUNNERS_ID && !vm.allocated_at
+    return github_runner.spill_over_set? if Config.central_vm_scheduler
+
     [16, 30].include?(label_data["vcpus"]) &&
-      vm.location_id == Location::GITHUB_RUNNERS_ID &&
-      !vm.allocated_at &&
       vm.waiting_for_capacity_set? &&
       Time.now - vm.created_at > 60 &&
       project.get_ff_spill_to_alien_runners &&
@@ -430,7 +431,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if is_high_util
-      should_spill_over = support_alien? &&
+      should_spill_over = !Config.central_vm_scheduler &&
+        support_alien? &&
         project.get_ff_spill_to_alien_runners &&
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds &&
         aws_quota_available?
@@ -491,7 +493,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Clog.emit("spilled over unallocated runner", {spilled_over_unallocated_runner: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       destroy_vm
       github_runner.update(vm_id: nil, location_id: nil, allocated_at: nil)
-      github_runner.incr_spill_over
+      github_runner.incr_spill_over unless github_runner.spill_over_set?
       hop_allocate_vm
     end
 

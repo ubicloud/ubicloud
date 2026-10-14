@@ -56,6 +56,14 @@ class GithubRunner < Sequel::Model
     ])
   end
 
+  def self.aws_vcpus_by_installation
+    Vm.where(boot_image: AWS_AMI_VERSIONS)
+      .join(:github_runner, vm_id: :id)
+      .select_group(:installation_id)
+      .select_append { sum(Sequel[:vm][:vcpus]).as(:vcpus) }
+      .to_hash(:installation_id, :vcpus)
+  end
+
   def label_data
     @label_data ||= Github.runner_labels[label]
   end

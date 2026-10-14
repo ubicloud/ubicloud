@@ -24,6 +24,15 @@ RSpec.describe Prog::Vm::Scheduler do
     vm
   end
 
+  def create_runner(vm)
+    customer = Project.create(name: "customer")
+    customer.set_ff_spill_to_alien_runners(true)
+    installation = GithubInstallation.create(installation_id: GithubInstallation.count + 1, project_id: customer.id, name: "ubicloud", type: "Organization")
+    runner = GithubRunner.create(installation_id: installation.id, vm_id: vm&.id, location_id: vm && Location::GITHUB_RUNNERS_ID, repository_name: "test-repo", label: "ubicloud-standard-2")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+    runner
+  end
+
   describe "#wait" do
     it "allocates the waiting vms and wakes their strands" do
       vmh = create_host
@@ -41,6 +50,27 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { nx.wait }.to nap(5)
       expect(vm.reload.vm_host_id).to be_nil
       expect(Semaphore.where(strand_id: vm.id, name: "waiting_for_capacity").count).to eq(1)
+    end
+
+    it "spills the runners without capacity" do
+      vm = create_waiting_vm
+      vm.update(created_at: Time.now - 60)
+      runner = create_runner(vm)
+
+      expect { nx.wait }.to nap(5)
+      expect(runner.spill_over_set?).to be(true)
+    end
+
+    it "skips the vms of spilled runners" do
+      create_host
+      create_runner(nil).incr_spill_over
+      spilled = create_waiting_vm
+      create_runner(spilled).incr_spill_over
+      vm = create_waiting_vm
+
+      expect { nx.wait }.to nap(5)
+      expect(spilled.reload.vm_host_id).to be_nil
+      expect(vm.reload.vm_host_id).not_to be_nil
     end
 
     it "skips the vms it allocated whose strands did not run yet" do
