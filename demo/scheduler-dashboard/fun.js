@@ -169,19 +169,10 @@
     if (text != null) e.textContent = text;
     return e;
   }
-  function who(side) {
-    const w = el("span", "fun-who");
-    const key = el("i");
-    key.style.background = side.color;
-    w.append(key, side.name);
-    return w;
-  }
 
   root.replaceChildren();
-  const head = el("div", "card-head");
-  head.append(el("h2", null, "Customer impact"));
   const grid = el("div", "fun-grid");
-  root.append(head, grid);
+  root.append(grid);
 
   // One column per side, like the rest of the page: money and mood up top,
   // that side's customer chatter below.
@@ -206,7 +197,12 @@
     const feed = el("ol", "fun-feed");
     feed.setAttribute("aria-label", `Customer tweets about ${side.name}`);
 
-    col.append(who(side), stats, el("span", "fun-label", "Customer chatter"), feed);
+    // Same side header as the "Inside each scheduler" columns.
+    const sideHead = el("div", "col-head");
+    const bar = el("span", "bar");
+    bar.style.background = side.color;
+    sideHead.append(bar, el("h2", null, side.name));
+    col.append(sideHead, stats, el("span", "fun-label", "Customer chatter"), feed);
     grid.append(col);
     view[side.key] = { total, big, word, feed };
   }

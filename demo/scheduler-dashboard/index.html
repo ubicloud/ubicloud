@@ -174,7 +174,8 @@
   .legend i.ramp { width: 44px; height: 8px; }
 
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .section { margin: 20px 0 8px; }
+  .section { margin: 24px 0 10px; }
+  .section.first { margin-top: 0; }
   .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   @media (max-width: 960px) { .grid2, .cols { grid-template-columns: minmax(0, 1fr); } }
 
@@ -185,8 +186,8 @@
   .col-head p { margin: 0; font-size: 12px; color: var(--muted); }
 
   /* By runner size */
-  .size-card { margin-top: 12px; }
-  .size-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .size-card .card-head { margin-bottom: 8px; }
+  .size-note { margin: 0; flex: 1; min-width: 240px; font-size: 12px; color: var(--muted); }
   .size-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px 12px; }
   @media (max-width: 1100px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .size-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -208,7 +209,7 @@
   #rate-now.err { color: var(--critical); }
 
   /* Scoreboard */
-  .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; }
   @media (max-width: 1100px) {
     .scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .score.primary { grid-column: 1 / -1; }
@@ -259,16 +260,12 @@
   }
   .toast.show { opacity: 1; }
   /* Customer impact (fun) */
-  .fun { margin-bottom: 12px; }
   .fun-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
   @media (max-width: 640px) { .fun-grid { grid-template-columns: minmax(0, 1fr); } }
   .fun-col { display: grid; gap: 8px; align-content: start; min-width: 0; }
-  .fun-col > .fun-who { font-size: 13px; font-weight: 600; color: var(--ink); }
-  .fun-who { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-  .fun-who i { width: 10px; height: 3px; border-radius: 2px; }
   .fun-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .fun-stat { display: grid; gap: 4px; align-content: start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); min-width: 0; }
-  .fun-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .fun-label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
   .fun-total { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .fun-mood-row { display: flex; align-items: center; gap: 8px; min-height: 32px; }
   .fun-big { font-size: 30px; line-height: 1; }
@@ -355,9 +352,11 @@
   </div>
   </div>
 
+  <h3 class="section first">Overview</h3>
   <section class="scoreboard" id="scoreboard" aria-label="Current vs Sorting Hat, now"></section>
 
-  <section class="card fun" id="fun" aria-label="Customer impact, just for fun"></section>
+  <h3 class="section">Customer impact</h3>
+  <section class="card fun" id="fun" aria-label="Customer impact"></section>
 
   <h3 class="section">Head to head</h3>
   <section class="grid2">
@@ -393,15 +392,15 @@
     </div>
   </section>
 
+  <h3 class="section">By runner size</h3>
   <section class="card size-card">
     <div class="card-head">
-      <h2>By runner size</h2>
+      <p class="size-note" id="size-note"></p>
       <div class="seg small" role="group" aria-label="By-size statistic">
         <button data-sizestat="oldest">Oldest wait</button><button data-sizestat="waiting">Waiting</button><button data-sizestat="vcpus">Waiting vCPU</button>
       </div>
       <div class="legend" data-legend="sides"></div>
     </div>
-    <p class="size-note" id="size-note"></p>
     <div class="size-grid" id="size-grid"></div>
   </section>
 
