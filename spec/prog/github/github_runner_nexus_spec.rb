@@ -503,6 +503,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to hop("apply_custom_label_quota")
     end
 
+    it "hops to wait_capacity when the capacity gate is on" do
+      expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+      expect(project).to receive(:active?).and_return(true)
+      expect(project).not_to receive(:quota_available?)
+
+      expect { nx.start }.to hop("wait_capacity")
+    end
+
+    it "hops to apply_custom_label_quota before the capacity gate when the label is a custom label" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+      expect(project).to receive(:active?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1")
+
+      expect { nx.start }.to hop("apply_custom_label_quota")
+    end
+
     it "pops if the project is not active" do
       expect(project).to receive(:active?).and_return(false)
 
@@ -521,6 +538,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       ].each do |location_id, arch, family|
         create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
       end
+    end
+
+    it "hops to wait_capacity when the capacity gate is on" do
+      expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+      expect { nx.wait_concurrency_limit }.to hop("wait_capacity")
     end
 
     it "hops to allocate_vm when the spill over semaphore is set manually" do
@@ -739,6 +761,112 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
+  describe "#wait_capacity" do
+    let(:pool) { GithubRunnerCapacity["x64-standard"].update(total_cores: 100, total_hugepages_1g: 1000) }
+    let(:spill) { GithubRunnerCapacity[GithubRunnerCapacity::SPILL] }
+
+    before do
+      pool
+      project.set_ff_spill_to_alien_runners(true)
+    end
+
+    it "hops to allocate_vm when the spill over semaphore is set manually" do
+      runner.incr_spill_over
+      expect(project).not_to receive(:quota_available?)
+      expect { nx.wait_capacity }.to hop("allocate_vm")
+    end
+
+    context "when the customer is within its quota" do
+      before { expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true) }
+
+      it "reserves metal capacity while metal stays under the spill utilization" do
+        pool.update(used_cores: 93)
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq("x64-standard")
+        expect(pool.reload.used_cores).to eq(95)
+      end
+
+      it "spills over when metal would pass the spill utilization" do
+        pool.update(used_cores: 94)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        expect(Clog).to receive(:emit).with("spilled over runner", instance_of(Hash)).and_call_original
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq(GithubRunnerCapacity::SPILL)
+        expect(runner.spill_over_set?).to be(true)
+        expect(spill.reload.used_vcpus).to eq(4)
+        expect(pool.reload.used_cores).to eq(94)
+      end
+
+      it "reserves metal capacity under the wait utilization when spill capacity is full" do
+        pool.update(used_cores: 94)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(0)
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq("x64-standard")
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "reserves metal capacity under the wait utilization when the customer's AWS quota is full" do
+        pool.update(used_cores: 94)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(false)
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq("x64-standard")
+      end
+
+      it "waits when metal would pass the wait utilization and the project does not spill" do
+        project.set_ff_spill_to_alien_runners(false)
+        pool.update(used_cores: 96)
+        expect(Clog).to receive(:emit).with("not allowed because of runner capacity", instance_of(Hash)).and_call_original
+        expect { nx.wait_capacity }.to nap
+        expect(runner.reload.capacity_pool).to be_nil
+        expect(pool.reload.used_cores).to eq(96)
+      end
+    end
+
+    it "does not touch the premium upgrade of arm64 runners over their quota" do
+      runner.update(label: "ubicloud-standard-4-arm")
+      GithubRunnerCapacity["arm64-standard"].update(total_cores: 100, total_hugepages_1g: 1000)
+      expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
+      expect { nx.wait_capacity }.to hop("allocate_vm")
+      expect(runner.reload.capacity_pool).to eq("arm64-standard")
+      expect(runner.not_upgrade_premium_set?).to be(false)
+    end
+
+    context "when the customer is over its quota" do
+      before { expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false) }
+
+      it "waits if reputation is limited" do
+        project.update(reputation: "limited")
+        expect(Clog).to receive(:emit).with("not allowed because of limited reputation", instance_of(Hash)).and_call_original
+        expect { nx.wait_capacity }.to nap
+      end
+
+      it "reserves metal capacity under the over quota utilization without a premium upgrade" do
+        pool.update(used_cores: 78)
+        expect(Clog).to receive(:emit).with("allowed because of low utilization", instance_of(Hash)).and_call_original
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq("x64-standard")
+        expect(runner.not_upgrade_premium_set?).to be(true)
+      end
+
+      it "spills over after waiting when metal would pass the over quota utilization" do
+        pool.update(used_cores: 79)
+        runner.update(created_at: now - 31)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        expect { nx.wait_capacity }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq(GithubRunnerCapacity::SPILL)
+        expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "waits before the spill threshold when metal would pass the over quota utilization" do
+        pool.update(used_cores: 79)
+        expect(Clog).to receive(:emit).with("not allowed because of high utilization", instance_of(Hash)).and_call_original
+        expect { nx.wait_capacity }.to nap
+        expect(runner.reload.capacity_pool).to be_nil
+      end
+    end
+  end
+
   describe "#apply_custom_label_quota" do
     it "hops to allocate_vm if custom label exists and has concurrency limit available" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
@@ -752,6 +880,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner).to receive(:actual_label).and_return("custom-label-1")
       expect(runner).to receive(:installation_id).and_return(installation.id)
       expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+    end
+
+    it "hops to wait_capacity after taking a custom label slot when the capacity gate is on" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
+      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+      expect { nx.apply_custom_label_quota }.to hop("wait_capacity")
     end
 
     it "naps if custom label exists and concurrency limit is not available" do
@@ -773,6 +909,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.location_id).to eq(picked_vm.location_id)
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
+      expect(runner.reload.capacity_pool).to eq("x64-standard")
+    end
+
+    it "moves the reservation to spill capacity when the vm is on AWS" do
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      runner.move_capacity("x64-standard")
+      expect(nx).to receive(:pick_vm).and_return(create_vm(name: "aws-vm", location_id: location.id))
+
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(runner.reload.capacity_pool).to eq(GithubRunnerCapacity::SPILL)
+      expect(GithubRunnerCapacity["x64-standard"].used_cores).to eq(0)
+      expect(GithubRunnerCapacity[GithubRunnerCapacity::SPILL].used_vcpus).to eq(4)
     end
   end
 
@@ -859,6 +1008,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "reserves spill capacity when the capacity gate is on" do
+        expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.capacity_pool).to eq(GithubRunnerCapacity::SPILL)
+        expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "does not spill over when the capacity gate is on and spill capacity is full" do
+        expect(Config).to receive(:github_runner_capacity_gate).and_return(true)
+        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(0)
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.reload.capacity_pool).to be_nil
       end
 
       it "does not spill over if the spill vcpus limit is exceeded" do

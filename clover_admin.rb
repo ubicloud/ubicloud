@@ -957,7 +957,7 @@ class CloverAdmin < Roda
         flash "Host allocation state changed to accepting"
         allow_if { it.allocation_state != "accepting" }
         run do |obj|
-          obj.update(allocation_state: "accepting")
+          obj.update_with_runner_capacity(allocation_state: "accepting")
         end
       end
 
@@ -965,7 +965,7 @@ class CloverAdmin < Roda
         flash "Host allocation state changed to draining"
         allow_if { it.allocation_state != "draining" }
         run do |obj|
-          obj.update(allocation_state: "draining")
+          obj.update_with_runner_capacity(allocation_state: "draining")
         end
       end
 

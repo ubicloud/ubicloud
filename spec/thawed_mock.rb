@@ -64,6 +64,7 @@ module ThawedMock
   allow_mocking(FreeQuota, :get_exhausted_projects)
   allow_mocking(Github, :app_client, :installation_client, :oauth_client)
   allow_mocking(GithubRunner, :[], :any?, :first, :join)
+  allow_mocking(GithubRunnerCapacity, :charge)
   allow_mocking(HostProvider, :create)
   allow_mocking(Invoice, :blob_storage_client)
   allow_mocking(IpsecTunnel, :[], :create)

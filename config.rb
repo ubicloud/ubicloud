@@ -146,6 +146,11 @@ module Config
   override :github_runner_aws_spill_threshold_seconds, 30, int
   override :github_runner_aws_spill_vcpu_capacity, 100, int
   override :github_runner_aws_spill_runner_capacity, 50, int
+  override :github_runner_capacity_gate, false, bool
+  override :github_runner_metal_spill_utilization, 95, int
+  override :github_runner_metal_wait_utilization, 97, int
+  override :github_runner_over_quota_utilization, 80, int
+  override :github_runner_capacity_reconcile_seconds, 600, int
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string

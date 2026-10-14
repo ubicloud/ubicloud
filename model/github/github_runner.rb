@@ -13,7 +13,7 @@ class GithubRunner < Sequel::Model
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
   include HealthMonitorMethods
 
-  NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
+  NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota wait_capacity].freeze
 
   AWS_AMI_VERSIONS = [
     Config.github_ubuntu_2204_x64_aws_ami_version,
@@ -58,6 +58,99 @@ class GithubRunner < Sequel::Model
 
   def label_data
     @label_data ||= Github.runner_labels[label]
+  end
+
+  # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
+  # instance, but the customer is still billed for 30 vCPUs.
+  def aws_vcpus
+    (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
+  end
+
+  def metal_capacity_pool
+    "#{label_data["arch"]}-#{label_data["family"]}"
+  end
+
+  def capacity_amounts(pool)
+    if pool == GithubRunnerCapacity::SPILL
+      {used_vcpus: aws_vcpus, used_runners: 1}
+    else
+      threads_per_core = (label_data["arch"] == "arm64") ? 1 : 2
+      {
+        used_cores: (label_data["vcpus"].to_f / threads_per_core).ceil,
+        used_hugepages_1g: Validation.validate_vm_size(label_data["vm_size"], label_data["arch"]).memory_gib,
+      }
+    end
+  end
+
+  # The capacity charge of each runner label, for queries that charge runners
+  # in SQL: label, metal pool, metal cores, metal hugepages and AWS vCPUs.
+  def self.capacity_charges
+    Github.runner_labels.keys.map do |label|
+      runner = new(label:)
+      pool = runner.metal_capacity_pool
+      amounts = runner.capacity_amounts(pool)
+      [label, pool, amounts[:used_cores], amounts[:used_hugepages_1g], runner.aws_vcpus]
+    end
+  end
+
+  def self.capacity_charges_dataset
+    DB.values(capacity_charges).as(:charge, [:label, :pool, :cores, :hugepages_1g, :vcpus])
+  end
+
+  # Gives a pool to runners that hold a VM but no reservation, such as the
+  # runners that were already running when the capacity ledger shipped.
+  # GithubRunnerCapacity.reconcile charges them in the same transaction.
+  def self.adopt_capacity
+    in_teardown = Strand.where(id: Sequel[:github_runner][:id], label: %w[destroy wait_vm_destroy]).exists
+    pool = Sequel.case({{Sequel[:github_runner][:location_id] => Config.github_runner_aws_location_id} => GithubRunnerCapacity::SPILL}, Sequel[:charge][:pool])
+    DB[:github_runner].from(:github_runner, capacity_charges_dataset)
+      .where(Sequel[:charge][:label] => Sequel[:github_runner][:label], Sequel[:github_runner][:capacity_pool] => nil)
+      .exclude(Sequel[:github_runner][:vm_id] => nil)
+      .exclude(in_teardown)
+      .update(capacity_pool: pool)
+  end
+
+  def reserve_metal_capacity(utilization)
+    pool = metal_capacity_pool
+    move_capacity(pool, GithubRunnerCapacity.metal_room(capacity_amounts(pool), utilization))
+  end
+
+  def reserve_spill_capacity
+    move_capacity(GithubRunnerCapacity::SPILL, GithubRunnerCapacity.spill_room(capacity_amounts(GithubRunnerCapacity::SPILL)))
+  end
+
+  # Moves the runner's capacity reservation to the given pool, releasing the
+  # one it holds. The condition limits the pool it moves to; without one, the
+  # move always succeeds. Locks the runner row before the pool rows, and the
+  # pool rows in name order.
+  def move_capacity(to, condition = nil)
+    # A plain read first, so runners waiting on a full pool do not queue on
+    # its row lock.
+    return false if condition && GithubRunnerCapacity.where(name: to).where(condition).empty?
+
+    DB.transaction(savepoint: true) do
+      from = this.for_no_key_update.get(:capacity_pool)
+      next true if from == to
+
+      this.update(capacity_pool: to)
+      moved = [from, to].compact.sort.all? do |name|
+        if name == to
+          GithubRunnerCapacity.charge(to, capacity_amounts(to), condition)
+        else
+          GithubRunnerCapacity.refund(from, capacity_amounts(from))
+        end
+      end
+      raise Sequel::Rollback unless moved
+
+      true
+    end
+  end
+
+  def release_capacity
+    return unless (from = this.for_no_key_update.get(:capacity_pool))
+
+    this.update(capacity_pool: nil)
+    GithubRunnerCapacity.refund(from, capacity_amounts(from))
   end
 
   def repository_url
@@ -148,6 +241,7 @@ end
 #  actual_label       | text                     |
 #  location_id        | uuid                     |
 #  encoded_jit_config | text                     |
+#  capacity_pool      | text                     |
 # Indexes:
 #  github_runner_pkey                  | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key             | UNIQUE btree (vm_id)

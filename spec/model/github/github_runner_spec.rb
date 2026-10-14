@@ -21,6 +21,104 @@ RSpec.describe GithubRunner do
     hash[message]
   end
 
+  describe "capacity" do
+    let(:runner) { described_class.create(repository_name: "test-repo", label: "ubicloud-standard-4", installation_id: GithubInstallation.create(installation_id: 456, name: "capacity", type: "User").id) }
+    let(:pool) { GithubRunnerCapacity["x64-standard"].update(total_cores: 100, total_hugepages_1g: 400) }
+    let(:spill) { GithubRunnerCapacity[GithubRunnerCapacity::SPILL] }
+
+    before { pool }
+
+    def usage(row)
+      row.reload.values.values_at(:used_cores, :used_hugepages_1g, :used_vcpus, :used_runners)
+    end
+
+    it "charges metal capacity by cores and hugepages, and spill capacity by AWS vCPUs" do
+      expect(runner.metal_capacity_pool).to eq("x64-standard")
+      expect(runner.capacity_amounts("x64-standard")).to eq({used_cores: 2, used_hugepages_1g: 16})
+      expect(runner.capacity_amounts(GithubRunnerCapacity::SPILL)).to eq({used_vcpus: 4, used_runners: 1})
+      runner.update(label: "ubicloud-standard-30-arm")
+      runner.instance_variable_set(:@label_data, nil)
+      expect(runner.metal_capacity_pool).to eq("arm64-standard")
+      expect(runner.capacity_amounts("arm64-standard")).to eq({used_cores: 30, used_hugepages_1g: 96})
+      expect(runner.capacity_amounts(GithubRunnerCapacity::SPILL)).to eq({used_vcpus: 32, used_runners: 1})
+    end
+
+    it "reserves metal capacity within the utilization" do
+      expect(runner.reserve_metal_capacity(95)).to be(true)
+      expect(runner.reload.capacity_pool).to eq("x64-standard")
+      expect(usage(pool)).to eq([2, 16, 0, 0])
+    end
+
+    it "does not reserve metal capacity past the utilization" do
+      pool.update(used_cores: 95)
+      expect(runner.reserve_metal_capacity(95)).to be(false)
+      expect(runner.reload.capacity_pool).to be_nil
+      expect(usage(pool)).to eq([95, 0, 0, 0])
+    end
+
+    it "rolls the move back when the pool fills up after the read" do
+      charged = nil
+      expect(GithubRunnerCapacity).to receive(:charge).and_wrap_original do |original, *args|
+        # Another runner fills the pool between the read and the charge.
+        pool.update(used_cores: 95)
+        charged = original.call(*args)
+      end
+      expect(runner.reserve_metal_capacity(95)).to be_nil
+      expect(charged).to be(false)
+      expect(runner.reload.capacity_pool).to be_nil
+    end
+
+    it "moves a metal reservation to spill capacity and back" do
+      runner.reserve_metal_capacity(95)
+      expect(runner.reserve_spill_capacity).to be(true)
+      expect(runner.reload.capacity_pool).to eq(GithubRunnerCapacity::SPILL)
+      expect(usage(pool)).to eq([0, 0, 0, 0])
+      expect(usage(spill)).to eq([0, 0, 4, 1])
+
+      expect(runner.move_capacity("x64-standard")).to be(true)
+      expect(usage(pool)).to eq([2, 16, 0, 0])
+      expect(usage(spill)).to eq([0, 0, 0, 0])
+    end
+
+    it "keeps the reservation it already holds" do
+      runner.reserve_metal_capacity(95)
+      expect(runner.move_capacity("x64-standard")).to be(true)
+      expect(usage(pool)).to eq([2, 16, 0, 0])
+    end
+
+    it "releases the reservation" do
+      runner.reserve_spill_capacity
+      runner.release_capacity
+      expect(runner.reload.capacity_pool).to be_nil
+      expect(usage(spill)).to eq([0, 0, 0, 0])
+      expect(runner.release_capacity).to be_nil
+    end
+  end
+
+  describe ".adopt_capacity" do
+    let(:installation) { GithubInstallation.create(installation_id: 457, name: "adopt", type: "User") }
+
+    def runner(label: "wait", location_id: Location::GITHUB_RUNNERS_ID, vm: true, **)
+      vm_id = create_vm(location_id:).id if vm
+      described_class.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-standard-4", vm_id:, location_id: (location_id if vm), **).tap {
+        Strand.create_with_id(it, prog: "Github::GithubRunnerNexus", label:)
+      }
+    end
+
+    it "gives a pool to runners that hold a VM without a reservation" do
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: Project.create(name: "aws").id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      metal = runner
+      aws = runner(location_id: location.id)
+      reserved = runner(capacity_pool: "x64-premium")
+      waiting = runner(vm: false)
+      leaving = runner(label: "wait_vm_destroy")
+
+      expect(described_class.adopt_capacity).to eq(2)
+      expect([metal, aws, reserved, waiting, leaving].map { it.reload.capacity_pool }).to eq(["x64-standard", GithubRunnerCapacity::SPILL, "x64-premium", nil, nil])
+    end
+  end
+
   it "can log duration with a vm" do
     vm = github_runner.vm
     boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)

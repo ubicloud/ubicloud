@@ -284,7 +284,7 @@ class Prog::Vm::HostNexus < Prog::Base
     end
     fail "Not enough hugepages for VMs" unless total_hugepages - spdk_hugepages >= total_vm_mem_gib
 
-    vm_host.update(
+    vm_host.update_with_runner_capacity(
       total_hugepages_1g: total_hugepages,
       used_hugepages_1g: spdk_hugepages + total_vm_mem_gib,
     )
@@ -309,13 +309,13 @@ class Prog::Vm::HostNexus < Prog::Base
       fail "BUG: VmHost not in draining state" unless vm_host.allocation_state == "draining"
 
       unless vm_host.patch_set?
-        vm_host.update(allocation_state: "accepting")
+        vm_host.update_with_runner_capacity(allocation_state: "accepting")
         decr_graceful_reboot
       end
     end
 
     if vm_host.allocation_state == "unprepared"
-      vm_host.update(allocation_state: "accepting")
+      vm_host.update_with_runner_capacity(allocation_state: "accepting")
       delete_from_stack("install_os", "default_boot_images", "vhost_block_backend_version")
     end
 
@@ -325,7 +325,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def prep_graceful_reboot
     case vm_host.allocation_state
     when "accepting"
-      vm_host.update(allocation_state: "draining")
+      vm_host.update_with_runner_capacity(allocation_state: "draining")
     when "draining"
       # nothing
     else
@@ -410,7 +410,7 @@ TIMER
 
     when_patch_set? do
       unless vm_host.allocation_state == "draining"
-        vm_host.update(allocation_state: "draining")
+        vm_host.update_with_runner_capacity(allocation_state: "draining")
         self.accepting_before_patch = true
       end
 
@@ -448,7 +448,7 @@ TIMER
     decr_destroy
 
     unless vm_host.allocation_state == "draining"
-      vm_host.update(allocation_state: "draining")
+      vm_host.update_with_runner_capacity(allocation_state: "draining")
       nap 5
     end
 
