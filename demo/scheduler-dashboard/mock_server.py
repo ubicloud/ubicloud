@@ -57,7 +57,7 @@ CURRENT_ALERTS = [
     {"id": "idle_recycle", "label": "Idle runner recycled", "metric": "stage_oldest_seconds.idle",
      "threshold": 310, "severity": "monitor", "source": "GithubRunnerNexus#wait"},
 ]
-STATIC_FILES = {"/": "index.html", "/index.html": "index.html", "/dashboard.js": "dashboard.js"}
+STATIC_FILES = {"/": "index.html", "/index.html": "index.html", "/dashboard.js": "dashboard.js", "/fun.js": "fun.js"}
 # Ubicloud logo, font and icon, served from the repo so the page carries the brand.
 REPO = Path(__file__).resolve().parents[2]
 BRAND_FILES = {

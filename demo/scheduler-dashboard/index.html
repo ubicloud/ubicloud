@@ -258,6 +258,38 @@
     opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: calc(100vw - 32px);
   }
   .toast.show { opacity: 1; }
+  /* Customer impact (fun) */
+  .fun { margin-bottom: 12px; }
+  .fun .fun-note { font-size: 12px; color: var(--muted); }
+  .fun-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.3fr); gap: 12px 24px; }
+  @media (max-width: 1100px) { .fun-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fun-grid > :last-child { grid-column: 1 / -1; } }
+  @media (max-width: 640px) { .fun-grid { grid-template-columns: minmax(0, 1fr); } }
+  .fun-panel { min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .fun-panel h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .fun-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .fun-side { display: grid; gap: 2px; align-content: start; min-width: 0; }
+  .fun-who { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .fun-who i { width: 10px; height: 3px; border-radius: 2px; }
+  .fun-total { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fun-rate { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .fun-cmp { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .fun-small { margin: 0; font-size: 11px; color: var(--muted); }
+  .fun-mood-top { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  .fun-big { font-size: 32px; line-height: 1; }
+  .fun-faces { display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; font-size: 14px; line-height: 1.25; max-width: 220px; }
+  .fun-faces span { text-align: center; }
+  .fun-feed { list-style: none; margin: 0; padding: 0; height: 196px; overflow: hidden; display: grid; gap: 4px; align-content: start;
+    -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent); mask-image: linear-gradient(to bottom, #000 75%, transparent); }
+  .fun-tweet { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; animation: fun-in 0.45s ease-out; }
+  .fun-tweet-by { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; color: var(--muted); }
+  .fun-tweet-by b { color: var(--ink-2); font-weight: 600; }
+  .fun-real { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); border: 1px solid var(--ink-2); border-radius: 999px; padding: 0 6px; }
+  .fun-reply { font-size: 11px; }
+  .fun-tweet.real { border-color: var(--ink-2); }
+  .fun-tweet p { margin: 0; color: var(--ink); }
+  .fun-tweet-face { font-size: 14px; line-height: 1.3; }
+  @keyframes fun-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .fun-tweet { animation: none; } }
 </style>
 </head>
 <body>
@@ -303,6 +335,8 @@
   </div>
 
   <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>
+
+  <section class="card fun" id="fun" aria-label="Customer impact, just for fun"></section>
 
   <section class="card traffic" aria-label="Traffic controls">
     <div class="card-head"><h2>Traffic</h2></div>
@@ -383,5 +417,6 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 <script src="dashboard.js"></script>
+<script src="fun.js"></script>
 </body>
 </html>
