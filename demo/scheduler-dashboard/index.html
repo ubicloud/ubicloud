@@ -260,21 +260,21 @@
   .toast.show { opacity: 1; }
   /* Customer impact (fun) */
   .fun { margin-bottom: 12px; }
-  .fun-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 12px 24px; }
-  @media (max-width: 1100px) { .fun-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fun-grid > .fun-tweets { grid-column: 1 / -1; } }
+  .fun-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
   @media (max-width: 640px) { .fun-grid { grid-template-columns: minmax(0, 1fr); } }
-  .fun-panel { min-width: 0; display: grid; gap: 6px; align-content: start; }
-  .fun-panel h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-  .fun-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .fun-side { display: grid; gap: 2px; align-content: start; min-width: 0; }
+  .fun-col { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .fun-col > .fun-who { font-size: 13px; font-weight: 600; color: var(--ink); }
   .fun-who { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .fun-who i { width: 10px; height: 3px; border-radius: 2px; }
-  .fun-total { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .fun-small { margin: 0; font-size: 11px; color: var(--muted); }
-  .fun-mood-top { display: flex; align-items: center; gap: 8px; min-height: 40px; }
-  .fun-big { font-size: 44px; line-height: 1; }
-  .fun-feed { list-style: none; margin: 0; padding: 0; height: 196px; overflow: hidden; display: grid; gap: 4px; align-content: start;
-    -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent); mask-image: linear-gradient(to bottom, #000 75%, transparent); }
+  .fun-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .fun-stat { display: grid; gap: 4px; align-content: start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); min-width: 0; }
+  .fun-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .fun-total { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fun-mood-row { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+  .fun-big { font-size: 30px; line-height: 1; }
+  .fun-mood-word { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .fun-feed { list-style: none; margin: 0; padding: 0 4px 0 0; height: 168px; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 4px; align-content: start;
+    scrollbar-width: thin; scrollbar-color: var(--axis) transparent; }
   .fun-tweet { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; animation: fun-in 0.45s ease-out; }
   .fun-tweet-by { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; color: var(--muted); }
   .fun-tweet-by b { color: var(--ink-2); font-weight: 600; }

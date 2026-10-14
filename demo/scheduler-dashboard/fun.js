@@ -20,48 +20,46 @@
     meh: { emoji: "😐", label: "meh" },
     angry: { emoji: "😡", label: "angry" },
   };
-  const TWEET_KEEP = 8;
-  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const TWEET_KEEP = 50; // scrollable history per feed
 
   // Fictional tweets are [handle, text] on made-up handles. Real tweets are
   // quoted verbatim as objects marked `real: true`, and get a "Real tweet"
   // badge in the feed.
   const TWEETS = {
     happy: [
-      ["@ci_goblin", "Pushed, reached for my coffee, and CI was green before the mug left the counter. Ubicloud runners have ruined my break schedule."],
-      ["@yaml_whisperer", "My workflow file is still cursed, but at least the runner picked it up instantly."],
-      ["@flaky_test_fairy", "Runner came up so fast my flaky test didn't have time to get nervous. All green."],
-      ["@rebase_raccoon", "Rebased, pushed, merged. The runner was waiting for ME. Role reversal."],
-      ["@pipeline_possum", "Queue time: 3 seconds. I blinked and missed it."],
-      ["@green_check_gremlin", "Collecting green checkmarks like trading cards today."],
-      ["@lint_lord", "The linter yelled at me in record time. Fast feedback, even when it hurts."],
-      ["@semver_sloth", "Even I, a sloth, can't keep up with how fast these runners start."],
-      ["@cache_miss_moth", "Cache miss, cold start, still done before standup ended. Who even am I."],
-      ["@monorepo_moose", "Our 40-job matrix fanned out instantly. I swear I heard the runners cheer."],
-      ["@hotfix_hedgehog", "Hotfix shipped in 4 minutes flat. The incident channel barely had time to get dramatic."],
-      ["@docker_dumpling", "Image built, tests passed, PR merged. My tea is still too hot to drink."],
-      ["@commit_crab", "Runner picked up my job sideways-fast. Respect, from one crab to another."],
-      ["@null_pointer_pal", "No waiting, no flakes, no drama. Is this what peace feels like?"],
-      ["@devops_dingo", "Told the team CI takes 20 minutes. It took 3. Now they think I lie."],
-      ["@kernel_kiwi", "Ubicloud runner booted faster than my laptop wakes from sleep."],
-      ["@artifact_otter", "Uploaded artifacts, holding paws with my green build. Lovely day."],
-      ["@tabs_not_spaces", "Finally something in this repo that's fast AND uncontroversial."],
-      ["@cron_job_crow", "Nightly build ran at night. On time. Groundbreaking."],
-      ["@runner_rabbit", "Queued at 9:00:00, running at 9:00:02. I can live with that."],
-      ["@segfault_squid", "My code crashed instantly, which means the runner started instantly. Silver linings."],
-      ["@merge_queue_mole", "Merge queue moving like a well-oiled conveyor belt today."],
-      ["@standup_skipper", "CI finished before my turn at standup. Got to say 'merged' instead of 'waiting on CI'."],
-      ["@sudo_sandwich", "sudo make me a green build. Done. Instantly."],
-      ["@diff_dragon", "Big diff, tiny wait. The dream."],
-      ["@branch_badger", "30-vCPU runner, zero queue. My compile flew."],
-      ["@ci_goblin", "Pushed a typo fix and got a green check before I could regret the commit message."],
-      ["@yaml_whisperer", "Indentation right on the first try AND an instant runner. Buying a lottery ticket."],
-      ["@webhook_wombat", "Webhook fired, runner appeared, job done. Like magic, but with logs."],
-      ["@test_matrix_tapir", "Ran the full matrix on every runner size we have. Still home for dinner."],
-      ["@deploy_duckling", "Friday deploy. CI was so fast I didn't even have time to get scared."],
-      ["@pr_pelican", "Reviewer approved, CI already green. Merged within the same sip of coffee."],
-      ["@green_check_gremlin", "Refreshing the PR page out of habit. No need. It's already green."],
-      ["@bisect_beaver", "Bisected 12 commits, each CI run under a minute. Found the bug before lunch."],
+      ["@ci_goblin", "CI went green so fast I accused it of lying and made it run again. Green again. I am being gaslit by competence."],
+      ["@yaml_whisperer", "Runner picked up my job before I finished typing git push. Is it reading my mind. Should I be worried. Not worried. Merged."],
+      ["@rebase_raccoon", "Pushed at 2:59am. Green at 2:59am. The raccoons and I are celebrating in the dumpster behind the office."],
+      ["@pipeline_possum", "Faked my death to avoid waiting on CI and it finished before I could even lie down."],
+      ["@lint_lord", "The runner booted so fast the linter didn't have time to judge me. First time in years. I feel free."],
+      ["@flaky_test_fairy", "My flaky test passed 10 times in a row. Either Ubicloud fixed physics or I'm dreaming. Don't wake me."],
+      ["@monorepo_moose", "Fanned out 200 jobs and they all started at once. I heard angels. The angels were also on 30 vCPUs."],
+      ["@docker_dumpling", "Build finished before my kettle clicked. I am now drinking cold water out of spite. Worth it."],
+      ["@devops_dingo", "Told my manager CI takes 20 minutes so I could get coffee. It took 2. I am now trapped at my desk with no excuses."],
+      ["@kernel_kiwi", "Ubicloud runner booted faster than my laptop wakes from sleep. Selling the laptop. I live on the runner now."],
+      ["@green_check_gremlin", "Hoarding green checkmarks in a jar under my bed. Got 47 today. I will not be taking questions."],
+      ["@hotfix_hedgehog", "Shipped the hotfix before the incident channel finished posting 👀. They're upset they didn't get to panic."],
+      ["@semver_sloth", "As a sloth I have never been fast at anything. Today my CI was. I'm crying in slow motion."],
+      ["@cache_miss_moth", "Cache miss, cold boot, still green before standup. I don't know who I am anymore and I love it."],
+      ["@null_pointer_pal", "Zero queue time. Zero flakes. Zero drama. I keep looking for the catch like I'm reading the terms and conditions."],
+      ["@commit_crab", "Pushed 14 commits titled 'fix'. All green instantly. CI has no idea how bad the code is and I intend to keep it that way."],
+      ["@artifact_otter", "Uploaded artifacts and they came back faster than I sent them. The runner has time travel. Do not tell legal."],
+      ["@tabs_not_spaces", "CI so fast I didn't have time to start a tabs vs spaces war in the PR comments. Everyone was civil. Unsettling."],
+      ["@cron_job_crow", "The nightly build ran at night. On time. I went outside and screamed at the moon with joy."],
+      ["@runner_rabbit", "Queued 9:00:00, running 9:00:01. That one second was the longest of my life and also the shortest."],
+      ["@segfault_squid", "My code segfaulted instantly, which means the runner started instantly. Never been so happy to crash."],
+      ["@merge_queue_mole", "Merge queue moving like a buttered water slide. Wheeeeee."],
+      ["@standup_skipper", "Said 'it's merged' at standup instead of 'waiting on CI'. The room went silent. Someone clapped. I wept."],
+      ["@sudo_sandwich", "sudo make me a green build. It did. Didn't even have to say please. Said please anyway. Out of respect."],
+      ["@branch_badger", "30-vCPU runner, zero queue. My Rust compile finished and for the first time in my life I saw the sun."],
+      ["@webhook_wombat", "Webhook fired, runner appeared, job done, all before my cat finished knocking my mug off the desk."],
+      ["@deploy_duckling", "Deployed at 4:59pm on a Friday because CI was so fast I felt invincible. Still invincible. Do not jinx me."],
+      ["@pr_pelican", "Reviewer approved, CI already green, merged within one sip of coffee. Choked on the sip out of shock."],
+      ["@bisect_beaver", "Bisected 12 commits, each run under a minute. Found the bug, the bug's parents and the bug's childhood home."],
+      ["@diff_dragon", "Massive diff, tiny wait. I am the dragon now. Hoard of green checks: complete."],
+      ["@test_matrix_tapir", "Ran the entire matrix on every runner size and was still home for dinner. My family doesn't recognize me."],
+      ["@ci_goblin", "CI bill went down so much finance called to ask if we'd stopped shipping. We hadn't. We're shipping MORE."],
+      ["@yaml_whisperer", "Indentation right on the first try AND an instant runner. Buying a lottery ticket and a cape."],
       {
         real: true, name: "J🫪E", handle: "@0x_Osprey", replyTo: "@altanBLN",
         text: "Currently using GitHub Actions + Ubicloud which is the most economical for my (relatively) small workloads but will be evaluating weekly over the next month or two and come back if I change my mind",
@@ -72,74 +70,74 @@
       },
     ],
     meh: [
-      ["@semver_sloth", "Runner took a minute and a bit. Enough time to read one more forum thread."],
-      ["@pipeline_possum", "CI is 'thinking about it'. Same, CI. Same."],
-      ["@flaky_test_fairy", "Waiting on a runner. Using the time to rename variables I'll rename back later."],
-      ["@lint_lord", "Queue's a little slow today. Refilled my water bottle like a responsible adult."],
-      ["@cache_miss_moth", "Job queued 90 seconds. Not mad, just staring at the spinner."],
-      ["@rebase_raccoon", "Runner's coming, probably. I'll rebase again in the meantime, for fun."],
-      ["@docker_dumpling", "Spinner, spinner on the wall, when will my runner start at all."],
-      ["@kernel_kiwi", "Long enough wait to check the weather. Short enough to not need a jacket."],
-      ["@commit_crab", "My job is queued. I am queued. We are all queued."],
-      ["@monorepo_moose", "Half the matrix is running, half is waiting. Schrödinger's build."],
-      ["@null_pointer_pal", "Status: queued. Mood: politely tapping foot."],
-      ["@devops_dingo", "Two minutes to get a runner. Not great, not terrible."],
-      ["@tabs_not_spaces", "While I wait for CI, a gentle reminder that tabs are correct."],
-      ["@hotfix_hedgehog", "Waiting on CI for a one-line hotfix. It's a very important line."],
-      ["@cron_job_crow", "Queue is a bit busy. Big launch day for somebody, apparently."],
-      ["@artifact_otter", "Runner's on its way. Using the time to write a commit message with actual words."],
-      ["@runner_rabbit", "Queued long enough that I started a second branch. Now I have two problems."],
-      ["@yaml_whisperer", "Watching 'Waiting for a runner' like it's a cooking show."],
-      ["@ci_goblin", "CI's taking a minute. Opened my editor, closed it, opened it again."],
-      ["@merge_queue_mole", "Merge queue moving at the speed of a polite crowd leaving a theater."],
-      ["@standup_skipper", "My build is 'queued'. Telling standup it's 'in progress'. Technically true."],
-      ["@segfault_squid", "Runner wait long enough to make toast. Not long enough to butter it."],
-      ["@diff_dragon", "Slightly slow queue. Good time to re-read my own diff and find two typos."],
-      ["@branch_badger", "Big runners take a bit longer to show up. Fair. Big things are slow."],
-      ["@webhook_wombat", "Queued. Doing breathing exercises. In for 4, out for 'please start'."],
-      ["@deploy_duckling", "CI is fine. I'm fine. Everything is a reasonable amount of fine."],
-      ["@test_matrix_tapir", "Matrix half done. Like a crossword I'm not allowed to finish."],
-      ["@pr_pelican", "Reviewer is waiting on CI, CI is waiting on a runner, I'm waiting on lunch."],
-      ["@bisect_beaver", "Bisecting slowly today. The bug isn't going anywhere, and neither am I."],
-      ["@sudo_sandwich", "Queue's a little long. Sandwich it is."],
-      ["@green_check_gremlin", "Yellow dot. Not red. Not green. Just vibes."],
-      ["@kernel_kiwi", "Runner pending. Cleaning up my desktop icons for the first time since spring."],
-      ["@lint_lord", "Took a while, but it ran. Lowered my expectations and met them exactly."],
+      ["@semver_sloth", "Runner took a minute and a half. Enough time to read one forum post and get mad about it."],
+      ["@pipeline_possum", "CI is 'thinking'. Same, CI. Same."],
+      ["@flaky_test_fairy", "Waiting on a runner. Renamed every variable. Will rename them back. This is my life now."],
+      ["@lint_lord", "Queue's a bit slow. Drank water. Hydrated. Furious about being hydrated."],
+      ["@cache_miss_moth", "Job queued 90 seconds. Not mad. Just staring at the spinner like it owes me money."],
+      ["@rebase_raccoon", "Runner's coming. Probably. Rebased again for fun. It was not fun."],
+      ["@docker_dumpling", "Spinner, spinner on the wall, who's the slowest queue of all."],
+      ["@kernel_kiwi", "Waited long enough to check the weather. Not long enough to need a jacket. Medium vibes."],
+      ["@commit_crab", "My job is queued. I am queued. My lunch is queued. We are all just queued."],
+      ["@monorepo_moose", "Half the matrix is running, half is waiting. Schrödinger's build. Opening the box feels risky."],
+      ["@null_pointer_pal", "Status: queued. Mood: politely tapping foot at 140 bpm."],
+      ["@devops_dingo", "Two minutes to get a runner. Not great, not terrible. Long enough to start quoting TV shows."],
+      ["@tabs_not_spaces", "While I wait for CI, a reminder that tabs are correct and I will die on this hill. In about a minute."],
+      ["@hotfix_hedgehog", "Waiting on CI for a one-line hotfix. It's a very important line. It's a semicolon."],
+      ["@cron_job_crow", "Queue's busy. Somebody out there is launching a startup. Hope it's worth my 90 seconds."],
+      ["@artifact_otter", "Runner's on its way. Wrote a commit message with actual words in the meantime. Growth."],
+      ["@runner_rabbit", "Queued long enough to start a second branch. Now I have two problems and zero runners."],
+      ["@yaml_whisperer", "Watching 'Waiting for a runner' like a nature documentary. The runner approaches. Slowly. Majestically."],
+      ["@ci_goblin", "CI's taking a minute. Opened my editor, closed it, stared into the void. The void said 'queued'."],
+      ["@merge_queue_mole", "Merge queue moving at the speed of a polite crowd leaving a theater. Someone's looking for their coat."],
+      ["@standup_skipper", "Build is 'queued'. Told standup it's 'in progress'. Technically a queue is a process."],
+      ["@segfault_squid", "Runner wait long enough to make toast. Not long enough to butter it. Dry toast. Dry life."],
+      ["@diff_dragon", "Slow-ish queue. Re-read my own diff. Found two typos and one existential crisis."],
+      ["@branch_badger", "Big runners take a bit longer to show up. Fair. I also take a while to show up."],
+      ["@webhook_wombat", "Queued. Breathing exercises. In for 4, hold for 4, out for 'please start'."],
+      ["@deploy_duckling", "CI is fine. I'm fine. Everything is a reasonable amount of fine. Ask me again in 60 seconds."],
+      ["@test_matrix_tapir", "Matrix half done. Like a crossword where someone keeps hiding the pen."],
+      ["@pr_pelican", "Reviewer waiting on CI, CI waiting on a runner, me waiting on lunch. The circle of life."],
+      ["@bisect_beaver", "Bisecting slowly today. The bug isn't going anywhere and neither am I. We're roommates now."],
+      ["@sudo_sandwich", "Queue's a little long. Sandwich time. The sandwich, unlike CI, arrived instantly."],
+      ["@green_check_gremlin", "Yellow dot. Not red. Not green. Yellow is a vibe. I am learning to accept yellow."],
+      ["@kernel_kiwi", "Runner pending. Cleaned my desktop for the first time since 2019. Found a folder called final_final_v3."],
+      ["@lint_lord", "Took a while, but it ran. Lowered my expectations and met them exactly. Personal best."],
     ],
     angry: [
-      ["@flaky_test_fairy", "Waited so long for a runner that my PR went stale and someone else fixed the bug."],
-      ["@ci_goblin", "Coffee brewed, poured, drunk and regretted. Job still queued."],
-      ["@yaml_whisperer", "Rewrote this YAML three times while waiting. Now it's worse and still queued."],
-      ["@rebase_raccoon", "By the time my runner started, main had moved 40 commits. Rebasing. Again."],
-      ["@pipeline_possum", "Playing dead until my job leaves the queue. Might be a while."],
-      ["@semver_sloth", "Even I think this queue is slow. Let that sink in."],
-      ["@monorepo_moose", "One job of my matrix finished. The other 39 are 'waiting for a runner'. Send help."],
-      ["@hotfix_hedgehog", "Hotfix waiting on CI longer than the outage it's fixing."],
-      ["@devops_dingo", "Queue time is now longer than my build time. Something is upside down."],
-      ["@docker_dumpling", "Started a sourdough starter while waiting for CI. It's rising faster than my runner."],
-      ["@lint_lord", "Queued so long the linter rules changed underneath me."],
-      ["@null_pointer_pal", "My runner is a null pointer. It points to nothing. Forever."],
-      ["@cache_miss_moth", "10 minutes waiting for a 30-vCPU runner while small jobs cut in line. Rude."],
-      ["@kernel_kiwi", "Dear Ubicloud, I could have compiled this on my laptop. Twice. With the fan screaming."],
-      ["@commit_crab", "Pinched the refresh button so many times it filed a complaint."],
-      ["@tabs_not_spaces", "CI is queued. My patience has been converted to spaces."],
-      ["@cron_job_crow", "Nightly build finished the next afternoon. Calling it a 'daily' now."],
-      ["@artifact_otter", "My artifacts expired before my job even started."],
-      ["@runner_rabbit", "Where is my runner. It's been so long I've started naming the spinner."],
-      ["@segfault_squid", "Queued so long my test fixtures need updating for the new year."],
-      ["@merge_queue_mole", "Merge queue is now a merge museum. Exhibits from this morning on display."],
-      ["@standup_skipper", "Said 'waiting on CI' at standup. Then at the next standup. Same build."],
-      ["@diff_dragon", "Breathing fire at a yellow dot. It remains yellow."],
-      ["@branch_badger", "My 30-vCPU job is starving while 2-vCPU jobs zoom past. I'd like to speak to the scheduler."],
-      ["@webhook_wombat", "The webhook arrived. The runner did not. Long-distance relationship."],
-      ["@deploy_duckling", "Wanted to deploy before the weekend. CI said: what weekend?"],
-      ["@test_matrix_tapir", "Matrix build queued so long I've memorized every job name in it."],
-      ["@pr_pelican", "Reviewer approved, went on vacation, came back. Still waiting on CI."],
-      ["@bisect_beaver", "Bisect needs 7 runs. At this queue speed I'll find the bug next quarter."],
+      ["@flaky_test_fairy", "Waited so long for a runner my PR got stale, then moldy, then grew legs and walked off."],
+      ["@ci_goblin", "Coffee brewed, poured, drunk, regretted and re-brewed. Job still queued. I am now 40% coffee by volume."],
+      ["@yaml_whisperer", "Rewrote my YAML three times while waiting. Now it's worse, longer and still queued. I'm speaking to it in tongues."],
+      ["@rebase_raccoon", "By the time my runner started, main had moved 40 commits, two reorgs and a company rebrand."],
+      ["@pipeline_possum", "Playing dead until my job leaves the queue. Wake me next fiscal year."],
+      ["@semver_sloth", "I'm a SLOTH and I think this queue is slow. Let that sink in. Slowly. Like me. Like the queue."],
+      ["@monorepo_moose", "1 of my 40 jobs finished. The other 39 are 'waiting for a runner'. I've started naming them like pets."],
+      ["@hotfix_hedgehog", "Hotfix waiting on CI longer than the outage it fixes. The outage is now fixing itself out of boredom."],
+      ["@devops_dingo", "Queue time is longer than my build time. Up is down. Left is right. CI is a myth."],
+      ["@docker_dumpling", "Started a sourdough starter while waiting. It has risen, been baked, eaten and digested. Still queued."],
+      ["@lint_lord", "Queued so long the lint rules changed. Then changed back. Then the linter retired."],
+      ["@null_pointer_pal", "My runner is a null pointer. It points to nothing. It references the void. The void references back."],
+      ["@cache_miss_moth", "10 minutes for a 30-vCPU runner while tiny 2-vCPU jobs cut the line like they own the place. Class warfare."],
+      ["@kernel_kiwi", "Could have compiled this on my laptop. Twice. With the fan screaming like a jet engine. Seriously considering it."],
+      ["@commit_crab", "Pinched the refresh button so many times it filed a restraining order."],
+      ["@tabs_not_spaces", "CI is queued. My patience has been converted to spaces. Four of them. Per indent. Forever."],
+      ["@cron_job_crow", "Nightly build finished the next afternoon. Renaming it 'eventually build'."],
+      ["@artifact_otter", "My artifacts expired before my job started. They died waiting. Holding a small funeral at 3pm."],
+      ["@runner_rabbit", "Where is my runner. I have named the loading spinner Kevin. Kevin and I are very close now."],
+      ["@segfault_squid", "Queued so long my test fixtures need updating for the new year. Happy new year from the queue."],
+      ["@merge_queue_mole", "Merge queue is now a merge museum. Admission is free. Exhibits from this morning on display."],
+      ["@standup_skipper", "Said 'waiting on CI' at standup. And the next standup. And the retro. They made it a team value."],
+      ["@diff_dragon", "Breathing fire at a yellow dot. It remains yellow. It is fireproof. I fear it."],
+      ["@branch_badger", "My 30-vCPU job is starving while 2-vCPU jobs zoom past. I would like to speak to the scheduler's manager."],
+      ["@webhook_wombat", "The webhook arrived. The runner did not. I'm in a long-distance relationship with my own CI."],
+      ["@deploy_duckling", "Wanted to deploy before the weekend. CI said: what weekend? I am now spiritually at the office."],
+      ["@test_matrix_tapir", "Matrix queued so long I memorized every job name and composed a sea shanty about them."],
+      ["@pr_pelican", "Reviewer approved, went on vacation, came back tanned. Still waiting on CI."],
+      ["@bisect_beaver", "Bisect needs 7 runs. At this pace I'll find the bug next year. The bug will have kids by then."],
       ["@sudo_sandwich", "sudo start my runner. Permission denied by the laws of physics, apparently."],
-      ["@green_check_gremlin", "I was promised green checks. I have received an hourglass."],
-      ["@ci_goblin", "My PR has waited so long it's developing merge conflicts out of boredom."],
-      ["@yaml_whisperer", "Whispered sweet nothings to the queue. It did not listen."],
+      ["@green_check_gremlin", "I was promised green checks. I have received an hourglass. I am going feral."],
+      ["@ci_goblin", "My PR waited so long it developed merge conflicts out of pure boredom, and then a personality."],
+      ["@yaml_whisperer", "Whispered sweet nothings to the queue. It left me on read."],
       {
         real: true, name: "Conner Swann", handle: "@YourBuddyConner",
         text: "Ubicloud? More like \"Ubetter have another cloud provider on standby\"",
@@ -173,45 +171,32 @@
   const grid = el("div", "fun-grid");
   root.append(head, grid);
 
-  const moneyPanel = el("div", "fun-panel");
-  const moodPanel = el("div", "fun-panel");
-  const tweetPanel = el("div", "fun-panel fun-tweets");
-  grid.append(moneyPanel, moodPanel, tweetPanel);
-
-  moneyPanel.append(el("h4", null, "Money made"));
-  const moneyPair = el("div", "fun-pair");
-  moneyPanel.append(moneyPair);
-
-  moodPanel.append(el("h4", null, "Customer mood"));
-  const moodPair = el("div", "fun-pair");
-  moodPanel.append(moodPair);
-
-  tweetPanel.append(el("h4", null, "Customer chatter"));
-  const feedPair = el("div", "fun-pair");
-  tweetPanel.append(feedPair);
-
+  // One column per side, like the rest of the page: money and mood up top,
+  // that side's customer chatter below.
   const view = {};
   for (const side of SIDES) {
-    const money = el("div", "fun-side");
-    const total = el("span", "fun-total", "—");
-    money.append(who(side), total);
-    moneyPair.append(money);
+    const col = el("div", "fun-col");
+    const stats = el("div", "fun-stats");
 
-    const mood = el("div", "fun-side");
+    const money = el("div", "fun-stat");
+    const total = el("span", "fun-total", "—");
+    money.append(el("span", "fun-label", "Money made · last minute"), total);
+
+    const mood = el("div", "fun-stat");
     const big = el("span", "fun-big", MOODS.happy.emoji);
     big.setAttribute("role", "img");
-    const top = el("div", "fun-mood-top");
-    top.append(big);
-    mood.append(who(side), top);
-    moodPair.append(mood);
+    const word = el("span", "fun-mood-word", "Happy");
+    const moodRow = el("div", "fun-mood-row");
+    moodRow.append(big, word);
+    mood.append(el("span", "fun-label", "Customer mood"), moodRow);
+    stats.append(money, mood);
 
-    const chatter = el("div", "fun-side");
     const feed = el("ol", "fun-feed");
     feed.setAttribute("aria-label", `Customer tweets about ${side.name}`);
-    chatter.append(who(side), feed);
-    feedPair.append(chatter);
 
-    view[side.key] = { total, big, feed };
+    col.append(who(side), stats, el("span", "fun-label", "Customer chatter"), feed);
+    grid.append(col);
+    view[side.key] = { total, big, word, feed };
   }
 
   // ---------------------------------------------------------------- state
@@ -219,11 +204,7 @@
   const state = {};
   for (const side of SIDES) {
     state[side.key] = {
-      lastGen: null, // server clock (ms) of the last sample
-      lastRate: 0, // $/min at the last sample
-      total: 0, // dollars integrated up to lastGen
-      // Displayed total eases from `from` to `to` over one poll interval.
-      anim: { from: 0, to: 0, start: 0, dur: POLL_MS },
+      earnings: [], // [server ms, $/min] samples covering the last minute
       mix: { happy: 0, meh: 0, angry: 0 },
       ok: false,
     };
@@ -233,41 +214,35 @@
 
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
   const fmtUsd = (v) => usd.format(v);
+  const WINDOW_MS = 60 * 1000;
 
-  function updateMoney(key, m, now) {
+  // Dollars earned over the last minute of server time: the $/min rate
+  // (vCPUs in use × price) integrated between samples, trapezoid-style, so a
+  // mock running faster than real time still earns the right amount.
+  function updateMoney(key, m) {
     const s = state[key];
     const gen = Date.parse(m.generated_at);
+    if (!Number.isFinite(gen)) return;
     const rate = (Number(m.fleet?.vcpus_used) || 0) * DOLLARS_PER_VCPU_MINUTE;
-    if (Number.isFinite(gen)) {
-      if (s.lastGen != null) {
-        const dt = (gen - s.lastGen) / 1000;
-        // Trapezoid between the two samples, in server seconds, so a mock
-        // running faster than real time still earns the right amount.
-        if (dt > 0 && dt <= MAX_GAP_SECONDS) s.total += ((s.lastRate + rate) / 2) * (dt / 60);
+    const pts = s.earnings;
+    if (pts.length && (gen <= pts.at(-1)[0] || gen - pts.at(-1)[0] > MAX_GAP_SECONDS * 1000)) pts.length = 0;
+    pts.push([gen, rate]);
+    const from = gen - WINDOW_MS;
+    // Keep one sample at or before the window start to interpolate from.
+    while (pts.length > 2 && pts[1][0] <= from) pts.shift();
+
+    let dollars = 0;
+    for (let i = 1; i < pts.length; i++) {
+      let [t0, r0] = pts[i - 1];
+      const [t1, r1] = pts[i];
+      if (t1 <= from) continue;
+      if (t0 < from) {
+        r0 += ((r1 - r0) * (from - t0)) / (t1 - t0);
+        t0 = from;
       }
-      s.lastGen = gen;
+      dollars += ((r0 + r1) / 2) * ((t1 - t0) / 60000);
     }
-    s.lastRate = rate;
-    s.anim = { from: displayed(s, now), to: s.total, start: now, dur: POLL_MS };
-  }
-
-  function displayed(s, now) {
-    const a = s.anim;
-    if (reducedMotion.matches) return a.to;
-    const f = Math.min(1, Math.max(0, (now - a.start) / a.dur));
-    return a.from + (a.to - a.from) * f;
-  }
-
-  function renderMoney(now) {
-    for (const side of SIDES) {
-      const s = state[side.key];
-      view[side.key].total.textContent = s.ok || s.total ? fmtUsd(displayed(s, now)) : "—";
-    }
-  }
-
-  function frame() {
-    renderMoney(performance.now());
-    if (!reducedMotion.matches) requestAnimationFrame(frame);
+    view[key].total.textContent = fmtUsd(dollars);
   }
 
   // ---------------------------------------------------------------- mood
@@ -298,27 +273,21 @@
     const v = view[key];
     const mood = overall(s.mix);
     v.big.textContent = MOODS[mood].emoji;
+    v.word.textContent = MOODS[mood].label[0].toUpperCase() + MOODS[mood].label.slice(1);
     v.big.setAttribute("aria-label", `Customers are ${MOODS[mood].label}`);
   }
 
   // ---------------------------------------------------------------- tweets
 
   // A tweet for one side, picked by that side's current mood mix.
+  // A tweet for one side, in that side's overall mood right now (the same
+  // mood its big face shows), so the chatter flips as the mood does.
   function pickTweet(key) {
     const feed = view[key].feed;
-    const mix = state[key].mix;
-    const total = mix.happy + mix.meh + mix.angry;
-    const w = total ? mix : { happy: 1, meh: 0, angry: 0 };
-    let r = Math.random() * (w.happy + w.meh + w.angry);
-    let mood = "happy";
-    for (const k of ["happy", "meh", "angry"]) {
-      if ((r -= w[k]) < 0) {
-        mood = k;
-        break;
-      }
-    }
-    const shown = new Set([...feed.children].map((li) => li.dataset.text));
-    const pool = TWEETS[mood].filter((t) => !shown.has(t.text));
+    const mood = overall(state[key].mix);
+    // Avoid repeating anything among the last few tweets on screen.
+    const recent = new Set([...feed.children].slice(0, 10).map((li) => li.dataset.text));
+    const pool = TWEETS[mood].filter((t) => !recent.has(t.text));
     const list = pool.length ? pool : TWEETS[mood];
     return { mood, tweet: list[Math.floor(Math.random() * list.length)] };
   }
@@ -342,10 +311,14 @@
       }
       body.append(by, el("p", null, tweet.text));
       li.append(face, body);
+      // Someone scrolled down to read older tweets: keep their place.
+      const reading = feed.scrollTop > 4;
+      const before = feed.scrollHeight;
       feed.prepend(li);
+      if (reading) feed.scrollTop += feed.scrollHeight - before;
       while (feed.children.length > TWEET_KEEP) feed.lastElementChild.remove();
     }
-    setTimeout(() => addTweet(key), 2000 + Math.random() * 1000);
+    setTimeout(() => addTweet(key), 4000 + Math.random() * 2000);
   }
 
   // ---------------------------------------------------------------- poll
@@ -355,13 +328,11 @@
       const r = await fetch(side.url, { cache: "no-store" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const m = await r.json();
-      const now = performance.now();
       const s = state[side.key];
       s.ok = true;
-      updateMoney(side.key, m, now);
+      updateMoney(side.key, m);
       s.mix = moodMix(m);
       renderMood(side.key);
-      if (reducedMotion.matches) renderMoney(now);
     } catch {
       state[side.key].ok = false;
     }
@@ -376,9 +347,4 @@
   // Staggered, so the two feeds don't tick in lockstep.
   setTimeout(() => addTweet("current"), 800);
   setTimeout(() => addTweet("central"), 1900);
-  requestAnimationFrame(frame);
-  reducedMotion.addEventListener?.("change", () => {
-    if (!reducedMotion.matches) requestAnimationFrame(frame);
-    else renderMoney(performance.now());
-  });
 })();
