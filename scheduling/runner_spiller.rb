@@ -17,6 +17,8 @@ class Scheduling::RunnerSpiller
 
   # Returns the ids of the VMs whose runners spilled.
   def spill(vm_ids)
+    return [] unless @free_vcpus > 0 && @free_runners > 0
+
     GithubRunner.where(vm_id: vm_ids).eager(:vm, installation: :project).all
       .select { spillable?(it) }
       .sort_by { [it.vm.created_at, -it.label_data["vcpus"]] }
