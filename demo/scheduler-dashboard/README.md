@@ -67,7 +67,7 @@ keeps fetching from its own origin:
 
 ```bash
 python3 demo/scheduler-dashboard/mock_server.py \
-  --current-url http://144.76.169.97:9292/scheduler/metrics \
+  --current-url http://144.76.171.226:9292/scheduler/metrics \
   --central-url http://46.4.181.62:3000/scheduler/metrics
 ```
 
