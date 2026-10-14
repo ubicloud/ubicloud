@@ -24,6 +24,13 @@ RSpec.describe Prog::Vm::Scheduler do
     vm
   end
 
+  def counter_increments
+    before = DB[:scheduler_metric_counter].to_hash(:name, :value)
+    yield
+    after = DB[:scheduler_metric_counter].to_hash(:name, :value)
+    after.to_h { |name, value| [name, value - before.fetch(name, 0)] }.reject { |_, increment| increment.zero? }
+  end
+
   def create_installation
     customer = Project.create(name: "customer")
     customer.set_ff_spill_to_alien_runners(true)
@@ -55,6 +62,18 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { nx.wait }.to nap(5)
       expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
       expect(vms.map { it.strand.schedule }).to all(be < Time.now)
+    end
+
+    it "counts the checks and allocations of runner vms in the scheduler metrics" do
+      create_host
+      runner_vm, failed_vm = Array.new(2) { create_waiting_vm }
+      [runner_vm, failed_vm].each { it.update(location_id: Location::GITHUB_RUNNERS_ID) }
+      create_runner(runner_vm)
+      create_runner(failed_vm)
+      failed_vm.update(vcpus: 30, memory_gib: 120)
+      create_waiting_vm
+
+      expect(counter_increments { expect { nx.wait }.to nap(5) }).to eq("scheduling_checks_total" => 2, "allocated_total" => 1)
     end
 
     it "marks the vms without capacity as waiting for capacity once" do

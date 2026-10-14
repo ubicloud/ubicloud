@@ -16,7 +16,9 @@ class Prog::Vm::Scheduler < Prog::Base
     strands.each do |st|
       nx = st.load
       request = nx.allocation_request
+      SchedulerMetrics.increment("scheduling_checks_total") if nx.runner
       DB.transaction(savepoint: true) { candidates.allocate(nx.vm, request) }
+      SchedulerMetrics.record_allocation(nx.runner) if nx.runner
       allocated_ids << st.id
     rescue Scheduling::Allocator::NoSpaceLeft
       no_capacity[st.id] = request
