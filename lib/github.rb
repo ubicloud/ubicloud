@@ -41,6 +41,7 @@ module Github
   # simplecov:disable
   def self.freeze
     runner_labels
+    canonical_runner_labels
     super
   end
   # simplecov:enable
@@ -55,5 +56,18 @@ module Github
         new
       end.freeze
     end
+  end
+
+  # Maps the VM configuration of a runner label to the name of the canonical
+  # (non-alias) label, so a VM can be matched to a label without knowing which
+  # runner, if any, it was created for.
+  def self.canonical_runner_labels
+    @canonical_runner_labels ||= runner_labels.values.uniq.to_h {
+      [it.values_at("family", "vcpus", "arch", "boot_image", "storage_size_gib"), it["name"]]
+    }.freeze
+  end
+
+  def self.runner_label_for(family:, vcpus:, arch:, boot_image:, storage_size_gib:)
+    canonical_runner_labels[[family, vcpus, arch, boot_image, storage_size_gib]]
   end
 end
