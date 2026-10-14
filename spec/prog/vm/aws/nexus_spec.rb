@@ -1280,6 +1280,14 @@ RSpec.describe Prog::Vm::Aws::Nexus do
     end
 
     it "hops to cleanup_roles if there is no aws_instance" do
+      expect(client).not_to receive(:terminate_instances)
+      expect { nx.destroy }.to hop("cleanup_roles")
+    end
+
+    it "terminates an instance launched without an aws_instance" do
+      client.stub_responses(:describe_instances, reservations: [{instances: [{instance_id: "i-0123456789abcdefg"}]}])
+      expect(client).to receive(:describe_instances).with({filters: [{name: "client-token", values: ["#{vm.id}-#{vm.family}"]}]}).and_call_original
+      expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})
       expect { nx.destroy }.to hop("cleanup_roles")
     end
   end
