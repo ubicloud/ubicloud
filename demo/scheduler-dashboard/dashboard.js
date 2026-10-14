@@ -1095,7 +1095,9 @@
   function setRateInputs(v) {
     document.getElementById("rate-input").value = Math.round(v);
     const slider = document.getElementById("rate-slider");
-    slider.value = Math.min(Number(slider.max), Math.round(v));
+    // Widen the slider when the generator already runs above its range.
+    if (v > Number(slider.max)) slider.max = Math.ceil((v * 1.5) / 600) * 600;
+    slider.value = Math.round(v);
   }
 
   async function refreshTraffic() {
@@ -1141,12 +1143,6 @@
       traffic.rateDirty = false;
       toast(value ? `Steady rate set to ${fmtInt(value)} / min` : "Steady traffic stopped");
     }));
-    for (const chip of document.querySelectorAll("[data-rate]")) {
-      chip.addEventListener("click", () => {
-        setRateInputs(Number(chip.dataset.rate));
-        traffic.rateDirty = true;
-      });
-    }
 
     const count = document.getElementById("burst-input");
     const send = document.getElementById("burst-send");
