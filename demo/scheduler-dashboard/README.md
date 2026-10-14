@@ -68,7 +68,7 @@ keeps fetching from its own origin:
 ```bash
 python3 demo/scheduler-dashboard/mock_server.py \
   --current-url http://144.76.169.97:9292/scheduler/metrics \
-  --central-url http://144.76.169.97:3000/scheduler/metrics
+  --central-url http://46.4.181.62:3000/scheduler/metrics
 ```
 
 - **Why proxy:** this avoids CORS, and avoids the browser blocking plain-HTTP
