@@ -128,7 +128,7 @@ From top to bottom:
    - Incoming per minute. This tile instead checks that both sides get the
      same feed.
 2. **Traffic.** The load-generator controls above.
-3. **Head to head.** Both control planes on each chart:
+3. **Dashboards.** Both control planes on each chart:
    - Incoming requests and requests placed on a host, per minute.
    - Requests waiting for a host.
    - Wait time, switchable between p50, p95 and oldest.
