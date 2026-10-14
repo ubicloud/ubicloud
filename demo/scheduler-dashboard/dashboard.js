@@ -346,25 +346,32 @@
     const offScale = [];
     const inScale = [];
     for (const a of chartAlerts(c)) (a.threshold > scale.max ? offScale : inScale).push(a);
-    // Lowest line first; push each next label up so neighbors never overlap.
-    inScale.sort((a, b) => a.threshold - b.threshold);
-    let lastLabelY = Infinity;
+    // Top line first. A label sits just above its line, or just below it
+    // when the line hugs the top of the plot, and is pushed down until it
+    // clears the label before it.
+    inScale.sort((a, b) => b.threshold - a.threshold);
+    let prevLabelY = -Infinity;
     for (const a of inScale) {
       const y = Y(a.threshold);
       const color = SEVERITY_COLOR[a.severity] || "var(--warning)";
       el("line", { x1: m.l, x2: m.l + iw, y1: y, y2: y, style: `stroke: ${color}`, "stroke-width": 2 }, svg);
-      const ly = Math.min(y - 5, lastLabelY - 13);
-      lastLabelY = ly;
+      const ly = Math.max(y - 5 >= m.t + 10 ? y - 5 : y + 14, prevLabelY + 14);
+      prevLabelY = ly;
       const label = text(svg, m.l + 6, ly, "", { class: "alert" });
       el("tspan", { style: `fill: ${color}` }, label).textContent = a.severity === "page" ? "▲ " : "● ";
       el("tspan", {}, label).textContent = `${a.label} · ${valueFmt(c.scaleKind, a.threshold)}`;
     }
-    offScale.forEach((a, i) => {
-      const color = SEVERITY_COLOR[a.severity] || "var(--warning)";
-      const label = text(svg, m.l + 6, m.t + 10 + i * 14, "", { class: "alert" });
-      el("tspan", { style: `fill: ${color}` }, label).textContent = a.severity === "page" ? "▲ " : "● ";
-      el("tspan", {}, label).textContent = `${a.label} at ${valueFmt(c.scaleKind, a.threshold)} ↑`;
-    });
+    // Thresholds far above the data are listed above the chart instead of
+    // squashing it.
+    c.notes.replaceChildren();
+    for (const a of offScale) {
+      const span = document.createElement("span");
+      const icon = document.createElement("b");
+      icon.style.color = SEVERITY_COLOR[a.severity] || "var(--warning)";
+      icon.textContent = a.severity === "page" ? "▲" : "●";
+      span.append(icon, document.createTextNode(` ${a.label} at ${valueFmt(c.scaleKind, a.threshold)}, above chart`));
+      c.notes.appendChild(span);
+    }
   }
 
   // ---------------------------------------------------------------- charts
@@ -374,10 +381,12 @@
 
   function addChart(hostId, opts) {
     const host = document.getElementById(hostId);
+    const notes = document.createElement("div");
+    notes.className = "alert-notes";
     const tip = document.createElement("div");
     tip.className = "tip";
-    host.appendChild(tip);
-    const c = { id: hostId, host, tip, kind: "lines", height: 180, scaleKind: "count", ...opts };
+    host.append(notes, tip);
+    const c = { id: hostId, host, notes, tip, kind: "lines", height: 180, scaleKind: "count", ...opts };
     charts.push(c);
     (groups[c.group || c.id] ||= []).push(c);
 
@@ -481,7 +490,10 @@
 
     // End dots and direct value labels, nudged apart so they never collide.
     ends.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < ends.length; i++) ends[i].ly = Math.max(ends[i].y, (ends[i - 1].ly ?? ends[i - 1].y) + 13);
+    for (let i = 0; i < ends.length; i++) ends[i].ly = Math.max(ends[i].y, i ? ends[i - 1].ly + 13 : -Infinity);
+    // If that pushed labels below the baseline, stack them back up from it.
+    const bottom = m.t + f.ih;
+    for (let i = ends.length - 1; i >= 0; i--) ends[i].ly = Math.min(ends[i].ly, i === ends.length - 1 ? bottom : ends[i + 1].ly - 13);
     for (const e of ends) {
       if (e.color) el("circle", { cx: e.x, cy: e.y, r: 4, style: `fill: ${e.color}; stroke: var(--surface)`, "stroke-width": 2 }, svg);
       text(svg, f.W - m.r + 8, (e.ly ?? e.y) + 4, e.label, { class: "end" });
@@ -602,7 +614,7 @@
     const w = tip.offsetWidth;
     const left = x + 12 + w > c.host.clientWidth ? x - 12 - w : x + 12;
     tip.style.left = `${Math.max(0, left)}px`;
-    tip.style.top = `${top}px`;
+    tip.style.top = `${top + c.notes.offsetHeight}px`;
   }
 
   // ---------------------------------------------------------------- size bars
