@@ -1,0 +1,222 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Standalone fake GitHub API for load-testing the Ubicloud control plane.
+#
+# This is a *passive* server: it never contacts staging. Instead, each staging
+# app is pointed at it via OCTOKIT_API_ENDPOINT, so its Octokit calls
+# (generate-jitconfig, runner GET/DELETE, rate_limit, ...) land here. The load
+# generator (bin/github_runner_load) separately sends webhooks to staging and
+# polls this server to discover registered runner ids.
+#
+# Multiple staging instances can share one process: bind one port per instance,
+# and state is namespaced by the listening port. This lets several instances use
+# the same repository name without their runner registrations colliding.
+#
+#   bin/fake-github-api --listen baseline:4567 --listen scheduler-v2:4568
+#
+# Then each staging app sets:
+#   OCTOKIT_API_ENDPOINT=http://<this-host>:<its port>
+#
+# Control endpoints (not part of the GitHub API), scoped to the port's namespace:
+#   GET  /_runners?repo=owner/name  -> runners registered for a repository
+#   GET  /_state                    -> full in-memory state for this namespace
+#   POST /_reset                    -> clear this namespace's state
+
+require "json"
+require "time"
+require "rack"
+require "puma"
+require "optparse"
+require "securerandom"
+
+class FakeGithubApi
+  Runner = Struct.new(:id, :name, :repo, :busy, :labels)
+
+  def initialize(namespaces: {})
+    @mutex = Mutex.new
+    @next_runner_id = 1
+    @namespaces = namespaces # port(String) => namespace name
+    @runners = Hash.new { |h, k| h[k] = {} } # ns => {id => Runner}
+    @installations = Hash.new { |h, k| h[k] = {} } # ns => {id(String) => {}}
+  end
+
+  def call(env)
+    req = Rack::Request.new(env)
+    path = req.path_info
+    method = req.request_method
+    ns = namespace_for(env)
+
+    # Internal control endpoints, scoped to this listener's namespace.
+    case [method, path]
+    when ["GET", "/_runners"]
+      return json(runners_for(ns, req.params["repo"]))
+    when ["GET", "/_state"]
+      return json(@mutex.synchronize {
+        {namespace: ns, runners: @runners[ns].values.map(&:to_h), installations: @installations[ns].keys}
+      })
+    when ["POST", "/_reset"]
+      @mutex.synchronize do
+        @runners[ns].clear
+        @installations[ns].clear
+      end
+      return json({message: "reset", namespace: ns})
+    end
+
+    route(req, method, path, ns)
+  rescue => e
+    warn "[fake-github-api] #{method} #{path} -> error: #{e.class}: #{e.message}"
+    json({message: e.message}, 500)
+  end
+
+  def namespace_for(env)
+    @namespaces[env["SERVER_PORT"].to_s] || "default"
+  end
+
+  private
+
+  def route(req, method, path, ns)
+    # POST /app/installations/:id/access_tokens
+    if method == "POST" && (m = %r{\A/app/installations/(\d+)/access_tokens\z}.match(path))
+      @mutex.synchronize { @installations[ns][m[1]] ||= {} }
+      return json({token: "fake-installation-token-#{ns}-#{m[1]}", expires_at: (Time.now + 3600).utc.iso8601})
+    end
+
+    # DELETE /app/installations/:id
+    return empty(204) if method == "DELETE" && path.match?(%r{\A/app/installations/\d+\z})
+
+    # GET /app/hook/deliveries
+    return json([]) if method == "GET" && path == "/app/hook/deliveries"
+
+    # POST /app/hook/deliveries/:id/attempts
+    return empty(202) if method == "POST" && path.match?(%r{\A/app/hook/deliveries/[^/]+/attempts\z})
+
+    # POST /login/oauth/access_token
+    return json({access_token: "fake-oauth-token", token_type: "bearer", scope: ""}) if method == "POST" && path == "/login/oauth/access_token"
+
+    # GET /user/installations
+    if method == "GET" && path == "/user/installations"
+      installations = @mutex.synchronize { @installations[ns].keys.map { |id| {id: id.to_i} } }
+      return json({total_count: installations.size, installations:})
+    end
+
+    # GET /rate_limit
+    if method == "GET" && path == "/rate_limit"
+      reset = (Time.now + 3600).to_i
+      core = {limit: 1_000_000, remaining: 999_999, reset:}
+      return json({resources: {core:, search: {limit: 30, remaining: 30, reset:}}, rate: core})
+    end
+
+    # Runner endpoints: /repos/:owner/:repo/actions/runners...
+    # Both groups are named: Ruby drops unnamed captures from positional
+    # indexing when a pattern also contains named captures.
+    if (m = %r{\A/repos/(?<repo>[^/]+/[^/]+)/actions/runners(?<rest>/.*)?\z}.match(path))
+      return handle_runner(req, method, ns, m[:repo], m[:rest].to_s)
+    end
+
+    # GET /repos/:owner/:repo/actions/runs
+    return json({total_count: 0, workflow_runs: []}) if method == "GET" && path.match?(%r{\A/repos/[^/]+/[^/]+/actions/runs\z})
+
+    # GET /repos/:owner/:repo/actions/runs/:id[/attempts/:n]/jobs
+    return json({total_count: 0, jobs: []}) if method == "GET" && path.match?(%r{\A/repos/[^/]+/[^/]+/actions/runs/\d+(?:/attempts/\d+)?/jobs\z})
+
+    # Anything else: succeed with an empty object so stray calls don't break the app.
+    warn "[fake-github-api] unhandled #{method} #{path} -> 200 {}"
+    json({})
+  end
+
+  def handle_runner(req, method, ns, repo, rest)
+    case [method, rest]
+    when ["POST", "/generate-jitconfig"]
+      body = parse_body(req)
+      name = body["name"] || "runner-#{SecureRandom.hex(4)}"
+      labels = body["labels"] || []
+      runner = @mutex.synchronize do
+        r = Runner.new(@next_runner_id, name, repo, false, labels)
+        @runners[ns][r.id] = r
+        @next_runner_id += 1
+        r
+      end
+      warn "[fake-github-api][#{ns}] registered runner #{runner.id} (#{name}) for #{repo}"
+      return json({
+        runner: {id: runner.id, name: runner.name, busy: false},
+        encoded_jit_config: "fake-jit-#{runner.id}-#{SecureRandom.hex(8)}",
+      })
+    when ["GET", ""]
+      runners = @mutex.synchronize { @runners[ns].values.select { |r| r.repo == repo } }
+      return json({total_count: runners.size, runners: runners.map { |r| {id: r.id, name: r.name, busy: r.busy, status: "online"} }})
+    end
+
+    if (m = %r{\A/(\d+)\z}.match(rest))
+      id = m[1].to_i
+      case method
+      when "GET"
+        runner = @mutex.synchronize { @runners[ns][id] }
+        return not_found unless runner
+        return json({id: runner.id, name: runner.name, busy: runner.busy, status: "online"})
+      when "DELETE"
+        @mutex.synchronize { @runners[ns].delete(id) }
+        warn "[fake-github-api][#{ns}] deregistered runner #{id}"
+        return empty(204)
+      end
+    end
+
+    not_found
+  end
+
+  def runners_for(ns, repo)
+    @mutex.synchronize do
+      @runners[ns].values
+        .select { |r| repo.nil? || r.repo == repo }
+        .map { |r| {id: r.id, name: r.name, repo: r.repo, busy: r.busy} }
+    end
+  end
+
+  def parse_body(req)
+    raw = req.body.read
+    req.body.rewind
+    return {} if raw.nil? || raw.empty?
+    JSON.parse(raw)
+  rescue JSON::ParserError
+    {}
+  end
+
+  def json(obj, status = 200)
+    body = JSON.generate(obj)
+    [status, {"content-type" => "application/json", "content-length" => body.bytesize.to_s}, [body]]
+  end
+
+  def empty(status)
+    [status, {"content-length" => "0"}, []]
+  end
+
+  def not_found
+    json({message: "Not Found"}, 404)
+  end
+end
+
+options = {host: "0.0.0.0", listens: {}}
+OptionParser.new do |opts|
+  opts.banner = "Usage: bin/fake-github-api [--host HOST] [--listen NAME:PORT]... [--port PORT]"
+  opts.on("--host HOST", "Bind address (default 0.0.0.0)") { |v| options[:host] = v }
+  opts.on("--listen NAME:PORT", "Bind a named namespace on PORT (repeatable)") do |v|
+    name, port = v.split(":", 2)
+    abort("--listen expects NAME:PORT") unless name && port
+    options[:listens][port.to_i] = name
+  end
+  opts.on("--port PORT", Integer, "Shorthand for --listen default:PORT (default 4567)") { |v| options[:listens][v] = "default" }
+  opts.on("-h", "--help") do
+    puts opts
+    exit
+  end
+end.parse!
+
+options[:listens][4567] = "default" if options[:listens].empty?
+
+server = Puma::Server.new(FakeGithubApi.new(namespaces: options[:listens].transform_keys(&:to_s)))
+options[:listens].each do |port, name|
+  server.add_tcp_listener(options[:host], port)
+  warn "[fake-github-api] listening on http://#{options[:host]}:#{port} (namespace=#{name})"
+end
+server.run
+sleep
