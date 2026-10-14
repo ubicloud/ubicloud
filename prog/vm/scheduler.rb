@@ -3,39 +3,70 @@
 class Prog::Vm::Scheduler < Prog::Base
   STRAND_ID = UBID.parse("st0vmschedv13rzzzzzzzzzzzz").to_uuid
 
-  frame_accessor :retry_cursor, :reservations
+  # The fields of a waiting VM's frame that its allocation request uses.
+  ALLOCATION_FRAME_KEYS = %w[storage_volumes distinct_storage_devices exclude_host_ids exclude_data_centers gpu_count gpu_device force_host_id ch_version].freeze
 
+  frame_accessor :reservations
+
+  # A round places VMs oldest first, taking turns between customers, after
+  # the reservation holders. VMs of the same request class ask for the
+  # same allocation, so once one of them does not fit, the round skips the
+  # rest of its class: they keep their place in line, cost nothing, and
+  # cannot block smaller VMs that fit in the gaps. A round ends after it
+  # placed central_vm_scheduler_batch_size VMs, or when no class fits.
   label def wait
     reservations = live_reservations
-    holder_ids = reservations.values
-    batch_ids, next_retry_cursor, more_waiting = next_batch(holder_ids)
-    strands = lock_strands(holder_ids + batch_ids)
+    holders, queue = waiting_queue.partition { reservations.value?(it[:id]) }
     candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
     allocated_ids = []
     no_capacity = {}
+    full_classes = Set.new
+    unplaced_ids = []
+    batch_size = Config.central_vm_scheduler_batch_size
+    more_waiting = false
 
-    strands.each do |st|
-      nx = st.load
-      request = nx.allocation_request
-      DB.transaction(savepoint: true) { candidates.allocate(nx.vm, request) }
-      allocated_ids << st.id
-    rescue Scheduling::Allocator::NoSpaceLeft
-      no_capacity[st.id] = request
-    rescue RuntimeError => ex
-      Clog.emit("central vm scheduler failed to allocate vm", Util.exception_to_hash(ex, into: {central_vm_scheduler_failure: {vm: st.ubid}}))
+    (holders + take_turns(queue)).each do |vm|
+      if allocated_ids.size >= batch_size
+        more_waiting = true
+        break
+      end
+
+      if full_classes.include?(vm[:class])
+        unplaced_ids << vm[:id]
+      elsif (st = lock_strands([vm[:id]]).first)
+        case (result = try_allocate(st, candidates))
+        when :allocated
+          allocated_ids << st.id
+        when Scheduling::Allocator::Request
+          no_capacity[st.id] = result
+          unplaced_ids << st.id
+          full_classes << vm[:class]
+        end
+      end
     end
 
-    no_capacity_ids = no_capacity.keys
     Strand.where(id: allocated_ids).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
-    Semaphore.incr(no_capacity_ids - Semaphore.where(strand_id: no_capacity_ids, name: "waiting_for_capacity").select_map(:strand_id), :waiting_for_capacity)
-    spilled_ids = no_capacity.empty? ? [] : Scheduling::RunnerSpiller.new.spill(no_capacity_ids)
+    Semaphore.incr(unplaced_ids - Semaphore.where(strand_id: unplaced_ids, name: "waiting_for_capacity").select_map(:strand_id), :waiting_for_capacity)
+    spilled_ids = unplaced_ids.empty? ? [] : Scheduling::RunnerSpiller.new.spill(unplaced_ids)
     reservations.delete_if { |_, vm_id| allocated_ids.include?(vm_id) || spilled_ids.include?(vm_id) }
     release_unfitting(reservations, no_capacity)
     reserve(no_capacity.except(*spilled_ids), reservations, candidates)
     self.reservations = reservations
 
-    self.retry_cursor = next_retry_cursor
     nap(more_waiting ? 0 : 5)
+  end
+
+  # Returns :allocated, the request of a VM that does not fit, or :failed.
+  def try_allocate(st, candidates)
+    nx = st.load
+    request = nx.allocation_request
+    DB.transaction(savepoint: true) { candidates.allocate(nx.vm, request) }
+    :allocated
+  rescue Scheduling::Allocator::NoSpaceLeft
+    request
+  rescue RuntimeError => ex
+    Clog.emit("central vm scheduler failed to allocate vm", Util.exception_to_hash(ex, into: {central_vm_scheduler_failure: {vm: st.ubid}}))
+    :failed
   end
 
   # An operator can override the configured value live in the frame.
@@ -94,42 +125,35 @@ class Prog::Vm::Scheduler < Prog::Base
       .exclude(Sequel[:strand][:id] => GithubRunner.where(id: Semaphore.where(name: "spill_over").select(:strand_id)).exclude(vm_id: nil).select(:vm_id))
   end
 
-  # Picks the VMs of a round, oldest first: in the order of their creation,
-  # then of their id, as an id does not tell its age. VMs that did not fail
-  # to fit yet go first, then the VMs that failed to fit, i.e., retries.
-  # Each group takes turns between customers (installations for runners,
-  # projects otherwise), so a customer with a large backlog does not delay
-  # the others. Retries continue after the retry cursor, their last position
-  # in a round, so VMs that still do not fit cannot block the ones behind
-  # them. A retry can move to an earlier turn when an older VM of its
-  # customer gets a host, and then waits for the next pass over the retries.
-  def next_batch(skip_ids)
-    customer = Sequel.function(:coalesce, Sequel[:github_runner][:installation_id], Sequel[:vm][:project_id])
-    failed = Semaphore.where(strand_id: Sequel[:strand][:id], name: "waiting_for_capacity").exists
-    fresh, retries = waiting_dataset
+  # The waiting VMs, oldest first, each with its customer (the installation
+  # for runners, the project otherwise) and its request class: everything
+  # its allocation request depends on. A VM's age counts from its creation,
+  # when it enters the queue; its id does not tell its age.
+  def waiting_queue
+    not_upgrade_premium = Semaphore.where(strand_id: Sequel[:github_runner][:id], name: "not_upgrade_premium").exists
+    waiting_dataset
       .join(:vm, id: Sequel[:strand][:id])
       .left_join(:github_runner, vm_id: Sequel[:vm][:id])
-      .select(Sequel[:strand][:id], Sequel[:vm][:created_at], customer.as(:customer), failed.as(:failed))
+      .select(
+        Sequel[:strand][:id], Sequel[:strand][:stack], Sequel[:vm][:created_at],
+        Sequel.function(:coalesce, Sequel[:github_runner][:installation_id], Sequel[:vm][:project_id]).as(:customer),
+        Sequel[:vm][:vcpus], Sequel[:vm][:memory_gib], Sequel[:vm][:family], Sequel[:vm][:arch], Sequel[:vm][:location_id],
+        Sequel[:vm][:boot_image], Sequel[:vm][:ip4_enabled], Sequel[:vm][:project_id], Sequel[:github_runner][:installation_id],
+        not_upgrade_premium.as(:not_upgrade_premium),
+      )
       .order(Sequel[:vm][:created_at], Sequel[:strand][:id])
       .naked
-      .all
-      .reject { skip_ids.include?(it[:id]) }
-      .partition { !it[:failed] }
-    retries = take_turns(retries)
-    retries.select! { (it[:position] <=> retry_cursor).positive? } if retry_cursor
-    queue = take_turns(fresh) + retries
-    batch = queue.first(Config.central_vm_scheduler_batch_size)
-    more_waiting = queue.size > batch.size
-    next_retry_cursor = more_waiting ? (batch.reverse.find { it[:failed] }&.fetch(:position) || retry_cursor) : nil
-    [batch.map { it[:id] }, next_retry_cursor, more_waiting]
+      .map do |row|
+        stack = row.delete(:stack)
+        row[:class] = row.except(:id, :customer, :created_at).merge(frame: stack.first.slice(*ALLOCATION_FRAME_KEYS))
+        row
+      end
   end
 
-  # Orders VMs by their turn within their customer, then by age. A position
-  # holds the creation time as a string, as the retry cursor keeps it in the
-  # frame.
+  # Orders VMs by their turn within their customer, then by age.
   def take_turns(vms)
     vms.group_by { it[:customer] }.each_value do |customer_vms|
-      customer_vms.each_with_index { |vm, turn| vm[:position] = [turn, vm[:created_at].utc.iso8601(6), vm[:id]] }
+      customer_vms.each_with_index { |vm, turn| vm[:position] = [turn, vm[:created_at], vm[:id]] }
     end
     vms.sort_by { it[:position] }
   end
