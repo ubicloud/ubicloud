@@ -602,31 +602,32 @@ module Scheduling::Allocator
         @hosts.values
       end
 
-      # Adds usage that the database does not have yet to a host's row.
-      def add_usage(host_id, usage)
-        return unless (row = @hosts[host_id])
+      def rows
+        @hosts.values
+      end
 
-        row[:used_cores] += usage[:cores]
-        row[:used_hugepages_1g] += usage[:hugepages_1g]
-        row[:vm_provisioning_count] += 1
-        row[:ipv4_available] = usage[:ipv4_available]
-        row[:available_storage_gib] -= usage[:storage_gib].values.sum
-        row[:storage_devices] = row[:storage_devices]
-          .map { it.merge("available_storage_gib" => it["available_storage_gib"] - usage[:storage_gib].fetch(it["id"], 0)) }
-          .sort_by { it["available_storage_gib"] }
+      def row(host_id)
+        @hosts[host_id]
       end
     end
   end
 
   # Plans allocations for a Scheduling::BulkCommit instead of committing
-  # them. Hosts are not queried again after an allocation, as the database
-  # has no planned usage yet. Instead, every request class adds the usage
-  # planned on its hosts, including classes loaded later in the round.
+  # them. The database has none of the planned usage until the bulk write,
+  # so hosts are not queried again after an allocation. Instead, the round
+  # keeps one capacity state per host: the capacity columns of the first
+  # row it loaded for the host, plus the usage planned on it. Every request
+  # class uses that state for the host, including classes first loaded
+  # later in the round. Their rows can have fresher values, as other
+  # processes free capacity during the round, and a plan checked against a
+  # fresher row could overfill an older one.
   class DeferredCandidateCache < CandidateCache
+    CAPACITY_COLUMNS = %i[used_cores used_hugepages_1g vm_provisioning_count ipv4_available available_storage_gib storage_devices].freeze
+
     def initialize(bulk_commit:, **)
       super(**)
       @bulk_commit = bulk_commit
-      @planned_usage = []
+      @capacity = {}
     end
 
     # Returns whether it planned the allocation. A VM it cannot plan, e.g.,
@@ -636,9 +637,10 @@ module Scheduling::Allocator
       fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
       return false unless @bulk_commit.plannable?(request, allocation)
 
-      usage = @bulk_commit.plan(vm, request, allocation)
-      @planned_usage << [allocation.vm_host_id, usage]
-      @classes.each_value { it.add_usage(allocation.vm_host_id, usage) }
+      host_id = allocation.vm_host_id
+      capacity = add_usage(@capacity.fetch(host_id), @bulk_commit.plan(vm, request, allocation))
+      @capacity[host_id] = capacity
+      @classes.each_value { it.row(host_id)&.merge!(capacity) }
       true
     end
 
@@ -646,8 +648,21 @@ module Scheduling::Allocator
 
     def new_equivalence_class(request)
       equivalence_class = super
-      @planned_usage.each { |host_id, usage| equivalence_class.add_usage(host_id, usage) }
+      equivalence_class.rows.each { it.merge!(@capacity[it[:vm_host_id]] ||= it.slice(*CAPACITY_COLUMNS)) }
       equivalence_class
+    end
+
+    def add_usage(capacity, usage)
+      capacity.merge(
+        used_cores: capacity[:used_cores] + usage[:cores],
+        used_hugepages_1g: capacity[:used_hugepages_1g] + usage[:hugepages_1g],
+        vm_provisioning_count: capacity[:vm_provisioning_count] + 1,
+        ipv4_available: usage[:ipv4_available],
+        available_storage_gib: capacity[:available_storage_gib] - usage[:storage_gib].values.sum,
+        storage_devices: capacity[:storage_devices]
+          .map { it.merge("available_storage_gib" => it["available_storage_gib"] - usage[:storage_gib].fetch(it["id"], 0)) }
+          .sort_by { it["available_storage_gib"] },
+      )
     end
   end
 

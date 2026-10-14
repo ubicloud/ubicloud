@@ -117,7 +117,7 @@ RSpec.describe Prog::Vm::Scheduler do
       def after_plan
         expect(Scheduling::BulkCommit).to receive(:new).and_wrap_original do |original|
           original.call.tap do |bulk_commit|
-            expect(bulk_commit).to receive(:plan).and_wrap_original { |plan, *args| plan.call(*args).tap { yield } }
+            expect(bulk_commit).to receive(:plan).at_least(:once).and_wrap_original { |plan, *args| plan.call(*args).tap { yield } }
           end
         end
       end
@@ -141,7 +141,7 @@ RSpec.describe Prog::Vm::Scheduler do
       end
 
       it "writes the same rows as committing the vms one by one" do
-        hosts = [create_slice_host, create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64")]
+        hosts = [create_slice_host, create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64", used_cores: 3, used_hugepages_1g: 16)]
         create_vm(vm_host_id: hosts[0].id, project_id: project.id, name: "existing-vm", local_vetho_ip: "169.254.0.0/32")
         vms = [2, 4, 2].map { create_waiting_vm(vcpus: it) }
         vms[0].update(ip4_enabled: true)
@@ -181,6 +181,17 @@ RSpec.describe Prog::Vm::Scheduler do
         expect(vm.vm_host_slice.cpus.map(&:cpu_number)).to eq([4, 5])
       end
 
+      it "uses one capacity state per host in a round, although other processes free capacity during the round" do
+        vmh = create_slice_host(used_cores: 4)
+        first, large, last = Array.new(3) { create_waiting_vm }.sort_by(&:id)
+        large.update(vcpus: 8, memory_gib: 32)
+        after_plan { VmHost.where(id: vmh.id).update(used_cores: 0) }
+        expect(Clog).not_to receive(:emit).with("central vm scheduler failed to allocate vm", anything)
+
+        expect { nx.wait }.to nap(5)
+        expect([first, large, last].map { it.reload.vm_host_id }).to eq([vmh.id, nil, vmh.id])
+      end
+
       it "plans no two vms on the last ipv4 address of a host" do
         fuller = create_slice_host(cidr: "1.1.1.1/32", used_cores: 3)
         other = create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64")
@@ -204,7 +215,7 @@ RSpec.describe Prog::Vm::Scheduler do
         vm.strand.update(stack: [{"storage_volumes" => volumes}])
 
         expect { nx.wait }.to nap(5)
-        expect(vm.reload.vm_storage_volumes.map(&:boot_image_id)).to eq([nil, vmh.boot_images.first.id, nil])
+        expect(vm.reload.vm_storage_volumes.sort_by(&:disk_index).map(&:boot_image_id)).to eq([nil, vmh.boot_images.first.id, nil])
       end
 
       it "counts the checks and allocations of runner vms" do
