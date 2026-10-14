@@ -281,7 +281,7 @@
   .fun-real { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); border: 1px solid var(--ink-2); border-radius: 999px; padding: 0 6px; }
   .fun-reply { font-size: 11px; }
   .fun-tweet.real { border-color: var(--ink-2); }
-  .fun-tweet p { margin: 0; color: var(--ink); }
+  .fun-tweet p { margin: 0; color: var(--ink); white-space: pre-line; } /* keep line breaks in real tweets */
   .fun-tweet-face { font-size: 14px; line-height: 1.3; }
   @keyframes fun-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .fun-tweet { animation: none; } }

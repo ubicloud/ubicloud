@@ -67,6 +67,16 @@
         real: true, name: "Caleb LeNoir", handle: "@caleblenoir", replyTo: "@janwilmake",
         text: "We just switched our runners to ubicloud and it cut our costs by about 90% without having to make any other changes. Pipelines are running more quickly too.",
       },
+      {
+        real: true, name: "Mustafa Akın", handle: "@mustafaakin",
+        url: "https://x.com/mustafaakin/status/1719664175775957184", date: "Nov 1, 2023",
+        text: "To reduce @github Actions cost, we started using ubicloud.com, a project by ex-@citusdata \n\nUbicloud allows managing dedicated hardware (Hetzner) with VMs. \n\nThey have a useful 1-click Github app, easy to try. It's 9-10x cheaper for the same specs of the VMs.",
+      },
+      {
+        real: true, name: "Mustafa Akın", handle: "@mustafaakin",
+        url: "https://x.com/mustafaakin/status/1719728427681329340", date: "Nov 1, 2023",
+        text: "Ubicloud cost $9 this month for us. On Github Actions it'd be about $120. I highly recommend it. \n\nIt's just 1 click to integrate the Github app and changing 1 line in workflow YMLs.",
+      },
     ],
     meh: [
       ["@semver_sloth", "Runner took a minute and a half. Enough time to read one forum post and get mad about it."],
@@ -102,6 +112,11 @@
       ["@green_check_gremlin", "Yellow dot. Not red. Not green. Yellow is a vibe. I am learning to accept yellow."],
       ["@kernel_kiwi", "Runner pending. Cleaned my desktop for the first time since 2019. Found a folder called final_final_v3."],
       ["@lint_lord", "Took a while, but it ran. Lowered my expectations and met them exactly. Personal best."],
+      {
+        real: true, name: "matsuu", handle: "@matsuu",
+        url: "https://x.com/matsuu/status/1754366219896189069", date: "Feb 5, 2024",
+        text: "GitHub Actionsを正規価格の1/10で動作可能と謳うGitHub Runnerサービス。GitHubで連携してGitHub workflowのruns-onを書き換えるだけ。 / “Ubicloud - GitHub Actions, ‍10x Cheaper”",
+      },
     ],
     angry: [
       ["@flaky_test_fairy", "Waited so long for a runner my PR got stale, then moldy, then grew legs and walked off."],
