@@ -272,6 +272,8 @@ module Config
   override :central_vm_scheduler, false, bool
   override :central_vm_scheduler_batch_size, 100, int
   override :central_vm_scheduler_spill_installation_share, 0.5, float
+  override :central_vm_scheduler_reservation_min_vcpus, 16, int
+  override :central_vm_scheduler_max_reservations, 10, int
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
   override :github_actions_ch_53_percent, 0.0, float
 

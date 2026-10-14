@@ -162,8 +162,9 @@ module Scheduling::Allocator
     end
 
     class CandidateHosts
-      def initialize(request)
+      def initialize(request, ignore_space: false)
         @request = request
+        @ignore_space = ignore_space
         @datasets = []
       end
 
@@ -264,7 +265,9 @@ module Scheduling::Allocator
               .where(display_state: "creating"))
         end
 
-        ds = if request.use_slices && request.require_shared_slice
+        ds = if @ignore_space
+          ds
+        elsif request.use_slices && request.require_shared_slice
           apply_filter(:slice) do
             # We are looking for hosts that have at least once slice already allocated but with enough room
             # for our new VM. This means it has to be a sharable slice, with cpu and memory available
@@ -511,8 +514,12 @@ module Scheduling::Allocator
   # class: requests that differ only in their VM share the candidate hosts.
   # A host that took an allocation is queried again before a later request
   # scores it, so a round never scores a host with stale usage.
+  #
+  # A host in reservations (host id to VM id) takes only the VM that holds
+  # it, so the host drains until that VM fits.
   class CandidateCache
-    def initialize
+    def initialize(reservations = {})
+      @reservations = reservations
       @classes = {}
       @changed_host_ids = []
     end
@@ -523,12 +530,32 @@ module Scheduling::Allocator
       Scheduling::Allocator.commit(vm, allocation)
     end
 
+    # The unreserved host, among the ones the request may use, that needs
+    # the least space freed to fit the request.
+    def closest_host(request)
+      Allocation::CandidateHosts.new(request, ignore_space: true).dataset.all
+        .reject { @reservations.key?(it[:vm_host_id]) }
+        .min_by { shortfall(it, request) }
+        &.fetch(:vm_host_id)
+    end
+
     private
 
     def best_allocation(request)
       key = request.to_h.except(:vm_id, :diagnostics)
       equivalence_class = (@classes[key] ||= EquivalenceClass.new(request, @changed_host_ids.size))
-      BestFitAllocation.best_of(equivalence_class.hosts(@changed_host_ids), request)
+      hosts = equivalence_class.hosts(@changed_host_ids).reject do
+        (holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id
+      end
+      BestFitAllocation.best_of(hosts, request)
+    end
+
+    def shortfall(host, request)
+      cores = request.cores_for_vcpus(host[:total_cpus] / host[:total_cores])
+      [
+        (cores - (host[:total_cores] - host[:used_cores])).fdiv(host[:total_cores]),
+        (request.memory_gib - (host[:total_hugepages_1g] - host[:used_hugepages_1g])).fdiv(host[:total_hugepages_1g]),
+      ].max
     end
 
     class EquivalenceClass

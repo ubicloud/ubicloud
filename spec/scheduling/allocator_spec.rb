@@ -175,6 +175,32 @@ RSpec.describe Scheduling::Allocator do
       expect(vm.reload.vm_host_id).to eq(fuller.id)
     end
 
+    it "keeps a reserved host for the vm that holds it" do
+      vmh = create_host
+      holder, other = Array.new(2) { create_waiting_vm }
+      cache = Al::CandidateCache.new({vmh.id => holder.id})
+
+      expect { cache.allocate(other, described_class.request(other, storage_volumes)) }.to raise_error(Al::NoSpaceLeft)
+      cache.allocate(holder, described_class.request(holder, storage_volumes))
+      expect(holder.reload.vm_host_id).to eq(vmh.id)
+    end
+
+    it "finds the unreserved host that needs the least space freed" do
+      reserved = create_host(used_cores: 7)
+      closest = create_host(used_cores: 6)
+      create_host(used_cores: 4, used_hugepages_1g: 50)
+      vm = create_waiting_vm(vcpus: 6, memory_gib: 24)
+      cache = Al::CandidateCache.new({reserved.id => "vm"})
+
+      expect(cache.closest_host(described_class.request(vm, storage_volumes))).to eq(closest.id)
+    end
+
+    it "finds no closest host if no host may take the vm" do
+      vm = create_waiting_vm
+
+      expect(cache.closest_host(described_class.request(vm, storage_volumes))).to be_nil
+    end
+
     it "scores a host that took an allocation with its new usage" do
       create_host(used_hugepages_1g: 44)
       first, second = Array.new(2) { create_waiting_vm }
