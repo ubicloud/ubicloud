@@ -215,6 +215,7 @@
       mood: "happy",
       dollars: 0,
       last: null, // { gen, rate } of the previous sample
+      baseline: null, // vCPUs in use with no runners at all (other VMs on the hosts)
       ok: false,
     };
   }
@@ -226,13 +227,28 @@
   const DOLLARS_PER_VCPU_MINUTE = 0.002;
   const MAX_GAP_MS = 10 * 60 * 1000; // longer gaps between samples (outage) earn nothing
 
+  // Runners that exist right now, in any stage after being placed.
+  const runnersActive = (m) => ["booting", "idle", "running"].reduce((n, k) => n + (Number(m.stages?.[k]) || 0), 0);
+
+  // vCPUs that runners hold. fleet.vcpus_used also counts other VMs on the
+  // hosts, so subtract what the side uses when it has no runners at all,
+  // learned whenever that happens.
+  function runnerVcpus(s, m) {
+    const used = Number(m.fleet?.vcpus_used) || 0;
+    if (!runnersActive(m)) {
+      s.baseline = used;
+      return 0;
+    }
+    return Math.max(0, used - (s.baseline ?? 0));
+  }
+
   // Money made since this page opened, so each viewer starts from $0 and a
-  // reload starts over: vCPUs in use × price, integrated between samples on
+  // reload starts over: runner vCPUs × price, integrated between samples on
   // the side's own clock (generated_at).
   function addMoney(key, m) {
     const s = state[key];
     const gen = Date.parse(m.generated_at);
-    const rate = (Number(m.fleet?.vcpus_used) || 0) * DOLLARS_PER_VCPU_MINUTE;
+    const rate = runnerVcpus(s, m) * DOLLARS_PER_VCPU_MINUTE;
     if (!Number.isFinite(gen)) return;
     if (s.last) {
       const dt = gen - s.last.gen;
@@ -321,12 +337,26 @@
     }
   }
 
+  async function seedBaselines() {
+    try {
+      const { samples } = await fetch("/history?seconds=900", { cache: "no-store" }).then((r) => r.json());
+      for (const side of SIDES) {
+        const idle = (samples[side.key] || []).filter(([, m]) => !runnersActive(m));
+        if (idle.length) state[side.key].baseline = Number(idle.at(-1)[1].fleet?.vcpus_used) || 0;
+      }
+    } catch {
+      // No history: the baseline is learned the next time a side has no runners.
+    }
+  }
+
   function tick() {
     for (const side of SIDES) poll(side);
   }
 
-  tick();
-  setInterval(tick, POLL_MS);
+  seedBaselines().then(() => {
+    tick();
+    setInterval(tick, POLL_MS);
+  });
   // Staggered, so the two feeds don't tick in lockstep.
   setTimeout(() => addTweet("current"), 800);
   setTimeout(() => addTweet("central"), 1900);
