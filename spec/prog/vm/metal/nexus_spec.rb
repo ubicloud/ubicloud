@@ -579,7 +579,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }
 
       before do
-        allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
+        allow(Config).to receive_messages(github_runner_service_project_id: runner_project.id, github_runner_vm_allocation_ratio: 1.0)
         BootImage.create(name: "github-ubuntu-2404", version: "20260101", vm_host_id: runner_host.id, activated_at: Time.now, size_gib: 75)
         create_vhost_block_backend(vm_host_id: runner_host.id)
         vm.update(project_id: runner_project.id, location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2404", vm_host_id: nil)
@@ -1836,7 +1836,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       let(:dev) { StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500) }
 
       before do
-        allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
+        allow(Config).to receive_messages(github_runner_service_project_id: runner_project.id, github_runner_vm_allocation_ratio: 1.0)
         vm.update(project_id: runner_project.id, location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2404", vm_host_slice_id: slice.id, ip4_enabled: true)
         VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 75, disk_index: 0, storage_device_id: dev.id)
         AssignedVmAddress.create(dst_vm_id: vm.id, address_id: Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id).id, ip: "1.1.1.1")

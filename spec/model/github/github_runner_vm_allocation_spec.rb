@@ -30,7 +30,7 @@ RSpec.describe GithubRunnerVmAllocation do
   end
 
   before do
-    allow(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+    allow(Config).to receive_messages(github_runner_service_project_id: project.id, github_runner_vm_allocation_ratio: 1.0)
     BootImage.create(name: "github-ubuntu-2404", version: "20260101", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 75)
     create_vhost_block_backend(vm_host_id: vm_host.id)
   end
@@ -45,6 +45,11 @@ RSpec.describe GithubRunnerVmAllocation do
       allow(Config).to receive(:vm_pool_project_id).and_return(pool_project.id)
       new_vm.update(project_id: pool_project.id)
       expect(described_class.label_for(new_vm, [75])).to eq("ubicloud-standard-2-ubuntu-2404")
+    end
+
+    it "returns nil when the ratio is 0" do
+      allow(Config).to receive(:github_runner_vm_allocation_ratio).and_return(0.0)
+      expect(described_class.label_for(new_vm, [75])).to be_nil
     end
 
     it "returns nil for VMs of other projects" do
