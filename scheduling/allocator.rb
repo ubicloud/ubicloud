@@ -148,7 +148,11 @@ module Scheduling::Allocator
     end
 
     def self.best_allocation(request)
-      candidate_hosts(request).map { Allocation.new(it, request) }
+      best_of(candidate_hosts(request), request)
+    end
+
+    def self.best_of(candidate_hosts, request)
+      candidate_hosts.map { Allocation.new(it, request) }
         .select { it.is_valid }
         .min_by { it.score + random_score }
     end
@@ -422,6 +426,10 @@ module Scheduling::Allocator
       end
     end
 
+    def vm_host_id
+      @candidate_host[:vm_host_id]
+    end
+
     def to_s
       "#{UBID.to_ubid(@request.vm_id)} (arch=#{@request.arch_filter}, vcpus=#{@request.vcpus}, mem=#{@request.memory_gib}, storage=#{@request.storage_gib}) -> #{UBID.to_ubid(@candidate_host[:vm_host_id])} (cpu=#{@candidate_host[:used_cores]}/#{@candidate_host[:total_cores]}, mem=#{@candidate_host[:used_hugepages_1g]}/#{@candidate_host[:total_hugepages_1g]}, storage=#{@candidate_host[:total_storage_gib] - @candidate_host[:available_storage_gib]}/#{@candidate_host[:total_storage_gib]}), score=#{@score}"
     end
@@ -473,6 +481,50 @@ module Scheduling::Allocator
         @candidate_host[:storage_devices].any? { it["available_storage_gib"] >= large } &&
         !@request.needs_large_storage_device? &&
         storage_allocation.reduces_large_device_multiples?
+    end
+  end
+
+  # Allocates many VMs in one round with a candidate query per equivalence
+  # class: requests that differ only in their VM share the candidate hosts.
+  # A host that took an allocation is queried again before a later request
+  # scores it, so a round never scores a host with stale usage.
+  class CandidateCache
+    def initialize
+      @classes = {}
+      @changed_host_ids = []
+    end
+
+    def allocate(vm, request)
+      allocation = best_allocation(request)
+      @changed_host_ids << allocation.vm_host_id if allocation
+      Scheduling::Allocator.commit(vm, allocation)
+    end
+
+    private
+
+    def best_allocation(request)
+      key = request.to_h.except(:vm_id, :diagnostics)
+      equivalence_class = (@classes[key] ||= EquivalenceClass.new(request, @changed_host_ids.size))
+      Allocation.best_of(equivalence_class.hosts(@changed_host_ids), request)
+    end
+
+    class EquivalenceClass
+      def initialize(request, seen_changes)
+        candidate_hosts = Allocation::CandidateHosts.new(request)
+        @dataset = candidate_hosts.dataset
+        @hosts = candidate_hosts.hosts.to_h { [it[:vm_host_id], it] }
+        @seen_changes = seen_changes
+      end
+
+      def hosts(changed_host_ids)
+        changed = changed_host_ids[@seen_changes..].uniq
+        @seen_changes = changed_host_ids.size
+        unless changed.empty?
+          changed.each { @hosts.delete(it) }
+          @dataset.where(Sequel[:vm_host][:id] => changed).each { @hosts[it[:vm_host_id]] = it }
+        end
+        @hosts.values
+      end
     end
   end
 
