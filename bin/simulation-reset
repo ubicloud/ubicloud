@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Deletes every runner and VM of the simulation, and resets the scheduler
+# metrics. With --hosts, deletes the simulated hosts too.
+#
+# Usage: sudo systemctl stop clover-web clover-respirate
+#        bin/simulation-reset [--hosts]
+#        sudo systemctl start clover-web clover-respirate
+
+require_relative "../loader"
+
+Simulation.reset(include_hosts: ARGV.include?("--hosts"))
+puts "Reset the simulation, #{VmHost.count} hosts left"

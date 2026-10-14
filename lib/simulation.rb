@@ -27,6 +27,43 @@ module Simulation
     GithubInstallation.with_github_installation_id(installation_id)
   end
 
+  RUNTIME_PROGS = %w[Github::GithubRunnerNexus Github::GithubRepositoryNexus Vm::Metal::Nexus Vnet::Metal::SubnetNexus
+    Vnet::Metal::NicNexus Vm::VmHostSliceNexus PageNexus].freeze
+
+  # Deletes every runner, VM, and everything created for them, and resets
+  # the scheduler metrics. Stop web and respirate first, so that nothing is
+  # created or progressed meanwhile. Hosts are kept, emptied, unless
+  # include_hosts is set.
+  def self.reset(include_hosts: false)
+    fail "Simulation mode is not enabled" unless Config.simulation_mode
+
+    DB.transaction do
+      DB[:semaphore].where(strand_id: DB[:strand].where(prog: RUNTIME_PROGS).select(:id)).delete
+      DB[:strand].where(prog: RUNTIME_PROGS).delete
+      %i[github_runner github_cache_entry github_repository github_installation_private_subnet github_custom_label
+        github_installation assigned_vm_address vm_storage_volume firewalls_vms vm_init_script ipsec_tunnel nic].each { DB[it].delete }
+      vm_ids = DB[:vm].select_map(:id)
+      DB[:vm].delete
+      DB[:sshable].where(id: vm_ids).delete
+      DB[:vm_host_cpu].update(vm_host_slice_id: nil)
+      %i[vm_host_slice firewall_rule firewalls_private_subnets firewall private_subnet page_root_resource page_snooze page
+        scheduler_metric_counter].each { DB[it].delete }
+
+      if include_hosts
+        host_ids = DB[:vm_host].select_map(:id)
+        cidrs = DB[:address].where(routed_to_host_id: host_ids).select(:cidr)
+        DB[:ipv4_address].where(cidr: cidrs).delete
+        %i[vm_host_cpu storage_device boot_image vhost_block_backend assigned_host_address].each { DB[it].where((it == :assigned_host_address) ? :host_id : :vm_host_id => host_ids).delete }
+        DB[:address].where(routed_to_host_id: host_ids).delete
+        DB[:vm_host].delete
+        DB[:sshable].where(id: host_ids).delete
+      else
+        VmHost.each { it.update(used_cores: it.io_cpu_count * it.total_cores / it.total_cpus, used_hugepages_1g: 0) }
+        DB[:storage_device].update(available_storage_gib: :total_storage_gib)
+      end
+    end
+  end
+
   def self.seed(host_count:, family: "standard", arch: "x64", location_id: Location::GITHUB_RUNNERS_ID,
     total_cores: 48, threads_per_core: 2, total_hugepages_1g: 360, storage_devices: 2, storage_gib_per_device: 3500,
     boot_images: Github.runner_labels.values.map { it["boot_image"] }.uniq, os_version: "ubuntu-24.04")
