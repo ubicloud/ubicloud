@@ -15,11 +15,17 @@ class Scheduling::RunnerSpiller
     @installation_vcpu_limit = Config.github_runner_aws_spill_vcpu_capacity * Config.central_vm_scheduler_spill_installation_share
   end
 
+  # Returns the ids of the VMs whose runners spilled.
   def spill(vm_ids)
     GithubRunner.where(vm_id: vm_ids).eager(:vm, installation: :project).all
       .select { spillable?(it) }
       .sort_by { [it.vm.created_at, -it.label_data["vcpus"]] }
-      .each { spill_runner(it) if fits?(it) }
+      .filter_map do |runner|
+        next unless fits?(runner)
+
+        spill_runner(runner)
+        runner.vm_id
+      end
   end
 
   private

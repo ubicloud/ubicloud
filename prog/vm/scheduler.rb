@@ -3,27 +3,33 @@
 class Prog::Vm::Scheduler < Prog::Base
   STRAND_ID = UBID.parse("st0vmschedv13rzzzzzzzzzzzz").to_uuid
 
-  frame_accessor :cursor
+  frame_accessor :cursor, :reservations
 
   label def wait
+    reservations = live_reservations
     strands = waiting_strands
-    candidates = Scheduling::Allocator::CandidateCache.new
+    candidates = Scheduling::Allocator::CandidateCache.new(reservations)
     allocated_ids = []
-    no_capacity_ids = []
+    no_capacity = {}
 
     strands.each do |st|
       nx = st.load
-      DB.transaction(savepoint: true) { candidates.allocate(nx.vm, nx.allocation_request) }
+      request = nx.allocation_request
+      DB.transaction(savepoint: true) { candidates.allocate(nx.vm, request) }
       allocated_ids << st.id
     rescue Scheduling::Allocator::NoSpaceLeft
-      no_capacity_ids << st.id
+      no_capacity[st.id] = request
     rescue RuntimeError => ex
       Clog.emit("central vm scheduler failed to allocate vm", Util.exception_to_hash(ex, into: {central_vm_scheduler_failure: {vm: st.ubid}}))
     end
 
+    no_capacity_ids = no_capacity.keys
     Strand.where(id: allocated_ids).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
     Semaphore.incr(no_capacity_ids - Semaphore.where(strand_id: no_capacity_ids, name: "waiting_for_capacity").select_map(:strand_id), :waiting_for_capacity)
-    Scheduling::RunnerSpiller.new.spill(no_capacity_ids) unless no_capacity_ids.empty?
+    spilled_ids = no_capacity.empty? ? [] : Scheduling::RunnerSpiller.new.spill(no_capacity_ids)
+    reservations.delete_if { |_, vm_id| allocated_ids.include?(vm_id) || spilled_ids.include?(vm_id) }
+    reserve(no_capacity.except(*spilled_ids), reservations, candidates)
+    self.reservations = reservations
 
     if strands.size == Config.central_vm_scheduler_batch_size
       self.cursor = strands.last.id
@@ -32,6 +38,26 @@ class Prog::Vm::Scheduler < Prog::Base
 
     self.cursor = nil
     nap 5
+  end
+
+  # A VM keeps its reservation while it waits for allocation.
+  def live_reservations
+    reserved = reservations || {}
+    waiting_ids = Strand.where(id: reserved.values, prog: "Vm::Metal::Nexus", label: "wait_allocation").select_map(:id)
+    reserved.select { |_, vm_id| waiting_ids.include?(vm_id) }
+  end
+
+  # Large VMs that fit on no host reserve the host closest to fitting them,
+  # in queue order, up to the reservation limit.
+  def reserve(no_capacity, reservations, candidates)
+    no_capacity.each do |vm_id, request|
+      break if reservations.size >= Config.central_vm_scheduler_max_reservations
+      next if request.vcpus < Config.central_vm_scheduler_reservation_min_vcpus || reservations.value?(vm_id)
+      next unless (host_id = candidates.closest_host(request))
+
+      reservations[host_id] = vm_id
+      Clog.emit("central vm scheduler reserved host", {central_vm_scheduler_reservation: {vm: UBID.to_ubid(vm_id), vm_host: UBID.to_ubid(host_id)}})
+    end
   end
 
   # The scheduler locks the strands of the VMs it allocates, and skips the

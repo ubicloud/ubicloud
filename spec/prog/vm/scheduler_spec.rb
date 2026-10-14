@@ -17,8 +17,8 @@ RSpec.describe Prog::Vm::Scheduler do
     vmh
   end
 
-  def create_waiting_vm(**)
-    vm = create_vm(project_id: project.id, name: "vm#{Vm.count}")
+  def create_waiting_vm(vcpus: 2, **)
+    vm = create_vm(project_id: project.id, name: "vm#{Vm.count}", vcpus:, memory_gib: vcpus * 4)
     vm.create_storage_volumes(storage_volumes.map { it.transform_keys(&:to_sym) })
     Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "wait_allocation", stack: [{"storage_volumes" => storage_volumes}], schedule: Time.now + 60, **)
     vm
@@ -71,6 +71,72 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { nx.wait }.to nap(5)
       expect(spilled.reload.vm_host_id).to be_nil
       expect(vm.reload.vm_host_id).not_to be_nil
+    end
+
+    context "with large vms" do
+      let(:vmh) { create_host(total_hugepages_1g: 200) }
+
+      before do
+        vmh
+        allow(Clog).to receive(:emit).and_call_original
+      end
+
+      it "reserves the host closest to fitting a large vm without capacity, and keeps other vms off it" do
+        large = create_waiting_vm(vcpus: 16)
+        expect(Clog).to receive(:emit).with("central vm scheduler reserved host", {central_vm_scheduler_reservation: {vm: large.ubid, vm_host: vmh.ubid}}).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(st.stack.first["reservations"]).to eq({vmh.id => large.id})
+
+        small = create_waiting_vm
+        expect { described_class.new(st).wait }.to nap(5)
+        expect(small.reload.vm_host_id).to be_nil
+
+        vmh.update(used_cores: 0)
+        expect { described_class.new(st).wait }.to nap(5)
+        expect(large.reload.vm_host_id).to eq(vmh.id)
+        expect(st.stack.first["reservations"]).to eq({})
+      end
+
+      it "gives the reservation of a spilled runner to the next large vm" do
+        spilled = create_waiting_vm(vcpus: 16)
+        spilled.update(created_at: Time.now - 60)
+        runner = create_runner(spilled)
+        runner.update(label: "ubicloud-standard-16")
+        large = create_waiting_vm(vcpus: 16)
+        st.update(stack: [{"reservations" => {vmh.id => spilled.id}}])
+
+        expect { nx.wait }.to nap(5)
+        expect(runner.spill_over_set?).to be(true)
+        expect(st.stack.first["reservations"]).to eq({vmh.id => large.id})
+      end
+
+      it "drops the reservations of vms that no longer wait for allocation" do
+        gone = create_waiting_vm(vcpus: 16)
+        gone.strand.update(label: "destroy")
+        st.update(stack: [{"reservations" => {vmh.id => gone.id}}])
+        small = create_waiting_vm
+
+        expect { nx.wait }.to nap(5)
+        expect(small.reload.vm_host_id).to eq(vmh.id)
+        expect(st.stack.first["reservations"]).to eq({})
+      end
+
+      it "reserves up to the reservation limit" do
+        create_host(total_hugepages_1g: 200)
+        Array.new(2) { create_waiting_vm(vcpus: 16) }
+        expect(Config).to receive(:central_vm_scheduler_max_reservations).and_return(1).twice
+
+        expect { nx.wait }.to nap(5)
+        expect(st.stack.first["reservations"].size).to eq(1)
+      end
+    end
+
+    it "reserves no host for a large vm that no host may take" do
+      create_waiting_vm(vcpus: 16)
+
+      expect { nx.wait }.to nap(5)
+      expect(st.stack.first["reservations"]).to eq({})
     end
 
     it "skips the vms it allocated whose strands did not run yet" do
