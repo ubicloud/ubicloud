@@ -4,7 +4,19 @@ module Scheduling::Allocator
   class NoSpaceLeft < RuntimeError
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
+  def self.allocate(vm, storage_volumes, **)
+    request = request(vm, storage_volumes, **)
+    commit(vm, Allocation.best_allocation(request))
+  end
+
+  def self.commit(vm, allocation)
+    fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
+
+    allocation.update(vm)
+    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
+  end
+
+  def self.request(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
@@ -15,7 +27,7 @@ module Scheduling::Allocator
       VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
     end
 
-    request = Request.new(
+    Request.new(
       vm.id,
       vm.vcpus,
       vm.memory_gib,
@@ -44,11 +56,6 @@ module Scheduling::Allocator
       os_filter,
       vm.project_id,
     )
-    allocation = Allocation.best_allocation(request)
-    fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
-
-    allocation.update(vm)
-    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
   end
 
   Request = Struct.new(
@@ -162,7 +169,31 @@ module Scheduling::Allocator
         ds
       end
 
+      def dataset
+        @dataset ||= build_dataset
+      end
+
       def hosts
+        records = dataset.all
+
+        # Emit the allocation query if the project is flagged for diagnostics or there were
+        # no candidate hosts found.
+        if @request.diagnostics || (records.empty? && !@request.boot_image&.include?("github"))
+          counts = []
+          @datasets.each do |name, ds|
+            count = ds.count
+            counts << [name, count]
+            break if count == 0
+          end
+          Clog.emit("Allocator query for vm", {allocator_query: {vm_id: @request.vm_id,
+                                                                 sql: dataset.no_auto_parameterize.sql,
+                                                                 counts:}})
+        end
+
+        records
+      end
+
+      private def build_dataset
         request = @request
 
         ds = apply_filter(:base) do
@@ -337,23 +368,7 @@ module Scheduling::Allocator
           apply_filter(:shared_slice) { ds = ds.where(accepts_slices: true) }
         end
 
-        records = ds.all
-
-        # Emit the allocation query if the project is flagged for diagnostics or there were
-        # no candidate hosts found.
-        if request.diagnostics || (records.empty? && !request.boot_image&.include?("github"))
-          counts = []
-          @datasets.each do |name, ds|
-            count = ds.count
-            counts << [name, count]
-            break if count == 0
-          end
-          Clog.emit("Allocator query for vm", {allocator_query: {vm_id: request.vm_id,
-                                                                 sql: ds.no_auto_parameterize.sql,
-                                                                 counts:}})
-        end
-
-        records
+        ds
       end
     end
 
