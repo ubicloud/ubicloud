@@ -152,7 +152,7 @@ module Scheduling::Allocator
     end
 
     def self.best_of(candidate_hosts, request)
-      candidate_hosts.map { Allocation.new(it, request) }
+      candidate_hosts.map { new(it, request) }
         .select { it.is_valid }
         .min_by { it.score + random_score }
     end
@@ -436,7 +436,7 @@ module Scheduling::Allocator
 
     private
 
-    def calculate_score
+    def fit_score
       util = @allocations.map { it.utilization }
 
       # utilization score, in range [0, 2]
@@ -444,7 +444,11 @@ module Scheduling::Allocator
       score = score.abs + 1 if score < 0
 
       # imbalance score, in range [0, 1]
-      score += util.max - util.min
+      score + util.max - util.min
+    end
+
+    def calculate_score
+      score = fit_score
 
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
@@ -484,6 +488,25 @@ module Scheduling::Allocator
     end
   end
 
+  # Prefers the host with the least space left after the allocation, i.e.,
+  # the slot that is closest to the space the VM needs, so the larger free
+  # slots stay for larger VMs.
+  class BestFitAllocation < Allocation
+    private
+
+    # Only cores and memory count, as storage fills far slower than they do
+    # and would make a full host look imbalanced.
+    def fit_score
+      util = @vm_host_allocations.map(&:utilization)
+
+      # space left score, in range [0, 1]
+      score = 1 - util.sum.fdiv(util.size)
+
+      # imbalance score, in range [0, 1]
+      score + util.max - util.min
+    end
+  end
+
   # Allocates many VMs in one round with a candidate query per equivalence
   # class: requests that differ only in their VM share the candidate hosts.
   # A host that took an allocation is queried again before a later request
@@ -505,7 +528,7 @@ module Scheduling::Allocator
     def best_allocation(request)
       key = request.to_h.except(:vm_id, :diagnostics)
       equivalence_class = (@classes[key] ||= EquivalenceClass.new(request, @changed_host_ids.size))
-      Allocation.best_of(equivalence_class.hosts(@changed_host_ids), request)
+      BestFitAllocation.best_of(equivalence_class.hosts(@changed_host_ids), request)
     end
 
     class EquivalenceClass
