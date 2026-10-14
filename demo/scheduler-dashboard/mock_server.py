@@ -57,7 +57,7 @@ CURRENT_ALERTS = [
     {"id": "idle_recycle", "label": "Idle runner recycled", "metric": "stage_oldest_seconds.idle",
      "threshold": 310, "severity": "monitor", "source": "GithubRunnerNexus#wait"},
 ]
-STATIC_FILES = {"/": "index.html", "/index.html": "index.html", "/dashboard.js": "dashboard.js"}
+STATIC_FILES = {"/": "index.html", "/index.html": "index.html", "/dashboard.js": "dashboard.js", "/fun.js": "fun.js"}
 
 
 class Job:
