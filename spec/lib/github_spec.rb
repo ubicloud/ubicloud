@@ -82,4 +82,11 @@ RSpec.describe Github do
   it "can map all aliases to actual tag" do
     expect(described_class.runner_labels.values).to be_all
   end
+
+  it "maps a runner VM configuration to its canonical label" do
+    expect(described_class.runner_label_for(family: "standard", vcpus: 2, arch: "x64", boot_image: "github-ubuntu-2404", storage_size_gib: 75)).to eq("ubicloud-standard-2-ubuntu-2404")
+    expect(described_class.runner_label_for(family: "premium", vcpus: 2, arch: "x64", boot_image: "github-ubuntu-2404", storage_size_gib: 75)).to eq("ubicloud-premium-2-ubuntu-2404")
+    expect(described_class.runner_label_for(family: "standard", vcpus: 4, arch: "arm64", boot_image: "github-ubuntu-2404", storage_size_gib: 150)).to eq("ubicloud-standard-4-arm-ubuntu-2404")
+    expect(described_class.runner_label_for(family: "standard", vcpus: 2, arch: "x64", boot_image: "github-ubuntu-2404", storage_size_gib: 86)).to be_nil
+  end
 end
