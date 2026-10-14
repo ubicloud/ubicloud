@@ -14,7 +14,6 @@
   const POLL_MS = 1000;
   const DOLLARS_PER_VCPU_MINUTE = 0.002;
   const MAX_GAP_SECONDS = 600; // longer server-clock gaps (restart, clock jump) are skipped
-  const ANGRY_SHARE = 0.2;
   const MOODS = {
     happy: { emoji: "😀", label: "happy" },
     meh: { emoji: "😐", label: "meh" },
@@ -205,7 +204,7 @@
   for (const side of SIDES) {
     state[side.key] = {
       earnings: [], // [server ms, $/min] samples covering the last minute
-      mix: { happy: 0, meh: 0, angry: 0 },
+      mood: "happy",
       ok: false,
     };
   }
@@ -247,31 +246,29 @@
 
   // ---------------------------------------------------------------- mood
 
-  // Bucket bounds are [10, 30, 60, 120, 300, 600, 1800, 3600, null].
-  function moodMix(m) {
-    const counts = m.waiting?.age_histogram?.counts;
-    const mix = { happy: 0, meh: 0, angry: 0 };
-    if (!Array.isArray(counts)) return mix;
-    counts.forEach((n, i) => {
-      n = Number(n) || 0;
-      if (i <= 2) mix.happy += n;
-      else if (i === 3) mix.meh += n;
-      else mix.angry += n;
-    });
-    return mix;
+  // Customers' mood follows the slow tail, not the median: the p95 wait for
+  // a host (19 in 20 customers wait less), the worse of those still waiting
+  // and those placed in the last minute. Counting recent placements keeps the
+  // mood from snapping back to happy the moment a backlog drains.
+  const MOOD_LIMITS = [[60, "happy"], [120, "meh"]]; // seconds; above both is angry
+
+  function moodFrom(seconds) {
+    for (const [limit, mood] of MOOD_LIMITS) if (seconds <= limit) return mood;
+    return "angry";
   }
 
-  function overall(mix) {
-    const total = mix.happy + mix.meh + mix.angry;
-    if (!total) return "happy";
-    if (mix.angry / total > ANGRY_SHARE) return "angry";
-    return ["happy", "meh", "angry"].reduce((best, k) => (mix[k] > mix[best] ? k : best), "happy");
+  function currentMood(m) {
+    const waits = [];
+    if (m.waiting?.count > 0) waits.push(Number(m.waiting.p95_seconds) || 0);
+    const placed = m.latency?.queue_to_allocated;
+    if (placed?.count > 0) waits.push(Number(placed.p95_seconds) || 0);
+    return moodFrom(Math.max(0, ...waits));
   }
 
   function renderMood(key) {
     const s = state[key];
     const v = view[key];
-    const mood = overall(s.mix);
+    const mood = s.mood;
     v.big.textContent = MOODS[mood].emoji;
     v.word.textContent = MOODS[mood].label[0].toUpperCase() + MOODS[mood].label.slice(1);
     v.big.setAttribute("aria-label", `Customers are ${MOODS[mood].label}`);
@@ -279,12 +276,11 @@
 
   // ---------------------------------------------------------------- tweets
 
-  // A tweet for one side, picked by that side's current mood mix.
   // A tweet for one side, in that side's overall mood right now (the same
   // mood its big face shows), so the chatter flips as the mood does.
   function pickTweet(key) {
     const feed = view[key].feed;
-    const mood = overall(state[key].mix);
+    const mood = state[key].mood;
     // Avoid repeating anything among the last few tweets on screen.
     const recent = new Set([...feed.children].slice(0, 10).map((li) => li.dataset.text));
     const pool = TWEETS[mood].filter((t) => !recent.has(t.text));
@@ -331,7 +327,7 @@
       const s = state[side.key];
       s.ok = true;
       updateMoney(side.key, m);
-      s.mix = moodMix(m);
+      s.mood = currentMood(m);
       renderMood(side.key);
     } catch {
       state[side.key].ok = false;
