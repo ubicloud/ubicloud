@@ -450,13 +450,13 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.update(vm_host_id: nil)
       vm.incr_waiting_for_capacity
       expect(Clog).to receive(:emit).with("No capacity left", {lack_of_capacity: {location: "hetzner-fsn1", arch: "x64", family: "standard", queue_size: 1}}).and_call_original
-      expect { nx.wait_allocation }.to nap(60)
+      expect { nx.wait_allocation }.to nap(5 * 60)
     end
 
     it "naps until the scheduler allocates the vm" do
       vm.update(vm_host_id: nil)
       expect(Clog).not_to receive(:emit)
-      expect { nx.wait_allocation }.to nap(60)
+      expect { nx.wait_allocation }.to nap(5 * 60)
     end
   end
 

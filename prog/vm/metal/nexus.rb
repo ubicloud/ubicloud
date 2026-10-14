@@ -164,7 +164,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   label def wait_allocation
     finish_allocation if vm.vm_host_id
     report_lack_of_capacity if vm.waiting_for_capacity_set?
-    nap 60
+    nap 5 * 60
   end
 
   label def create_unix_user
