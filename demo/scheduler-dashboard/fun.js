@@ -188,9 +188,6 @@
   moodPanel.append(el("h4", null, "Customer mood"));
   const moodPair = el("div", "fun-pair");
   moodPanel.append(moodPair);
-  moodPanel.append(
-    el("p", "fun-small", "Waited ≤1 min 😀, 1–2 min 😐, over 2 min 😡. Big face: 😡 once over 20% are angry, else the most common mood."),
-  );
 
   const tweetHead = el("h4");
   tweetHead.append(who(SIDES[1]), document.createTextNode(" · Simulated customer chatter"));
