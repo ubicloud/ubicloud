@@ -53,80 +53,77 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     log_vm_stats
   end
 
-  label def start
-    queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
-    begin
-      distinct_storage_devices = self.distinct_storage_devices || false
-      host_exclusion_filter = exclude_host_ids || []
-      data_center_exclusion_filter = exclude_data_centers || []
-      gpu_count = self.gpu_count || 0
-      gpu_device = self.gpu_device || nil
-      runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
-      allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if force_host_id
-          [[], [], [], [force_host_id], []]
-        elsif vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          runner_location_preference = [Location::GITHUB_RUNNERS_ID]
-          installation = runner&.installation
-          prefs = installation&.allocator_preferences || {}
-          host_exclusion_filter |= prefs["host_exclusion_filter"] || []
+  def runner
+    return @runner if defined?(@runner)
 
-          runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
-            [vm.family]
-          elsif installation&.free_runner_upgrade?
-            prefs["family_filter"] || [vm.family, "premium"]
-          else
-            prefs["family_filter"] || [vm.family]
-          end
-          [
-            ["accepting"],
-            prefs["location_filter"] || runner_location_filter,
-            prefs["location_preference"] || runner_location_preference,
-            [],
-            runner_family_filter,
-          ]
+    @runner = (GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID)
+  end
+
+  def allocation_filters
+    host_exclusion_filter = exclude_host_ids || []
+    allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
+      if force_host_id
+        [[], [], [], [force_host_id], []]
+      elsif vm.location_id == Location::GITHUB_RUNNERS_ID
+        runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
+        runner_location_preference = [Location::GITHUB_RUNNERS_ID]
+        installation = runner&.installation
+        prefs = installation&.allocator_preferences || {}
+        host_exclusion_filter |= prefs["host_exclusion_filter"] || []
+
+        runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
+          [vm.family]
+        elsif installation&.free_runner_upgrade?
+          prefs["family_filter"] || [vm.family, "premium"]
         else
-          [["accepting"], [vm.location_id], [], [], [vm.family]]
+          prefs["family_filter"] || [vm.family]
         end
-      family_filter = ["standard"] if vm.family == "burstable"
-      os_filter = CH_VERSION_OS_VERSIONS[ch_version]
-
-      SchedulerMetrics.increment("scheduling_checks_total") if runner
-      Scheduling::Allocator.allocate(
-        vm, storage_volumes,
-        distinct_storage_devices:,
-        allocation_state_filter:,
-        location_filter:,
-        location_preference:,
-        host_filter:,
-        host_exclusion_filter:,
-        data_center_exclusion_filter:,
-        gpu_count:,
-        gpu_device:,
-        os_filter:,
-        family_filter:,
-      )
-    rescue Scheduling::Allocator::NoSpaceLeft
-      incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
-
-      Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}})
-
-      waiting_seconds = Time.now - vm.created_at
-      page_after_minutes = if vm.location_id == Location::GITHUB_RUNNERS_ID
-        (vm.vcpus == 60) ? (6 * 60) : 60
+        [
+          ["accepting"],
+          prefs["location_filter"] || runner_location_filter,
+          prefs["location_preference"] || runner_location_preference,
+          [],
+          runner_family_filter,
+        ]
       else
-        10
+        [["accepting"], [vm.location_id], [], [], [vm.family]]
       end
-      if waiting_seconds >= page_after_minutes * 60
-        utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
-      end
+    family_filter = ["standard"] if vm.family == "burstable"
 
-      nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
+    {
+      distinct_storage_devices: distinct_storage_devices || false,
+      allocation_state_filter:,
+      location_filter:,
+      location_preference:,
+      host_filter:,
+      host_exclusion_filter:,
+      data_center_exclusion_filter: exclude_data_centers || [],
+      gpu_count: gpu_count || 0,
+      gpu_device:,
+      os_filter: CH_VERSION_OS_VERSIONS[ch_version],
+      family_filter:,
+    }
+  end
+
+  def queued_vms
+    Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
+  end
+
+  def report_lack_of_capacity
+    Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}})
+
+    page_after_minutes = if vm.location_id == Location::GITHUB_RUNNERS_ID
+      (vm.vcpus == 60) ? (6 * 60) : 60
+    else
+      10
     end
+    if Time.now - vm.created_at >= page_after_minutes * 60
+      utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
+      Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
+    end
+  end
 
-    SchedulerMetrics.record_allocation(runner) if runner
+  def finish_allocation
     vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
     wakeup_waiting_strand("allocated_waiting_strand_id")
@@ -147,6 +144,20 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     hop_create_unix_user
+  end
+
+  label def start
+    begin
+      SchedulerMetrics.increment("scheduling_checks_total") if runner
+      Scheduling::Allocator.allocate(vm, storage_volumes, **allocation_filters)
+    rescue Scheduling::Allocator::NoSpaceLeft
+      incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
+      report_lack_of_capacity
+      nap (30.0 / (1 + (Time.now - vm.created_at) / 120.0)).clamp(5, 30)
+    end
+
+    SchedulerMetrics.record_allocation(runner) if runner
+    finish_allocation
   end
 
   label def create_unix_user
