@@ -9,7 +9,7 @@
 
   const SIDES = [
     { key: "current", name: "Current", url: "/current/scheduler/metrics", color: "var(--current)" },
-    { key: "central", name: "Central", url: "/central/scheduler/metrics", color: "var(--central)" },
+    { key: "central", name: "Sorting Hat", url: "/central/scheduler/metrics", color: "var(--central)" },
   ];
   const POLL_MS = 1000;
   const DOLLARS_PER_VCPU_MINUTE = 0.002;

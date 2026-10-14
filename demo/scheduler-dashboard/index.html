@@ -24,7 +24,7 @@
     --wash: rgba(11, 11, 11, 0.04);
     --track: #f0efec;
 
-    --current: #2a78d6;
+    --current: #6e7179;
     --central: #ff5c12;
     --stage-admission: #1baf7a;
     --stage-capacity: #eda100;
@@ -48,7 +48,7 @@
       --border: rgba(255, 255, 255, 0.10);
       --wash: rgba(255, 255, 255, 0.05);
       --track: #383835;
-      --current: #3987e5;
+      --current: #a3a5ad;
       --central: #ff6a26;
       --stage-admission: #199e70;
       --stage-capacity: #c98500;
@@ -69,7 +69,7 @@
     --border: rgba(255, 255, 255, 0.10);
     --wash: rgba(255, 255, 255, 0.05);
     --track: #383835;
-    --current: #3987e5;
+    --current: #a3a5ad;
     --central: #ff6a26;
     --stage-admission: #199e70;
     --stage-capacity: #c98500;
@@ -305,7 +305,7 @@
 <div class="wrap">
   <div class="toolbar">
     <div>
-      <h1>Current vs central scheduler</h1>
+      <h1>Current vs Sorting Hat scheduler</h1>
       <p class="sub">Same job stream to both control planes. Side-by-side charts share a scale. Red lines are paging thresholds.</p>
     </div>
   <div class="controls">
@@ -321,7 +321,7 @@
       <summary>Endpoints</summary>
       <form class="panel" id="settings">
         <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"></label>
-        <label>Central metrics URL <input name="central" autocomplete="off" spellcheck="false"></label>
+        <label>Sorting Hat metrics URL <input name="central" autocomplete="off" spellcheck="false"></label>
         <label>Poll interval (ms) <input name="interval" type="number" min="250" step="250"></label>
         <div class="row"><button type="button" id="settings-reset">Defaults</button><button type="submit" class="primary">Apply</button></div>
       </form>
@@ -329,7 +329,7 @@
   </div>
   </div>
 
-  <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>
+  <section class="scoreboard" id="scoreboard" aria-label="Current vs Sorting Hat, now"></section>
 
   <section class="card fun" id="fun" aria-label="Customer impact, just for fun"></section>
 

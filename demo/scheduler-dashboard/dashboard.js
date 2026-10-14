@@ -6,7 +6,7 @@
   const SIDES = ["current", "central"];
   const SIDE_INFO = {
     current: { name: "Current", sub: "Each runner polls; allocator retries on a 5–30s backoff", color: "var(--current)" },
-    central: { name: "Central", sub: "One queue, dispatched when capacity changes", color: "var(--central)" },
+    central: { name: "Sorting Hat", sub: "One queue, dispatched when capacity changes", color: "var(--central)" },
   };
   const STAGES = [
     { key: "waiting_admission", label: "Waiting: admission", color: "var(--stage-admission)" },
@@ -809,7 +809,7 @@
     if (k.better === "match") {
       return Math.abs(d) < 0.05 ? ["✓ Same feed to both", "better"] : [`● Feeds differ by ${pct || "100%"}`, "worse"];
     }
-    if (Math.abs(d) < 0.05) return ["≈ Central same as current", ""];
+    if (Math.abs(d) < 0.05) return ["≈ Sorting Hat same as current", ""];
     const higher = d > 0;
     const good = higher === (k.better === "higher");
     // Big increases read better as a multiple ("10.0× higher", not "899% higher").
@@ -818,7 +818,7 @@
     // The verdict is spelled out, not left to the color: higher is good for
     // some metrics and bad for others.
     const tail = Number.isFinite(d) ? "" : " (current is 0)";
-    return [`${higher ? "▲" : "▼"} Central ${amount}${higher ? "higher" : "lower"}${tail} · ${good ? "better" : "worse"}`, good ? "better" : "worse"];
+    return [`${higher ? "▲" : "▼"} Sorting Hat ${amount}${higher ? "higher" : "lower"}${tail} · ${good ? "better" : "worse"}`, good ? "better" : "worse"];
   }
 
   function buildColumns() {
@@ -878,23 +878,23 @@
 
     const both = (value, fmt) => SIDES.map((side) => ({ side, label: SIDE_INFO[side].name, color: SIDE_INFO[side].color, fmt, value }));
     addChart("h2h-incoming", {
-      group: "flow", height: 200, aria: "Incoming requests per minute, current vs central",
+      group: "flow", height: 200, aria: "Incoming requests per minute, current vs Sorting Hat",
       series: both((s) => s.rates.arrivals, fmtRate),
     });
     addChart("h2h-placed", {
-      group: "flow", height: 200, aria: "Requests placed on a host per minute, current vs central",
+      group: "flow", height: 200, aria: "Requests placed on a host per minute, current vs Sorting Hat",
       series: both((s) => s.rates.allocations, fmtRate),
     });
-    addChart("h2h-waiting", { height: 200, aria: "Requests waiting for a host, current vs central", series: both((s) => s.m.waiting.count, fmtInt) });
+    addChart("h2h-waiting", { height: 200, aria: "Requests waiting for a host, current vs Sorting Hat", series: both((s) => s.m.waiting.count, fmtInt) });
     addChart("h2h-wait", {
-      height: 200, scaleKind: "duration", aria: "Wait time, current vs central",
+      height: 200, scaleKind: "duration", aria: "Wait time, current vs Sorting Hat",
       series: both((s) => metric(s, WAIT_STATS[state.waitStat].path), fmtDur),
     });
     addChart("h2h-util", {
-      height: 200, scaleKind: "pct", aria: "Fleet utilization, current vs central", alertMetrics: ["fleet.utilization"],
+      height: 200, scaleKind: "pct", aria: "Fleet utilization, current vs Sorting Hat", alertMetrics: ["fleet.utilization"],
       series: both((s) => metric(s, "fleet.utilization"), fmtPct),
     });
-    addChart("h2h-checks", { height: 200, aria: "Scheduling checks per minute, current vs central", series: both((s) => s.rates.checks, fmtRate) });
+    addChart("h2h-checks", { height: 200, aria: "Scheduling checks per minute, current vs Sorting Hat", series: both((s) => s.rates.checks, fmtRate) });
     // One small head-to-head chart per runner size, all on one scale, so a
     // size that starves while others are placed stands out.
     const grid = document.getElementById("size-grid");
@@ -910,7 +910,7 @@
       const bySize = (s) => SIZE_STATS[state.sizeStat].value(s, size);
       addChart(`size-${size}`, {
         group: "by-size", compact: true, height: 140, margin: { l: 40, r: 44, t: 8, b: 22 },
-        scaleKind: SIZE_STATS[state.sizeStat].kind, aria: `${size} vCPU runners, current vs central`,
+        scaleKind: SIZE_STATS[state.sizeStat].kind, aria: `${size} vCPU runners, current vs Sorting Hat`,
         series: both(bySize, (v) => SIZE_STATS[state.sizeStat].fmt(v)),
       });
     }
