@@ -152,6 +152,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.private_subnet.net4.to_s[-3..]).to eq "/16"
+      expect(kc.private_subnet.nic_ipv4_prefix_len).to eq 24
       expect(kc.private_subnet.name).to eq kc.ubid.to_s + "-subnet"
       expect(kc.private_subnet.firewalls.first.name).to eq kc.ubid.to_s + "-firewall"
       expect(kc.target_node_size).to eq "standard-2"

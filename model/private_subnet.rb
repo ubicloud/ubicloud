@@ -110,29 +110,32 @@ class PrivateSubnet < Sequel::Model
   # provider contributes only the addresses it actually reserves instead of
   # the union of every provider's constraints.
   #
-  # Requirements:
-  # - The parent subnet mask can range from /16 to /26.
-  # - The VM's assigned subnet must allow:
-  #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
-  #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
+  # Each NIC gets a block of nic_ipv4_prefix_len: a /32, unless the guests
+  # of the subnet hand out addresses themselves, e.g. the /24 pod range of a
+  # Kubernetes node. The size is a property of the subnet, so a plain VM
+  # that a customer attaches to a Kubernetes subnet gets a /24 as well.
+  # Subnets created before the column existed have it NULL and keep the old
+  # rule of a /(prefix + 8) block, capped at /32.
   def random_private_ipv4
-    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
-  end
+    cidr_size = nic_ipv4_prefix_len || [32, (net4.netmask.prefix_len + 8)].min
+    block_size = 2**(32 - cidr_size)
 
-  private def _random_private_ipv4
-    cidr_size = [32, (net4.netmask.prefix_len + 8)].min
-    total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
+    # Skip the blocks that overlap the addresses the provider reserves at the
+    # edges of the subnet, e.g. the first /24 of a /16 parent contains the
+    # reserved gateway/DNS addresses and must not be leased to a VM.
+    leading, trailing = ipv4_reservation.map { (it + block_size - 1) / block_size }
+    free_blocks = 2**(cidr_size - net4.netmask.prefix_len) - leading - trailing
+    fail "#{net4} has no /#{cidr_size} block outside the reserved addresses" unless free_blocks > 0
 
-    # Skip the sub-blocks overlapping the addresses the provider reserves at
-    # the edges of the subnet, e.g. the first /24 of a /16 parent contains
-    # the reserved gateway/DNS addresses and must not be leased to a VM.
-    leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1].freeze
-    random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
+    # A block must not overlap an existing NIC's block of any size, so a /32
+    # never lands inside the pod range of a Kubernetes node. NetAddr#rel is
+    # nil only for unrelated blocks.
+    taken = nics.filter_map(&:private_ipv4)
 
-    addr = net4.nth_subnet(cidr_size, random_offset)
-    return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
-
-    addr
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") do
+      addr = net4.nth_subnet(cidr_size, SecureRandom.random_number(free_blocks) + leading)
+      addr unless taken.any? { it.rel(addr) }
+    end
   end
 
   def random_private_ipv6
@@ -172,21 +175,23 @@ end
 
 # Table: private_subnet
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  net6              | cidr                     | NOT NULL
-#  net4              | cidr                     | NOT NULL
-#  state             | text                     | NOT NULL DEFAULT 'creating'::text
-#  name              | text                     | NOT NULL
-#  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id        | uuid                     | NOT NULL
-#  location_id       | uuid                     | NOT NULL
-#  firewall_priority | integer                  |
+#  id                  | uuid                     | PRIMARY KEY
+#  net6                | cidr                     | NOT NULL
+#  net4                | cidr                     | NOT NULL
+#  state               | text                     | NOT NULL DEFAULT 'creating'::text
+#  name                | text                     | NOT NULL
+#  last_rekey_at       | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id          | uuid                     | NOT NULL
+#  location_id         | uuid                     | NOT NULL
+#  firewall_priority   | integer                  |
+#  nic_ipv4_prefix_len | integer                  |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
-#  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
+#  private_subnet_firewall_priority_check   | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
+#  private_subnet_nic_ipv4_prefix_len_check | (nic_ipv4_prefix_len IS NULL OR nic_ipv4_prefix_len > masklen(net4::inet) AND nic_ipv4_prefix_len <= 32)
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
