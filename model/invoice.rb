@@ -421,3 +421,4 @@ end
 # Indexes:
 #  invoice_pkey             | PRIMARY KEY btree (id)
 #  invoice_project_id_index | btree (project_id)
+#  invoice_status_index     | btree (status)
