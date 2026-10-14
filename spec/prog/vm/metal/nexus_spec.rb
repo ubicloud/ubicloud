@@ -657,6 +657,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Page.active.first.resolve_set?).to be true
     end
 
+    it "provisions simulated VMs as soon as they are allocated" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(Scheduling::Allocator).to receive(:allocate)
+      expect(sshable).not_to receive(:_cmd)
+      expect { nx.start }.to hop("wait")
+      expect(vm.display_state).to eq("running")
+      expect(vm.provisioned_at).not_to be_nil
+    end
+
     it "schedules the allocation waiting strand when the vm is allocated" do
       waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
       st.stack = [{"storage_volumes" => storage_volumes, "allocated_waiting_strand_id" => waiting_strand.id}]
@@ -1261,6 +1270,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
+    it "ignores host operations on simulated VMs" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      vm.incr_update_firewall_rules
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
     it "cleans the prep daemonizer state when requested" do
       vm.incr_clean_prep
       expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
@@ -1667,6 +1682,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.destroy }.to raise_error ex
     end
 
+    it "releases the host resources of simulated VMs without running commands" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(sshable).not_to receive(:_cmd)
+      expect { nx.destroy }.to hop("destroy_slice")
+      vm_host.reload
+      expect(vm_host.used_cores).to eq(1)
+      expect(vm_host.used_hugepages_1g).to eq(8)
+    end
+
     it "hops when all commands are succeeded" do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
@@ -1907,6 +1931,13 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#log_vm_stats" do
+    it "does not log stats of simulated VMs" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(sshable).not_to receive(:_cmd)
+      expect(Clog).not_to receive(:emit)
+      nx.log_vm_stats
+    end
+
     it "logs stats" do
       expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("{\"stats\": \"stats\"}")
       expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats"})

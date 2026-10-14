@@ -138,6 +138,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     # transitioning to the next state.
     clear_stack_storage_volumes
 
+    if Config.simulation_mode
+      # Nothing runs on simulated hosts, so the VM is ready once allocated.
+      vm.update(display_state: "running", provisioned_at: Time.now)
+      hop_wait_and_wakeup_waiting_strand
+    end
+
     hop_create_unix_user
   end
 
@@ -287,6 +293,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait
+    nap 6 * 60 * 60 if Config.simulation_mode
+
     when_stop_set? do
       hop_stopped
     end
@@ -577,7 +585,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
-    unless host.nil?
+    unless host.nil? || Config.simulation_mode
       if vm.gpu_partition
         host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action: "delete_gpu_partition", vm_name:)
       end
@@ -728,7 +736,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def log_vm_stats
-    return unless host
+    return if host.nil? || Config.simulation_mode
     stats = host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name:, timeout: 10, log: false)
   rescue Sshable::SshError, JSON::ParserError => e
     # Collecting VM stats is best effort during destroy, so we catch and log any

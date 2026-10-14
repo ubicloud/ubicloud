@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Creates the database-only infrastructure for simulating GitHub runner
+# provisioning: the runner service project, a customer project that
+# simulated installations are registered under, and simulated VM hosts.
+# Running it again adds more hosts.
+#
+# Usage: bin/simulation-seed [options]
+
+require "optparse"
+
+options = {host_count: 10}
+OptionParser.new do |opts|
+  opts.banner = "Usage: bin/simulation-seed [options]"
+  opts.on("--hosts N", Integer, "Number of hosts to add (default 10)") { options[:host_count] = it }
+  opts.on("--family FAMILY", "standard or premium (default standard)") { options[:family] = it }
+  opts.on("--arch ARCH", "x64 or arm64 (default x64)") { options[:arch] = it }
+  opts.on("--cores N", Integer, "Physical cores per host (default 48)") { options[:total_cores] = it }
+  opts.on("--threads-per-core N", Integer, "Threads per core (default 2)") { options[:threads_per_core] = it }
+  opts.on("--hugepages N", Integer, "1G hugepages per host (default 360)") { options[:total_hugepages_1g] = it }
+  opts.on("--storage-devices N", Integer, "Storage devices per host (default 2)") { options[:storage_devices] = it }
+  opts.on("--storage-gib N", Integer, "GiB per storage device (default 3500)") { options[:storage_gib_per_device] = it }
+end.parse!
+
+require_relative "../loader"
+
+hosts = Simulation.seed(**options)
+puts "Added #{hosts.size} simulated #{options[:family] || "standard"} hosts, #{VmHost.count} in total"

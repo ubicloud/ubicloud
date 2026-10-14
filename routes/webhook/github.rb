@@ -4,9 +4,12 @@ class Clover
   hash_branch(:webhook_prefix, "github") do |r|
     r.post true do
       body = r.body.read
-      next 401 unless (signature = r.headers["x-hub-signature-256"])
-      expected_signature = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", Config.github_app_webhook_secret, body)}"
-      next 401 unless Rack::Utils.secure_compare(signature, expected_signature)
+      # The simulator stands in for GitHub without the app's webhook secret.
+      unless Config.simulation_mode
+        next 401 unless (signature = r.headers["x-hub-signature-256"])
+        expected_signature = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", Config.github_app_webhook_secret, body)}"
+        next 401 unless Rack::Utils.secure_compare(signature, expected_signature)
+      end
 
       response.content_type = :json
 

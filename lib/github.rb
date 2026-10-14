@@ -34,6 +34,13 @@ module Github
   end
 
   def self.installation_client(installation_id, auto_paginate: false, per_page: 100)
+    if Config.simulation_mode
+      # The simulator answers the GitHub API calls in place of GitHub. The
+      # token only tells it which installation the call is made for.
+      fail "GITHUB_SIMULATOR_URL is not set" unless Config.github_simulator_url
+      return Octokit::Client.new(api_endpoint: Config.github_simulator_url, access_token: "simulated-#{installation_id}", auto_paginate:, per_page:)
+    end
+
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
     Octokit::Client.new(access_token:, auto_paginate:, per_page:)
   end

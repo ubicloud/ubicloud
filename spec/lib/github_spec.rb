@@ -59,6 +59,21 @@ RSpec.describe Github do
     described_class.installation_client(installation_id)
   end
 
+  it "creates installation client for the simulator in simulation mode" do
+    expect(Config).to receive_messages(simulation_mode: true, github_simulator_url: "http://simulator:9393")
+    stub_request(:post, "http://simulator:9393/repos/sim/repo/actions/runners/generate-jitconfig")
+      .with(headers: {"Authorization" => "token simulated-123"})
+      .to_return(status: 201, headers: {"Content-Type" => "application/json"}, body: {runner: {id: 1}, encoded_jit_config: "jit"}.to_json)
+
+    response = described_class.installation_client(123).post("/repos/sim/repo/actions/runners/generate-jitconfig", {})
+    expect(response[:runner][:id]).to eq(1)
+  end
+
+  it "fails to create installation client in simulation mode without a simulator" do
+    expect(Config).to receive_messages(simulation_mode: true, github_simulator_url: nil)
+    expect { described_class.installation_client(123) }.to raise_error RuntimeError, "GITHUB_SIMULATOR_URL is not set"
+  end
+
   it "parses API responses with installation client" do
     expect(described_class).to receive(:app_client).and_return(Octokit::Client.new(bearer_token: "jwt"))
     stub_request(:post, "https://api.github.com/app/installations/123/access_tokens")

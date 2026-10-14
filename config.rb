@@ -147,6 +147,12 @@ module Config
   override :github_runner_aws_spill_vcpu_capacity, 100, int
   override :github_runner_aws_spill_runner_capacity, 50, int
 
+  # Simulation mode keeps VM hosts and VMs as database records only, and
+  # stands in a simulator for GitHub, to exercise allocation at scale.
+  override :simulation_mode, false, bool
+  optional :github_simulator_url, string
+  override :simulated_runner_idle_seconds, 30, int
+
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
   optional :github_cache_blob_storage_region, string

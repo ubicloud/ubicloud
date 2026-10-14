@@ -29,6 +29,8 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   end
 
   label def prep
+    hop_wait if Config.simulation_mode
+
     name = vm_host_slice.name
     case host.sshable.cmd("common/bin/daemonizer --check prep_:name", name:)
     when "Succeeded"
@@ -78,7 +80,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    host.sshable.cmd("sudo host/bin/setup-slice delete :inhost_name", inhost_name:, log: :on_error)
+    host.sshable.cmd("sudo host/bin/setup-slice delete :inhost_name", inhost_name:, log: :on_error) unless Config.simulation_mode
 
     VmHost.dataset.where(id: host.id).update(
       used_cores: Sequel[:used_cores] - vm_host_slice.cores,

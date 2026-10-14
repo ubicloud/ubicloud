@@ -1015,6 +1015,15 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       allow(Config).to receive(:clover_runtime_token_secret).and_return("1")
     end
 
+    it "skips setting up simulated VMs" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(vm.sshable).not_to receive(:_cmd)
+      expect { nx.setup_environment }.to hop("register_runner")
+
+      runner.update(encoded_jit_config: "AABBCC$")
+      expect { nx.setup_environment }.to hop("start_runner")
+    end
+
     it "hops to register_runner" do
       installation.update(use_docker_mirror: false, cache_enabled: false)
       expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
@@ -1147,6 +1156,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#register_runner" do
+    it "registers simulated runners without starting the runner script" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s)).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+      expect(vm.sshable).not_to receive(:_cmd)
+      expect { nx.register_runner }.to hop("wait")
+      expect(runner.ready_at).to eq(now)
+    end
+
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
@@ -1220,6 +1237,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
   describe "#start_runner" do
     before { vm.update(allocated_at: now) }
+
+    it "starts simulated runners without starting the runner script" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      runner.update(encoded_jit_config: "AABBCC$")
+      expect(vm.sshable).not_to receive(:_cmd)
+      expect { nx.start_runner }.to hop("wait")
+      expect(runner.ready_at).to eq(now)
+    end
 
     it "starts the runner script with the stored jit config and hops" do
       runner.update(encoded_jit_config: "AABBCC$")
@@ -1440,6 +1465,31 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#wait" do
+    context "when simulating" do
+      before do
+        allow(Config).to receive_messages(simulation_mode: true, simulated_runner_idle_seconds: 30)
+        expect(vm.sshable).not_to receive(:_cmd)
+      end
+
+      it "waits for the completed webhook if the runner picked a job" do
+        runner.update(ready_at: now - 60 * 60)
+        expect { nx.wait }.to nap(60)
+        expect(runner.destroy_set?).to be(false)
+      end
+
+      it "naps until the idle deadline if the runner did not pick a job" do
+        runner.update(ready_at: now - 10, workflow_job: nil)
+        expect { nx.wait }.to nap(20)
+      end
+
+      it "destroys the runner if it did not pick a job before the idle deadline" do
+        runner.update(ready_at: now - 31, workflow_job: nil)
+        expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(GithubRunner)).and_call_original
+        expect { nx.wait }.to nap(0)
+        expect(runner.destroy_set?).to be(true)
+      end
+    end
+
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
@@ -1698,6 +1748,17 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#destroy" do
+    it "neither deregisters nor collects telemetry of simulated runners" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      runner.update(workflow_job: nil)
+      vm.update(allocated_at: now)
+      expect(client).not_to receive(:get)
+      expect(client).not_to receive(:delete)
+      expect(nx).not_to receive(:collect_final_telemetry)
+      expect(vm).to receive(:incr_destroy)
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
     it "naps if runner not deregistered yet" do
       expect(client).to receive(:get).and_return(busy: false)
       expect(client).to receive(:delete)

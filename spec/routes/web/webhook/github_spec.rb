@@ -47,6 +47,24 @@ RSpec.describe Clover, "github" do
     expect(page.body).to eq({error: {message: "Unhandled event"}}.to_json)
   end
 
+  context "when simulating" do
+    before do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      Project.create(name: Simulation::CUSTOMER_PROJECT_NAME, billing_info_id: BillingInfo.create(stripe_id: "0").id)
+    end
+
+    it "accepts unsigned webhooks and registers unknown installations under the simulated customer" do
+      page.driver.post("/webhook/github",
+        workflow_job_payload(action: "queued", installation_id: 4567).to_json,
+        {"Content-Type" => "application/json", "HTTP_X_GITHUB_EVENT" => "workflow_job"})
+
+      expect(page.status_code).to eq(200)
+      installation = GithubInstallation.with_github_installation_id(4567)
+      expect(installation.project.name).to eq(Simulation::CUSTOMER_PROJECT_NAME)
+      expect(page.body).to eq({message: "GithubRunner[#{installation.runners.first.ubid}] created"}.to_json)
+    end
+  end
+
   context "when installation event" do
     it "fails if unexpected action" do
       send_webhook("installation", {action: "created", installation: {id: 1234}})

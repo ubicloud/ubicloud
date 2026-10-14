@@ -552,6 +552,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def setup_environment
+    # Simulated VMs have no runner image to set up.
+    if Config.simulation_mode
+      github_runner.encoded_jit_config ? hop_start_runner : hop_register_runner
+    end
+
     command = [NetSsh.command(<<~COMMAND, setup_info: setup_info.to_json, runtime_token: vm.runtime_token, base_url: Config.base_url)]
       # To make sure the script errors out if any command fails
       set -ueo pipefail
@@ -625,10 +630,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       client.post(runners_path("generate-jitconfig"), data)
     end
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
-    sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
-    sudo systemctl start runner-script.service
-    COMMAND
+    unless Config.simulation_mode
+      vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
+      sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      sudo systemctl start runner-script.service
+      COMMAND
+    end
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
@@ -712,10 +719,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       encoded_jit_config = generate_jit_config(regenerate: true)
     end
 
-    vm.sshable.cmd(<<~COMMAND, stdin: encoded_jit_config, log: :on_error)
-    sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
-    sudo systemctl start runner-script.service
-    COMMAND
+    unless Config.simulation_mode
+      vm.sshable.cmd(<<~COMMAND, stdin: encoded_jit_config, log: :on_error)
+      sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      sudo systemctl start runner-script.service
+      COMMAND
+    end
     github_runner.update(ready_at: Time.now, encoded_jit_config: nil)
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
@@ -724,6 +733,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   label def wait
     register_deadline(nil, 5 * 24 * 60 * 60)
+    simulated_wait if Config.simulation_mode
     substate = begin
       vm.sshable.cmd(RUNNER_SCRIPT_SUBSTATE_COMMAND).chomp
     rescue *Sshable::SSH_CONNECTION_ERRORS
@@ -763,6 +773,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     nap 60
+  end
+
+  # A simulated runner has no runner script to report its state, so the
+  # simulator's completed webhook is what destroys a runner that picked a job.
+  def simulated_wait
+    nap 60 if github_runner.workflow_job
+
+    idle_deadline = github_runner.ready_at + Config.simulated_runner_idle_seconds
+    if Time.now > idle_deadline
+      Clog.emit("The runner did not pick a job", github_runner)
+      github_runner.incr_destroy
+      nap 0
+    end
+
+    nap idle_deadline - Time.now
   end
 
   def collect_final_telemetry
@@ -838,7 +863,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # when the job is completed. In certain situations, such as fraudulent activity,
     # we may need to bypass this verification and immediately remove the runner
     # using the semaphore.
-    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
+    unless Config.simulation_mode || github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
@@ -854,7 +879,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      collect_final_telemetry if vm.allocated_at
+      collect_final_telemetry if vm.allocated_at && !Config.simulation_mode
       destroy_vm
     end
 

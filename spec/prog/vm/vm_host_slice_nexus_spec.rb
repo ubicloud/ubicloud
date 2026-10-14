@@ -81,6 +81,12 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   end
 
   describe "#prep" do
+    it "skips preparing slices on simulated hosts" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(sshable).not_to receive(:_cmd)
+      expect { nx.prep }.to hop("wait")
+    end
+
     it "starts prep on NotStarted" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard", log: :on_error)
@@ -137,6 +143,13 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   describe "#destroy" do
     it "deletes resources and exits" do
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-slice delete standard.slice", log: :on_error)
+      expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
+      expect(vm_host_slice.exists?).to be false
+    end
+
+    it "deletes simulated slices without running commands" do
+      allow(Config).to receive(:simulation_mode).and_return(true)
+      expect(sshable).not_to receive(:_cmd)
       expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
       expect(vm_host_slice.exists?).to be false
     end

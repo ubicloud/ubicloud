@@ -16,7 +16,11 @@ class Clover
   end
 
   def handle_webhook_github_workflow_job(data)
-    unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
+    if Config.simulation_mode && (installation_id = data.dig("installation", "id"))
+      installation = Simulation.find_or_register_installation(installation_id, data.dig("installation", "account", "login"))
+    end
+
+    unless (installation_id = data.dig("installation", "id")) && (installation ||= GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
       return {error: {message: "Unregistered installation"}}
     end
