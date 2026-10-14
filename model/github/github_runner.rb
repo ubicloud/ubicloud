@@ -60,6 +60,29 @@ class GithubRunner < Sequel::Model
     @label_data ||= Github.runner_labels[label]
   end
 
+  def arch
+    label_data["arch"]
+  end
+
+  def x64?
+    arch == "x64"
+  end
+
+  def support_alien?
+    label_data["vcpus"] <= 30
+  end
+
+  # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
+  # instance, but the customer is still billed for 30 vCPUs.
+  def aws_vcpus
+    (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
+  end
+
+  def aws_quota_available?
+    resource_type = x64? ? "GithubRunnerVCpuAws" : "GithubRunnerVCpuArmAws"
+    installation.project.quota_available?(resource_type, 0)
+  end
+
   def repository_url
     "http://github.com/#{repository_name}"
   end
