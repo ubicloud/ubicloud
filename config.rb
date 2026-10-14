@@ -259,6 +259,7 @@ module Config
   override :allocator_target_host_utilization, 0.72, float
   override :allocator_target_premium_host_utilization, 0.85, float
   override :allocator_max_random_score, 0.1, float
+  override :allocator_max_host_attempts, 5, int
   override :allocator_large_storage_device_gib, 4096, int
   override :allocator_protected_large_storage_location_ids, "caa7a807-36c5-8420-a75c-f906839dad71", array(uuid)
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
