@@ -14,7 +14,6 @@
   const POLL_MS = 1000;
   const DOLLARS_PER_VCPU_MINUTE = 0.002;
   const MAX_GAP_SECONDS = 600; // longer server-clock gaps (restart, clock jump) are skipped
-  const FACES = 20;
   const ANGRY_SHARE = 0.2;
   const MOODS = {
     happy: { emoji: "😀", label: "happy" },
@@ -176,24 +175,20 @@
 
   const moneyPanel = el("div", "fun-panel");
   const moodPanel = el("div", "fun-panel");
-  const tweetPanel = el("div", "fun-panel");
+  const tweetPanel = el("div", "fun-panel fun-tweets");
   grid.append(moneyPanel, moodPanel, tweetPanel);
 
   moneyPanel.append(el("h4", null, "Money made"));
   const moneyPair = el("div", "fun-pair");
   moneyPanel.append(moneyPair);
-  const moneyCmp = el("p", "fun-cmp");
-  moneyPanel.append(moneyCmp, el("p", "fun-small", "$0.002 per vCPU-minute, since this page opened"));
 
   moodPanel.append(el("h4", null, "Customer mood"));
   const moodPair = el("div", "fun-pair");
   moodPanel.append(moodPair);
 
-  const tweetHead = el("h4");
-  tweetHead.append(who(SIDES[1]), document.createTextNode(" · Customer chatter"));
-  const feed = el("ol", "fun-feed");
-  feed.setAttribute("aria-label", "Simulated customer tweets about Central");
-  tweetPanel.append(tweetHead, feed);
+  tweetPanel.append(el("h4", null, "Customer chatter"));
+  const feedPair = el("div", "fun-pair");
+  tweetPanel.append(feedPair);
 
   const view = {};
   for (const side of SIDES) {
@@ -206,16 +201,18 @@
     const mood = el("div", "fun-side");
     const big = el("span", "fun-big", MOODS.happy.emoji);
     big.setAttribute("role", "img");
-    const faces = el("div", "fun-faces");
-    faces.setAttribute("aria-hidden", "true");
-    for (let i = 0; i < FACES; i++) faces.append(el("span", null, MOODS.happy.emoji));
-    const count = el("span", "fun-small", "—");
     const top = el("div", "fun-mood-top");
-    top.append(big, count);
-    mood.append(who(side), top, faces);
+    top.append(big);
+    mood.append(who(side), top);
     moodPair.append(mood);
 
-    view[side.key] = { rate, total, big, faces, count };
+    const chatter = el("div", "fun-side");
+    const feed = el("ol", "fun-feed");
+    feed.setAttribute("aria-label", `Customer tweets about ${side.name}`);
+    chatter.append(who(side), feed);
+    feedPair.append(chatter);
+
+    view[side.key] = { rate, total, big, feed };
   }
 
   // ---------------------------------------------------------------- state
@@ -268,14 +265,6 @@
       const s = state[side.key];
       view[side.key].total.textContent = s.ok || s.total ? fmtUsd(displayed(s, now)) : "—";
     }
-    const cur = displayed(state.current, now);
-    const cen = displayed(state.central, now);
-    const diff = cen - cur;
-    if (!state.current.ok || !state.central.ok || Math.abs(diff) < 0.01) {
-      moneyCmp.textContent = " ";
-    } else {
-      moneyCmp.textContent = `${diff > 0 ? "Central" : "Current"} is ahead by ${fmtUsd(Math.abs(diff))}`;
-    }
   }
 
   function frame() {
@@ -306,44 +295,20 @@
     return ["happy", "meh", "angry"].reduce((best, k) => (mix[k] > mix[best] ? k : best), "happy");
   }
 
-  // Split FACES faces in proportion to the mix (largest remainder).
-  function faceCounts(mix) {
-    const total = mix.happy + mix.meh + mix.angry;
-    if (!total) return { happy: FACES, meh: 0, angry: 0 };
-    const keys = ["happy", "meh", "angry"];
-    const exact = keys.map((k) => (mix[k] / total) * FACES);
-    const out = keys.map((_, i) => Math.floor(exact[i]));
-    let left = FACES - out.reduce((a, b) => a + b, 0);
-    const order = keys.map((_, i) => i).sort((a, b) => exact[b] - out[b] - (exact[a] - out[a]));
-    for (const i of order) if (left-- > 0) out[i]++;
-    return { happy: out[0], meh: out[1], angry: out[2] };
-  }
-
   function renderMood(key) {
     const s = state[key];
     const v = view[key];
     const mood = overall(s.mix);
     v.big.textContent = MOODS[mood].emoji;
     v.big.setAttribute("aria-label", `Customers are ${MOODS[mood].label}`);
-    const total = s.mix.happy + s.mix.meh + s.mix.angry;
-    v.count.textContent = total
-      ? `${total.toLocaleString()} waiting: ${s.mix.happy.toLocaleString()} 😀 ${s.mix.meh.toLocaleString()} 😐 ${s.mix.angry.toLocaleString()} 😡`
-      : "Nobody waiting";
-    const fc = faceCounts(s.mix);
-    const seq = [...Array(fc.happy).fill("happy"), ...Array(fc.meh).fill("meh"), ...Array(fc.angry).fill("angry")];
-    seq.forEach((k, i) => {
-      const face = v.faces.children[i];
-      if (face.dataset.mood !== k) {
-        face.dataset.mood = k;
-        face.textContent = MOODS[k].emoji;
-      }
-    });
   }
 
   // ---------------------------------------------------------------- tweets
 
-  function pickTweet() {
-    const mix = state.central.mix;
+  // A tweet for one side, picked by that side's current mood mix.
+  function pickTweet(key) {
+    const feed = view[key].feed;
+    const mix = state[key].mix;
     const total = mix.happy + mix.meh + mix.angry;
     const w = total ? mix : { happy: 1, meh: 0, angry: 0 };
     let r = Math.random() * (w.happy + w.meh + w.angry);
@@ -360,9 +325,10 @@
     return { mood, tweet: list[Math.floor(Math.random() * list.length)] };
   }
 
-  function addTweet() {
-    if (state.central.ok) {
-      const { mood, tweet } = pickTweet();
+  function addTweet(key) {
+    const feed = view[key].feed;
+    if (state[key].ok) {
+      const { mood, tweet } = pickTweet(key);
       const li = el("li", `fun-tweet mood-${mood}`);
       li.dataset.text = tweet.text;
       const face = el("span", "fun-tweet-face", MOODS[mood].emoji);
@@ -381,7 +347,7 @@
       feed.prepend(li);
       while (feed.children.length > TWEET_KEEP) feed.lastElementChild.remove();
     }
-    setTimeout(addTweet, 2000 + Math.random() * 1000);
+    setTimeout(() => addTweet(key), 2000 + Math.random() * 1000);
   }
 
   // ---------------------------------------------------------------- poll
@@ -409,7 +375,9 @@
 
   tick();
   setInterval(tick, POLL_MS);
-  setTimeout(addTweet, 800);
+  // Staggered, so the two feeds don't tick in lockstep.
+  setTimeout(() => addTweet("current"), 800);
+  setTimeout(() => addTweet("central"), 1900);
   requestAnimationFrame(frame);
   reducedMotion.addEventListener?.("change", () => {
     if (!reducedMotion.matches) requestAnimationFrame(frame);

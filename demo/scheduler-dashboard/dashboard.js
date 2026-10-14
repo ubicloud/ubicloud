@@ -93,10 +93,12 @@
   const fmtPct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
   function fmtDur(s) {
     if (s == null || Number.isNaN(s)) return "—";
-    if (s < 10) return `${s.toFixed(1)}s`;
-    if (s < 60) return `${Math.round(s)}s`;
-    if (s < 3600) return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
-    return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+    if (s < 9.95) return `${s.toFixed(1)}s`;
+    // Round once, then split, so 119.6s reads "2m 00s" rather than "1m 60s".
+    const r = Math.round(s);
+    if (r < 60) return `${r}s`;
+    if (r < 3600) return `${Math.floor(r / 60)}m ${String(r % 60).padStart(2, "0")}s`;
+    return `${Math.floor(r / 3600)}h ${String(Math.floor((r % 3600) / 60)).padStart(2, "0")}m`;
   }
   function fmtDurAxis(s) {
     if (s < 60) return `${s}s`;
