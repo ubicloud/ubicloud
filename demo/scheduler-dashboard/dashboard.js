@@ -1151,12 +1151,6 @@
       send.textContent = "Send burst";
     };
     count.addEventListener("input", resetSend);
-    for (const chip of document.querySelectorAll("[data-burst]")) {
-      chip.addEventListener("click", () => {
-        count.value = chip.dataset.burst;
-        resetSend();
-      });
-    }
     send.addEventListener("click", () => {
       const n = Math.round(Number(count.value) || 0);
       if (n < 1) return toast("Enter how many requests to send");

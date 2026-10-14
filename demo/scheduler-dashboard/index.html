@@ -181,8 +181,6 @@
     width: 96px; font: inherit; font-size: 13px; color: var(--ink); background: var(--page);
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
   }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chips button { font-size: 12px; padding: 2px 9px; border-radius: 999px; }
   button:disabled { opacity: 0.5; cursor: progress; }
   .trow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
   .trow .failed { color: var(--critical); font-weight: 600; }
@@ -294,9 +292,6 @@
           <input type="number" id="burst-input" min="1" max="20000" value="1000" inputmode="numeric">
           <span class="muted">requests</span>
           <button id="burst-send" class="primary">Send burst</button>
-        </div>
-        <div class="chips">
-          <button data-burst="100">100</button><button data-burst="500">500</button><button data-burst="1000">1,000</button><button data-burst="5000">5,000</button>
         </div>
       </div>
       <div class="tgroup">
