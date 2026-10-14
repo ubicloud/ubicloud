@@ -372,10 +372,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     vcpus = label_data["vcpus"]
     ds = vcpu_usage_dataset(provider)
-    unless force
-      quota = project.effective_quota_value(GithubInstallation::VCPU_QUOTA_RESOURCE_TYPES.fetch([provider, arch]))
-      ds = ds.where(Sequel[:used_vcpus] + vcpus <= quota)
-    end
+    ds = ds.where(Sequel[:used_vcpus] + vcpus <= quota_value(provider)) unless force
     return false unless ds.update(used_vcpus: Sequel[:used_vcpus] + vcpus) == 1
 
     # Release the previous reservation if the runner already has one, such as
@@ -396,6 +393,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     DB[:github_installation_vcpu_usage].where(installation_id: github_runner.installation_id, provider:, arch:)
   end
 
+  def quota_value(provider)
+    (@quota_values ||= {})[provider] ||= project.effective_quota_value(GithubInstallation::VCPU_QUOTA_RESOURCE_TYPES.fetch([provider, arch]))
+  end
+
+  # A cheap check before the global spill capacity query. reserve_quota makes
+  # the decision, as the usage can change after this check.
+  def aws_quota_available?
+    vcpu_usage_dataset("aws").get(:used_vcpus) + label_data["vcpus"] <= quota_value("aws")
+  end
+
   def aws_spill_capacity_available?
     spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
     spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity && spilled_runners < Config.github_runner_aws_spill_runner_capacity
@@ -410,6 +417,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       vm.waiting_for_capacity_set? &&
       Time.now - vm.created_at > 60 &&
       project.get_ff_spill_to_alien_runners &&
+      aws_quota_available? &&
       aws_spill_capacity_available?
   end
 
@@ -458,7 +466,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if is_high_util
       should_spill_over = support_alien? &&
         project.get_ff_spill_to_alien_runners &&
-        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
+        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds &&
+        aws_quota_available?
 
       if should_spill_over
         spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage

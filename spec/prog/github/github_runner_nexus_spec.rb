@@ -656,14 +656,29 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(false)
       end
 
-      it "waits if utilization is high, spill over enabled, and waited enough but customer's own alien quota is exceeded" do
+      it "waits without checking the spill capacity if utilization is high, spill over enabled, and waited enough but customer's own alien quota is exceeded" do
         fill_quota
         fill_quota(provider: "aws")
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
+        expect(Config).not_to receive(:github_runner_aws_spill_vcpu_capacity)
 
         expect { nx.wait_concurrency_limit }.to nap
         expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "waits if another runner takes the alien quota after the check" do
+        fill_quota
+        usage = fill_quota(provider: "aws")
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
+        # The check passes, and a concurrent runner fills the quota before the reservation.
+        expect(nx).to receive(:aws_quota_available?).and_return(true)
+        expect(Clog).to receive(:emit).with("not allowed because of high utilization", instance_of(Hash)).and_call_original
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+        expect(vcpu_usage(provider: "aws")).to eq(usage)
       end
 
       it "allocates if utilization is high but spill over enabled and waited enough" do
@@ -975,6 +990,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       it "does not spill over if the customer's alien quota is exceeded" do
         usage = fill_quota(provider: "aws")
+        expect(Config).not_to receive(:github_runner_aws_spill_vcpu_capacity)
 
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
