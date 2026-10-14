@@ -303,7 +303,7 @@
       if (reading) feed.scrollTop += feed.scrollHeight - before;
       while (feed.children.length > TWEET_KEEP) feed.lastElementChild.remove();
     }
-    setTimeout(() => addTweet(key), 4000 + Math.random() * 2000);
+    setTimeout(() => addTweet(key), 16000 + Math.random() * 8000);
   }
 
   // ---------------------------------------------------------------- poll
