@@ -14,6 +14,7 @@ require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
+require_relative "runner_metrics_setup"
 
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
@@ -162,6 +163,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_without_network
+    RunnerMetricsSetup.new(@vm_name).stop_and_remove
     service = vp.systemd_service
     rm_if_exists(service)
     rm_if_exists(service + ".d")
@@ -335,6 +337,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     r "ip", "-n", @vm_name, "addr", "replace", "fd00:0b1c:100d:5AFE:CE::", "dev", nics.first.tap
     r "ip", "-n", @vm_name, "addr", "replace", "fd00:0b1c:100d:53::", "dev", nics.first.tap
+    r "ip", "-n", @vm_name, "addr", "replace", RunnerMetricsSetup::ADDRESS, "dev", nics.first.tap
   end
 
   def routes4(ip4, ip4_local, nics)

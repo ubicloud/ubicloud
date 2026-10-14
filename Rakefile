@@ -372,6 +372,56 @@ task "ubi-release" do
   end
 end
 
+runner_metrics_version = lambda do
+  # Bump version for new releases
+  File.read("runner-metrics/version.txt").chomp
+end
+
+desc "Compile runner-metrics binary for current platform"
+task "runner-metrics" do
+  version = runner_metrics_version.call
+  Dir.chdir("runner-metrics") do
+    sh("go", "build", "-ldflags", "-X main.version=#{version}")
+  end
+end
+
+desc "Build release files for runner-metrics"
+task "runner-metrics-release" do
+  version = runner_metrics_version.call
+
+  require "rubygems/package"
+  require "zlib"
+
+  Dir.chdir("runner-metrics") do
+    %w[amd64 arm64].each do |arch|
+      sh({"GOOS" => "linux", "GOARCH" => arch, "CGO_ENABLED" => "0"}, "go", "build", "-trimpath", "-buildvcs=false", "-ldflags", "-s -w -X main.version=#{version}")
+      # Written in Ruby with a fixed gzip mtime, so rebuilding gives the same checksum.
+      filename = "runner-metrics-linux-#{arch}-#{version}.tar.gz"
+      File.open(filename, "wb") do |file|
+        gz = Zlib::GzipWriter.new(file)
+        gz.mtime = 0
+        Gem::Package::TarWriter.new(gz) do |tar|
+          tar.add_file_simple("runner-metrics", 0o755, File.size("runner-metrics")) do |io|
+            File.open("runner-metrics", "rb") { IO.copy_stream(it, io) }
+          end
+        end
+        gz.close
+      end
+      File.delete("runner-metrics")
+      puts "#{filename} sha256: #{OpenSSL::Digest::SHA256.file(filename).hexdigest}"
+    end
+  end
+end
+
+desc "Update ubicloud/runner-metrics checkout in ../runner-metrics"
+task "runner-metrics-sync" do
+  Dir.chdir("runner-metrics") do
+    FileUtils.cp(%w[README.md go.mod main.go main_test.go version.txt].freeze, "../../runner-metrics/")
+  end
+  FileUtils.cp("LICENSE", "../runner-metrics/")
+  File.write("../runner-metrics/Makefile", "all:\n\tgo build -ldflags '-s -w -X main.version=#{runner_metrics_version.call}'")
+end
+
 desc "Regenerate screenshots for documentation site"
 task "screenshots" do
   sh("bundle", "exec", "ruby", "bin/regen-screenshots")
@@ -431,6 +481,7 @@ namespace :linter do
   desc "Run golangci-lint"
   task :go do
     sh "golangci-lint run cli/ubi.go"
+    sh "cd runner-metrics && golangci-lint run"
   end
 
   desc "Validate, lint, format OpenAPI YAML file"
