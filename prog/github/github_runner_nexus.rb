@@ -510,7 +510,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         self.boot_race_checked = true
         replace_runner_on_known_kernel_boot_race
       end
-      nap 10
+      nap(Config.central_vm_scheduler ? 5 * 60 : 10)
     end
 
     register_deadline("wait", 10 * 60)
