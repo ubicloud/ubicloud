@@ -263,6 +263,7 @@ module Config
   override :allocator_protected_large_storage_location_ids, "caa7a807-36c5-8420-a75c-f906839dad71", array(uuid)
   override :central_vm_scheduler, false, bool
   override :central_vm_scheduler_batch_size, 100, int
+  override :central_vm_scheduler_spill_installation_share, 0.5, float
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
   override :github_actions_ch_53_percent, 0.0, float
 
