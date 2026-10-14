@@ -105,14 +105,12 @@ set the URL to `http://localhost:8787`.
 
 From top to bottom:
 
-1. **Burst race.** One bar per control plane showing how much of the latest
-   burst has been placed on a host, with a ✓ and the drain time once done.
-2. **Head to head.** Four charts with both control planes on each:
+1. **Head to head.** Four charts with both control planes on each:
    - Requests waiting for a host.
    - Wait time, switchable between p50, p95 and oldest.
    - Fleet utilization, with the 80% admission gate as an amber line.
    - Scheduling checks per minute: control-plane work spent on scheduling.
-3. **Inside each scheduler.** One column per control plane; side-by-side
+2. **Inside each scheduler.** One column per control plane; side-by-side
    charts share a scale.
    - Three headline numbers. Central's show the change versus current.
    - Wait time spread: a p50–p95 band with the oldest request as a line.
@@ -126,7 +124,7 @@ From top to bottom:
      the data shows as a note in the corner until the data gets within 25%
      of it.
    - Oldest waiting request by runner size, to show large runners starving.
-4. **Snapshot table.** Collapsed at the bottom: the latest values as a
+3. **Snapshot table.** Collapsed at the bottom: the latest values as a
    table.
 
 Every time chart has a crosshair that's synced across all charts. When one

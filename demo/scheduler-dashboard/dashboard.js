@@ -864,86 +864,6 @@
     }
   }
 
-  function burstOutcome(side, mk) {
-    const h = state.sides[side].hist;
-    const before = h[indexAtOrBefore(h, mk.t - 1)];
-    const baseline = before ? before.m.waiting.count : 0;
-    const start = Math.max(0, indexAtOrBefore(h, mk.t));
-    const end = indexAtOrBefore(h, viewEnd());
-    let peakIdx = -1;
-    let peak = 0;
-    for (let i = start; i <= end; i++) {
-      if (h[i].m.waiting.count > peak) {
-        peak = h[i].m.waiting.count;
-        peakIdx = i;
-      }
-    }
-    // Durations use the control plane's own clock (generated_at), so they
-    // agree with its wait times even when a mock runs faster than real time.
-    const startGen = before ? before.gen : h[start]?.gen;
-    let drainedMs = null;
-    if (peakIdx >= 0) {
-      for (let i = peakIdx; i <= end; i++) {
-        if (h[i].m.waiting.count <= baseline + 2) {
-          drainedMs = h[i].gen - startGen;
-          break;
-        }
-      }
-    }
-    const remaining = end >= 0 ? Math.max(0, h[end].m.waiting.count - baseline) : 0;
-    return {
-      served: drainedMs != null ? 1 : Math.min(1, Math.max(0, 1 - remaining / markerSize(mk))),
-      drainedMs,
-      elapsedMs: end >= 0 && startGen != null ? h[end].gen - startGen : 0,
-    };
-  }
-
-  // The burst as a race: how much of it each control plane has placed.
-  function renderBurst() {
-    const host = document.getElementById("burst-race");
-    host.replaceChildren();
-    const mk = state.markers.at(-1);
-    const head = document.createElement("div");
-    head.className = "burst-head";
-    const title = document.createElement("b");
-    const hint = document.createElement("span");
-    hint.className = "muted";
-    head.append(title, hint);
-    host.appendChild(head);
-    if (!mk) {
-      title.textContent = "Waiting for a burst";
-      hint.textContent = "python3 demo/scheduler-dashboard/inject.py --count 300";
-      return;
-    }
-    title.textContent = `Burst of ${fmtInt(markerSize(mk))} requests: share placed on a host`;
-    hint.textContent = `${fmtDur(Math.max(0, (viewEnd() - mk.t) / 1000))} ago`;
-    const race = document.createElement("div");
-    race.className = "race";
-    for (const side of SIDES) {
-      const o = burstOutcome(side, mk);
-      const who = document.createElement("span");
-      who.className = "who";
-      const key = document.createElement("i");
-      key.style.background = SIDE_INFO[side].color;
-      who.append(key, document.createTextNode(SIDE_INFO[side].name));
-      const track = document.createElement("div");
-      track.className = "track";
-      track.setAttribute("role", "progressbar");
-      track.setAttribute("aria-label", `${SIDE_INFO[side].name} share of burst placed`);
-      track.setAttribute("aria-valuenow", String(Math.round(o.served * 100)));
-      const fill = document.createElement("div");
-      fill.className = "fill";
-      fill.style.width = `${(o.served * 100).toFixed(1)}%`;
-      fill.style.background = SIDE_INFO[side].color;
-      track.appendChild(fill);
-      const out = document.createElement("span");
-      out.className = `out${o.drainedMs != null ? " done" : ""}`;
-      out.textContent = o.drainedMs != null ? `✓ ${fmtDur(o.drainedMs / 1000)}` : `${Math.round(o.served * 100)}% · ${fmtDur(o.elapsedMs / 1000)}`;
-      race.append(who, track, out);
-    }
-    host.appendChild(race);
-  }
-
   function renderTable() {
     const rows = [
       ...STAGES.map((st) => [st.label, (s) => fmtInt(s.m.stages[st.key])]),
@@ -979,7 +899,6 @@
 
   function render() {
     renderConnections();
-    renderBurst();
     renderStats();
     renderCharts();
     renderTable();

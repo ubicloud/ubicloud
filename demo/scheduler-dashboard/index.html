@@ -16,7 +16,6 @@
     --axis: #c3c2b7;
     --border: rgba(11, 11, 11, 0.10);
     --wash: rgba(11, 11, 11, 0.04);
-    --track: #f0efec;
 
     --current: #eb6834;
     --central: #2a78d6;
@@ -41,7 +40,6 @@
       --axis: #383835;
       --border: rgba(255, 255, 255, 0.10);
       --wash: rgba(255, 255, 255, 0.05);
-      --track: #383835;
       --current: #d95926;
       --central: #3987e5;
       --stage-admission: #199e70;
@@ -62,7 +60,6 @@
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.10);
     --wash: rgba(255, 255, 255, 0.05);
-    --track: #383835;
     --current: #d95926;
     --central: #3987e5;
     --stage-admission: #199e70;
@@ -148,16 +145,6 @@
   .legend i.wash { opacity: 0.25; }
   .legend i.ramp { width: 44px; height: 8px; }
 
-  /* Burst race */
-  .race { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; margin-top: 8px; }
-  .race .who { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
-  .race .who i { width: 10px; height: 3px; border-radius: 2px; }
-  .race .track { height: 14px; border-radius: 4px; background: var(--track); overflow: hidden; }
-  .race .fill { height: 100%; border-radius: 0 4px 4px 0; transition: width 0.6s ease; }
-  .race .out { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
-  .race .out.done { color: var(--good-text); }
-  .burst-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .burst-head b { font-weight: 600; }
 
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .section { margin: 20px 0 8px; }
@@ -253,8 +240,6 @@
       </form>
     </details>
   </div>
-
-  <section class="card" id="burst-race" aria-live="polite"></section>
 
   <h3 class="section">Head to head</h3>
   <section class="grid2">
