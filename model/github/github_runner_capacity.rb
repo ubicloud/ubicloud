@@ -26,6 +26,56 @@ class GithubRunnerCapacity < Sequel::Model
     ds.update(amounts.to_h { |column, amount| [column, Sequel[column] + amount] }) == 1
   end
 
+  # Reads the stored counters and their truth in one statement, so both come
+  # from one snapshot: host capacity from VmHost.runner_capacity, and usage
+  # from the charges of the runners holding each pool.
+  def self.reconcile_rows
+    runners = DB[:github_runner].join(GithubRunner.capacity_charges_dataset, label: :label)
+      .exclude(capacity_pool: nil)
+      .select_group(Sequel[:github_runner][:capacity_pool].as(:name))
+      .select_append {
+        [
+          sum(Sequel[:charge][:cores]).as(:cores),
+          sum(Sequel[:charge][:hugepages_1g]).as(:hugepages_1g),
+          sum(Sequel[:charge][:vcpus]).as(:vcpus),
+          count.function.*.as(:runners),
+        ]
+      }
+    dataset
+      .left_join(VmHost.dataset.runner_capacity.as(:host), name: Sequel[:github_runner_capacity][:name])
+      .left_join(runners.as(:runner), name: Sequel[:github_runner_capacity][:name])
+      .select_all(:github_runner_capacity)
+      .select_append(
+        Sequel[:host][:cores].as(:host_cores), Sequel[:host][:hugepages_1g].as(:host_hugepages_1g),
+        Sequel[:runner][:cores].as(:runner_cores), Sequel[:runner][:hugepages_1g].as(:runner_hugepages_1g),
+        Sequel[:runner][:vcpus].as(:runner_vcpus), Sequel[:runner][:runners].as(:runner_runners),
+      )
+      .order(Sequel[:github_runner_capacity][:name])
+      .all
+  end
+
+  # Adds each counter's drift to it, instead of overwriting it with the truth.
+  # Every writer changes a counter and the row it counts in one transaction, so
+  # a write committed before the snapshot is in both the counter and the truth,
+  # and one committed after is in neither and lands on top of the correction.
+  # Overwriting would lose those later writes. This needs a single reconciler.
+  def self.reconcile(rows = reconcile_rows)
+    rows.each do |row|
+      spill = row.name == SPILL
+      truth = {
+        total_cores: row[:host_cores].to_i,
+        total_hugepages_1g: row[:host_hugepages_1g].to_i,
+        used_cores: spill ? 0 : row[:runner_cores].to_i,
+        used_hugepages_1g: spill ? 0 : row[:runner_hugepages_1g].to_i,
+        used_vcpus: spill ? row[:runner_vcpus].to_i : 0,
+        used_runners: spill ? row[:runner_runners].to_i : 0,
+      }
+      drift = truth.to_h { |column, value| [column, value - row[column]] }.reject { |_, amount| amount.zero? }
+      where(name: row.name).update(reconciled_at: Sequel::CURRENT_TIMESTAMP, **drift.to_h { |column, amount| [column, Sequel[column] + amount] })
+      Clog.emit("github runner capacity drift", {github_runner_capacity_drift: {name: row.name, **drift}}) unless drift.empty?
+    end
+  end
+
   # A missed or repeated release must never fail a runner's teardown, so the
   # usage stops at zero and the reconciler corrects it.
   def self.refund(name, amounts)

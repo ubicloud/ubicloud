@@ -82,6 +82,34 @@ class GithubRunner < Sequel::Model
     end
   end
 
+  # The capacity charge of each runner label, for queries that charge runners
+  # in SQL: label, metal pool, metal cores, metal hugepages and AWS vCPUs.
+  def self.capacity_charges
+    Github.runner_labels.keys.map do |label|
+      runner = new(label:)
+      pool = runner.metal_capacity_pool
+      amounts = runner.capacity_amounts(pool)
+      [label, pool, amounts[:used_cores], amounts[:used_hugepages_1g], runner.aws_vcpus]
+    end
+  end
+
+  def self.capacity_charges_dataset
+    DB.values(capacity_charges).as(:charge, [:label, :pool, :cores, :hugepages_1g, :vcpus])
+  end
+
+  # Gives a pool to runners that hold a VM but no reservation, such as the
+  # runners that were already running when the capacity ledger shipped.
+  # GithubRunnerCapacity.reconcile charges them in the same transaction.
+  def self.adopt_capacity
+    in_teardown = Strand.where(id: Sequel[:github_runner][:id], label: %w[destroy wait_vm_destroy]).exists
+    pool = Sequel.case({{Sequel[:github_runner][:location_id] => Config.github_runner_aws_location_id} => GithubRunnerCapacity::SPILL}, Sequel[:charge][:pool])
+    DB[:github_runner].from(:github_runner, capacity_charges_dataset)
+      .where(Sequel[:charge][:label] => Sequel[:github_runner][:label], Sequel[:github_runner][:capacity_pool] => nil)
+      .exclude(Sequel[:github_runner][:vm_id] => nil)
+      .exclude(in_teardown)
+      .update(capacity_pool: pool)
+  end
+
   def reserve_metal_capacity(utilization)
     pool = metal_capacity_pool
     move_capacity(pool, GithubRunnerCapacity.metal_room(capacity_amounts(pool), utilization))

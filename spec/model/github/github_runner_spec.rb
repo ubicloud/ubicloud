@@ -95,6 +95,30 @@ RSpec.describe GithubRunner do
     end
   end
 
+  describe ".adopt_capacity" do
+    let(:installation) { GithubInstallation.create(installation_id: 457, name: "adopt", type: "User") }
+
+    def runner(label: "wait", location_id: Location::GITHUB_RUNNERS_ID, vm: true, **)
+      vm_id = create_vm(location_id:).id if vm
+      described_class.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-standard-4", vm_id:, location_id: (location_id if vm), **).tap {
+        Strand.create_with_id(it, prog: "Github::GithubRunnerNexus", label:)
+      }
+    end
+
+    it "gives a pool to runners that hold a VM without a reservation" do
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: Project.create(name: "aws").id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      metal = runner
+      aws = runner(location_id: location.id)
+      reserved = runner(capacity_pool: "x64-premium")
+      waiting = runner(vm: false)
+      leaving = runner(label: "wait_vm_destroy")
+
+      expect(described_class.adopt_capacity).to eq(2)
+      expect([metal, aws, reserved, waiting, leaving].map { it.reload.capacity_pool }).to eq(["x64-standard", GithubRunnerCapacity::SPILL, "x64-premium", nil, nil])
+    end
+  end
+
   it "can log duration with a vm" do
     vm = github_runner.vm
     boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)

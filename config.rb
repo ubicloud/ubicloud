@@ -150,6 +150,7 @@ module Config
   override :github_runner_metal_spill_utilization, 95, int
   override :github_runner_metal_wait_utilization, 97, int
   override :github_runner_over_quota_utilization, 80, int
+  override :github_runner_capacity_reconcile_seconds, 600, int
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
