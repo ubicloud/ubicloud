@@ -3,14 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Runner Scheduler Live</title>
+<title>Ubicloud Runner Scheduling</title>
+<link rel="icon" href="/brand/favicon.ico">
 <style>
+  @font-face { font-family: "Be Vietnam Pro"; src: url("/brand/BeVietnamPro-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Be Vietnam Pro"; src: url("/brand/BeVietnamPro-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
   :root {
     color-scheme: light;
-    --page: #f9f9f7;
-    --surface: #fcfcfb;
-    --ink: #0b0b0b;
-    --ink-2: #52514e;
+    --brand: #ff5c12;
+    --brand-ink: #1a1b20;
+    --action: #ea580c;
+    --page: #f5f5f3;
+    --surface: #ffffff;
+    --ink: #1a1b20;
+    --ink-2: #4f5058;
     --muted: #898781;
     --grid: #e1e0d9;
     --axis: #c3c2b7;
@@ -18,8 +24,8 @@
     --wash: rgba(11, 11, 11, 0.04);
     --track: #f0efec;
 
-    --current: #eb6834;
-    --central: #2a78d6;
+    --current: #2a78d6;
+    --central: #ff5c12;
     --stage-admission: #1baf7a;
     --stage-capacity: #eda100;
     --stage-booting: #e87ba4;
@@ -32,8 +38,8 @@
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
       color-scheme: dark;
-      --page: #0d0d0d;
-      --surface: #1a1a19;
+      --page: #0e0f12;
+      --surface: #17181c;
       --ink: #ffffff;
       --ink-2: #c3c2b7;
       --muted: #898781;
@@ -42,8 +48,8 @@
       --border: rgba(255, 255, 255, 0.10);
       --wash: rgba(255, 255, 255, 0.05);
       --track: #383835;
-      --current: #d95926;
-      --central: #3987e5;
+      --current: #3987e5;
+      --central: #ff6a26;
       --stage-admission: #199e70;
       --stage-capacity: #c98500;
       --stage-booting: #d55181;
@@ -53,8 +59,8 @@
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
+    --page: #0e0f12;
+    --surface: #17181c;
     --ink: #ffffff;
     --ink-2: #c3c2b7;
     --muted: #898781;
@@ -63,8 +69,8 @@
     --border: rgba(255, 255, 255, 0.10);
     --wash: rgba(255, 255, 255, 0.05);
     --track: #383835;
-    --current: #d95926;
-    --central: #3987e5;
+    --current: #3987e5;
+    --central: #ff6a26;
     --stage-admission: #199e70;
     --stage-capacity: #c98500;
     --stage-booting: #d55181;
@@ -77,18 +83,36 @@
   body {
     background: var(--page);
     color: var(--ink);
-    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 14px/1.45 "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 24px 48px; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 18px 24px 48px; }
+
+  /* App bar */
+  .appbar { position: sticky; top: 0; z-index: 30; background: var(--brand-ink); color: #fff; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+  .appbar-in { max-width: 1440px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+  @media (max-width: 640px) { .appbar-in { padding: 10px 16px; } }
+  .brand { display: flex; }
+  .brand img { height: 20px; display: block; }
+  .appbar-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.2); }
+  .app-title { font-weight: 600; font-size: 14px; }
+  .env { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brand); border: 1px solid rgba(255, 92, 18, 0.55); border-radius: 999px; padding: 1px 8px; }
+  .appbar .spacer { flex: 1; }
+  .updated { font-size: 12px; color: rgba(255, 255, 255, 0.6); font-variant-numeric: tabular-nums; }
+  .appbar .conn { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.85); }
+  .appbar .conn[data-state="live"] .state { color: #4ade80; }
+  .appbar .conn[data-state="error"] .state { color: #f87171; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
   @media (max-width: 640px) { .wrap { padding: 16px 16px 40px; } }
 
-  h1 { font-size: 20px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
   h2 { font-size: 13px; font-weight: 600; margin: 0; }
-  h3 { font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  h3 { font-size: 11px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  h3.section { display: flex; align-items: center; gap: 10px; }
+  h3.section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
   .sub { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
   .muted { color: var(--muted); }
 
-  header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
   .conns { display: flex; gap: 8px; flex-wrap: wrap; }
   .conn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -100,22 +124,21 @@
   .conn[data-state="live"] .state { color: var(--good-text); }
   .conn[data-state="error"] .state { color: var(--critical); }
 
-  .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 16px 0; }
-  .controls .spacer { flex: 1; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .group { display: inline-flex; align-items: center; gap: 6px; }
   button {
     font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px; cursor: pointer;
   }
   button:hover { background: var(--wash); }
-  button:focus-visible, summary:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--central); outline-offset: 2px; }
+  button:focus-visible, summary:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button { border: 0; border-radius: 0; }
   .seg button + button { border-left: 1px solid var(--border); }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .seg button[aria-pressed="true"] { background: var(--brand-ink); color: #fff; }
   .seg.small button { font-size: 12px; padding: 2px 8px; }
-  button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  button.primary:hover { opacity: 0.88; background: var(--ink); }
+  button.primary { background: var(--action); color: #fff; border-color: var(--action); font-weight: 600; }
+  button.primary:hover { opacity: 0.9; background: var(--action); }
   #pause[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
 
   details.settings { position: relative; }
@@ -139,8 +162,8 @@
   .col-err:empty { display: none; }
 
   .card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 14px 16px; position: relative; min-width: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; position: relative; min-width: 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 6px; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); }
@@ -176,7 +199,7 @@
   .tgroup { display: grid; gap: 6px; align-content: start; min-width: 0; }
   .tgroup > label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
   .tctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .tctl input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--ink); }
+  .tctl input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--action); }
   .tctl input[type="number"] {
     width: 96px; font: inherit; font-size: 13px; color: var(--ink); background: var(--page);
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
@@ -190,12 +213,13 @@
     .scoreboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .score.primary { grid-column: 1 / -1; }
   }
-  .score { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; min-width: 0; display: grid; gap: 4px; align-content: start; }
-  .score .label { font-size: 12px; color: var(--ink-2); }
+  .score { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; min-width: 0; display: grid; gap: 4px; align-content: start; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+  .score.primary { border-top: 3px solid var(--brand); }
+  .score .label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
   .score .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .score .who { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .score .who i { width: 10px; height: 3px; border-radius: 2px; }
-  .score .num { display: block; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; }
+  .score .num { display: block; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .score.primary .num { font-size: 40px; }
   .score .cmp { font-size: 12px; font-weight: 600; color: var(--muted); min-height: 18px; }
   .score .cmp.better { color: var(--good-text); }
@@ -203,7 +227,7 @@
 
   .chart { position: relative; width: 100%; }
   .chart svg { display: block; width: 100%; overflow: visible; }
-  .chart text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .chart text { font: 11px "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
   .chart text.end { fill: var(--ink-2); font-weight: 600; }
   .chart text.marker, .chart text.alert { fill: var(--ink-2); font-weight: 600; }
   .stale .chart svg { opacity: 0.55; }
@@ -238,18 +262,26 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div>
-      <h1>GitHub runner scheduling: current vs central</h1>
-      <p class="sub">Same fake job stream to both control planes. Side-by-side charts share a scale. Red lines are paging thresholds.</p>
-    </div>
+<header class="appbar">
+  <div class="appbar-in">
+    <a class="brand" href="https://www.ubicloud.com" target="_blank" rel="noopener"><img src="/brand/logo-white.png" alt="Ubicloud"></a>
+    <span class="appbar-sep" aria-hidden="true"></span>
+    <span class="app-title">GitHub runner scheduling</span>
+    <span class="env">Hackathon demo</span>
+    <span class="spacer"></span>
+    <span class="updated" id="updated" aria-live="off"></span>
     <div class="conns">
       <span class="conn" id="conn-current" data-state="connecting"></span>
       <span class="conn" id="conn-central" data-state="connecting"></span>
     </div>
-  </header>
-
+  </div>
+</header>
+<div class="wrap">
+  <div class="toolbar">
+    <div>
+      <h1>Current vs central scheduler</h1>
+      <p class="sub">Same job stream to both control planes. Side-by-side charts share a scale. Red lines are paging thresholds.</p>
+    </div>
   <div class="controls">
     <div class="seg" role="group" aria-label="Time window">
       <button data-window="120000">2m</button>
@@ -268,6 +300,7 @@
         <div class="row"><button type="button" id="settings-reset">Defaults</button><button type="submit" class="primary">Apply</button></div>
       </form>
     </details>
+  </div>
   </div>
 
   <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>

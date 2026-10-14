@@ -58,6 +58,14 @@ CURRENT_ALERTS = [
      "threshold": 310, "severity": "monitor", "source": "GithubRunnerNexus#wait"},
 ]
 STATIC_FILES = {"/": "index.html", "/index.html": "index.html", "/dashboard.js": "dashboard.js"}
+# Ubicloud logo, font and icon, served from the repo so the page carries the brand.
+REPO = Path(__file__).resolve().parents[2]
+BRAND_FILES = {
+    "/brand/logo-white.png": (REPO / "public/logo-white.png", "image/png"),
+    "/brand/favicon.ico": (REPO / "public/favicon.ico", "image/x-icon"),
+    "/brand/BeVietnamPro-Regular.ttf": (REPO / "assets/font/BeVietnamPro/Regular.ttf", "font/ttf"),
+    "/brand/BeVietnamPro-SemiBold.ttf": (REPO / "assets/font/BeVietnamPro/SemiBold.ttf", "font/ttf"),
+}
 
 
 class Job:
@@ -471,6 +479,9 @@ def make_handler(world, upstreams, recorder, control_url):
                 with recorder.lock:
                     metrics, error = recorder.latest[side]
                 return self.send(200, metrics) if metrics else self.send(502, {"error": error})
+            if path in BRAND_FILES:
+                file, ctype = BRAND_FILES[path]
+                return self.send(200, file.read_bytes(), ctype)
             if path in STATIC_FILES:
                 name = STATIC_FILES[path]
                 ctype = "text/html; charset=utf-8" if name.endswith(".html") else "text/javascript; charset=utf-8"

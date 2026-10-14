@@ -948,6 +948,10 @@
   }
 
   function renderConnections() {
+    const lastOk = Math.max(...SIDES.map((side) => state.sides[side].lastOk));
+    document.getElementById("updated").textContent = state.paused
+      ? "Paused"
+      : lastOk ? `Updated ${Math.max(0, Math.round((Date.now() - lastOk) / 1000))}s ago` : "Connecting…";
     const labels = { live: "● Live", stale: "◐ Stale", error: "✕ Error", connecting: "… Connecting" };
     for (const side of SIDES) {
       const pill = document.getElementById(`conn-${side}`);
