@@ -220,6 +220,8 @@ class Scheduling::Dispatcher
       .order_by(:schedule)
       .limit(@queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
+      .exclude(Sequel.&({id: Prog::Vm::Scheduler::STRAND_ID},
+        Sequel[:schedule] > Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{Config.central_vm_scheduler_respirate_fallback_seconds} seconds", :interval)))
       .select(:id, :schedule, :lease)
       .for_no_key_update
       .skip_locked

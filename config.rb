@@ -262,6 +262,7 @@ module Config
   override :allocator_large_storage_device_gib, 4096, int
   override :allocator_protected_large_storage_location_ids, "caa7a807-36c5-8420-a75c-f906839dad71", array(uuid)
   override :central_vm_scheduler, false, bool
+  override :central_vm_scheduler_respirate_fallback_seconds, 30, int
   override :central_vm_scheduler_batch_size, 50, int
   override :central_vm_scheduler_spill_installation_share, 0.5, float
   override :central_vm_scheduler_reservation_min_vcpus, 16, int

@@ -163,6 +163,13 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.scan.map(&:id)).to eq([st.id])
     end
 
+    it "leaves the central scheduler strand to bin/central-scheduler until it is overdue" do
+      st = Strand.create_with_id(Prog::Vm::Scheduler::STRAND_ID, prog: "Vm::Scheduler", label: "wait", schedule: Time.now - 10)
+      expect(di.scan).to eq([])
+      st.update(schedule: Time.now - Config.central_vm_scheduler_respirate_fallback_seconds - 1)
+      expect(di.scan.map(&:id)).to eq([st.id])
+    end
+
     it "does not include strands outside of partition" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
       di = @di = new_dispatcher(partition_number: 2)

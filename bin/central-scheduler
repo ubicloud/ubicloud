@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs the central VM scheduler strand as soon as it is due, outside the
+# respirate queue, so a respirate backlog does not delay VM allocation.
+# Respirate runs the strand only when this process has left it overdue for
+# central_vm_scheduler_respirate_fallback_seconds.
+
+require_relative "../loader"
+
+fail "CENTRAL_VM_SCHEDULER is not set" unless Config.central_vm_scheduler
+
+shutting_down = false
+Signal.trap("INT") { shutting_down = true }
+Signal.trap("TERM") { shutting_down = true }
+
+clover_freeze
+
+until shutting_down
+  begin
+    strand = Strand[Prog::Vm::Scheduler::STRAND_ID]
+    ran = strand && strand.schedule <= Time.now && strand.run(Scheduling::Dispatcher::STRAND_RUNTIME)
+  rescue Strand::RunError
+    # Already logged by Strand#run, and the strand retries after a backoff.
+    ran = false
+  rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+    sleep(1 + rand)
+    ran = false
+  end
+
+  sleep 0.2 unless ran
+end
