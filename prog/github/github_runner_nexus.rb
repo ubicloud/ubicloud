@@ -68,9 +68,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
-      # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
-      # instance, but the customer is still billed for 30 vCPUs.
-      vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
+      vcpus = github_runner.aws_vcpus
       if x64?
         size = Option.aws_instance_type_name("m8a", vcpus)
         alternative_families = ["m8i", "m7a", "m7i", "m6a"]
@@ -360,6 +358,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
+    if Config.github_runner_capacity_gate
+      hop_apply_custom_label_quota if github_runner.custom_label
+      hop_wait_capacity
+    end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
@@ -396,8 +398,30 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       vm.waiting_for_capacity_set? &&
       Time.now - vm.created_at > 60 &&
       project.get_ff_spill_to_alien_runners &&
-      aws_quota_available? &&
-      aws_spill_capacity_available?
+      aws_quota_available?
+  end
+
+  def reserve_unallocated_spill
+    if Config.github_runner_capacity_gate
+      github_runner.reserve_spill_capacity
+    else
+      aws_spill_capacity_available? && github_runner.move_capacity(GithubRunnerCapacity::SPILL)
+    end
+  end
+
+  def can_spill?
+    support_alien? && project.get_ff_spill_to_alien_runners
+  end
+
+  def spill_over
+    Clog.emit("spilled over runner", {spilled_over_runner: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+    github_runner.incr_spill_over
+    hop_allocate_vm
+  end
+
+  def hop_capacity_gate
+    hop_wait_capacity if Config.github_runner_capacity_gate
+    hop_allocate_vm
   end
 
   def destroy_vm
@@ -409,7 +433,50 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     vm.incr_destroy
   end
 
+  # Within quota, a runner goes to metal while metal stays under the spill
+  # utilization, spills to AWS above it, and still goes to metal while metal
+  # stays under the wait utilization. Over quota, it only gets the metal
+  # capacity left under the over quota utilization, or spills after waiting.
+  label def wait_capacity
+    # An operator can set the spill over semaphore by hand to override the checks below.
+    hop_allocate_vm if spill_over_set?
+
+    if quota_available?
+      hop_allocate_vm if github_runner.reserve_metal_capacity(Config.github_runner_metal_spill_utilization)
+      spill_over if can_spill? && aws_quota_available? && github_runner.reserve_spill_capacity
+      hop_allocate_vm if github_runner.reserve_metal_capacity(Config.github_runner_metal_wait_utilization)
+
+      Clog.emit("not allowed because of runner capacity", {runner_capacity_wait: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+      nap rand(5..15)
+    end
+
+    if project.reputation == "limited"
+      Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      nap rand(5..15)
+    end
+
+    if github_runner.reserve_metal_capacity(Config.github_runner_over_quota_utilization)
+      github_runner.incr_not_upgrade_premium if x64?
+      Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      hop_allocate_vm
+    end
+
+    if can_spill? &&
+        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds &&
+        aws_quota_available? &&
+        github_runner.reserve_spill_capacity
+      spill_over
+    end
+
+    Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+    nap rand(5..15)
+  end
+
   label def wait_concurrency_limit
+    # Runners that waited here before the capacity gate wait in wait_capacity
+    # once it is on. Remove this label once the gate is on everywhere.
+    hop_wait_capacity if Config.github_runner_capacity_gate
+
     # An operator can set the spill over semaphore by hand to override the checks below.
     hop_allocate_vm if spill_over_set?
 
@@ -478,7 +545,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   label def apply_custom_label_quota
     custom_label = github_runner.custom_label
-    hop_allocate_vm unless custom_label.concurrent_runner_count_limit
+    hop_capacity_gate unless custom_label.concurrent_runner_count_limit
 
     new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
     updated_rows = GithubCustomLabel
@@ -490,11 +557,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
-    hop_allocate_vm
+    hop_capacity_gate
   end
 
   label def allocate_vm
     picked_vm = pick_vm
+    # Runners can land on AWS without a spill reservation, such as alien
+    # runners, and they still take up spill capacity.
+    github_runner.move_capacity((picked_vm.location_id == Config.github_runner_aws_location_id) ? GithubRunnerCapacity::SPILL : github_runner.metal_capacity_pool)
     github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
     github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
@@ -503,7 +573,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm
-    if spill_unallocated_vm?
+    if spill_unallocated_vm? && reserve_unallocated_spill
       Clog.emit("spilled over unallocated runner", {spilled_over_unallocated_runner: {label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       destroy_vm
       github_runner.update(vm_id: nil, location_id: nil, allocated_at: nil)
@@ -869,6 +939,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       end
     end
+    github_runner.release_capacity
     hop_wait_vm_destroy
   end
 
