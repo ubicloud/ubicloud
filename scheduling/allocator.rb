@@ -151,8 +151,8 @@ module Scheduling::Allocator
       best_of(candidate_hosts(request), request)
     end
 
-    def self.best_of(candidate_hosts, request)
-      candidate_hosts.map { new(it, request) }
+    def self.best_of(candidate_hosts, request, **)
+      candidate_hosts.map { new(it, request, **) }
         .select { it.is_valid }
         .min_by { it.score + random_score }
     end
@@ -450,11 +450,15 @@ module Scheduling::Allocator
       score + util.max - util.min
     end
 
+    # penalty for ongoing vm provisionings on the host
+    def provisioning_penalty
+      @candidate_host[:vm_provisioning_count] * 0.5
+    end
+
     def calculate_score
       score = fit_score
 
-      # penalty for ongoing vm provisionings on the host
-      score += @candidate_host[:vm_provisioning_count] * 0.5
+      score += provisioning_penalty
 
       # prioritize premium family over other families if available
       score += -1 if @candidate_host[:family] == "premium"
@@ -495,7 +499,19 @@ module Scheduling::Allocator
   # the slot that is closest to the space the VM needs, so the larger free
   # slots stay for larger VMs.
   class BestFitAllocation < Allocation
+    def initialize(candidate_host, request, free_provisionings:)
+      @free_provisionings = free_provisionings
+      super(candidate_host, request)
+    end
+
     private
+
+    # Hosts boot a few VMs at once without slowing down, so only the
+    # provisionings beyond those count, and best fit can fill a host in a
+    # burst.
+    def provisioning_penalty
+      [@candidate_host[:vm_provisioning_count] - @free_provisionings, 0].max * 0.5
+    end
 
     # Only cores and memory count, as storage fills far slower than they do
     # and would make a full host look imbalanced.
@@ -518,8 +534,9 @@ module Scheduling::Allocator
   # A host in reservations (host id to VM id) takes only the VM that holds
   # it, so the host drains until that VM fits.
   class CandidateCache
-    def initialize(reservations = {})
+    def initialize(reservations:, free_provisionings:)
       @reservations = reservations
+      @free_provisionings = free_provisionings
       @classes = {}
       @changed_host_ids = []
     end
@@ -547,7 +564,7 @@ module Scheduling::Allocator
       hosts = equivalence_class.hosts(@changed_host_ids).reject do
         (holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id
       end
-      BestFitAllocation.best_of(hosts, request)
+      BestFitAllocation.best_of(hosts, request, free_provisionings: @free_provisionings)
     end
 
     def shortfall(host, request)

@@ -8,7 +8,7 @@ class Prog::Vm::Scheduler < Prog::Base
   label def wait
     reservations = live_reservations
     strands = waiting_strands
-    candidates = Scheduling::Allocator::CandidateCache.new(reservations)
+    candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
     allocated_ids = []
     no_capacity = {}
 
@@ -38,6 +38,11 @@ class Prog::Vm::Scheduler < Prog::Base
 
     self.cursor = nil
     nap 5
+  end
+
+  # An operator can override the configured value live in the frame.
+  def free_provisionings
+    frame["free_provisionings"] || Config.central_vm_scheduler_free_provisionings
   end
 
   # A VM keeps its reservation while it waits for allocation.

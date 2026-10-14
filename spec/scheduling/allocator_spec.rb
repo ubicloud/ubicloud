@@ -129,7 +129,7 @@ RSpec.describe Scheduling::Allocator do
   describe "CandidateCache" do
     let(:storage_volumes) { [{"size_gib" => 11, "use_bdev_ubi" => false, "boot" => true}] }
     let(:project) { Project.create(name: "test-project") }
-    let(:cache) { Al::CandidateCache.new }
+    let(:cache) { Al::CandidateCache.new(reservations: {}, free_provisionings: 0) }
 
     def create_host(**)
       vmh = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, **)
@@ -175,10 +175,22 @@ RSpec.describe Scheduling::Allocator do
       expect(vm.reload.vm_host_id).to eq(fuller.id)
     end
 
+    it "penalizes only the provisionings beyond the free ones" do
+      emptier = create_host
+      fuller = create_host(used_cores: 5, used_hugepages_1g: 30)
+      2.times { create_vm(vm_host_id: fuller.id, display_state: "creating", project_id: project.id, name: "booting#{it}", local_vetho_ip: "169.254.0.#{it * 2}/32") }
+      vm, other = Array.new(2) { create_waiting_vm }
+
+      Al::CandidateCache.new(reservations: {}, free_provisionings: 2).allocate(vm, described_class.request(vm, storage_volumes))
+      Al::CandidateCache.new(reservations: {}, free_provisionings: 0).allocate(other, described_class.request(other, storage_volumes))
+      expect(vm.reload.vm_host_id).to eq(fuller.id)
+      expect(other.reload.vm_host_id).to eq(emptier.id)
+    end
+
     it "keeps a reserved host for the vm that holds it" do
       vmh = create_host
       holder, other = Array.new(2) { create_waiting_vm }
-      cache = Al::CandidateCache.new({vmh.id => holder.id})
+      cache = Al::CandidateCache.new(reservations: {vmh.id => holder.id}, free_provisionings: 0)
 
       expect { cache.allocate(other, described_class.request(other, storage_volumes)) }.to raise_error(Al::NoSpaceLeft)
       cache.allocate(holder, described_class.request(holder, storage_volumes))
@@ -190,7 +202,7 @@ RSpec.describe Scheduling::Allocator do
       closest = create_host(used_cores: 6)
       create_host(used_cores: 4, used_hugepages_1g: 50)
       vm = create_waiting_vm(vcpus: 6, memory_gib: 24)
-      cache = Al::CandidateCache.new({reserved.id => "vm"})
+      cache = Al::CandidateCache.new(reservations: {reserved.id => "vm"}, free_provisionings: 0)
 
       expect(cache.closest_host(described_class.request(vm, storage_volumes))).to eq(closest.id)
     end
