@@ -111,6 +111,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         os_filter:,
         family_filter:,
       )
+    rescue Scheduling::Allocator::HostsBusy
+      Clog.emit("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
+
+      nap capacity_wait_seconds if vm.waiting_for_capacity_set?
+
+      incr_waiting_for_capacity
+      nap rand(1..3)
     rescue Scheduling::Allocator::NoSpaceLeft
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
 

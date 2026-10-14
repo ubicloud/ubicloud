@@ -584,6 +584,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Page.active.count).to eq(1)
     end
 
+    it "waits for capacity without paging if the best eligible hosts are busy, napping briefly only the first time" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(Scheduling::Allocator::HostsBusy.new("the best eligible hosts are busy")).exactly(3).times
+      expect(Clog).to receive(:emit).with("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}}).exactly(3).times
+      vm.created_at = Time.now + 10
+      expect { nx.start }.to nap(1..3)
+      expect(vm.reload.waiting_for_capacity_set?).to be(true)
+
+      expect(nx).not_to receive(:incr_waiting_for_capacity)
+      vm.created_at = Time.now + 10
+      expect { nx.start }.to nap(30)
+
+      vm.created_at = Time.now - 7 * 60 * 60
+      expect { nx.start }.to nap(5)
+      expect(Page.count).to eq(0)
+    end
+
     it "does not create a page if VM has been waiting less than 10 minutes" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(Scheduling::Allocator::NoSpaceLeft.new("no space left on any eligible host"))
 
