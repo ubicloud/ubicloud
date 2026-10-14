@@ -17,7 +17,14 @@ class Prog::Vm::Scheduler < Prog::Base
   label def wait
     reservations = live_reservations
     holders, queue = waiting_queue.partition { reservations.value?(it[:id]) }
-    candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
+    bulk_commit = Scheduling::BulkCommit.new if Config.central_vm_scheduler_bulk_commit
+    candidates = if bulk_commit
+      Scheduling::Allocator::DeferredCandidateCache.new(bulk_commit:, reservations:, free_provisionings:)
+    else
+      Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
+    end
+    planned = []
+    unplannable = []
     allocated_ids = []
     no_capacity = {}
     full_classes = Set.new
@@ -26,7 +33,7 @@ class Prog::Vm::Scheduler < Prog::Base
     more_waiting = false
 
     (holders + take_turns(queue)).each do |vm|
-      if allocated_ids.size >= batch_size
+      if allocated_ids.size + planned.size >= batch_size
         more_waiting = true
         break
       end
@@ -34,15 +41,23 @@ class Prog::Vm::Scheduler < Prog::Base
       if full_classes.include?(vm[:class])
         unplaced_ids << vm[:id]
       elsif (st = lock_strands([vm[:id]]).first)
-        case (result = try_allocate(st, candidates))
+        case (result = bulk_commit ? try_plan(st, candidates) : try_allocate(st, candidates))
         when :allocated
           allocated_ids << st.id
+        when :planned
+          planned << st
+        when :unplannable
+          unplannable << st
         when Scheduling::Allocator::Request
           no_capacity[st.id] = result
           unplaced_ids << st.id
           full_classes << vm[:class]
         end
       end
+    end
+
+    if bulk_commit
+      allocated_ids.concat(commit_planned(bulk_commit, planned, unplannable, reservations))
     end
 
     Strand.where(id: allocated_ids).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
@@ -59,14 +74,52 @@ class Prog::Vm::Scheduler < Prog::Base
   # Returns :allocated, the request of a VM that does not fit, or :failed.
   def try_allocate(st, candidates)
     nx = st.load
+    commit_one(nx, candidates)
+  end
+
+  def commit_one(nx, candidates)
     request = nx.allocation_request
     DB.transaction(savepoint: true) { candidates.allocate(nx.vm, request) }
     :allocated
   rescue Scheduling::Allocator::NoSpaceLeft
     request
   rescue RuntimeError => ex
+    Clog.emit("central vm scheduler failed to allocate vm", Util.exception_to_hash(ex, into: {central_vm_scheduler_failure: {vm: nx.strand.ubid}}))
+    :failed
+  end
+
+  # As try_allocate, but plans the allocation for the bulk commit. Returns
+  # :planned, :unplannable, the request of a VM that does not fit, or
+  # :failed.
+  def try_plan(st, candidates)
+    nx = st.load
+    request = nx.allocation_request
+    candidates.plan(nx.vm, request) ? :planned : :unplannable
+  rescue Scheduling::Allocator::NoSpaceLeft
+    request
+  rescue RuntimeError => ex
     Clog.emit("central vm scheduler failed to allocate vm", Util.exception_to_hash(ex, into: {central_vm_scheduler_failure: {vm: st.ubid}}))
     :failed
+  end
+
+  # Writes the planned allocations in bulk, then commits the VMs it could
+  # not plan one by one, with hosts queried after the bulk write. If the
+  # bulk write fails, e.g., as another process took planned capacity, its
+  # savepoint undoes it and the planned VMs are committed one by one too.
+  # Returns the ids of the VMs that got a host.
+  def commit_planned(bulk_commit, planned, unplannable, reservations)
+    one_by_one = unplannable
+    begin
+      DB.transaction(savepoint: true) { bulk_commit.write }
+      allocated_ids = planned.map(&:id)
+    rescue Sequel::Error, RuntimeError => ex
+      Clog.emit("central vm scheduler bulk commit failed", Util.exception_to_hash(ex, into: {central_vm_scheduler_bulk_failure: {vms: planned.size}}))
+      allocated_ids = []
+      one_by_one = planned + unplannable
+    end
+
+    candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
+    allocated_ids + one_by_one.select { commit_one(it.load, candidates) == :allocated }.map(&:id)
   end
 
   # An operator can override the configured value live in the frame.
