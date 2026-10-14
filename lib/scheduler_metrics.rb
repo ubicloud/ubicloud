@@ -26,9 +26,14 @@ module SchedulerMetrics
   ].freeze
 
   # Counters live in the database, as both web and respirate processes
-  # increment them.
+  # increment them. They are incremented over a connection of their own, in
+  # autocommit, as a counter row locked until the end of a strand's
+  # transaction would serialize all strands incrementing it. Sequel connects
+  # lazily, so each forked process gets its own connection.
+  COUNTER_DB = Sequel.connect(Config.clover_database_url, max_connections: 1, test: false)
+
   def self.increment(name)
-    DB[:scheduler_metric_counter]
+    COUNTER_DB[:scheduler_metric_counter]
       .insert_conflict(target: :name, update: {value: Sequel[:scheduler_metric_counter][:value] + 1})
       .insert(name:, value: 1)
   end
