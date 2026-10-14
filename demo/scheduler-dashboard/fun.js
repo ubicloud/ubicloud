@@ -12,8 +12,6 @@
     { key: "central", name: "Sorting Hat", url: "/central/scheduler/metrics", color: "var(--central)" },
   ];
   const POLL_MS = 1000;
-  const DOLLARS_PER_VCPU_MINUTE = 0.002;
-  const MAX_GAP_SECONDS = 600; // longer server-clock gaps (restart, clock jump) are skipped
   const MOODS = {
     happy: { emoji: "😀", label: "happy" },
     meh: { emoji: "😐", label: "meh" },
@@ -194,7 +192,7 @@
 
     const money = el("div", "fun-stat");
     const total = el("span", "fun-total", "—");
-    money.append(el("span", "fun-label", "Money made · last minute"), total);
+    money.append(el("span", "fun-label", "Money made · total"), total);
 
     const mood = el("div", "fun-stat");
     const big = el("span", "fun-big", MOODS.happy.emoji);
@@ -218,7 +216,6 @@
   const state = {};
   for (const side of SIDES) {
     state[side.key] = {
-      earnings: [], // [server ms, $/min] samples covering the last minute
       mood: "happy",
       ok: false,
     };
@@ -227,36 +224,18 @@
   // ---------------------------------------------------------------- money
 
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-  const fmtUsd = (v) => usd.format(v);
-  const WINDOW_MS = 60 * 1000;
 
-  // Dollars earned over the last minute of server time: the $/min rate
-  // (vCPUs in use × price) integrated between samples, trapezoid-style, so a
-  // mock running faster than real time still earns the right amount.
-  function updateMoney(key, m) {
-    const s = state[key];
-    const gen = Date.parse(m.generated_at);
-    if (!Number.isFinite(gen)) return;
-    const rate = (Number(m.fleet?.vcpus_used) || 0) * DOLLARS_PER_VCPU_MINUTE;
-    const pts = s.earnings;
-    if (pts.length && (gen <= pts.at(-1)[0] || gen - pts.at(-1)[0] > MAX_GAP_SECONDS * 1000)) pts.length = 0;
-    pts.push([gen, rate]);
-    const from = gen - WINDOW_MS;
-    // Keep one sample at or before the window start to interpolate from.
-    while (pts.length > 2 && pts[1][0] <= from) pts.shift();
-
-    let dollars = 0;
-    for (let i = 1; i < pts.length; i++) {
-      let [t0, r0] = pts[i - 1];
-      const [t1, r1] = pts[i];
-      if (t1 <= from) continue;
-      if (t0 < from) {
-        r0 += ((r1 - r0) * (from - t0)) / (t1 - t0);
-        t0 = from;
-      }
-      dollars += ((r0 + r1) / 2) * ((t1 - t0) / 60000);
+  // The serving process keeps the running total (GET /money), so it survives
+  // page reloads and every viewer sees the same figure.
+  async function updateMoney() {
+    try {
+      const r = await fetch("/money", { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const { dollars } = await r.json();
+      for (const side of SIDES) view[side.key].total.textContent = usd.format(dollars[side.key] ?? 0);
+    } catch {
+      // Keep the last figure; it updates again on the next tick.
     }
-    view[key].total.textContent = fmtUsd(dollars);
   }
 
   // ---------------------------------------------------------------- mood
@@ -341,7 +320,6 @@
       const m = await r.json();
       const s = state[side.key];
       s.ok = true;
-      updateMoney(side.key, m);
       s.mood = currentMood(m);
       renderMood(side.key);
     } catch {
@@ -351,6 +329,7 @@
 
   function tick() {
     for (const side of SIDES) poll(side);
+    updateMoney();
   }
 
   tick();

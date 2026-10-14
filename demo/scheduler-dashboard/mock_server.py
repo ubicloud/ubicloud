@@ -32,6 +32,7 @@ import random
 import threading
 import time
 import urllib.error
+from datetime import datetime
 import urllib.parse
 import urllib.request
 from collections import deque
@@ -389,6 +390,8 @@ class World:
 
 
 HISTORY_SECONDS = 16 * 60
+DOLLARS_PER_VCPU_MINUTE = 0.002  # premium runner price used by the "money made" figure
+MAX_MONEY_GAP_SECONDS = 600  # longer gaps between samples (outage, restart) earn nothing
 
 
 class Recorder:
@@ -402,6 +405,11 @@ class Recorder:
         self.lock = threading.Lock()
         self.samples = {side: deque(maxlen=HISTORY_SECONDS) for side in ("current", "central")}
         self.latest = {side: (None, "no sample yet") for side in self.samples}
+        # Money made since this server started, so it survives page reloads
+        # and every viewer sees the same figure: vCPUs in use × price,
+        # integrated over each side's own clock (generated_at).
+        self.money = {side: {"dollars": 0.0, "last": None} for side in self.samples}
+        self.money_since = time.time()
 
     def sample(self, side):
         url = self.upstreams.get(side)
@@ -419,6 +427,28 @@ class Recorder:
             self.latest[side] = (metrics, error)
             if metrics:
                 self.samples[side].append((time.time() * 1000, metrics))
+                self.add_money(side, metrics)
+
+    def add_money(self, side, metrics):
+        try:
+            gen = datetime.fromisoformat(metrics["generated_at"]).timestamp()
+            rate = float(metrics["fleet"]["vcpus_used"]) * DOLLARS_PER_VCPU_MINUTE
+        except (KeyError, TypeError, ValueError):
+            return
+        acc = self.money[side]
+        if acc["last"]:
+            last_gen, last_rate = acc["last"]
+            dt = gen - last_gen
+            if 0 < dt <= MAX_MONEY_GAP_SECONDS:
+                acc["dollars"] += (last_rate + rate) / 2 * dt / 60
+        acc["last"] = (gen, rate)
+
+    def money_made(self):
+        with self.lock:
+            return {
+                "since": datetime.fromtimestamp(self.money_since).astimezone().isoformat(timespec="seconds"),
+                "dollars": {side: round(acc["dollars"], 2) for side, acc in self.money.items()},
+            }
 
     def run(self):
         while True:
@@ -469,6 +499,8 @@ def make_handler(world, upstreams, recorder, control_url):
                 return self.send(200, {"upstreams": upstreams, "control": control_url})
             if path == "/control/status":
                 return self.control("GET", "/status", {})
+            if path == "/money":
+                return self.send(200, recorder.money_made())
             if path == "/history":
                 query = dict(p.split("=", 1) for p in self.path.partition("?")[2].split("&") if "=" in p)
                 seconds = min(HISTORY_SECONDS, max(0, int(query.get("seconds", "900") or 0)))
