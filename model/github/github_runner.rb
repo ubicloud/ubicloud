@@ -148,6 +148,7 @@ end
 #  actual_label       | text                     |
 #  location_id        | uuid                     |
 #  encoded_jit_config | text                     |
+#  capacity_pool      | text                     |
 # Indexes:
 #  github_runner_pkey                  | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key             | UNIQUE btree (vm_id)
