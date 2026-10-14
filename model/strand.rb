@@ -400,9 +400,10 @@ end
 #  retval    | jsonb                    |
 #  try       | integer                  | NOT NULL DEFAULT 0
 # Indexes:
-#  strand_pkey                  | PRIMARY KEY btree (id)
-#  strand_parent_id_idx         | btree (parent_id) WHERE parent_id IS NOT NULL
-#  strand_schedule_id_lease_idx | btree (schedule, id, lease) WHERE exitval IS NULL
+#  strand_pkey                     | PRIMARY KEY btree (id)
+#  strand_parent_id_idx            | btree (parent_id) WHERE parent_id IS NOT NULL
+#  strand_schedule_id_lease_idx    | btree (schedule, id, lease) WHERE exitval IS NULL
+#  strand_wait_allocation_id_index | btree (id) WHERE prog = 'Vm::Metal::Nexus'::text AND label = 'wait_allocation'::text AND exitval IS NULL
 # Foreign key constraints:
 #  strand_parent_id_fkey | (parent_id) REFERENCES strand(id)
 # Referenced By:
