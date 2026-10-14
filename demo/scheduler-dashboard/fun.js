@@ -183,7 +183,7 @@
 
     const money = el("div", "fun-stat");
     const total = el("span", "fun-total", "—");
-    money.append(el("span", "fun-label", "Money made · total"), total);
+    money.append(el("span", "fun-label", "Money made · this session"), total);
 
     const mood = el("div", "fun-stat");
     const big = el("span", "fun-big", MOODS.happy.emoji);
@@ -213,6 +213,8 @@
   for (const side of SIDES) {
     state[side.key] = {
       mood: "happy",
+      dollars: 0,
+      last: null, // { gen, rate } of the previous sample
       ok: false,
     };
   }
@@ -221,17 +223,23 @@
 
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-  // The serving process keeps the running total (GET /money), so it survives
-  // page reloads and every viewer sees the same figure.
-  async function updateMoney() {
-    try {
-      const r = await fetch("/money", { cache: "no-store" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const { dollars } = await r.json();
-      for (const side of SIDES) view[side.key].total.textContent = usd.format(dollars[side.key] ?? 0);
-    } catch {
-      // Keep the last figure; it updates again on the next tick.
+  const DOLLARS_PER_VCPU_MINUTE = 0.002;
+  const MAX_GAP_MS = 10 * 60 * 1000; // longer gaps between samples (outage) earn nothing
+
+  // Money made since this page opened, so each viewer starts from $0 and a
+  // reload starts over: vCPUs in use × price, integrated between samples on
+  // the side's own clock (generated_at).
+  function addMoney(key, m) {
+    const s = state[key];
+    const gen = Date.parse(m.generated_at);
+    const rate = (Number(m.fleet?.vcpus_used) || 0) * DOLLARS_PER_VCPU_MINUTE;
+    if (!Number.isFinite(gen)) return;
+    if (s.last) {
+      const dt = gen - s.last.gen;
+      if (dt > 0 && dt <= MAX_GAP_MS) s.dollars += ((s.last.rate + rate) / 2) * (dt / 60000);
     }
+    s.last = { gen, rate };
+    view[key].total.textContent = usd.format(s.dollars);
   }
 
   // ---------------------------------------------------------------- mood
@@ -316,6 +324,7 @@
       const m = await r.json();
       const s = state[side.key];
       s.ok = true;
+      addMoney(side.key, m);
       s.mood = currentMood(m);
       renderMood(side.key);
     } catch {
@@ -325,7 +334,6 @@
 
   function tick() {
     for (const side of SIDES) poll(side);
-    updateMoney();
   }
 
   tick();
