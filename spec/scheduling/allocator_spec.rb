@@ -166,6 +166,15 @@ RSpec.describe Scheduling::Allocator do
       vms.each { allocate(it) }
     end
 
+    it "prefers the host with the least space left" do
+      create_host
+      fuller = create_host(used_cores: 5, used_hugepages_1g: 30)
+      vm = create_waiting_vm
+
+      allocate(vm)
+      expect(vm.reload.vm_host_id).to eq(fuller.id)
+    end
+
     it "scores a host that took an allocation with its new usage" do
       create_host(used_hugepages_1g: 44)
       first, second = Array.new(2) { create_waiting_vm }
