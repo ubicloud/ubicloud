@@ -20,6 +20,59 @@ RSpec.describe VmHost do
     vm_host.provider.api
   }
 
+  describe "#update_with_runner_capacity" do
+    let(:capacity) { GithubRunnerCapacity["x64-standard"] }
+    let(:host) { create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, allocation_state: "unprepared", total_cores: 48, total_cpus: 96, total_hugepages_1g: 375) }
+
+    def capacity_totals(name = "x64-standard")
+      GithubRunnerCapacity[name].values.values_at(:total_cores, :total_hugepages_1g)
+    end
+
+    it "adds the capacity of a host in a runner location that starts accepting, without its IO cores and SPDK hugepages" do
+      2.times { VmHostCpu.create(vm_host_id: host.id, cpu_number: it, io: true, numa_node: 0) }
+      SpdkInstallation.create(vm_host_id: host.id, version: "v1", allocation_weight: 100, hugepages: 3)
+
+      expect { host.update_with_runner_capacity(allocation_state: "accepting") }.to change { capacity_totals }.from([0, 0]).to([47, 372])
+      expect(host.reload.allocation_state).to eq "accepting"
+    end
+
+    it "removes the capacity of a host that drains" do
+      host.update_with_runner_capacity(allocation_state: "accepting")
+
+      expect { host.update_with_runner_capacity(allocation_state: "draining") }.to change { capacity_totals }.from([48, 375]).to([0, 0])
+    end
+
+    it "applies a capacity change of an accepting host" do
+      host.update_with_runner_capacity(allocation_state: "accepting")
+
+      expect { host.update_with_runner_capacity(total_hugepages_1g: 380) }.to change { capacity_totals }.from([48, 375]).to([48, 380])
+    end
+
+    it "moves the capacity between pools when the family changes" do
+      host.update_with_runner_capacity(allocation_state: "accepting")
+
+      expect { host.update_with_runner_capacity(family: "premium") }
+        .to change { capacity_totals }.from([48, 375]).to([0, 0])
+        .and change { capacity_totals("x64-premium") }.from([0, 0]).to([48, 375])
+    end
+
+    it "keeps the capacity when nothing it counts changes" do
+      host.update_with_runner_capacity(allocation_state: "accepting")
+
+      expect { host.update_with_runner_capacity(data_center: "FSN1-DC8") }.not_to change { capacity_totals }
+    end
+
+    it "ignores hosts outside the runner locations and hosts owned by a project" do
+      leaseweb_host = create_vm_host(location_id: Location::LEASEWEB_WDC02_ID, allocation_state: "unprepared", total_cpus: 96)
+      owned_host = create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, allocation_state: "unprepared", total_cpus: 96, project_id: Project.create(name: "owner").id)
+
+      expect {
+        leaseweb_host.update_with_runner_capacity(allocation_state: "accepting")
+        owned_host.update_with_runner_capacity(allocation_state: "accepting")
+      }.not_to change { capacity_totals }
+    end
+  end
+
   describe "#ip6_random_vm_network" do
     it "can generate random ipv6 subnets" do
       expect(vm_host.ip6_random_vm_network.contains(vm_host.ip6)).to be false

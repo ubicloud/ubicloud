@@ -66,7 +66,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         if force_host_id
           [[], [], [], [force_host_id], []]
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
+          runner_location_filter = Location::GITHUB_RUNNER_HOST_IDS
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
           installation = runner&.installation
           prefs = installation&.allocator_preferences || {}

@@ -34,6 +34,36 @@ class VmHost < Sequel::Model
     vms_dataset.exclude(display_state: "deleting")
   end
 
+  dataset_module do
+    # The capacity that accepting hosts in the runner locations give each
+    # GithubRunnerCapacity pool, without the IO cores and SPDK hugepages the
+    # host keeps for itself. Hosts owned by a project only run its VMs.
+    def runner_capacity
+      io_cores = DB[:vm_host_cpu].where(vm_host_id: Sequel[:vm_host][:id], io: true).select { count.function.* }
+      spdk_hugepages = DB[:spdk_installation].where(vm_host_id: Sequel[:vm_host][:id]).select { coalesce(sum(:hugepages), 0) }
+      where(allocation_state: "accepting", location_id: Location::GITHUB_RUNNER_HOST_IDS, project_id: nil)
+        .where { (total_cores > 0) & (total_cpus > 0) }
+        .select_group(Sequel.join([Sequel.cast(:arch, :text), "-", :family]).as(:name))
+        .select_append {
+          [
+            sum(Sequel[:total_cores] - io_cores * Sequel[:total_cores] / Sequel[:total_cpus]).cast(:integer).as(:cores),
+            sum(Sequel[:total_hugepages_1g] - spdk_hugepages).cast(:integer).as(:hugepages_1g),
+          ]
+        }
+    end
+  end
+
+  # Updates the host and moves its share of GitHub runner capacity in the
+  # same transaction, so the GithubRunnerCapacity totals follow the host.
+  def update_with_runner_capacity(values)
+    DB.transaction do
+      lock!
+      before = VmHost.where(id:).runner_capacity.first
+      update(values)
+      GithubRunnerCapacity.move_host_capacity(before, VmHost.where(id:).runner_capacity.first)
+    end
+  end
+
   def host_prefix
     net6.netmask.prefix_len
   end
