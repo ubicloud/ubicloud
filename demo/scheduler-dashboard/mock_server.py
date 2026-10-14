@@ -32,6 +32,7 @@ import random
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -98,6 +99,8 @@ class Sim:
         self.counters = dict.fromkeys(
             ["requests_received_total", "allocated_total", "started_total", "completed_total",
              "scheduling_checks_total", "order_inversions_total"], 0)
+        self.received_by_vcpus = dict.fromkeys(SIZES, 0)
+        self.allocated_by_vcpus = dict.fromkeys(SIZES, 0)
 
     # -- shared mechanics -------------------------------------------------
 
@@ -135,6 +138,7 @@ class Sim:
         self.waiting.remove(job)
         self.in_flight.append(job)
         self.counters["allocated_total"] += 1
+        self.allocated_by_vcpus[job.vcpus] += 1
         self.latency.append((now, now - job.arrived))
         self.dirty = True
 
@@ -163,6 +167,7 @@ class Sim:
     def submit(self, template):
         job = Job(template)
         self.counters["requests_received_total"] += 1
+        self.received_by_vcpus[job.vcpus] += 1
         self.waiting.append(job)
         self.dirty = True
         return job
@@ -219,8 +224,17 @@ class Sim:
                     "p99_seconds": round(pct(waits, 99), 1),
                 },
             },
-            "counters": dict(self.counters),
-            "fleet": {"vcpus_total": self.total, "vcpus_used": self.used()},
+            "counters": {
+                **self.counters,
+                "received_by_vcpus": {str(v): n for v, n in self.received_by_vcpus.items()},
+                "allocated_by_vcpus": {str(v): n for v, n in self.allocated_by_vcpus.items()},
+            },
+            "fleet": {
+                "vcpus_total": self.total,
+                "vcpus_used": self.used(),
+                # How many more runners of each size would fit right now.
+                "free_slots_by_vcpus": {str(v): sum(f // v for f in self.free) for v in SIZES},
+            },
             "alerts": self.alerts,
         }
 
@@ -428,7 +442,11 @@ class Recorder:
             return {side: [[t, m] for t, m in samples if t >= cutoff] for side, samples in self.samples.items()}
 
 
-def make_handler(world, upstreams, recorder):
+MAX_RATE_PER_MIN = 100_000
+MAX_BURST = 20_000
+
+
+def make_handler(world, upstreams, recorder, control_url):
     root = Path(__file__).resolve().parent
 
     class Handler(BaseHTTPRequestHandler):
@@ -453,7 +471,9 @@ def make_handler(world, upstreams, recorder):
             path = self.path.split("?")[0]
             side = path.split("/")[1]
             if path == "/config":
-                return self.send(200, {"upstreams": upstreams})
+                return self.send(200, {"upstreams": upstreams, "control": control_url})
+            if path == "/control/status":
+                return self.control("GET", "/status", {})
             if path == "/history":
                 query = dict(p.split("=", 1) for p in self.path.partition("?")[2].split("&") if "=" in p)
                 seconds = min(HISTORY_SECONDS, max(0, int(query.get("seconds", "900") or 0)))
@@ -470,7 +490,48 @@ def make_handler(world, upstreams, recorder):
                 return self.send(200, (root / name).read_bytes(), ctype)
             self.send(404, {"error": "not found"})
 
+        def control(self, method, path, params):
+            """Relay a load-generator call (see "Load controls" in METRICS.md).
+            The generator sends no CORS headers and speaks plain HTTP, so the
+            browser can't call it itself. Without --control-url the calls
+            drive this server's simulation instead."""
+            if control_url:
+                url = f"{control_url.rstrip('/')}{path}"
+                if params:
+                    url += f"?{urllib.parse.urlencode(params)}"
+                req = urllib.request.Request(url, method=method, data=b"" if method == "POST" else None)
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        return self.send(resp.status, resp.read())
+                except urllib.error.HTTPError as e:
+                    return self.send(e.code, {"error": f"load generator: HTTP {e.code} {e.read().decode(errors='replace')[:200]}"})
+                except (urllib.error.URLError, OSError) as e:
+                    return self.send(502, {"error": f"load generator {control_url}: {e}"})
+            if path == "/rate":
+                with world.lock:
+                    world.bg_rate_per_min = params["value"]
+            elif path == "/burst":
+                world.inject(params["count"], spread=5)
+            with world.lock:
+                return self.send(200, {"rate_per_min": world.bg_rate_per_min, "simulated": True})
+
         def do_POST(self):
+            path, _, query = self.path.partition("?")
+            if path in ("/control/rate", "/control/burst"):
+                q = dict(urllib.parse.parse_qsl(query))
+                try:
+                    if path == "/control/rate":
+                        value = float(q["value"])
+                        if not 0 <= value <= MAX_RATE_PER_MIN:
+                            raise ValueError
+                        return self.control("POST", "/rate", {"value": int(value) if value.is_integer() else value})
+                    count = int(q["count"])
+                    if not 1 <= count <= MAX_BURST:
+                        raise ValueError
+                    return self.control("POST", "/burst", {"count": count})
+                except (KeyError, ValueError):
+                    limits = f"value 0–{MAX_RATE_PER_MIN}" if path == "/control/rate" else f"count 1–{MAX_BURST}"
+                    return self.send(400, {"error": f"expected {limits}"})
             length = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
@@ -508,6 +569,7 @@ def main():
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--current-url", help="serve /current/scheduler/metrics from this real endpoint instead of the simulation")
     p.add_argument("--central-url", help="serve /central/scheduler/metrics from this real endpoint instead of the simulation")
+    p.add_argument("--control-url", help="load generator to relay the dashboard's traffic controls to (default: drive the simulation)")
     args = p.parse_args()
     upstreams = {"current": args.current_url, "central": args.central_url}
 
@@ -515,7 +577,7 @@ def main():
     threading.Thread(target=world.run, daemon=True).start()
     recorder = Recorder(world, upstreams)
     threading.Thread(target=recorder.run, daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world, upstreams, recorder))
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world, upstreams, recorder, args.control_url))
     print(f"Dashboard:  http://localhost:{args.port}/")
     for side in ("current", "central"):
         source = f"proxied from {upstreams[side]}" if upstreams[side] else "simulated"

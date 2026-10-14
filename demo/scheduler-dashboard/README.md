@@ -93,31 +93,58 @@ http://localhost:8787/?current=http://cp-current:3000/scheduler/metrics&central=
 Settings are remembered in the browser. This only works when the endpoints
 send CORS headers and use the same scheme (HTTP or HTTPS) as the page.
 
-## The Burst and Load buttons
+## Traffic controls
 
-They do nothing until a **Load control URL** is set under Endpoints. After
-that, they call:
+The **Traffic** panel sets the load generator's steady rate (slider, number or
+presets, then **Set rate**) and sends bursts (**Send burst**; bursts of 2,000
+or more take a second click to confirm). It also shows how many events the
+generator has sent to each control plane, and whether any failed.
 
-- `POST /inject {"count": 300, "spread": 5}` for **Burst**.
-- `POST /load {"delta_per_min": ±10}` for **Load −/+**.
+Start the server with the load generator's address:
 
-Both calls are specified in METRICS.md. To try the buttons against the mock,
-set the URL to `http://localhost:8787`.
+```bash
+python3 demo/scheduler-dashboard/mock_server.py ... --control-url http://144.76.169.97:9299
+```
+
+The server relays only `GET /status`, `POST /rate?value=` and
+`POST /burst?count=`, and checks the numbers first: rate 0–100,000 per minute,
+burst 1–20,000. The generator sends no CORS headers and speaks plain HTTP, so
+the browser can't call it directly. Without `--control-url`, the panel drives
+the server's own simulation instead.
+
+⚠️ Anyone who can open the dashboard, including through a public tunnel, can
+use these controls.
 
 ## What the dashboard shows
 
 From top to bottom:
 
-1. **Burst race.** One bar per control plane showing how much of the latest
-   burst has been placed on a host, with a ✓ and the drain time once done.
-2. **Head to head.** Four charts with both control planes on each:
+1. **Scoreboard.** Current and central side by side, with how central
+   compares:
+   - Requests waiting for a host (the large tile).
+   - Oldest wait.
+   - p95 wait for a host.
+   - Placed per minute.
+   - Incoming per minute. This tile instead checks that both sides get the
+     same feed.
+2. **Traffic.** The load-generator controls above.
+3. **Head to head.** Both control planes on each chart:
+   - Incoming requests and requests placed on a host, per minute.
    - Requests waiting for a host.
    - Wait time, switchable between p50, p95 and oldest.
    - Fleet utilization, with the 80% admission gate as an amber line.
    - Scheduling checks per minute: control-plane work spent on scheduling.
-3. **Inside each scheduler.** One column per control plane; side-by-side
+4. **By runner size.** One small chart per size (2–30 vCPU) on a shared scale,
+   switchable between:
+   - Oldest wait, waiting count, and waiting vCPU.
+   - Placed / min and free slots. These two need the optional
+     `*_by_vcpus` fields in METRICS.md.
+
+   Large runners starving shows as the 16 and 30 vCPU charts climbing while
+   the small ones stay flat. Fragmentation shows as free slots for 30 vCPU
+   reaching zero while small slots remain.
+5. **Inside each scheduler.** One column per control plane; side-by-side
    charts share a scale.
-   - Three headline numbers. Central's show the change versus current.
    - Wait time spread: a p50–p95 band with the oldest request as a line.
    - Age of waiting requests: a heatmap of how long waiting requests have
      waited. A request served in order (FIFO) leaves a clean diagonal; a
@@ -126,15 +153,15 @@ From top to bottom:
    - Time in stage vs paging limits: the oldest request in each stage. Red
      lines are paging thresholds and amber lines are monitoring thresholds,
      both taken from each control plane's `alerts`. A threshold far above
-     the data shows as a note in the corner until the data gets within 25%
-     of it.
-   - Oldest waiting request by runner size, to show large runners starving.
-4. **Snapshot table.** Collapsed at the bottom: the latest values as a
+     the data is listed above the chart until the data gets within 25% of
+     it.
+6. **Snapshot table.** Collapsed at the bottom: the latest values as a
    table.
 
 Every time chart has a crosshair that's synced across all charts. When one
 poll sees 25 or more new requests, the dashboard marks a burst on every time
-chart.
+chart. The server records both sides every second, so reloading the page or
+opening it late starts with the last 15 minutes.
 
 ## What the mock models, and what it doesn't
 

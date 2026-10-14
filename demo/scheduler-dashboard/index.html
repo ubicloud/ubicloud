@@ -150,17 +150,6 @@
   .legend i.wash { opacity: 0.25; }
   .legend i.ramp { width: 44px; height: 8px; }
 
-  /* Burst race */
-  .race { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; margin-top: 8px; }
-  .race .who { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
-  .race .who i { width: 10px; height: 3px; border-radius: 2px; }
-  .race .track { height: 14px; border-radius: 4px; background: var(--track); overflow: hidden; }
-  .race .fill { height: 100%; border-radius: 0 4px 4px 0; transition: width 0.6s ease; }
-  .race .out { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
-  .race .out.done { color: var(--good-text); }
-  .burst-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .burst-head b { font-weight: 600; }
-
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .section { margin: 20px 0 8px; }
   .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
@@ -179,6 +168,25 @@
   @media (max-width: 1100px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .size-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .size-grid h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+
+  /* Traffic */
+  .traffic { margin-bottom: 12px; }
+  .traffic-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; }
+  @media (max-width: 960px) { .traffic-row { grid-template-columns: minmax(0, 1fr); } }
+  .tgroup { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .tgroup > label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  .tctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tctl input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--ink); }
+  .tctl input[type="number"] {
+    width: 96px; font: inherit; font-size: 13px; color: var(--ink); background: var(--page);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips button { font-size: 12px; padding: 2px 9px; border-radius: 999px; }
+  button:disabled { opacity: 0.5; cursor: progress; }
+  .trow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .trow .failed { color: var(--critical); font-weight: 600; }
+  .tstatus-err { margin: 0; font-size: 12px; color: var(--critical); font-weight: 600; }
 
   /* Scoreboard */
   .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
@@ -255,18 +263,11 @@
     <button id="pause" aria-pressed="false">Pause</button>
     <button id="clear">Clear</button>
     <span class="spacer"></span>
-    <div class="group" aria-label="Incoming load">
-      <span class="muted">Incoming load</span>
-      <button id="load-down" aria-label="Decrease incoming load">−</button>
-      <button id="load-up" aria-label="Increase incoming load">+</button>
-      <button id="burst" class="primary">Burst 300 jobs</button>
-    </div>
     <details class="settings">
       <summary>Endpoints</summary>
       <form class="panel" id="settings">
         <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"></label>
         <label>Central metrics URL <input name="central" autocomplete="off" spellcheck="false"></label>
-        <label>Load control URL (for the buttons; leave empty until wired) <input name="control" autocomplete="off" spellcheck="false" placeholder="e.g. http://localhost:8787"></label>
         <label>Poll interval (ms) <input name="interval" type="number" min="250" step="250"></label>
         <div class="row"><button type="button" id="settings-reset">Defaults</button><button type="submit" class="primary">Apply</button></div>
       </form>
@@ -275,7 +276,38 @@
 
   <section class="scoreboard" id="scoreboard" aria-label="Current vs central, now"></section>
 
-  <section class="card" id="burst-race" aria-live="polite"></section>
+  <section class="card traffic" aria-label="Traffic controls">
+    <div class="card-head"><h2>Traffic</h2><span class="muted" id="traffic-source"></span></div>
+    <div class="traffic-row">
+      <div class="tgroup">
+        <label for="rate-input">Steady rate <span class="muted" id="rate-now"></span></label>
+        <div class="tctl">
+          <input type="range" id="rate-slider" min="0" max="7200" step="60" aria-label="Steady rate per minute">
+          <input type="number" id="rate-input" min="0" step="60" inputmode="numeric">
+          <span class="muted">/ min</span>
+          <button id="rate-set" class="primary">Set rate</button>
+        </div>
+        <div class="chips">
+          <button data-rate="0">Off</button><button data-rate="600">600</button><button data-rate="1800">1,800</button><button data-rate="3600">3,600</button><button data-rate="7200">7,200</button>
+        </div>
+      </div>
+      <div class="tgroup">
+        <label for="burst-input">Burst</label>
+        <div class="tctl">
+          <input type="number" id="burst-input" min="1" max="20000" value="1000" inputmode="numeric">
+          <span class="muted">requests</span>
+          <button id="burst-send" class="primary">Send burst</button>
+        </div>
+        <div class="chips">
+          <button data-burst="100">100</button><button data-burst="500">500</button><button data-burst="1000">1,000</button><button data-burst="5000">5,000</button>
+        </div>
+      </div>
+      <div class="tgroup">
+        <label>Sent by the load generator</label>
+        <div id="traffic-status" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
 
   <h3 class="section">Head to head</h3>
   <section class="grid2">
@@ -315,11 +347,11 @@
     <div class="card-head">
       <h2>By runner size</h2>
       <div class="seg small" role="group" aria-label="By-size statistic">
-        <button data-sizestat="oldest">Oldest wait</button><button data-sizestat="waiting">Waiting</button><button data-sizestat="vcpus">Waiting vCPU</button>
+        <button data-sizestat="oldest">Oldest wait</button><button data-sizestat="waiting">Waiting</button><button data-sizestat="vcpus">Waiting vCPU</button><button data-sizestat="placed">Placed / min</button><button data-sizestat="slots">Free slots</button>
       </div>
       <div class="legend" data-legend="sides"></div>
     </div>
-    <p class="size-note">Same scale for every size. Large runners starving shows as the 16 and 30 vCPU charts climbing while the small ones stay flat.</p>
+    <p class="size-note" id="size-note"></p>
     <div class="size-grid" id="size-grid"></div>
   </section>
 

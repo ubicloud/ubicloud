@@ -29,6 +29,21 @@ the two payloads must mean exactly the same thing.
 The dashboard still renders a v1 payload, but the charts that depend on the new
 fields stay empty.
 
+### Optional, added later: placements and free slots by runner size
+
+These three fields are **optional**: a v2 payload without them stays valid. They
+power the "Placed / min" and "Free slots" views of the dashboard's "By runner
+size" panel, which show **why** large runners starve, not just that they do.
+
+| Field | What it shows |
+|---|---|
+| `counters.received_by_vcpus` | Requests received per runner size (monotonic) |
+| `counters.allocated_by_vcpus` | Requests placed on a host per runner size (monotonic). Small runners being favored shows as 2 and 4 vCPU placements continuing while 16 and 30 drop to zero. |
+| `fleet.free_slots_by_vcpus` | How many more runners of each size would fit right now. Plenty of 2-vCPU slots but no 30-vCPU slots means the free capacity is fragmented. |
+
+Each is an object keyed by the size **as a string**, with all five sizes
+present, e.g. `{"2": 4562, "4": 2862, "8": 1733, "16": 1359, "30": 940}`.
+
 ## Endpoint
 
 ```
@@ -101,10 +116,16 @@ GET /scheduler/metrics
     "started_total": 18001,
     "completed_total": 17805,
     "scheduling_checks_total": 92311,
-    "order_inversions_total": 566
+    "order_inversions_total": 566,
+    "received_by_vcpus":  { "2": 6382, "4": 4558, "8": 3647, "16": 2188, "30": 1459 },
+    "allocated_by_vcpus": { "2": 6371, "4": 4540, "8": 3610, "16": 2120, "30": 1382 }
   },
 
-  "fleet": { "vcpus_total": 1536, "vcpus_used": 1351 },
+  "fleet": {
+    "vcpus_total": 1536,
+    "vcpus_used": 1351,
+    "free_slots_by_vcpus": { "2": 88, "4": 41, "8": 17, "16": 6, "30": 0 }
+  },
 
   "alerts": [
     { "id": "no_capacity_page", "label": "NoCapacity page", "metric": "stage_oldest_seconds.waiting_capacity",
@@ -131,6 +152,8 @@ The dashboard degrades gracefully, so the fields can land in this order:
    - `by_vcpus`
    - `latency`
 3. **Everything else:** the rest of `counters` (shown in the snapshot table).
+4. **Optional, for the by-size panel:** `counters.received_by_vcpus`,
+   `counters.allocated_by_vcpus`, `fleet.free_slots_by_vcpus`.
 
 The dashboard requires `stages`, `waiting`, `counters`, `latency`, `fleet` and
 `by_vcpus` to be **present**, even if some values inside are still `0`.
@@ -230,6 +253,8 @@ All counters may reset to zero on restart; the dashboard detects resets.
 | `completed_total` | Its job completes (webhook `completed`) |
 | `scheduling_checks_total` | **Any attempt to admit or place a request**, successful or not. This measures how much work the control plane spends on scheduling. Current control plane: each run of `wait_concurrency_limit`, plus each `Scheduling::Allocator.allocate` call for a runner VM, including ones that raise `NoSpaceLeft`. Central: each placement attempt. |
 | `order_inversions_total` | At allocation time, some **older** request **of the same or smaller size** is still waiting. Count at most once per allocation. This measures fairness: that older request could have used the capacity. |
+| `received_by_vcpus` *(optional)* | Same as `requests_received_total`, split by runner size. The five values sum to `requests_received_total`. |
+| `allocated_by_vcpus` *(optional)* | Same as `allocated_total`, split by runner size. The five values sum to `allocated_total`. |
 
 ### `fleet`: runner-fleet capacity
 
@@ -239,6 +264,7 @@ Measured in vCPU, over the hosts this control plane schedules runners onto.
 |---|---|
 | `vcpus_total` | Total vCPUs of `accepting` hosts |
 | `vcpus_used` | Allocated vCPUs on those hosts |
+| `free_slots_by_vcpus` *(optional)* | For each runner size, how many more runners of that size would fit right now, counting each host separately: the sum over hosts of how many fit on that host. Not cumulative: one host with 32 free vCPU counts as 16 two-vCPU slots **and** 1 thirty-vCPU slot. |
 
 Both control planes must use the same unit and the same host set, or the
 utilization comparison is meaningless. The dashboard plots
@@ -373,6 +399,24 @@ Fleet capacity uses the same host set as `wait_concurrency_limit`
 
 - `vcpus_total = sum(total_cpus)`
 - `vcpus_used = sum(used_cores * total_cpus / total_cores)`
+
+`free_slots_by_vcpus` (optional), over the same hosts. For each host and each
+runner size, count how many runners of that size fit in what's left on the
+host, then sum over hosts:
+
+- **CPU:** `free_vcpus = (total_cores - used_cores) * total_cpus / total_cores`,
+  so `floor(free_vcpus / size)` runners fit.
+- **Memory:** each runner also needs 1 GiB hugepages per GiB of memory, so
+  take the lower of the CPU and memory counts. The memory per size is the
+  label's VM size.
+- **Better still:** count with the allocator's own fit check, if it's easy to
+  reuse, so that slots match what `Scheduling::Allocator` would actually
+  accept.
+
+Per-size counters: increment `received_by_vcpus[size]` and
+`allocated_by_vcpus[size]` at the same points as `requests_received_total`
+and `allocated_total`, with the size from
+`Github.runner_labels[label]["vcpus"]`.
 
 ### Alerts
 

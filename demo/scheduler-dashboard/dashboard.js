@@ -21,14 +21,36 @@
   };
   const SIZES = [2, 4, 8, 16, 30];
   // What the by-size panel plots for each runner size, from `by_vcpus`.
+  // value(sample, size) returns null when a side doesn't report the field.
+  const bucket = (s, size) => s.m.by_vcpus.find((x) => x.vcpus === size);
   const SIZE_STATS = {
-    oldest: { kind: "duration", fmt: (v) => fmtDur(v), value: (b) => b.oldest_seconds },
-    waiting: { kind: "count", fmt: (v) => fmtInt(v), value: (b) => b.waiting },
-    vcpus: { kind: "count", fmt: (v) => fmtInt(v), value: (b) => b.waiting * b.vcpus },
+    oldest: {
+      kind: "duration", fmt: (v) => fmtDur(v), value: (s, size) => bucket(s, size)?.oldest_seconds ?? null,
+      note: "Large runners starving shows as the 16 and 30 vCPU charts climbing while the small ones stay flat.",
+    },
+    waiting: {
+      kind: "count", fmt: (v) => fmtInt(v), value: (s, size) => bucket(s, size)?.waiting ?? null,
+      note: "How many requests of each size are waiting for a host.",
+    },
+    vcpus: {
+      kind: "count", fmt: (v) => fmtInt(v),
+      value: (s, size) => (bucket(s, size) ? bucket(s, size).waiting * size : null),
+      note: "Waiting requests × size: how much of the backlog each size really is.",
+    },
+    placed: {
+      kind: "count", fmt: (v) => fmtRate(v), field: "counters.allocated_by_vcpus",
+      value: (s, size) => s.sizeRates?.[size]?.allocations ?? null,
+      note: "Small runners being favored shows as 2 and 4 vCPU placements continuing while 16 and 30 drop to zero.",
+    },
+    slots: {
+      kind: "count", fmt: (v) => fmtInt(v), field: "fleet.free_slots_by_vcpus",
+      value: (s, size) => s.m.fleet.free_slots_by_vcpus?.[size] ?? null,
+      note: "How many more runners of each size fit right now. Plenty of small slots but none for 30 vCPU means fragmentation.",
+    },
   };
   const AGE_LABELS = ["≤10s", "≤30s", "≤1m", "≤2m", "≤5m", "≤10m", "≤30m", "≤1h", ">1h"];
   const SEVERITY_COLOR = { page: "var(--critical)", monitor: "var(--warning)" };
-  const DEFAULTS = { current: "/current/scheduler/metrics", central: "/central/scheduler/metrics", control: "", interval: 1000 };
+  const DEFAULTS = { current: "/current/scheduler/metrics", central: "/central/scheduler/metrics", interval: 1000 };
   const STORAGE_KEY = "scheduler-dashboard";
   const RATE_WINDOW_MS = 20000;
   const BURST_MIN = 25; // new requests in one poll that mark a burst
@@ -73,6 +95,7 @@
   for (const s of SIDES) state.sides[s] = { hist: [], error: null, lastOk: 0 };
   // Real endpoints the serving process proxies each default path to (GET /config).
   let upstreams = {};
+  let controlUrl = null; // load generator the server relays traffic controls to
 
   // ---------------------------------------------------------------- format
 
@@ -116,7 +139,9 @@
     return typeof v === "number" ? v : null;
   }
 
-  function rate(hist, sample, key) {
+  // Per-minute rate of a counter, read by `get` from a payload, over about
+  // RATE_WINDOW_MS of history.
+  function rate(hist, sample, get) {
     let ref = null;
     for (let i = hist.length - 1; i >= 0; i--) {
       ref = hist[i];
@@ -124,7 +149,10 @@
     }
     if (!ref) return null;
     const dt = (sample.gen - ref.gen) / 1000;
-    const d = sample.m.counters[key] - ref.m.counters[key];
+    const now = get(sample.m);
+    const then = get(ref.m);
+    if (typeof now !== "number" || typeof then !== "number") return null;
+    const d = now - then;
     if (dt < 0.5 || d < 0) return null; // too soon, or the counter reset
     return (d / dt) * 60;
   }
@@ -135,10 +163,13 @@
     const sample = { t, m, gen: Date.parse(m.generated_at) || t };
     if (prev && prev.gen === sample.gen) return; // same snapshot polled twice
     sample.rates = {
-      arrivals: rate(S.hist, sample, "requests_received_total"),
-      allocations: rate(S.hist, sample, "allocated_total"),
-      checks: rate(S.hist, sample, "scheduling_checks_total"),
+      arrivals: rate(S.hist, sample, (x) => x.counters.requests_received_total),
+      allocations: rate(S.hist, sample, (x) => x.counters.allocated_total),
+      checks: rate(S.hist, sample, (x) => x.counters.scheduling_checks_total),
     };
+    sample.sizeRates = Object.fromEntries(SIZES.map((size) => [size, {
+      allocations: rate(S.hist, sample, (x) => x.counters.allocated_by_vcpus?.[size]),
+    }]));
     if (prev) {
       const d = m.counters.requests_received_total - prev.m.counters.requests_received_total;
       if (d >= BURST_MIN) noteBurst(side, t, d);
@@ -262,7 +293,7 @@
   async function loadServerConfig() {
     try {
       const r = await fetch("/config", { cache: "no-store" });
-      if (r.ok) upstreams = (await r.json()).upstreams || {};
+      if (r.ok) ({ upstreams = {}, control: controlUrl = null } = await r.json());
       // A real endpoint saved by hand earlier is the one this server proxies:
       // go through the server so it also works over HTTPS.
       for (const side of SIDES) if (upstreams[side] && cfg[side] === upstreams[side]) cfg[side] = DEFAULTS[side];
@@ -882,10 +913,7 @@
       chart.id = `size-${size}`;
       cell.append(h4, chart);
       grid.appendChild(cell);
-      const bySize = (s) => {
-        const b = s.m.by_vcpus.find((x) => x.vcpus === size);
-        return b ? SIZE_STATS[state.sizeStat].value(b) : null;
-      };
+      const bySize = (s) => SIZE_STATS[state.sizeStat].value(s, size);
       addChart(`size-${size}`, {
         group: "by-size", compact: true, height: 140, margin: { l: 40, r: 44, t: 8, b: 22 },
         scaleKind: SIZE_STATS[state.sizeStat].kind, aria: `${size} vCPU runners, current vs central`,
@@ -907,6 +935,20 @@
       for (const c of list) (c.kind === "heatmap" ? renderHeatmap : renderLines)(c, scale, x0, x1);
     }
   }
+
+  // Explain the selected by-size view, and say when a side doesn't report it.
+  function renderSizeNote() {
+    const stat = SIZE_STATS[state.sizeStat];
+    const missing = stat.field
+      ? SIDES.filter((side) => {
+        const s = sampleAt(side);
+        return s && metricAt(s.m, stat.field) == null;
+      })
+      : [];
+    const gap = missing.length ? ` Not reported yet by ${missing.map((side) => SIDE_INFO[side].name).join(" or ")} (${stat.field}).` : "";
+    document.getElementById("size-note").textContent = `Same scale for every size. ${stat.note}${gap}`;
+  }
+  const metricAt = (m, path) => path.split(".").reduce((v, k) => v?.[k], m);
 
   function renderScoreboard() {
     const samples = Object.fromEntries(SIDES.map((side) => [side, sampleAt(side)]));
@@ -946,90 +988,6 @@
     }
   }
 
-  function burstOutcome(side, mk) {
-    const h = state.sides[side].hist;
-    const before = h[indexAtOrBefore(h, mk.t - 1)];
-    const baseline = before ? before.m.waiting.count : 0;
-    const start = Math.max(0, indexAtOrBefore(h, mk.t));
-    const end = indexAtOrBefore(h, viewEnd());
-    let peakIdx = -1;
-    let peak = 0;
-    for (let i = start; i <= end; i++) {
-      if (h[i].m.waiting.count > peak) {
-        peak = h[i].m.waiting.count;
-        peakIdx = i;
-      }
-    }
-    // Durations use the control plane's own clock (generated_at), so they
-    // agree with its wait times even when a mock runs faster than real time.
-    const startGen = before ? before.gen : h[start]?.gen;
-    let drainedMs = null;
-    if (peakIdx >= 0) {
-      for (let i = peakIdx; i <= end; i++) {
-        if (h[i].m.waiting.count <= baseline + 2) {
-          drainedMs = h[i].gen - startGen;
-          break;
-        }
-      }
-    }
-    const remaining = end >= 0 ? Math.max(0, h[end].m.waiting.count - baseline) : 0;
-    return {
-      served: drainedMs != null ? 1 : Math.min(1, Math.max(0, 1 - remaining / markerSize(mk))),
-      drainedMs,
-      elapsedMs: end >= 0 && startGen != null ? h[end].gen - startGen : 0,
-    };
-  }
-
-  // The burst as a race: how much of it each control plane has placed.
-  function renderBurst() {
-    const host = document.getElementById("burst-race");
-    host.replaceChildren();
-    const mk = state.markers.at(-1);
-    const head = document.createElement("div");
-    head.className = "burst-head";
-    const title = document.createElement("b");
-    const hint = document.createElement("span");
-    hint.className = "muted";
-    head.append(title, hint);
-    host.appendChild(head);
-    if (!mk) {
-      title.textContent = "No burst yet";
-      // inject.py only reaches the simulated sides of this server.
-      const simulated = SIDES.some((side) => cfg[side] === DEFAULTS[side] && !upstreams[side]);
-      hint.textContent = simulated
-        ? "python3 demo/scheduler-dashboard/inject.py --count 300"
-        : `Marked when one poll sees ${BURST_MIN}+ new requests`;
-      return;
-    }
-    title.textContent = `Burst of ${fmtInt(markerSize(mk))} requests: share placed on a host`;
-    hint.textContent = `${fmtDur(Math.max(0, (viewEnd() - mk.t) / 1000))} ago`;
-    const race = document.createElement("div");
-    race.className = "race";
-    for (const side of SIDES) {
-      const o = burstOutcome(side, mk);
-      const who = document.createElement("span");
-      who.className = "who";
-      const key = document.createElement("i");
-      key.style.background = SIDE_INFO[side].color;
-      who.append(key, document.createTextNode(SIDE_INFO[side].name));
-      const track = document.createElement("div");
-      track.className = "track";
-      track.setAttribute("role", "progressbar");
-      track.setAttribute("aria-label", `${SIDE_INFO[side].name} share of burst placed`);
-      track.setAttribute("aria-valuenow", String(Math.round(o.served * 100)));
-      const fill = document.createElement("div");
-      fill.className = "fill";
-      fill.style.width = `${(o.served * 100).toFixed(1)}%`;
-      fill.style.background = SIDE_INFO[side].color;
-      track.appendChild(fill);
-      const out = document.createElement("span");
-      out.className = `out${o.drainedMs != null ? " done" : ""}`;
-      out.textContent = o.drainedMs != null ? `✓ ${fmtDur(o.drainedMs / 1000)}` : `${Math.round(o.served * 100)}% · ${fmtDur(o.elapsedMs / 1000)}`;
-      race.append(who, track, out);
-    }
-    host.appendChild(race);
-  }
-
   function renderTable() {
     const rows = [
       ...STAGES.map((st) => [st.label, (s) => fmtInt(s.m.stages[st.key])]),
@@ -1065,8 +1023,8 @@
 
   function render() {
     renderConnections();
-    renderBurst();
     renderScoreboard();
+    renderSizeNote();
     renderCharts();
     renderTable();
   }
@@ -1082,25 +1040,143 @@
     toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
   }
 
-  // The Burst and Load buttons call the load-control API from METRICS.md.
-  // They do nothing until a control URL is configured.
-  async function control(path, body) {
-    if (!cfg.control) {
-      toast("Not wired yet. Set a load control URL under Endpoints, or use inject.py.");
+  // ---------------------------------------------------------------- traffic
+
+  // The serving process relays these to the load generator (or drives its
+  // simulation), see /control/* in mock_server.py.
+  async function controlCall(method, path) {
+    const r = await fetch(path, { method, cache: "no-store" });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    return body;
+  }
+
+  const traffic = { status: null, error: null, busy: false, rateDirty: false, confirmUntil: 0 };
+  const CONFIRM_BURST_AT = 2000;
+
+  function renderTraffic() {
+    const st = traffic.status;
+    document.getElementById("traffic-source").textContent = controlUrl ? `via ${controlUrl}` : "driving this server's simulation";
+    const now = document.getElementById("rate-now");
+    now.textContent = st ? `Now ${fmtInt(st.rate_per_min)} / min (${fmtRate(st.rate_per_min / 60)} / s)` : traffic.error ? "" : "…";
+    if (st && !traffic.rateDirty && document.activeElement?.id !== "rate-input") setRateInputs(st.rate_per_min);
+
+    const host = document.getElementById("traffic-status");
+    host.replaceChildren();
+    if (traffic.error) {
+      const p = document.createElement("p");
+      p.className = "tstatus-err";
+      p.textContent = `Load generator unreachable: ${traffic.error}`;
+      host.appendChild(p);
       return;
     }
-    try {
-      const r = await fetch(`${cfg.control.replace(/\/$/, "")}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const res = await r.json().catch(() => ({}));
-      toast(path === "/inject" ? `Injected ${fmtInt(res.injected ?? body.count)} requests` : `Background load: ${fmtRate(res.rate_per_min)} / min`);
-    } catch (e) {
-      toast(`Load control failed: ${e.message}`);
+    if (st?.simulated) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "Both simulated control planes receive these directly.";
+      host.appendChild(p);
     }
+    for (const t of st?.targets || []) {
+      const ev = t.events?.workflow_job || {};
+      const row = document.createElement("div");
+      row.className = "trow";
+      const name = document.createElement("span");
+      name.textContent = t.name;
+      const sent = document.createElement("b");
+      sent.textContent = `${fmtInt(ev.sent)} sent`;
+      const failed = document.createElement("span");
+      failed.className = ev.failed ? "failed" : "muted";
+      failed.textContent = ev.failed ? `▲ ${fmtInt(ev.failed)} failed` : "0 failed";
+      row.append(name, sent, failed);
+      host.appendChild(row);
+    }
+  }
+
+  function setRateInputs(v) {
+    document.getElementById("rate-input").value = Math.round(v);
+    const slider = document.getElementById("rate-slider");
+    slider.value = Math.min(Number(slider.max), Math.round(v));
+  }
+
+  async function refreshTraffic() {
+    try {
+      traffic.status = await controlCall("GET", "/control/status");
+      traffic.error = null;
+    } catch (e) {
+      traffic.error = e.message;
+    }
+    renderTraffic();
+  }
+
+  async function act(button, fn) {
+    if (traffic.busy) return;
+    traffic.busy = true;
+    button.disabled = true;
+    try {
+      await fn();
+    } catch (e) {
+      toast(`Traffic control failed: ${e.message}`);
+    } finally {
+      traffic.busy = false;
+      button.disabled = false;
+      refreshTraffic();
+    }
+  }
+
+  function bindTraffic() {
+    const slider = document.getElementById("rate-slider");
+    const input = document.getElementById("rate-input");
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+      traffic.rateDirty = true;
+    });
+    input.addEventListener("input", () => {
+      slider.value = Math.min(Number(slider.max), Number(input.value) || 0);
+      traffic.rateDirty = true;
+    });
+    const setRate = document.getElementById("rate-set");
+    setRate.addEventListener("click", () => act(setRate, async () => {
+      const value = Math.max(0, Number(input.value) || 0);
+      await controlCall("POST", `/control/rate?value=${value}`);
+      traffic.rateDirty = false;
+      toast(value ? `Steady rate set to ${fmtInt(value)} / min` : "Steady traffic stopped");
+    }));
+    for (const chip of document.querySelectorAll("[data-rate]")) {
+      chip.addEventListener("click", () => {
+        setRateInputs(Number(chip.dataset.rate));
+        traffic.rateDirty = true;
+      });
+    }
+
+    const count = document.getElementById("burst-input");
+    const send = document.getElementById("burst-send");
+    const resetSend = () => {
+      traffic.confirmUntil = 0;
+      send.textContent = "Send burst";
+    };
+    count.addEventListener("input", resetSend);
+    for (const chip of document.querySelectorAll("[data-burst]")) {
+      chip.addEventListener("click", () => {
+        count.value = chip.dataset.burst;
+        resetSend();
+      });
+    }
+    send.addEventListener("click", () => {
+      const n = Math.round(Number(count.value) || 0);
+      if (n < 1) return toast("Enter how many requests to send");
+      // Large bursts take a second click, so a stray click can't flood both control planes.
+      if (n >= CONFIRM_BURST_AT && Date.now() > traffic.confirmUntil) {
+        traffic.confirmUntil = Date.now() + 4000;
+        send.textContent = `Confirm ${fmtInt(n)}?`;
+        setTimeout(() => Date.now() >= traffic.confirmUntil && resetSend(), 4100);
+        return;
+      }
+      resetSend();
+      act(send, async () => {
+        await controlCall("POST", `/control/burst?count=${n}`);
+        toast(`Sent a burst of ${fmtInt(n)} requests`);
+      });
+    });
   }
 
   function bindSeg(selector, attr, current, onPick) {
@@ -1129,6 +1205,7 @@
       state.sizeStat = v;
       writeStored({ sizeStat: v });
       for (const c of groups["by-size"]) c.scaleKind = SIZE_STATS[v].kind;
+      renderSizeNote();
       renderCharts();
     });
 
@@ -1145,9 +1222,6 @@
       state.markers = [];
       render();
     });
-    document.getElementById("burst").addEventListener("click", () => control("/inject", { count: 300, vcpus: null, spread: 5 }));
-    document.getElementById("load-up").addEventListener("click", () => control("/load", { delta_per_min: 10 }));
-    document.getElementById("load-down").addEventListener("click", () => control("/load", { delta_per_min: -10 }));
 
     const form = document.getElementById("settings");
     // The fields show the real endpoint. Entering the one this server proxies
@@ -1192,8 +1266,11 @@
   buildColumns();
   bindControls();
   render();
+  bindTraffic();
   loadServerConfig().then(loadHistory).then(() => {
     render();
     poll();
+    refreshTraffic();
+    setInterval(refreshTraffic, 3000);
   });
 })();
