@@ -287,8 +287,151 @@ RSpec.describe IoThrottle do
     end
   end
 
+  describe "#walg_concurrency_ceiling" do
+    def ceiling_for(vcpus, ram_gib)
+      allow(throttle).to receive_messages(vcpu_count: vcpus, memory_mib: ram_gib * 1024)
+      throttle.walg_concurrency_ceiling
+    end
+
+    it "scales with vCPU count, at the eight uploads per core the bench measured" do
+      expect(ceiling_for(2, 8)).to eq(16)    # m8gd.large,   best measured 289 MB/s at 16
+      expect(ceiling_for(4, 16)).to eq(32)   # m8gd.xlarge,  557 MB/s at 32
+      expect(ceiling_for(8, 32)).to eq(64)   # m8gd.2xlarge, 971 MB/s at 64
+      expect(ceiling_for(16, 64)).to eq(64)  # m8gd.4xlarge, 1095 MB/s at 64
+    end
+
+    it "caps at the highest tier measured" do
+      expect(ceiling_for(64, 256)).to eq(described_class::WALG_MAX_CONCURRENCY)
+      expect(ceiling_for(192, 1536)).to eq(described_class::WALG_MAX_CONCURRENCY)
+    end
+
+    it "lets memory bind where a shape has less RAM per core" do
+      expect(ceiling_for(8, 16)).to eq(63)   # (10% of 16 GiB - 360) / 20, under 8 * 8
+    end
+
+    it "never drops below the baseline, however little RAM there is" do
+      expect(ceiling_for(2, 4)).to eq(described_class::WALG_BASELINE_CONCURRENCY)
+      expect(ceiling_for(1, 1)).to eq(described_class::WALG_BASELINE_CONCURRENCY)
+    end
+
+    it "reads the server's own vCPU count and memory" do
+      allow(Etc).to receive(:nprocessors).and_return(8)
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:       #{32 * 1024 * 1024} kB\nMemFree: 1 kB\n")
+      expect(throttle.walg_concurrency_ceiling).to eq(64)
+    end
+  end
+
+  describe "#walg_concurrency_tiers" do
+    it "keeps the 1, 3/4, 1/2 shape as the ceiling moves" do
+      allow(throttle).to receive_messages(vcpu_count: 16, memory_mib: 64 * 1024)
+      expect(throttle.walg_concurrency_tiers).to eq([[500, 64], [250, 48], [50, 32]])
+    end
+
+    it "floors every tier at the baseline on a small server" do
+      allow(throttle).to receive_messages(vcpu_count: 2, memory_mib: 8 * 1024)
+      expect(throttle.walg_concurrency_tiers).to eq([[500, 16], [250, 12], [50, 8]])
+    end
+  end
+
+  describe "#walg_upload_concurrency" do
+    # 4 vCPU / 16 GiB: ceiling 4 * 8 = 32, so the tiers are 32/24/16.
+    before { allow(throttle).to receive_messages(vcpu_count: 4, memory_mib: 16 * 1024) }
+
+    it "climbs a tier at a time as the backlog grows" do
+      expect(throttle.walg_upload_concurrency(0)).to eq(8)
+      expect(throttle.walg_upload_concurrency(49)).to eq(8)
+      expect(throttle.walg_upload_concurrency(50)).to eq(16)
+      expect(throttle.walg_upload_concurrency(249)).to eq(16)
+      expect(throttle.walg_upload_concurrency(250)).to eq(24)
+      expect(throttle.walg_upload_concurrency(499)).to eq(24)
+      expect(throttle.walg_upload_concurrency(500)).to eq(32)
+      expect(throttle.walg_upload_concurrency(10_000)).to eq(32)
+    end
+
+    it "starts climbing a tier before the I/O throttle takes bandwidth away" do
+      described_class::IO_THROTTLE_RATIOS.each do |threshold, _|
+        expect(throttle.walg_upload_concurrency(threshold)).to be > described_class::WALG_BASELINE_CONCURRENCY
+      end
+    end
+  end
+
+  describe "#apply_walg_upload_concurrency" do
+    let(:env_path) { described_class::WALG_CONCURRENCY_ENV_PATH }
+
+    before { allow(throttle).to receive_messages(vcpu_count: 4, memory_mib: 16 * 1024) }
+
+    def env_for(concurrency)
+      "WALG_UPLOAD_CONCURRENCY=#{concurrency}\n"
+    end
+
+    def expect_written(concurrency)
+      expect(throttle).to receive(:safe_write_to_file).with(env_path, env_for(concurrency))
+      expect(FileUtils).to receive(:mkdir_p).with(File.dirname(described_class::WALG_CONCURRENCY_DROP_IN_PATH))
+      expect(throttle).to receive(:safe_write_to_file).with(described_class::WALG_CONCURRENCY_DROP_IN_PATH, described_class::WALG_CONCURRENCY_DROP_IN_CONTENTS)
+      expect(throttle).to receive(:_run_command).with("systemctl daemon-reload")
+      expect(throttle).to receive(:_run_command).with("systemctl", "try-restart", "wal-g.service")
+    end
+
+    it "writes the baseline and restarts the daemon when there is no override" do
+      expect(File).to receive(:exist?).with(env_path).and_return(false)
+      expect_written(8)
+      expect(logger).to receive(:info).with("Set wal-g upload concurrency to 8 (archival backlog: 0 files, ceiling: 32)")
+
+      throttle.apply_walg_upload_concurrency(0)
+    end
+
+    it "climbs to the tier the backlog calls for" do
+      expect(File).to receive(:exist?).with(env_path).and_return(true)
+      expect(File).to receive(:read).with(env_path).and_return(env_for(24))
+      expect_written(32)
+
+      throttle.apply_walg_upload_concurrency(500)
+    end
+
+    it "does nothing while the tier is unchanged" do
+      expect(File).to receive(:exist?).with(env_path).and_return(true)
+      expect(File).to receive(:read).with(env_path).and_return(env_for(16))
+      expect(throttle).not_to receive(:safe_write_to_file)
+      expect(logger).not_to receive(:info)
+
+      throttle.apply_walg_upload_concurrency(100)
+    end
+
+    it "holds a climbed tier until the backlog is clear, so an upload in flight survives" do
+      expect(File).to receive(:exist?).with(env_path).twice.and_return(true)
+      expect(File).to receive(:read).with(env_path).twice.and_return(env_for(32))
+      expect(throttle).not_to receive(:safe_write_to_file)
+
+      # A backlog resting on the lowest threshold, and one still draining from a
+      # higher tier, both leave the daemon where it is.
+      throttle.apply_walg_upload_concurrency(49)
+      throttle.apply_walg_upload_concurrency(249)
+    end
+
+    it "returns a climbed tier to the baseline once the backlog is clear" do
+      expect(File).to receive(:exist?).with(env_path).and_return(true)
+      expect(File).to receive(:read).with(env_path).and_return(env_for(32))
+      expect_written(8)
+
+      throttle.apply_walg_upload_concurrency(25)
+    end
+  end
+
   describe "#run" do
     let(:data_dir) { "/dat/17/data" }
+
+    before { allow(throttle).to receive(:apply_walg_upload_concurrency) }
+
+    it "hands the backlog to the wal-g upload concurrency too" do
+      expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(["a.ready", "b.ready"])
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=52428800 riops=max wiops=max\n")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
+      expect(throttle).to receive(:apply_walg_upload_concurrency).with(2)
+
+      throttle.run
+    end
 
     it "applies no throttle when backlog is below threshold and no disk usage throttle" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
@@ -333,6 +476,7 @@ RSpec.describe IoThrottle do
 
     it "scales throttle values with the disk throughput baseline" do
       throttle_leaseweb = described_class.new("17-main", logger, 35)
+      allow(throttle_leaseweb).to receive(:apply_walg_upload_concurrency)
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
       expect(throttle_leaseweb).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
 

@@ -11,30 +11,42 @@ RSpec.describe WalgConfig do
       h = env(vcpu_count: 48, memory_mib: 384 * 1024, direct_io: true, dense_nvme: true)
       expect(h["WALG_COMPRESSION_METHOD"]).to eq("lz4")
       expect(h["WALG_UPLOAD_DISK_CONCURRENCY"]).to eq("48")   # dense NVMe -> full vCPU under O_DIRECT
-      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("4")
+      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("8")
       expect(h["WALG_UPLOAD_QUEUE"]).to eq("2")
-      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((64 * 1024 * 1024).to_s)
+      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((43 * 1024 * 1024).to_s) # floor(5%*384GiB / ((48+2)*(8+1)))
       expect(h["WALG_DOWNLOAD_CONCURRENCY"]).to eq("48")      # vCPU, clamped [10,128]
       expect(h["WALG_DIRECT_IO"]).to eq("true")
       expect(h["WALG_DIRECT_IO_BLOCK_COUNT"]).to eq("1024")   # 4 drives * 256
     end
 
-    it "sizes the m8gd.large (2 vCPU / 8 GiB) row: buffered, 5%-RAM cap binds the part size" do
+    it "sizes the m8gd.large (2 vCPU / 8 GiB) row: the segment-size floor binds, not the 5%-RAM cap" do
       h = env(vcpu_count: 2, memory_mib: 8 * 1024)
       expect(h["WALG_UPLOAD_DISK_CONCURRENCY"]).to eq("1")    # 1/2 vCPU (buffered) = 2/2 = 1
-      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("4")
-      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((27 * 1024 * 1024).to_s) # floor(5%*8GiB / ((1+2)*(4+1)))
+      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("8")
+      # the budget alone would pick 15 MiB: floor(5%*8GiB / ((1+2)*(8+1)))
+      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((described_class::WAL_SEGMENT_SIZE_MIB * 1024 * 1024).to_s)
       expect(h["WALG_DOWNLOAD_CONCURRENCY"]).to eq("10")      # floor
       expect(h).not_to have_key("WALG_DIRECT_IO")             # off by default
     end
 
-    it "keeps peak upload RAM <= 5% of RAM across sizes (the memory cap)" do
+    it "never sizes a part below one WAL segment, so a wal-push stays single-part" do
+      # 2 vCPU / 4 GiB under O_DIRECT is where the budget alone picks 10 MiB
+      h = env(vcpu_count: 2, memory_mib: 4 * 1024, direct_io: true)
+      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((described_class::WAL_SEGMENT_SIZE_MIB * 1024 * 1024).to_s)
+    end
+
+    it "keeps peak upload RAM <= 5% of RAM, except where the segment-size floor lifts it" do
       [[2, 8], [16, 128], [48, 384], [192, 1536]].each do |vcpu_count, ram_gib|
         h = env(vcpu_count:, memory_mib: ram_gib * 1024)
         disk = h["WALG_UPLOAD_DISK_CONCURRENCY"].to_i
         upl = h["WALG_UPLOAD_CONCURRENCY"].to_i
         part = h["WALG_S3_MAX_PART_SIZE"].to_i
         peak = (disk + 2) * (upl + 1) * part
+        # A part smaller than a segment costs throughput and buys no memory
+        # back, so on the shapes where the budget would go below a segment the
+        # floor wins and the budget is exceeded -- by 5% of itself on the
+        # tightest shape, 432 MiB against 410 MiB on m8gd.large.
+        next if part == described_class::WAL_SEGMENT_SIZE_MIB * 1024 * 1024
         expect(peak).to be <= (ram_gib * 1024**3 / 20)
       end
     end
