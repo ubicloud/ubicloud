@@ -99,8 +99,6 @@ class Sim:
         self.counters = dict.fromkeys(
             ["requests_received_total", "allocated_total", "started_total", "completed_total",
              "scheduling_checks_total", "order_inversions_total"], 0)
-        self.received_by_vcpus = dict.fromkeys(SIZES, 0)
-        self.allocated_by_vcpus = dict.fromkeys(SIZES, 0)
 
     # -- shared mechanics -------------------------------------------------
 
@@ -138,7 +136,6 @@ class Sim:
         self.waiting.remove(job)
         self.in_flight.append(job)
         self.counters["allocated_total"] += 1
-        self.allocated_by_vcpus[job.vcpus] += 1
         self.latency.append((now, now - job.arrived))
         self.dirty = True
 
@@ -167,7 +164,6 @@ class Sim:
     def submit(self, template):
         job = Job(template)
         self.counters["requests_received_total"] += 1
-        self.received_by_vcpus[job.vcpus] += 1
         self.waiting.append(job)
         self.dirty = True
         return job
@@ -224,17 +220,8 @@ class Sim:
                     "p99_seconds": round(pct(waits, 99), 1),
                 },
             },
-            "counters": {
-                **self.counters,
-                "received_by_vcpus": {str(v): n for v, n in self.received_by_vcpus.items()},
-                "allocated_by_vcpus": {str(v): n for v, n in self.allocated_by_vcpus.items()},
-            },
-            "fleet": {
-                "vcpus_total": self.total,
-                "vcpus_used": self.used(),
-                # How many more runners of each size would fit right now.
-                "free_slots_by_vcpus": {str(v): sum(f // v for f in self.free) for v in SIZES},
-            },
+            "counters": dict(self.counters),
+            "fleet": {"vcpus_total": self.total, "vcpus_used": self.used()},
             "alerts": self.alerts,
         }
 

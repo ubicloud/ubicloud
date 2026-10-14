@@ -37,16 +37,6 @@
       value: (s, size) => (bucket(s, size) ? bucket(s, size).waiting * size : null),
       note: "Waiting requests × size: how much of the backlog each size really is.",
     },
-    placed: {
-      kind: "count", fmt: (v) => fmtRate(v), field: "counters.allocated_by_vcpus",
-      value: (s, size) => s.sizeRates?.[size]?.allocations ?? null,
-      note: "Small runners being favored shows as 2 and 4 vCPU placements continuing while 16 and 30 drop to zero.",
-    },
-    slots: {
-      kind: "count", fmt: (v) => fmtInt(v), field: "fleet.free_slots_by_vcpus",
-      value: (s, size) => s.m.fleet.free_slots_by_vcpus?.[size] ?? null,
-      note: "How many more runners of each size fit right now. Plenty of small slots but none for 30 vCPU means fragmentation.",
-    },
   };
   const AGE_LABELS = ["≤10s", "≤30s", "≤1m", "≤2m", "≤5m", "≤10m", "≤30m", "≤1h", ">1h"];
   const SEVERITY_COLOR = { page: "var(--critical)", monitor: "var(--warning)" };
@@ -166,9 +156,6 @@
       allocations: rate(S.hist, sample, (x) => x.counters.allocated_total),
       checks: rate(S.hist, sample, (x) => x.counters.scheduling_checks_total),
     };
-    sample.sizeRates = Object.fromEntries(SIZES.map((size) => [size, {
-      allocations: rate(S.hist, sample, (x) => x.counters.allocated_by_vcpus?.[size]),
-    }]));
     if (prev) {
       const d = m.counters.requests_received_total - prev.m.counters.requests_received_total;
       if (d >= BURST_MIN) noteBurst(side, t, d);
@@ -941,19 +928,9 @@
     }
   }
 
-  // Explain the selected by-size view, and say when a side doesn't report it.
   function renderSizeNote() {
-    const stat = SIZE_STATS[state.sizeStat];
-    const missing = stat.field
-      ? SIDES.filter((side) => {
-        const s = sampleAt(side);
-        return s && metricAt(s.m, stat.field) == null;
-      })
-      : [];
-    const gap = missing.length ? ` Not reported yet by ${missing.map((side) => SIDE_INFO[side].name).join(" or ")} (${stat.field}).` : "";
-    document.getElementById("size-note").textContent = `Same scale for every size. ${stat.note}${gap}`;
+    document.getElementById("size-note").textContent = `Same scale for every size. ${SIZE_STATS[state.sizeStat].note}`;
   }
-  const metricAt = (m, path) => path.split(".").reduce((v, k) => v?.[k], m);
 
   function renderScoreboard() {
     const samples = Object.fromEntries(SIDES.map((side) => [side, sampleAt(side)]));

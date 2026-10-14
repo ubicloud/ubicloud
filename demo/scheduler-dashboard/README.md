@@ -135,14 +135,9 @@ From top to bottom:
    - Fleet utilization, with the 80% admission gate as an amber line.
    - Scheduling checks per minute: control-plane work spent on scheduling.
 4. **By runner size.** One small chart per size (2–30 vCPU) on a shared scale,
-   switchable between:
-   - Oldest wait, waiting count, and waiting vCPU.
-   - Placed / min and free slots. These two need the optional
-     `*_by_vcpus` fields in METRICS.md.
-
-   Large runners starving shows as the 16 and 30 vCPU charts climbing while
-   the small ones stay flat. Fragmentation shows as free slots for 30 vCPU
-   reaching zero while small slots remain.
+   switchable between oldest wait, waiting count, and waiting vCPU. Large
+   runners starving shows as the 16 and 30 vCPU charts climbing while the
+   small ones stay flat.
 5. **Inside each scheduler.** One column per control plane; side-by-side
    charts share a scale.
    - Wait time spread: a p50–p95 band with the oldest request as a line.
