@@ -559,12 +559,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vcpu_usage(arch: "arm64")).to eq(4)
     end
 
-    it "hops to apply_custom_label_quota if there is capacity and the label is a custom label" do
+    it "hops to apply_custom_label_quota before reserving the quota if the label is a custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      runner.update(actual_label: "custom-label-1")
       expect(project).to receive(:active?).and_return(true)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1")
 
       expect { nx.start }.to hop("apply_custom_label_quota")
+      expect(vcpu_usage).to eq(0)
+      expect(nx.reserved_quota_provider).to be_nil
     end
 
     it "pops if the project is not active" do
@@ -603,11 +605,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
 
-    it "hops to apply_custom_label_quota when the label is a custom label" do
-      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1")
+    it "hops to allocate_vm without applying the custom label limit again" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 1)
+      runner.update(actual_label: "custom-label-1")
 
-      expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      expect(custom_label.reload.allocated_runner_count).to eq(1)
     end
 
     context "when standard runner" do
@@ -714,12 +717,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
       end
 
-      it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
-        GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-        expect(runner).to receive(:actual_label).and_return("custom-label-1")
+      it "hops to allocate_vm without applying the custom label limit again if standard utilization is low" do
+        custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 1)
+        runner.update(actual_label: "custom-label-1")
         fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(custom_label.reload.allocated_runner_count).to eq(1)
       end
     end
 
@@ -808,26 +812,37 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#apply_custom_label_quota" do
-    it "hops to allocate_vm if custom label exists and has concurrency limit available" do
-      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
-      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+    before { runner.update(actual_label: "custom-label-1") }
+
+    it "hops to allocate_vm and reserves the quota if custom label exists and has concurrency limit available" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+      expect(custom_label.reload.allocated_runner_count).to eq(1)
+      expect(vcpu_usage).to eq(4)
+      expect(nx.reserved_quota_provider).to eq("metal")
     end
 
-    it "hops to allocate_vm if custom label exists and concurrency limit is not set" do
-      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
-      expect(runner).to receive(:actual_label).and_return("custom-label-1")
-      expect(runner).to receive(:installation_id).and_return(installation.id)
+    it "hops to allocate_vm and reserves the quota if custom label exists and concurrency limit is not set" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+      expect(custom_label.reload.allocated_runner_count).to eq(0)
+      expect(vcpu_usage).to eq(4)
     end
 
-    it "naps if custom label exists and concurrency limit is not available" do
-      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 10)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
-      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
+    it "hops to wait_concurrency_limit and keeps the custom label slot if the quota is full" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      usage = fill_quota
+      expect { nx.apply_custom_label_quota }.to hop("wait_concurrency_limit")
+      expect(custom_label.reload.allocated_runner_count).to eq(1)
+      expect(vcpu_usage).to eq(usage)
+    end
+
+    it "naps without reserving the quota if custom label exists and concurrency limit is not available" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 10)
       expect(Clog).to receive(:emit).with("hit custom label concurrency limit", instance_of(Hash)).and_call_original
       expect { nx.apply_custom_label_quota }.to nap
+      expect(custom_label.reload.allocated_runner_count).to eq(10)
+      expect(vcpu_usage).to eq(0)
     end
   end
 

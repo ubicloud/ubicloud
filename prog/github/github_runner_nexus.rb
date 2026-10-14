@@ -360,8 +360,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
-    hop_wait_concurrency_limit unless reserve_quota("metal")
+    # Check the custom label limit first, so runners that wait for it do not
+    # hold quota that other labels of the installation could use.
     hop_apply_custom_label_quota if github_runner.custom_label
+    hop_wait_concurrency_limit unless reserve_quota("metal")
     hop_allocate_vm
   end
 
@@ -424,10 +426,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # An operator can set the spill over semaphore by hand to override the checks below.
     hop_allocate_vm if spill_over_set?
 
-    if reserve_quota("metal")
-      hop_apply_custom_label_quota if github_runner.custom_label
-      hop_allocate_vm
-    end
+    hop_allocate_vm if reserve_quota("metal")
 
     if project.reputation == "limited"
       Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
@@ -484,25 +483,24 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
     Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
     reserve_quota("metal", force: true)
-
-    hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
   end
 
   label def apply_custom_label_quota
-    custom_label = github_runner.custom_label
-    hop_allocate_vm unless custom_label.concurrent_runner_count_limit
+    if github_runner.custom_label.concurrent_runner_count_limit
+      new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
+      updated_rows = GithubCustomLabel
+        .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
+        .where(new_allocated_runner_count <= Sequel[:concurrent_runner_count_limit])
+        .update(allocated_runner_count: new_allocated_runner_count)
 
-    new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
-    updated_rows = GithubCustomLabel
-      .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
-      .where(new_allocated_runner_count <= Sequel[:concurrent_runner_count_limit])
-      .update(allocated_runner_count: new_allocated_runner_count)
-
-    if updated_rows != 1
-      Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
-      nap rand(5..15)
+      if updated_rows != 1
+        Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
+        nap rand(5..15)
+      end
     end
+
+    hop_wait_concurrency_limit unless reserve_quota("metal")
     hop_allocate_vm
   end
 
