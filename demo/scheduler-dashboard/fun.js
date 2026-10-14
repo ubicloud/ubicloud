@@ -193,9 +193,8 @@
   const view = {};
   for (const side of SIDES) {
     const money = el("div", "fun-side");
-    const rate = el("span", "fun-rate", "—");
     const total = el("span", "fun-total", "—");
-    money.append(who(side), total, rate);
+    money.append(who(side), total);
     moneyPair.append(money);
 
     const mood = el("div", "fun-side");
@@ -212,7 +211,7 @@
     chatter.append(who(side), feed);
     feedPair.append(chatter);
 
-    view[side.key] = { rate, total, big, feed };
+    view[side.key] = { total, big, feed };
   }
 
   // ---------------------------------------------------------------- state
@@ -250,7 +249,6 @@
     }
     s.lastRate = rate;
     s.anim = { from: displayed(s, now), to: s.total, start: now, dur: POLL_MS };
-    view[key].rate.textContent = `${fmtUsd(rate)} / min`;
   }
 
   function displayed(s, now) {
