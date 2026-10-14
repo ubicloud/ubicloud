@@ -283,8 +283,6 @@
       const { mood, tweet } = pickTweet(key);
       const li = el("li", `fun-tweet mood-${mood}`);
       li.dataset.text = tweet.text;
-      const face = el("span", "fun-tweet-face", MOODS[mood].emoji);
-      face.setAttribute("aria-hidden", "true");
       const body = el("div");
       const by = el("div", "fun-tweet-by");
       if (tweet.real) {
@@ -295,7 +293,7 @@
         by.append(el("b", null, tweet.handle));
       }
       body.append(by, el("p", null, tweet.text));
-      li.append(face, body);
+      li.append(body);
       // Someone scrolled down to read older tweets: keep their place.
       const reading = feed.scrollTop > 4;
       const before = feed.scrollHeight;

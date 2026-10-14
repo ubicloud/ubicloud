@@ -269,14 +269,13 @@
   .fun-mood-word { font-size: 15px; font-weight: 600; color: var(--ink); }
   .fun-feed { list-style: none; margin: 0; padding: 0 4px 0 0; height: 168px; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 4px; align-content: start;
     scrollbar-width: thin; scrollbar-color: var(--axis) transparent; }
-  .fun-tweet { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; animation: fun-in 0.45s ease-out; }
+  .fun-tweet { display: grid; grid-template-columns: minmax(0, 1fr); padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; animation: fun-in 0.45s ease-out; }
   .fun-tweet-by { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; color: var(--muted); }
   .fun-tweet-by b { color: var(--ink-2); font-weight: 600; }
   .fun-real { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); border: 1px solid var(--ink-2); border-radius: 999px; padding: 0 6px; }
   .fun-reply { font-size: 11px; }
   .fun-tweet.real { border-color: var(--ink-2); }
   .fun-tweet p { margin: 0; color: var(--ink); white-space: pre-line; } /* keep line breaks in real tweets */
-  .fun-tweet-face { font-size: 14px; line-height: 1.3; }
   @keyframes fun-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .fun-tweet { animation: none; } }
 </style>
