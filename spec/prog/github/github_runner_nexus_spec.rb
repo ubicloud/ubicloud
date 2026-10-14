@@ -607,6 +607,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(true)
       end
 
+      it "leaves spilling to the central vm scheduler if it is enabled" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(Config).to receive(:central_vm_scheduler).and_return(true)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+      end
+
       it "spills over 30 vCPU runners" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
@@ -778,6 +788,32 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
   describe "#wait_vm" do
     before { project.set_ff_early_jit_registration(true) }
+
+    context "when the central vm scheduler allocates the vm" do
+      before do
+        project.set_ff_early_jit_registration(false)
+        vm.update(allocated_at: nil, provisioned_at: nil)
+        Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "wait_allocation")
+        expect(Config).to receive(:central_vm_scheduler).and_return(true)
+      end
+
+      it "replaces the metal vm of a runner that the scheduler spilled" do
+        runner.incr_spill_over
+
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.vm_id).to be_nil
+        expect(Semaphore.where(strand_id: runner.id, name: "spill_over").count).to eq(1)
+        expect(vm.reload.destroy_set?).to be(true)
+      end
+
+      it "waits for the scheduler to allocate the vm" do
+        vm.incr_waiting_for_capacity
+        vm.update(created_at: now - 61)
+
+        expect { nx.wait_vm }.to nap(10)
+        expect(runner.spill_over_set?).to be(false)
+      end
+    end
 
     context "when a large runner waits for metal capacity" do
       before do
