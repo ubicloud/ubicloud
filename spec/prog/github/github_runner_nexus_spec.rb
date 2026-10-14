@@ -25,6 +25,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   let(:client) { instance_double(Octokit::Client) }
   let(:now) { Time.utc(2026, 2, 5, 19, 0) }
 
+  def set_vcpu_usage(used_vcpus, provider: "metal", arch: "x64", installation_id: installation.id)
+    DB[:github_installation_vcpu_usage].where(installation_id:, provider:, arch:).update(used_vcpus:)
+  end
+
+  def fill_quota(provider: "metal", arch: "x64")
+    quota = project.effective_quota_value(GithubInstallation::VCPU_QUOTA_RESOURCE_TYPES.fetch([provider, arch]))
+    set_vcpu_usage(quota, provider:, arch:)
+    quota
+  end
+
+  def vcpu_usage(provider: "metal", arch: "x64", installation_id: installation.id)
+    DB[:github_installation_vcpu_usage].where(installation_id:, provider:, arch:).get(:used_vcpus)
+  end
+
   before do
     allow(Config).to receive(:github_runner_service_project_id).and_return(vm.project_id)
     allow(Github).to receive(:installation_client).and_return(client)
@@ -481,22 +495,72 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
   describe "#start" do
     it "hops to wait_concurrency_limit if there is no capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+      usage = fill_quota
       expect(project).to receive(:active?).and_return(true)
 
       expect { nx.start }.to hop("wait_concurrency_limit")
+      expect(vcpu_usage).to eq(usage)
+      expect(nx.reserved_quota_provider).to be_nil
     end
 
-    it "hops to allocate_vm if there is capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
+    it "hops to allocate_vm and reserves the quota if there is capacity" do
       expect(project).to receive(:active?).and_return(true)
 
       expect { nx.start }.to hop("allocate_vm")
+      expect(vcpu_usage).to eq(4)
+      expect(vcpu_usage(arch: "arm64")).to eq(0)
+      expect(nx.reserved_quota_provider).to eq("metal")
+    end
+
+    it "lets runners use the quota up to the limit but not exceed it" do
+      set_vcpu_usage(296)
+      expect { nx.start }.to hop("allocate_vm")
+      expect(vcpu_usage).to eq(300)
+
+      other = described_class.new(described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-2"))
+      expect { other.start }.to hop("wait_concurrency_limit")
+      expect(vcpu_usage).to eq(300)
+    end
+
+    it "waits if the runner does not fit in the remaining quota" do
+      set_vcpu_usage(298)
+      expect { nx.start }.to hop("wait_concurrency_limit")
+      expect(vcpu_usage).to eq(298)
+    end
+
+    it "waits if the runner is larger than the quota" do
+      ProjectQuota.create(project_id: project.id, quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 2)
+      expect { nx.start }.to hop("wait_concurrency_limit")
+      expect(vcpu_usage).to eq(0)
+    end
+
+    it "counts the usage of each installation separately" do
+      other_installation = GithubInstallation.create(installation_id: 456, project_id: project.id, name: "other", type: "Organization")
+      set_vcpu_usage(300, installation_id: other_installation.id)
+
+      expect { nx.start }.to hop("allocate_vm")
+      expect(vcpu_usage).to eq(4)
+      expect(vcpu_usage(installation_id: other_installation.id)).to eq(300)
+    end
+
+    it "uses the quota override of the project" do
+      ProjectQuota.create(project_id: project.id, quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
+      set_vcpu_usage(350)
+
+      expect { nx.start }.to hop("allocate_vm")
+      expect(vcpu_usage).to eq(354)
+    end
+
+    it "reserves the arm64 quota for arm64 runners" do
+      runner.update(label: "ubicloud-standard-4-arm")
+      fill_quota
+
+      expect { nx.start }.to hop("allocate_vm")
+      expect(vcpu_usage(arch: "arm64")).to eq(4)
     end
 
     it "hops to apply_custom_label_quota if there is capacity and the label is a custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect(project).to receive(:active?).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1")
 
@@ -525,18 +589,22 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "hops to allocate_vm when the spill over semaphore is set manually" do
       runner.incr_spill_over
-      expect(project).not_to receive(:quota_available?)
+      expect(nx).not_to receive(:reserve_quota)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
 
+    it "reserves the quota when customer concurrency limit frees up" do
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      expect(vcpu_usage).to eq(4)
+      expect(nx.reserved_quota_provider).to eq("metal")
+    end
+
     it "hops to allocate_vm when customer concurrency limit frees up" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
 
     it "hops to apply_custom_label_quota when the label is a custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1")
 
       expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
@@ -544,19 +612,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     context "when standard runner" do
       it "waits if standard utilization is high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "waits if reputation is limited" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         project.update(reputation: "limited")
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "waits if utilization is high and spill over enabled but not waited enough" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         project.set_ff_spill_to_alien_runners(true)
 
         expect { nx.wait_concurrency_limit }.to nap
@@ -564,8 +632,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "waits if utilization is high, spill over enabled, and waited enough but spill vcpus limit exceeded" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        fill_quota
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
         expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
@@ -576,8 +643,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "waits if utilization is high, spill over enabled, and waited enough but spill runner limit exceeded" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        fill_quota
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
         expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(1)
@@ -588,8 +654,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "waits if utilization is high, spill over enabled, and waited enough but customer's own alien quota is exceeded" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(false)
+        fill_quota
+        fill_quota(provider: "aws")
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
 
@@ -598,18 +664,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "allocates if utilization is high but spill over enabled and waited enough" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        usage = fill_quota
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
 
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.spill_over_set?).to be(true)
+        expect(vcpu_usage).to eq(usage)
+        expect(vcpu_usage(provider: "aws")).to eq(4)
+        expect(nx.reserved_quota_provider).to eq("aws")
       end
 
       it "spills over 30 vCPU runners" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        fill_quota
         project.set_ff_spill_to_alien_runners(true)
         runner.update(label: "ubicloud-standard-30", created_at: now - 40)
 
@@ -618,7 +685,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "does not spill over 60 vCPU runners" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         project.set_ff_spill_to_alien_runners(true)
         runner.update(label: "ubicloud-standard-60", created_at: now - 40)
 
@@ -626,20 +693,22 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(false)
       end
 
-      it "allocates if standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+      it "allocates and reserves the quota if standard utilization is low" do
+        usage = fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(vcpu_usage).to eq(usage + 4)
+        expect(nx.reserved_quota_provider).to eq("metal")
       end
 
       it "waits if hugepage utilization is high although core utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost.where(arch: "x64", family: "standard").update(used_cores: 8, used_hugepages_1g: 350)
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "ignores hosts that don't report their cores or hugepages yet" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost.where(arch: "x64", family: "standard").update(used_cores: 8)
         create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "x64", family: "standard", total_cores: 0, used_cores: 0, total_hugepages_1g: 0, used_hugepages_1g: 0)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
@@ -648,7 +717,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
         GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
         expect(runner).to receive(:actual_label).and_return("custom-label-1")
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
       end
@@ -658,34 +727,33 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       before { installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]}) }
 
       it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "allocates if standard utilization is high but premium utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is high but standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.not_upgrade_premium_set?).to be(true)
       end
 
       it "allocates arm64 runners without checking premium utilization" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
+        fill_quota(arch: "arm64")
         runner.update(label: "ubicloud-standard-4-arm")
         VmHost[arch: "arm64"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
       end
 
       it "checks the arm alien quota when spilling over an arm64 runner" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArmAws", 0).and_return(true)
+        fill_quota(arch: "arm64")
         runner.update(label: "ubicloud-standard-16-arm", created_at: now - 40)
         project.set_ff_spill_to_alien_runners(true)
 
@@ -698,18 +766,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       before { runner.update(label: "ubicloud-premium-4") }
 
       it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "allocates if premium utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
       end
 
       it "waits if premium utilization is high but standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to nap
       end
@@ -719,19 +787,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       before { project.set_ff_free_runner_upgrade_until(Time.now + 100).reload }
 
       it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         expect { nx.wait_concurrency_limit }.to nap
       end
 
       it "allocates if premium utilization is low than 50" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost.where(arch: "x64").update(used_cores: 4)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is higher than 50" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        fill_quota
         VmHost.where(arch: "x64").update(used_cores: 10)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.not_upgrade_premium_set?).to be(true)
@@ -774,6 +842,41 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
     end
+
+    it "keeps the reserved quota if the vm is on metal" do
+      set_vcpu_usage(10)
+      nx.reserved_quota_provider = "metal"
+      expect(nx).to receive(:pick_vm).and_return(create_vm(location_id: Location::GITHUB_RUNNERS_ID))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(vcpu_usage).to eq(10)
+      expect(nx.reserved_quota_provider).to eq("metal")
+    end
+
+    it "moves the reserved quota to aws if the vm is on aws" do
+      set_vcpu_usage(10)
+      set_vcpu_usage(20, provider: "aws")
+      nx.reserved_quota_provider = "metal"
+      expect(nx).to receive(:pick_vm).and_return(create_vm(location_id: Location::HETZNER_FSN1_ID))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(vcpu_usage).to eq(6)
+      expect(vcpu_usage(provider: "aws")).to eq(24)
+      expect(nx.reserved_quota_provider).to eq("aws")
+    end
+
+    it "keeps the reserved quota if the vm is on aws and the aws quota is reserved" do
+      set_vcpu_usage(10, provider: "aws")
+      nx.reserved_quota_provider = "aws"
+      expect(nx).to receive(:pick_vm).and_return(create_vm(location_id: Location::HETZNER_FSN1_ID))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(vcpu_usage(provider: "aws")).to eq(10)
+    end
+
+    it "reserves the quota of a runner without a reservation" do
+      expect(nx).to receive(:pick_vm).and_return(create_vm(location_id: Location::GITHUB_RUNNERS_ID))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(vcpu_usage).to eq(4)
+      expect(nx.reserved_quota_provider).to eq("metal")
+    end
   end
 
   describe "#wait_vm" do
@@ -796,7 +899,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         Nic.create(private_subnet_id: ps.id, vm_id: vm.id, name: "runner-nic", mac: "00:00:00:00:00:01", private_ipv4: "10.0.0.2/32", private_ipv6: "fd10::2/128", state: "active")
         Strand.create_with_id(ps, prog: "Vnet::SubnetNexus", label: "wait")
 
+        set_vcpu_usage(16)
+        nx.reserved_quota_provider = "metal"
+
         expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(vcpu_usage).to eq(0)
+        expect(vcpu_usage(provider: "aws")).to eq(16)
+        expect(nx.reserved_quota_provider).to eq("aws")
         expect(runner.reload.vm_id).to be_nil
         expect(runner.location_id).to be_nil
         expect(runner.allocated_at).to be_nil
@@ -850,15 +959,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "does not spill over if the customer's alien quota is exceeded" do
-        project.update(reputation: "limited")
-        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-        allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
-        aws_vm = create_vm(location_id: location.id)
-        aws_runner = GithubRunner.create(installation_id: installation.id, vm_id: aws_vm.id, location_id: location.id, repository_name: "test-repo", label: "ubicloud-standard-2")
-        Strand.create_with_id(aws_runner, prog: "Github::GithubRunnerNexus", label: "wait")
+        usage = fill_quota(provider: "aws")
 
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
+        expect(vcpu_usage(provider: "aws")).to eq(usage)
       end
 
       it "does not spill over if the spill vcpus limit is exceeded" do
@@ -1807,6 +1912,24 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to hop("wait_vm_destroy")
       custom_label.reload
       expect(custom_label.allocated_runner_count).to eq(0)
+    end
+
+    it "releases the reserved quota" do
+      set_vcpu_usage(10)
+      nx.reserved_quota_provider = "metal"
+      runner.incr_skip_deregistration
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(vcpu_usage).to eq(6)
+      expect(nx.reserved_quota_provider).to be_nil
+    end
+
+    it "does not release the quota if it is not reserved" do
+      set_vcpu_usage(10)
+      runner.incr_skip_deregistration
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(vcpu_usage).to eq(10)
     end
   end
 
