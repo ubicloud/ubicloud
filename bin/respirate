@@ -30,6 +30,7 @@ workers = [
   {ubid: "stcheck4newh0stkeyszzzzzzz", prog: "CheckForNewHostKeys", label: "start"},
   {ubid: "stde1etedrecypart1t10nerzy", prog: "DeletedRecordPartitioner"},
   {ubid: "stde1etedrecyarch1verzzzzy", prog: "DeletedRecordArchiver"},
+  {ubid: "stgh0bvma110cat10nreaperzz", prog: "Github::ReleaseRunnerVmAllocations"},
   Config.heartbeat_url ? {ubid: "stheartbeatheartbheartheaz", prog: "Heartbeat"} : nil,
   Config.github_app_id ? {ubid: "stredelivergith0bfail0reaz", prog: "RedeliverGithubFailures", stack: [{last_check_at: Time.now}]} : nil,
 ]

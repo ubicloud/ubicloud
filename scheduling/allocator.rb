@@ -5,15 +5,8 @@ module Scheduling::Allocator
   end
 
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
-    requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
-
-    minimum_vhost_block_backend_version = if uses_remote_storage_server
-      VhostBlockBackend::MIN_REMOTE_STORAGE_SERVER_VERSION
-    elsif requires_track_written || uses_machine_image
-      VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
-    end
 
     request = Request.new(
       vm.id,
@@ -40,7 +33,7 @@ module Scheduling::Allocator
       Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
       family_filter,
-      minimum_vhost_block_backend_version,
+      minimum_vhost_block_backend_version(storage_volumes),
       os_filter,
       vm.project_id,
     )
@@ -49,6 +42,14 @@ module Scheduling::Allocator
 
     allocation.update(vm)
     Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
+  end
+
+  def self.minimum_vhost_block_backend_version(storage_volumes)
+    if storage_volumes.any? { it["remote_storage_server_id"] }
+      VhostBlockBackend::MIN_REMOTE_STORAGE_SERVER_VERSION
+    elsif storage_volumes.any? { it["track_written"] || it["machine_image_version_id"] }
+      VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
+    end
   end
 
   Request = Struct.new(
@@ -752,7 +753,7 @@ module Scheduling::Allocator
 
     def update(vm, vm_host)
       @storage_device_allocations.each { it.update }
-      allocate_storage_volume_associations(vm, vm_host)
+      StorageAllocation.allocate_storage_volume_associations(vm, vm_host, @request.storage_volumes.to_h, @volume_to_device_map, @request.minimum_vhost_block_backend_version)
     end
 
     def utilization
@@ -803,7 +804,7 @@ module Scheduling::Allocator
 
     private
 
-    def allocate_boot_image(vm_host, boot_image_name)
+    private_class_method def self.allocate_boot_image(vm_host, boot_image_name)
       boot_image = BootImage.where(
         vm_host_id: vm_host.id,
         name: boot_image_name,
@@ -841,8 +842,7 @@ module Scheduling::Allocator
       true
     end
 
-    def allocate_storage_volume_associations(vm, vm_host)
-      params_by_disk_index = @request.storage_volumes.to_h
+    public_class_method def self.allocate_storage_volume_associations(vm, vm_host, params_by_disk_index, volume_to_device_map, minimum_vhost_block_backend_version)
       vm.vm_storage_volumes.each do |volume|
         params = params_by_disk_index[volume.disk_index]
         if vm_host.vhost_block_backends_dataset.exclude(allocation_weight: 0).empty?
@@ -851,7 +851,7 @@ module Scheduling::Allocator
         else
           vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(
             vm_host.vhost_block_backends,
-            min_version: @request.minimum_vhost_block_backend_version,
+            min_version: minimum_vhost_block_backend_version,
           )
           use_bdev_ubi = false
         end
@@ -869,7 +869,7 @@ module Scheduling::Allocator
           boot_image_id:,
           spdk_installation_id:,
           vhost_block_backend_id:,
-          storage_device_id: @volume_to_device_map[volume.disk_index],
+          storage_device_id: volume_to_device_map[volume.disk_index],
           vring_workers: vhost_block_backend_id ? params["vring_workers"] : nil,
         )
       end
