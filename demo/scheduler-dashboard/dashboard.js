@@ -824,7 +824,13 @@
     if (Math.abs(d) < 0.05) return ["≈ Central same as current", ""];
     const higher = d > 0;
     const good = higher === (k.better === "higher");
-    return [`${higher ? "▲" : "▼"} Central ${pct ? `${pct} ` : ""}${higher ? "higher" : "lower"}`, good ? "better" : "worse"];
+    // Big increases read better as a multiple ("10.0× higher", not "899% higher").
+    let amount = higher && d >= 1 ? `${(d + 1).toFixed(1)}× ` : `${pct} `;
+    if (!Number.isFinite(d)) amount = ""; // current is 0, so no ratio
+    // The verdict is spelled out, not left to the color: higher is good for
+    // some metrics and bad for others.
+    const tail = Number.isFinite(d) ? "" : " (current is 0)";
+    return [`${higher ? "▲" : "▼"} Central ${amount}${higher ? "higher" : "lower"}${tail} · ${good ? "better" : "worse"}`, good ? "better" : "worse"];
   }
 
   function buildColumns() {
