@@ -84,29 +84,35 @@ set the URL to `http://localhost:8787`.
 
 ## What the dashboard shows
 
-**Top section:**
+From top to bottom:
 
-- **Burst summary:** the last burst's peak, its oldest wait, and how long each
-  control plane took to drain it.
-- **Head-to-head charts:** requests waiting and the oldest waiting request,
-  with both control planes on one chart.
+1. **Burst race.** One bar per control plane showing how much of the latest
+   burst has been placed on a host, with a ✓ and the drain time once done.
+2. **Head to head.** Four charts with both control planes on each:
+   - Requests waiting for a host.
+   - Wait time, switchable between p50, p95 and oldest.
+   - Fleet utilization, with the 80% admission gate as an amber line.
+   - Scheduling checks per minute: control-plane work spent on scheduling.
+3. **Inside each scheduler.** One column per control plane; side-by-side
+   charts share a scale.
+   - Three headline numbers. Central's show the change versus current.
+   - Wait time spread: a p50–p95 band with the oldest request as a line.
+   - Age of waiting requests: a heatmap of how long waiting requests have
+     waited. A request served in order (FIFO) leaves a clean diagonal; a
+     long smear means requests are left behind.
+   - Requests by stage: admission, capacity, booting and idle, stacked.
+   - Time in stage vs paging limits: the oldest request in each stage. Red
+     lines are paging thresholds and amber lines are monitoring thresholds,
+     both taken from each control plane's `alerts`. A threshold far above
+     the data shows as a note in the corner until the data gets within 25%
+     of it.
+   - Oldest waiting request by runner size, to show large runners starving.
+4. **Snapshot table.** Collapsed at the bottom: the latest values as a
+   table.
 
-**One column per control plane.** Charts that sit side by side share a scale.
-
-- **KPI tiles:** waiting now, oldest wait, p95 wait for a host, allocations
-  per minute, scheduling checks per minute, and fleet utilization. Central's
-  tiles show the change versus current.
-- **Requests by stage:** waiting for admission, waiting for capacity, and
-  booting/idle.
-- **Arrivals vs allocations per minute:** whether the backlog is growing or
-  draining.
-- **Scheduling checks per minute:** control-plane work spent on scheduling.
-- **Oldest waiting request by runner size:** shows large runners starving.
-
-**Snapshot table** (at the bottom): the latest values as a table.
-
-**Burst markers:** when one poll sees 25 or more new requests, the dashboard
-marks a burst on every time chart.
+Every time chart has a crosshair that's synced across all charts. When one
+poll sees 25 or more new requests, the dashboard marks a burst on every time
+chart.
 
 ## What the mock models, and what it doesn't
 
