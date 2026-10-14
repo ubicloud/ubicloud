@@ -4,6 +4,9 @@ module Scheduling::Allocator
   class NoSpaceLeft < RuntimeError
   end
 
+  class HostsBusy < RuntimeError
+  end
+
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
@@ -44,11 +47,14 @@ module Scheduling::Allocator
       os_filter,
       vm.project_id,
     )
-    allocation = Allocation.best_allocation(request)
-    fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
+    allocations = Allocation.ranked_allocations(request)
+    fail NoSpaceLeft, "#{vm} no space left on any eligible host" if allocations.empty?
 
-    allocation.update(vm)
-    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
+    allocation = nil
+    skipped_hosts = allocations.index { allocation = it.allocate(vm) }
+    fail HostsBusy, "#{vm} the best eligible hosts are busy" unless allocation
+
+    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at, skipped_hosts:})
   end
 
   Request = Struct.new(
@@ -140,10 +146,10 @@ module Scheduling::Allocator
       rand(0..@max_random_score)
     end
 
-    def self.best_allocation(request)
+    def self.ranked_allocations(request)
       candidate_hosts(request).map { Allocation.new(it, request) }
         .select { it.is_valid }
-        .min_by { it.score + random_score }
+        .min_by(Config.allocator_max_host_attempts) { it.score + random_score }
     end
 
     def self.candidate_hosts(request)
@@ -398,8 +404,40 @@ module Scheduling::Allocator
       @allocations.all? { it.is_valid }
     end
 
+    def allocate(vm)
+      DB.transaction(savepoint: true) do
+        allocation = refresh
+        raise Sequel::Rollback unless allocation
+        allocation.update(vm)
+        allocation
+      end
+    end
+
+    def refresh
+      vm_host_id = @candidate_host[:vm_host_id]
+      vm_host = VmHost.dataset.for_no_key_update.skip_locked.first(id: vm_host_id)
+      return unless vm_host
+
+      storage_devices = DB[:storage_device]
+        .where(vm_host_id:, enabled: true)
+        .order(:available_storage_gib)
+        .select(:id, :total_storage_gib, :available_storage_gib)
+        .all
+      candidate_host = @candidate_host.merge(
+        vm_host:,
+        used_cores: vm_host[:used_cores],
+        used_hugepages_1g: vm_host[:used_hugepages_1g],
+        available_storage_gib: storage_devices.sum { it[:available_storage_gib] },
+        total_storage_gib: storage_devices.sum { it[:total_storage_gib] },
+        storage_devices: storage_devices.map { it.transform_keys(&:to_s) },
+      )
+
+      allocation = Allocation.new(candidate_host, @request)
+      allocation if allocation.is_valid
+    end
+
     def update(vm)
-      vm_host = VmHost[@candidate_host[:vm_host_id]]
+      vm_host = @candidate_host[:vm_host] || VmHost[@candidate_host[:vm_host_id]]
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
         @vm_host_allocations.each { it.update(vm, vm_host) }
@@ -632,7 +670,7 @@ module Scheduling::Allocator
     end
 
     def select_existing_slice
-      vm_host = VmHost[@candidate_host[:vm_host_id]]
+      vm_host = @candidate_host[:vm_host] || VmHost[@candidate_host[:vm_host_id]]
 
       # Try to find an existing slice with some room
       vm_host.slices

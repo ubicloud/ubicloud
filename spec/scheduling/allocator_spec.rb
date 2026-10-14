@@ -78,8 +78,24 @@ RSpec.describe Scheduling::Allocator do
     }
 
     it "fails if no valid allocation is found" do
-      expect(Al::Allocation).to receive(:best_allocation).and_return(nil)
+      expect(Al::Allocation).to receive(:ranked_allocations).and_return([])
       expect { described_class.allocate(vm, storage_volumes) }.to raise_error Scheduling::Allocator::NoSpaceLeft, "Vm[\"#{vm.ubid}\"] no space left on any eligible host"
+    end
+
+    it "allocates on the next candidate if the better ones are busy" do
+      busy = instance_double(Al::Allocation, allocate: nil)
+      free = instance_double(Al::Allocation, to_s: "free allocation")
+      expect(free).to receive(:allocate).with(vm).and_return(free)
+      expect(Al::Allocation).to receive(:ranked_allocations).and_return([busy, busy, free])
+      expect(Clog).to receive(:emit).with("vm allocated", hash_including(allocation: "free allocation", skipped_hosts: 2))
+      described_class.allocate(vm, storage_volumes)
+    end
+
+    it "fails if the best candidates are busy" do
+      busy = instance_double(Al::Allocation)
+      expect(busy).to receive(:allocate).with(vm).and_return(nil).twice
+      expect(Al::Allocation).to receive(:ranked_allocations).and_return([busy, busy])
+      expect { described_class.allocate(vm, storage_volumes) }.to raise_error Scheduling::Allocator::HostsBusy, "Vm[\"#{vm.ubid}\"] the best eligible hosts are busy"
     end
 
     it "persists valid allocation" do
@@ -143,16 +159,17 @@ RSpec.describe Scheduling::Allocator do
         expect(b[:allocator_query].keys).to eq([:vm_id, :sql, :counts])
         expect(b[:allocator_query][:counts]).to eq [[:base, 0]]
       end
-      Al::Allocation.best_allocation(req)
+      Al::Allocation.ranked_allocations(req).first
     end
 
-    it "selects the best allocation candidate" do
+    it "selects the best allocation candidates, up to the maximum host attempts" do
       candidates = [[0.1, false], [5, true], [0.9, true], [99, true]]
       candidates.each { expect(Al::Allocation).to receive(:new).once.ordered.with(it, req).and_return TestAllocation.new(it[0], it[1]) }
       expect(Al::Allocation).to receive(:candidate_hosts).with(req).and_return(candidates)
       expect(Al::Allocation).to receive(:random_score).and_return(0).at_least(:once)
+      expect(Config).to receive(:allocator_max_host_attempts).and_return(2)
 
-      expect(Al::Allocation.best_allocation(req)).to eq(TestAllocation.new(0.9, true))
+      expect(Al::Allocation.ranked_allocations(req)).to eq([TestAllocation.new(0.9, true), TestAllocation.new(5, true)])
     end
 
     it "disqualifies invalid candidates" do
@@ -178,7 +195,7 @@ RSpec.describe Scheduling::Allocator do
       expect(Clog).to receive(:emit).twice.with("Allocator query for vm", instance_of(Hash)) do |_, b|
         expect(b[:allocator_query][:counts]).to eq [[:base, 3], [:space, 1], [:boot_image, 0]]
       end
-      Al::Allocation.best_allocation(req)
+      Al::Allocation.ranked_allocations(req).first
       expect(Al::Allocation.candidate_hosts(req)).to eq([])
 
       req.boot_image = "github-ubuntu-2404"
@@ -1079,8 +1096,8 @@ RSpec.describe Scheduling::Allocator do
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
       vm1 = create_vm
       vm2 = create_vm
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
       al1.update(vm1)
       al2.update(vm2)
       vmh.reload
@@ -1094,8 +1111,8 @@ RSpec.describe Scheduling::Allocator do
       vmh.update(used_cores: vmh.used_cores + 6)
       vm1 = create_vm
       vm2 = create_vm
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(Sequel::CheckConstraintViolation, /core_allocation_limit/)
     end
@@ -1105,8 +1122,8 @@ RSpec.describe Scheduling::Allocator do
       vmh.update(used_hugepages_1g: vmh.used_hugepages_1g + 37)
       vm1 = create_vm
       vm2 = create_vm
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(Sequel::CheckConstraintViolation, /hugepages_allocation_limit/)
     end
@@ -1115,8 +1132,8 @@ RSpec.describe Scheduling::Allocator do
       vm1 = create_vm
       vm2 = create_vm
       vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(Sequel::CheckConstraintViolation, /available_storage_gib_non_negative/)
     end
@@ -1126,8 +1143,8 @@ RSpec.describe Scheduling::Allocator do
       PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       vm1 = create_vm
       vm2 = create_vm
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_count: 1))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_count: 1))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol, gpu_count: 1)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol, gpu_count: 1)).first
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(RuntimeError, "concurrent GPU allocation")
     end
@@ -1138,9 +1155,57 @@ RSpec.describe Scheduling::Allocator do
       DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
       vm1 = create_vm
       vm2 = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm1, vol, gpu_count: 1))
+      al = Al::Allocation.ranked_allocations(create_req(vm1, vol, gpu_count: 1)).first
       GpuPartition.where(id: gp.id).update(vm_id: vm2.id)
       expect { al.update(vm1) }.to raise_error(RuntimeError, "concurrent GPU partition allocation")
+    end
+
+    it "allocates with fresh values on a host a concurrent allocation used, if it still fits" do
+      vmh = VmHost.first
+      used_cores = vmh.used_cores
+      used_hugepages_1g = vmh.used_hugepages_1g
+      vm1 = create_vm
+      vm2 = create_vm
+      vol = [{"size_gib" => 60, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      expect(VmHost).not_to receive(:[])
+      expect(al1.allocate(vm1)).not_to be_nil
+      expect(al2.allocate(vm2)).not_to be_nil
+      vmh.reload
+      expect(used_cores + vm1.cores + vm2.cores).to eq(vmh.used_cores)
+      expect(used_hugepages_1g + vm1.memory_gib + vm2.memory_gib).to eq(vmh.used_hugepages_1g)
+      expect(vmh.storage_devices.to_h { [it.name, it.available_storage_gib] }).to eq("stor1" => 40, "stor2" => 30)
+    end
+
+    it "skips a host locked by a concurrent allocation" do
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      expect(VmHost).to receive(:dataset).and_return(VmHost.where(false))
+      expect(al.allocate(create_vm)).to be_nil
+    end
+
+    it "skips a host a concurrent allocation filled up" do
+      vmh = VmHost.first
+      vmh.update(used_hugepages_1g: vmh.used_hugepages_1g + 37)
+      vm1 = create_vm
+      vm2 = create_vm
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      expect(al1.allocate(vm1)).not_to be_nil
+      expect(al2.allocate(vm2)).to be_nil
+      expect(vm2.reload.vm_host_id).to be_nil
+      expect(vmh.reload.used_hugepages_1g).to eq(2 + 37 + vm1.memory_gib)
+    end
+
+    it "skips a host whose storage a concurrent allocation took" do
+      vm1 = create_vm
+      vm2 = create_vm
+      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol)).first
+      expect(al1.allocate(vm1)).not_to be_nil
+      expect(al2.allocate(vm2)).to be_nil
+      expect(vm2.reload.vm_host_id).to be_nil
     end
 
     it "succeeds allocation when track_written is set and host has vhost block backend v0.4.1+" do
@@ -1208,14 +1273,14 @@ RSpec.describe Scheduling::Allocator do
     it "can have empty allocation state filter" do
       vmh = VmHost.first
       vmh.update(allocation_state: "draining")
-      al = Al::Allocation.best_allocation(create_req(vm, vol, allocation_state_filter: []))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, allocation_state_filter: [])).first
       expect(al).to be_truthy
     end
 
     it "can have empty family filter" do
       vmh = VmHost.first
       vmh.update(family: "premium")
-      al = Al::Allocation.best_allocation(create_req(vm, vol, family_filter: []))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, family_filter: [])).first
       expect(al).to be_truthy
     end
 
@@ -1399,7 +1464,7 @@ RSpec.describe Scheduling::Allocator do
       expect(vmh.accepts_slices).to be(false)
 
       vm = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       expect(al).not_to be_nil
       al.update(vm)
 
@@ -1413,7 +1478,7 @@ RSpec.describe Scheduling::Allocator do
       expect(vmh.accepts_slices).to be(true)
 
       vm = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       expect(al).not_to be_nil
       al.update(vm)
 
@@ -1426,7 +1491,7 @@ RSpec.describe Scheduling::Allocator do
       expect(vmh.accepts_slices).to be(false)
 
       vm = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: false))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: false)).first
       expect(al).not_to be_nil
       al.update(vm)
 
@@ -1440,7 +1505,7 @@ RSpec.describe Scheduling::Allocator do
       expect(vmh.accepts_slices).to be(true)
 
       vm = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: false))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: false)).first
       expect(al).to be_nil
     end
   end
@@ -1469,7 +1534,7 @@ RSpec.describe Scheduling::Allocator do
 
       vh.update(used_cores: 8, used_hugepages_1g: 24)
 
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       expect(al).to be_nil
     end
 
@@ -1480,7 +1545,7 @@ RSpec.describe Scheduling::Allocator do
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
 
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       al.update(vm)
       vmh.reload
 
@@ -1520,8 +1585,8 @@ RSpec.describe Scheduling::Allocator do
 
       vm1 = create_vm
       vm2 = create_vm
-      al1 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
-      al2 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al1 = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
+      al2 = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       al1.update(vm1)
       al2.update(vm2)
       vmh.reload
@@ -1536,7 +1601,7 @@ RSpec.describe Scheduling::Allocator do
       Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: (8..11), memory_gib: 16)
 
       vm = create_vm(vcpus: 4, memory_gib: 16, cpu_percent_limit: 400)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       al.update(vm)
       vh.reload
 
@@ -1555,7 +1620,7 @@ RSpec.describe Scheduling::Allocator do
       used_hugepages_1g = vh.used_hugepages_1g
 
       vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true, require_shared_slice: true)).first
       expect(al).not_to be_nil
 
       al.update(vm)
@@ -1634,7 +1699,7 @@ RSpec.describe Scheduling::Allocator do
 
       # Expect the first host to be picked, to fill in the available slice
       vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true, require_shared_slice: true)).first
       expect(al).not_to be_nil
 
       al.update(vm)
@@ -1681,7 +1746,7 @@ RSpec.describe Scheduling::Allocator do
       end
 
       vm = create_vm
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       expect(al).not_to be_nil
       al.update(vm)
 
@@ -1709,7 +1774,7 @@ RSpec.describe Scheduling::Allocator do
       end
 
       vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true, require_shared_slice: true)).first
       expect(al).to be_nil
     end
 
@@ -1876,7 +1941,7 @@ RSpec.describe Scheduling::Allocator do
 
       vm = create_vm(vcpus: 2, memory_gib: 16)
       create_storage_volumes(vm, vol)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, gpu_count: 1))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true, gpu_count: 1)).first
       expect { al.update(vm) }.to change { vh.reload.used_hugepages_1g }.by(16)
 
       slice = vm.vm_host_slice
@@ -1902,7 +1967,7 @@ RSpec.describe Scheduling::Allocator do
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 10..16).update(numa_node: 1) # 7 free cpus
 
       vm = create_vm(vcpus: 4, memory_gib: 16, cpu_percent_limit: 400)
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al = Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first
       al.update(vm)
       vh.reload
 
