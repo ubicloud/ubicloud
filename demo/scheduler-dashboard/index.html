@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runner Scheduler Live</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --wash: rgba(11, 11, 11, 0.04);
+    --track: #f0efec;
+
+    --current: #eb6834;
+    --central: #2a78d6;
+    --stage-admission: #1baf7a;
+    --stage-capacity: #eda100;
+    --stage-booting: #e87ba4;
+    --stage-idle: #008300;
+
+    --good-text: #006300;
+    --warning: #fab219;
+    --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --wash: rgba(255, 255, 255, 0.05);
+      --track: #383835;
+      --current: #d95926;
+      --central: #3987e5;
+      --stage-admission: #199e70;
+      --stage-capacity: #c98500;
+      --stage-booting: #d55181;
+      --stage-idle: #008300;
+      --good-text: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --wash: rgba(255, 255, 255, 0.05);
+    --track: #383835;
+    --current: #d95926;
+    --central: #3987e5;
+    --stage-admission: #199e70;
+    --stage-capacity: #c98500;
+    --stage-booting: #d55181;
+    --stage-idle: #008300;
+    --good-text: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 24px 48px; }
+  @media (max-width: 640px) { .wrap { padding: 16px 16px 40px; } }
+
+  h1 { font-size: 20px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  h3 { font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sub { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+  .muted { color: var(--muted); }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+  .conns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .conn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); font-size: 12px; color: var(--ink-2); white-space: nowrap;
+  }
+  .conn .key { width: 10px; height: 3px; border-radius: 2px; }
+  .conn .state { font-weight: 600; }
+  .conn[data-state="live"] .state { color: var(--good-text); }
+  .conn[data-state="error"] .state { color: var(--critical); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 16px 0; }
+  .controls .spacer { flex: 1; }
+  .group { display: inline-flex; align-items: center; gap: 6px; }
+  button {
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px; cursor: pointer;
+  }
+  button:hover { background: var(--wash); }
+  button:focus-visible, summary:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--central); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .seg.small button { font-size: 12px; padding: 2px 8px; }
+  button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  button.primary:hover { opacity: 0.88; background: var(--ink); }
+  #pause[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
+
+  details.settings { position: relative; }
+  details.settings summary {
+    list-style: none; cursor: pointer; font-size: 13px; padding: 5px 11px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  }
+  details.settings summary::-webkit-details-marker { display: none; }
+  details.settings[open] .panel {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; width: min(440px, calc(100vw - 32px));
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); display: grid; gap: 10px;
+  }
+  .panel label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
+  .panel input {
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--page);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%;
+  }
+  .panel .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; position: relative; min-width: 0;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+  .legend i.line { height: 3px; width: 14px; }
+  .legend i.wash { opacity: 0.25; }
+  .legend i.ramp { width: 44px; height: 8px; }
+
+  /* Burst race */
+  .race { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; margin-top: 8px; }
+  .race .who { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+  .race .who i { width: 10px; height: 3px; border-radius: 2px; }
+  .race .track { height: 14px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .race .fill { height: 100%; border-radius: 0 4px 4px 0; transition: width 0.6s ease; }
+  .race .out { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+  .race .out.done { color: var(--good-text); }
+  .burst-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .burst-head b { font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .section { margin: 20px 0 8px; }
+  .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 960px) { .grid2, .cols { grid-template-columns: minmax(0, 1fr); } }
+
+  .col { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .col-head { display: flex; align-items: center; gap: 10px; }
+  .col-head .bar { width: 4px; align-self: stretch; border-radius: 2px; }
+  .col-head h2 { font-size: 16px; }
+  .col-head p { margin: 0; font-size: 12px; color: var(--muted); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; min-width: 0; }
+  .stat .label { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .value { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
+  .stat .delta { font-size: 12px; font-weight: 600; min-height: 18px; color: var(--muted); }
+  .stat .delta.better { color: var(--good-text); }
+  .stat .delta.worse { color: var(--critical); }
+
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .chart text.end { fill: var(--ink-2); font-weight: 600; }
+  .chart text.marker, .chart text.alert { fill: var(--ink-2); font-weight: 600; }
+  .stale .chart svg { opacity: 0.55; }
+
+  .tip {
+    position: absolute; pointer-events: none; z-index: 5; min-width: 150px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); padding: 8px 10px; font-size: 12px; display: none;
+  }
+  .tip .t { color: var(--muted); margin-bottom: 4px; }
+  .tip .r { display: grid; grid-template-columns: 14px auto 1fr; gap: 6px; align-items: center; }
+  .tip .r i { height: 3px; border-radius: 2px; }
+  .tip .r b { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tip .r span { color: var(--ink-2); }
+
+  details.table { margin-top: 20px; }
+  details.table summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; color: var(--ink-2); }
+  thead th { color: var(--muted); font-weight: 600; }
+  .table-scroll { overflow-x: auto; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 20;
+    background: var(--ink); color: var(--surface); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: calc(100vw - 32px);
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>GitHub runner scheduling: current vs central</h1>
+      <p class="sub">Same fake job stream to both control planes. Side-by-side charts share a scale. Red lines are paging thresholds.</p>
+    </div>
+    <div class="conns">
+      <span class="conn" id="conn-current" data-state="connecting"></span>
+      <span class="conn" id="conn-central" data-state="connecting"></span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Time window">
+      <button data-window="120000">2m</button>
+      <button data-window="300000">5m</button>
+      <button data-window="900000">15m</button>
+    </div>
+    <button id="pause" aria-pressed="false">Pause</button>
+    <button id="clear">Clear</button>
+    <span class="spacer"></span>
+    <div class="group" aria-label="Incoming load">
+      <span class="muted">Incoming load</span>
+      <button id="load-down" aria-label="Decrease incoming load">−</button>
+      <button id="load-up" aria-label="Increase incoming load">+</button>
+      <button id="burst" class="primary">Burst 300 jobs</button>
+    </div>
+    <details class="settings">
+      <summary>Endpoints</summary>
+      <form class="panel" id="settings">
+        <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"></label>
+        <label>Central metrics URL <input name="central" autocomplete="off" spellcheck="false"></label>
+        <label>Load control URL (for the buttons; leave empty until wired) <input name="control" autocomplete="off" spellcheck="false" placeholder="e.g. http://localhost:8787"></label>
+        <label>Poll interval (ms) <input name="interval" type="number" min="250" step="250"></label>
+        <div class="row"><button type="button" id="settings-reset">Defaults</button><button type="submit" class="primary">Apply</button></div>
+      </form>
+    </details>
+  </div>
+
+  <section class="card" id="burst-race" aria-live="polite"></section>
+
+  <h3 class="section">Head to head</h3>
+  <section class="grid2">
+    <div class="card">
+      <div class="card-head"><h2>Requests waiting for a host</h2><div class="legend" data-legend="sides"></div></div>
+      <div class="chart" id="h2h-waiting"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Wait time</h2>
+        <div class="seg small" role="group" aria-label="Wait statistic" id="wait-stat">
+          <button data-stat="p50">p50</button><button data-stat="p95">p95</button><button data-stat="oldest">Oldest</button>
+        </div>
+        <div class="legend" data-legend="sides"></div>
+      </div>
+      <div class="chart" id="h2h-wait"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Fleet utilization</h2><div class="legend" data-legend="sides"></div></div>
+      <div class="chart" id="h2h-util"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Scheduling checks / min</h2><div class="legend" data-legend="sides"></div></div>
+      <div class="chart" id="h2h-checks"></div>
+    </div>
+  </section>
+
+  <h3 class="section">Inside each scheduler</h3>
+  <section class="cols" id="cols"></section>
+
+  <details class="table">
+    <summary>Latest snapshot as a table</summary>
+    <div class="table-scroll"><table id="snapshot"></table></div>
+  </details>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="dashboard.js"></script>
+</body>
+</html>
