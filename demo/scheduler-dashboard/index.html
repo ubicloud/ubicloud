@@ -88,17 +88,17 @@
   .wrap { max-width: 1440px; margin: 0 auto; padding: 18px 24px 48px; }
 
   /* App bar */
-  .appbar { position: sticky; top: 0; z-index: 30; background: var(--brand-ink); color: #fff; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+  .appbar { position: sticky; top: 0; z-index: 30; background: var(--brand); color: #fff; border-bottom: 1px solid rgba(0, 0, 0, 0.12); }
   .appbar-in { max-width: 1440px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
   @media (max-width: 640px) { .appbar-in { padding: 10px 16px; } }
   .brand { display: flex; }
   .brand img { height: 20px; display: block; }
-  .appbar-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.2); }
+  .appbar-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.45); }
   .app-title { font-weight: 600; font-size: 14px; }
-  .env { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brand); border: 1px solid rgba(255, 92, 18, 0.55); border-radius: 999px; padding: 1px 8px; }
+  .env { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 999px; padding: 1px 8px; }
   .appbar .spacer { flex: 1; }
-  .updated { font-size: 12px; color: rgba(255, 255, 255, 0.6); font-variant-numeric: tabular-nums; }
-  .appbar .conn { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.85); }
+  .updated { font-size: 12px; color: rgba(255, 255, 255, 0.9); font-variant-numeric: tabular-nums; }
+  .appbar .conn { background: var(--brand-ink); border-color: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.9); }
   .appbar .conn[data-state="live"] .state { color: #4ade80; }
   .appbar .conn[data-state="error"] .state { color: #f87171; }
 
@@ -134,7 +134,7 @@
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button { border: 0; border-radius: 0; }
   .seg button + button { border-left: 1px solid var(--border); }
-  .seg button[aria-pressed="true"] { background: var(--brand-ink); color: #fff; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
   .seg.small button { font-size: 12px; padding: 2px 8px; }
   button.primary { background: var(--action); color: #fff; border-color: var(--action); font-weight: 600; }
   button.primary:hover { opacity: 0.9; background: var(--action); }
