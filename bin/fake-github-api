@@ -33,11 +33,19 @@ require "securerandom"
 class FakeGithubApi
   Runner = Struct.new(:id, :name, :repo, :busy, :labels)
 
+  # Keep at most this many runners per namespace; when exceeded, drop the
+  # oldest. Bounds memory and keeps /_runners polling cheap on long runs.
+  MAX_RUNNERS_PER_NAMESPACE = 200_000
+  PRUNE_TO = 100_000
+
   def initialize(namespaces: {})
     @mutex = Mutex.new
     @next_runner_id = 1
     @namespaces = namespaces # port(String) => namespace name
-    @runners = Hash.new { |h, k| h[k] = {} } # ns => {id => Runner}
+    # Ordered (by id) array per namespace for cheap since_id slicing.
+    @runners = Hash.new { |h, k| h[k] = [] }
+    # id => Runner lookup per namespace for GET/DELETE by id.
+    @runner_by_id = Hash.new { |h, k| h[k] = {} }
     @installations = Hash.new { |h, k| h[k] = {} } # ns => {id(String) => {}}
   end
 
@@ -50,14 +58,15 @@ class FakeGithubApi
     # Internal control endpoints, scoped to this listener's namespace.
     case [method, path]
     when ["GET", "/_runners"]
-      return json(runners_for(ns, req.params["repo"]))
+      return json(runners_for(ns, req.params["repo"], req.params["since_id"]))
     when ["GET", "/_state"]
       return json(@mutex.synchronize {
-        {namespace: ns, runners: @runners[ns].values.map(&:to_h), installations: @installations[ns].keys}
+        {namespace: ns, runners: @runners[ns].map(&:to_h), installations: @installations[ns].keys}
       })
     when ["POST", "/_reset"]
       @mutex.synchronize do
         @runners[ns].clear
+        @runner_by_id[ns].clear
         @installations[ns].clear
       end
       return json({message: "reset", namespace: ns})
@@ -133,8 +142,10 @@ class FakeGithubApi
       labels = body["labels"] || []
       runner = @mutex.synchronize do
         r = Runner.new(@next_runner_id, name, repo, false, labels)
-        @runners[ns][r.id] = r
+        @runners[ns] << r
+        @runner_by_id[ns][r.id] = r
         @next_runner_id += 1
+        prune_runners(ns)
         r
       end
       warn "[fake-github-api][#{ns}] registered runner #{runner.id} (#{name}) for #{repo}"
@@ -143,7 +154,7 @@ class FakeGithubApi
         encoded_jit_config: "fake-jit-#{runner.id}-#{SecureRandom.hex(8)}",
       })
     when ["GET", ""]
-      runners = @mutex.synchronize { @runners[ns].values.select { |r| r.repo == repo } }
+      runners = @mutex.synchronize { @runners[ns].select { |r| r.repo == repo } }
       return json({total_count: runners.size, runners: runners.map { |r| {id: r.id, name: r.name, busy: r.busy, status: "online"} }})
     end
 
@@ -151,11 +162,14 @@ class FakeGithubApi
       id = m[1].to_i
       case method
       when "GET"
-        runner = @mutex.synchronize { @runners[ns][id] }
+        runner = @mutex.synchronize { @runner_by_id[ns][id] }
         return not_found unless runner
         return json({id: runner.id, name: runner.name, busy: runner.busy, status: "online"})
       when "DELETE"
-        @mutex.synchronize { @runners[ns].delete(id) }
+        @mutex.synchronize do
+          runner = @runner_by_id[ns].delete(id)
+          @runners[ns].delete(runner) if runner
+        end
         warn "[fake-github-api][#{ns}] deregistered runner #{id}"
         return empty(204)
       end
@@ -164,12 +178,26 @@ class FakeGithubApi
     not_found
   end
 
-  def runners_for(ns, repo)
+  # Returns runners (optionally filtered by repo) with id > since_id, so
+  # pollers can fetch only what they haven't seen. The array is ordered by id,
+  # so we binary-search the starting offset instead of scanning everything.
+  def runners_for(ns, repo, since_id)
+    since = since_id.to_i
     @mutex.synchronize do
-      @runners[ns].values
+      all = @runners[ns]
+      offset = (since > 0) ? (all.bsearch_index { |r| r.id > since } || all.size) : 0
+      all[offset..].to_a
         .select { |r| repo.nil? || r.repo == repo }
         .map { |r| {id: r.id, name: r.name, repo: r.repo, busy: r.busy} }
     end
+  end
+
+  # Drop the oldest runners once the namespace exceeds the cap. Called while
+  # holding @mutex.
+  def prune_runners(ns)
+    all = @runners[ns]
+    return if all.size <= MAX_RUNNERS_PER_NAMESPACE
+    all.shift(all.size - PRUNE_TO).each { |r| @runner_by_id[ns].delete(r.id) }
   end
 
   def parse_body(req)

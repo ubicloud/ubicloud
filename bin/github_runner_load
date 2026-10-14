@@ -136,6 +136,7 @@ class TargetRunner
     @job_id = 0
     @run_id = 0
     @seen_runner_ids = {}
+    @last_runner_id = 0
     @label_counts = Hash.new(0)
     @queue = SizedQueue.new([@concurrency * 8, 64].max)
   end
@@ -262,13 +263,18 @@ class TargetRunner
     end
   end
 
+  # Poll incrementally: ask only for runners newer than the last id we saw, so
+  # the response (and its JSON cost) stays small regardless of run length.
   def fetch_registered_runners
     return [] unless @fake_api_uri
-    body = get_json(@fake_api_uri, "/_runners?repo=#{URI.encode_www_form_component(@repository)}")
+    query = URI.encode_www_form(repo: @repository, since_id: @last_runner_id)
+    body = get_json(@fake_api_uri, "/_runners?#{query}")
     return [] unless body.is_a?(Array)
-    body.reject { |r| @seen_runner_ids.key?(r["id"]) }.tap do |fresh|
-      fresh.each { |r| @seen_runner_ids[r["id"]] = true }
+    body.each do |r|
+      @last_runner_id = r["id"] if r["id"] > @last_runner_id
+      @seen_runner_ids[r["id"]] = true
     end
+    body
   rescue => e
     log "fake api poll failed: #{e.class}: #{e.message}"
     []

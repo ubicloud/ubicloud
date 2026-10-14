@@ -104,17 +104,23 @@ Control/inspection endpoints (not part of the GitHub API):
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/_runners?repo=owner/name` | runners registered for a repo |
+| `GET` | `/_runners?repo=owner/name[&since_id=N]` | runners registered for a repo; `since_id` returns only ids `> N` |
 | `GET` | `/_state` | full state for this namespace |
 | `POST` | `/_reset` | clear this namespace's state |
 
 ```bash
 curl -s http://144.76.169.97:4567/_state
 curl -s 'http://144.76.169.97:4567/_runners?repo=my-org/my-repo'
+curl -s 'http://144.76.169.97:4567/_runners?repo=my-org/my-repo&since_id=1000'
 ```
 
-> State is **in-memory**: restarting the fake API clears it. Restart only while
-> load is stopped.
+> `since_id` exists so pollers (the load generator) fetch only newly registered
+> runners instead of the whole list every second. Prefer it for anything
+> long-running or high-rate.
+>
+> State is **in-memory**: restarting the fake API clears it. It is also pruned
+> (oldest runners dropped) once a namespace exceeds 200k runners, to bound
+> memory on long runs. Restart only while load is stopped.
 
 ---
 
