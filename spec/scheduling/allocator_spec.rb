@@ -126,6 +126,55 @@ RSpec.describe Scheduling::Allocator do
     end
   end
 
+  describe "CandidateCache" do
+    let(:storage_volumes) { [{"size_gib" => 11, "use_bdev_ubi" => false, "boot" => true}] }
+    let(:project) { Project.create(name: "test-project") }
+    let(:cache) { Al::CandidateCache.new }
+
+    def create_host(**)
+      vmh = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, **)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
+      vmh
+    end
+
+    def create_waiting_vm(**)
+      vm = create_vm(project_id: project.id, name: "vm#{Vm.count}", **)
+      create_storage_volumes(vm, storage_volumes)
+      vm
+    end
+
+    def allocate(vm)
+      cache.allocate(vm, described_class.request(vm, storage_volumes))
+    end
+
+    it "queries the candidate hosts of an equivalence class once" do
+      vmh = create_host
+      vms = Array.new(2) { create_waiting_vm }
+      expect(Al::Allocation::CandidateHosts).to receive(:new).once.and_call_original
+
+      vms.each { allocate(it) }
+      expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
+    end
+
+    it "queries the candidate hosts of each equivalence class" do
+      create_host
+      vms = [create_waiting_vm, create_waiting_vm(vcpus: 4, memory_gib: 16)]
+      expect(Al::Allocation::CandidateHosts).to receive(:new).twice.and_call_original
+
+      vms.each { allocate(it) }
+    end
+
+    it "scores a host that took an allocation with its new usage" do
+      create_host(used_hugepages_1g: 44)
+      first, second = Array.new(2) { create_waiting_vm }
+
+      allocate(first)
+      expect { allocate(second) }.to raise_error(Al::NoSpaceLeft)
+    end
+  end
+
   describe "candidate_selection" do
     let(:req) {
       Al::Request.new(
