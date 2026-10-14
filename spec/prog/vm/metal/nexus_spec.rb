@@ -441,6 +441,25 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#wait_allocation" do
+    it "finishes the allocation once the scheduler allocated the vm" do
+      expect { nx.wait_allocation }.to hop("create_unix_user")
+    end
+
+    it "reports lack of capacity while the vm waits for capacity" do
+      vm.update(vm_host_id: nil)
+      vm.incr_waiting_for_capacity
+      expect(Clog).to receive(:emit).with("No capacity left", {lack_of_capacity: {location: "hetzner-fsn1", arch: "x64", family: "standard", queue_size: 1}}).and_call_original
+      expect { nx.wait_allocation }.to nap(60)
+    end
+
+    it "naps until the scheduler allocates the vm" do
+      vm.update(vm_host_id: nil)
+      expect(Clog).not_to receive(:emit)
+      expect { nx.wait_allocation }.to nap(60)
+    end
+  end
+
   describe "#create_unix_user" do
     it "runs adduser" do
       expect(nx).to receive(:rand).and_return(1111)
@@ -565,6 +584,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       volume[:machine_image_version_id] = metal.id if metal
       vm.create_storage_volumes([volume])
       st.stack = [{"storage_volumes" => [volume].map { it.transform_keys(&:to_s) }}]
+    end
+
+    it "waits for the central scheduler if it is enabled" do
+      expect(Config).to receive(:central_vm_scheduler).and_return(true)
+      scheduler = Strand.create_with_id(Prog::Vm::Scheduler::STRAND_ID, prog: "Vm::Scheduler", label: "wait", schedule: Time.now + 60)
+      expect(Scheduling::Allocator).not_to receive(:allocate)
+      expect { nx.start }.to hop("wait_allocation")
+      expect(scheduler.reload.schedule).to be < Time.now
     end
 
     it "creates a page if no capacity left and naps" do
