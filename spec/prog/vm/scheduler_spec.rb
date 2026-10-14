@@ -7,7 +7,7 @@ RSpec.describe Prog::Vm::Scheduler do
 
   let(:st) { Strand.create_with_id(described_class::STRAND_ID, prog: "Vm::Scheduler", label: "wait") }
   let(:project) { Project.create(name: "default") }
-  let(:storage_volumes) { [{"size_gib" => 11, "use_bdev_ubi" => false, "boot" => true}] }
+  let(:storage_volumes) { [{"size_gib" => 11, "use_bdev_ubi" => false, "boot" => true, "vring_workers" => 1}] }
 
   def create_host(**)
     vmh = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, **)
@@ -104,6 +104,197 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { nx.wait }.to nap(5)
       expect(spilled.reload.vm_host_id).to be_nil
       expect(vm.reload.vm_host_id).not_to be_nil
+    end
+
+    context "with the bulk commit" do
+      before do
+        allow(Config).to receive(:central_vm_scheduler_bulk_commit).and_return(true)
+        allow(Clog).to receive(:emit).and_call_original
+      end
+
+      def create_slice_host(cidr: "1.1.1.0/30", net6: "fd10:9b0b:6b4b:8fbb::/64", backend: true, **)
+        vmh = create_host(accepts_slices: true, net6:, **)
+        16.times { VmHostCpu.create(vm_host_id: vmh.id, cpu_number: it, io: it < 2, numa_node: it / 8) }
+        create_vhost_block_backend(vm_host_id: vmh.id) if backend
+        Address.create(cidr:, routed_to_host_id: vmh.id).populate_ipv4_addresses
+        vmh
+      end
+
+      def after_plan
+        expect(Scheduling::BulkCommit).to receive(:new).and_wrap_original do |original|
+          original.call.tap do |bulk_commit|
+            expect(bulk_commit).to receive(:plan).at_least(:once).and_wrap_original { |plan, *args| plan.call(*args).tap { yield } }
+          end
+        end
+      end
+
+      def allocation_rows(vms, hosts)
+        {
+          vms: vms.map do |vm|
+            vm.reload
+            slice = vm.vm_host_slice
+            [
+              vm.vm_host_id, vm.family, !vm.allocated_at.nil?, !vm.ephemeral_net6.nil?, !vm.local_vetho_ip.nil?,
+              !vm.assigned_vm_address.nil?, vm.sshable&.host == (vm.ip4_string || vm.ip6_string),
+              slice.values.slice(:name, :family, :cores, :total_cpu_percent, :used_cpu_percent, :total_memory_gib, :used_memory_gib, :enabled, :is_shared, :vm_host_id),
+              slice.cpus.map(&:cpu_number).sort, slice.strand.label,
+              vm.vm_storage_volumes.map { it.values.slice(:disk_index, :storage_device_id, :boot_image_id, :vhost_block_backend_id, :vring_workers, :use_bdev_ubi, :spdk_installation_id) },
+            ]
+          end,
+          hosts: hosts.map { it.reload.values.slice(:used_cores, :used_hugepages_1g) },
+          devices: StorageDevice.order(:id).select_map([:id, :available_storage_gib]),
+        }
+      end
+
+      it "writes the same rows as committing the vms one by one" do
+        hosts = [create_slice_host, create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64", used_cores: 3, used_hugepages_1g: 16)]
+        create_vm(vm_host_id: hosts[0].id, project_id: project.id, name: "existing-vm", local_vetho_ip: "169.254.0.0/32")
+        vms = [2, 4, 2].map { create_waiting_vm(vcpus: it) }
+        vms[0].update(ip4_enabled: true)
+        vms[0..1].each { Sshable.create_with_id(it, host: "temp_#{it.id}") }
+        expect(Scheduling::Allocator::Allocation).to receive(:random_score).and_return(0).at_least(:once)
+
+        one_by_one = nil
+        DB.transaction(savepoint: true, rollback: :always) do
+          expect(Config).to receive(:central_vm_scheduler_bulk_commit).and_return(false)
+          expect { nx.wait }.to nap(5)
+          one_by_one = allocation_rows(vms, hosts)
+        end
+
+        expect { described_class.new(st).wait }.to nap(5)
+        expect(allocation_rows(vms, hosts)).to eq(one_by_one)
+        expect(vms.map { it.vm_host_slice.vm_host_id }).to all(be_truthy)
+      end
+
+      it "commits the vms it cannot plan one by one after the bulk write" do
+        vmh = create_slice_host(backend: false)
+        vm = create_waiting_vm
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.vm_host_id).to eq(vmh.id)
+        expect(vm.vm_storage_volumes.first.spdk_installation_id).not_to be_nil
+      end
+
+      it "commits the planned vms one by one if the bulk write fails" do
+        vmh = create_slice_host
+        vm = create_waiting_vm
+        taken = create_vm_host_slice(vm_host_id: vmh.id)
+        after_plan { VmHostCpu.where(vm_host_id: vmh.id, cpu_number: [2, 3]).update(vm_host_slice_id: taken.id) }
+        expect(Clog).to receive(:emit).with("central vm scheduler bulk commit failed", hash_including(central_vm_scheduler_bulk_failure: {vms: 1})).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.vm_host_id).to eq(vmh.id)
+        expect(vm.vm_host_slice.cpus.map(&:cpu_number)).to eq([4, 5])
+      end
+
+      it "uses one capacity state per host in a round, although other processes free capacity during the round" do
+        vmh = create_slice_host(used_cores: 4)
+        first, large, last = Array.new(3) { create_waiting_vm }
+        large.update(vcpus: 8, memory_gib: 32)
+        after_plan { VmHost.where(id: vmh.id).update(used_cores: 0) }
+        expect(Clog).not_to receive(:emit).with("central vm scheduler failed to allocate vm", anything)
+
+        expect { nx.wait }.to nap(5)
+        expect([first, large, last].map { it.reload.vm_host_id }).to eq([vmh.id, nil, vmh.id])
+      end
+
+      it "plans no two vms on the last ipv4 address of a host" do
+        fuller = create_slice_host(cidr: "1.1.1.1/32", used_cores: 3)
+        other = create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64")
+        vms = Array.new(2) { create_waiting_vm }
+        vms.each { it.update(ip4_enabled: true) }
+
+        expect { nx.wait }.to nap(5)
+        expect(vms.map { it.reload.vm_host_id }).to contain_exactly(fuller.id, other.id)
+      end
+
+      it "sets up read only image volumes, data volumes and volumes from machine images" do
+        vmh = create_slice_host
+        vm = create_waiting_vm
+        volumes = [
+          {"size_gib" => 11, "boot" => true, "vring_workers" => 1, "machine_image_version_id" => MachineImageVersion.generate_uuid},
+          {"size_gib" => 0, "boot" => false, "read_only" => true, "image" => "ubuntu-jammy", "vring_workers" => 1},
+          {"size_gib" => 5, "boot" => false, "vring_workers" => 1},
+        ]
+        vm.vm_storage_volumes_dataset.destroy
+        vm.create_storage_volumes(volumes.map { it.except("machine_image_version_id").transform_keys(&:to_sym) })
+        vm.strand.update(stack: [{"storage_volumes" => volumes}])
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.vm_storage_volumes.sort_by(&:disk_index).map(&:boot_image_id)).to eq([nil, vmh.boot_images.first.id, nil])
+      end
+
+      it "counts the checks and allocations of runner vms" do
+        create_slice_host
+        vm = create_waiting_vm
+        vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+        create_runner(vm)
+
+        expect(counter_increments { expect { nx.wait }.to nap(5) }).to eq("scheduling_checks_total" => 1, "allocated_total" => 1)
+      end
+
+      it "marks the vms without capacity" do
+        vm = create_waiting_vm
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.waiting_for_capacity_set?).to be(true)
+      end
+
+      it "adds the planned usage only to the request classes that may use the host" do
+        create_slice_host(used_cores: 6, used_hugepages_1g: 40)
+        other = create_slice_host(cidr: "1.1.2.0/30", net6: "fd10:9b0b:6b4b:8fbc::/64")
+        large, small = Array.new(2) { create_waiting_vm }
+        large.update(vcpus: 8, memory_gib: 32)
+
+        expect { nx.wait }.to nap(5)
+        expect(large.reload.vm_host_id).to eq(other.id)
+        expect(small.reload.vm_host_id).not_to eq(other.id)
+      end
+
+      context "with fixed random numbers" do
+        before { allow(SecureRandom).to receive(:random_number).and_call_original }
+
+        it "avoids the veth and ipv6 addresses that vms on the host use" do
+          vmh = create_slice_host
+          expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(4, 4, 6)
+          expect(SecureRandom).to receive(:random_number).with(VmHost::APIPA_LEN).and_return(5)
+          used_net6 = vmh.ip6_random_vm_network.to_s
+          create_vm(vm_host_id: vmh.id, project_id: project.id, name: "existing-vm", ephemeral_net6: used_net6, local_vetho_ip: VmHost::APIPA_RANGE.nth(10).to_s + "/32")
+          vm = create_waiting_vm
+
+          expect { nx.wait }.to nap(5)
+          expect(vm.reload.ephemeral_net6.to_s).not_to eq(used_net6)
+          expect(vm.local_vetho_ip.network.to_s).to eq(VmHost::APIPA_RANGE.nth(12).to_s)
+        end
+      end
+
+      it "logs a vm whose host lost its last ipv4 address after it chose the host" do
+        vmh = create_slice_host(cidr: "1.1.1.1/32")
+        vm = create_waiting_vm
+        vm.update(ip4_enabled: true)
+        expect(Scheduling::BulkCommit).to receive(:new).and_wrap_original do |original|
+          original.call.tap do |bulk_commit|
+            expect(bulk_commit).to receive(:plannable?).and_wrap_original do |plannable, *args|
+              AssignedVmAddress.create(dst_vm_id: create_vm(project_id: project.id, name: "taker").id, ip: "1.1.1.1/32", address_id: Address.first(routed_to_host_id: vmh.id).id)
+              plannable.call(*args)
+            end
+          end
+        end
+        expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vm.ubid})).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.vm_host_id).to be_nil
+      end
+
+      it "logs a vm it fails to plan" do
+        vmh = create_slice_host
+        VmHostCpu.where(vm_host_id: vmh.id).update(io: true)
+        vm = create_waiting_vm
+        expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vm.ubid})).and_call_original
+
+        expect { nx.wait }.to nap(5)
+        expect(vm.reload.vm_host_id).to be_nil
+      end
     end
 
     context "with large vms" do

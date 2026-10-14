@@ -133,7 +133,11 @@ module Scheduling::Allocator
   end
 
   class Allocation
-    attr_reader :score
+    attr_reader :score, :candidate_host
+
+    def storage_allocation
+      @device_allocations.first
+    end
 
     # simplecov:disable
     def self.freeze
@@ -560,11 +564,16 @@ module Scheduling::Allocator
 
     def best_allocation(request)
       key = request.to_h.except(:vm_id, :diagnostics)
-      equivalence_class = (@classes[key] ||= EquivalenceClass.new(request, @changed_host_ids.size))
+      equivalence_class = (@classes[key] ||= new_equivalence_class(request))
       hosts = equivalence_class.hosts(@changed_host_ids).reject do
-        (holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id
+        ((holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id) ||
+          (request.ip4_enabled && !it[:ipv4_available])
       end
       BestFitAllocation.best_of(hosts, request, free_provisionings: @free_provisionings)
+    end
+
+    def new_equivalence_class(request)
+      EquivalenceClass.new(request, @changed_host_ids.size)
     end
 
     def shortfall(host, request)
@@ -592,6 +601,68 @@ module Scheduling::Allocator
         end
         @hosts.values
       end
+
+      def rows
+        @hosts.values
+      end
+
+      def row(host_id)
+        @hosts[host_id]
+      end
+    end
+  end
+
+  # Plans allocations for a Scheduling::BulkCommit instead of committing
+  # them. The database has none of the planned usage until the bulk write,
+  # so hosts are not queried again after an allocation. Instead, the round
+  # keeps one capacity state per host: the capacity columns of the first
+  # row it loaded for the host, plus the usage planned on it. Every request
+  # class uses that state for the host, including classes first loaded
+  # later in the round. Their rows can have fresher values, as other
+  # processes free capacity during the round, and a plan checked against a
+  # fresher row could overfill an older one.
+  class DeferredCandidateCache < CandidateCache
+    CAPACITY_COLUMNS = %i[used_cores used_hugepages_1g vm_provisioning_count ipv4_available available_storage_gib storage_devices].freeze
+
+    def initialize(bulk_commit:, **)
+      super(**)
+      @bulk_commit = bulk_commit
+      @capacity = {}
+    end
+
+    # Returns whether it planned the allocation. A VM it cannot plan, e.g.,
+    # one with a GPU, needs a commit of its own.
+    def plan(vm, request)
+      allocation = best_allocation(request)
+      fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
+      return false unless @bulk_commit.plannable?(request, allocation)
+
+      host_id = allocation.vm_host_id
+      capacity = add_usage(@capacity.fetch(host_id), @bulk_commit.plan(vm, request, allocation))
+      @capacity[host_id] = capacity
+      @classes.each_value { it.row(host_id)&.merge!(capacity) }
+      true
+    end
+
+    private
+
+    def new_equivalence_class(request)
+      equivalence_class = super
+      equivalence_class.rows.each { it.merge!(@capacity[it[:vm_host_id]] ||= it.slice(*CAPACITY_COLUMNS)) }
+      equivalence_class
+    end
+
+    def add_usage(capacity, usage)
+      capacity.merge(
+        used_cores: capacity[:used_cores] + usage[:cores],
+        used_hugepages_1g: capacity[:used_hugepages_1g] + usage[:hugepages_1g],
+        vm_provisioning_count: capacity[:vm_provisioning_count] + 1,
+        ipv4_available: usage[:ipv4_available],
+        available_storage_gib: capacity[:available_storage_gib] - usage[:storage_gib].values.sum,
+        storage_devices: capacity[:storage_devices]
+          .map { it.merge("available_storage_gib" => it["available_storage_gib"] - usage[:storage_gib].fetch(it["id"], 0)) }
+          .sort_by { it["available_storage_gib"] },
+      )
     end
   end
 
@@ -877,7 +948,7 @@ module Scheduling::Allocator
     # room for a new boot image or for an emergency.
     RESERVED_STORAGE_GIB = 100
 
-    attr_reader :is_valid, :total, :used, :requested, :volume_to_device_map
+    attr_reader :is_valid, :total, :used, :requested, :volume_to_device_map, :storage_device_allocations
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
