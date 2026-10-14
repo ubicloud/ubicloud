@@ -14,10 +14,11 @@ class GithubRunnerVmAllocation < Sequel::Model
   many_to_one :vm_host, read_only: true
 
   # Returns the runner label for the VM's configuration, or nil if the
-  # resources of the VM cannot be reused.
+  # resources of the VM cannot or should not be reused.
   def self.label_for(vm, storage_sizes)
     return unless storage_sizes.one?
     return unless [Config.github_runner_service_project_id, Config.vm_pool_project_id].include?(vm.project_id)
+    return unless rand < Config.github_runner_vm_allocation_ratio
 
     Github.runner_label_for(family: vm.family, vcpus: vm.vcpus, arch: vm.arch, boot_image: vm.boot_image, storage_size_gib: storage_sizes.first)
   end
