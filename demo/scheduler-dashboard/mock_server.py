@@ -379,7 +379,56 @@ class World:
                 self.advance()
 
 
-def make_handler(world, upstreams):
+HISTORY_SECONDS = 16 * 60
+
+
+class Recorder:
+    """Samples both sides once a second. Every viewer shares this one stream,
+    so the real endpoints see one request a second however many people are
+    watching, and a freshly opened page can start with recent history."""
+
+    def __init__(self, world, upstreams):
+        self.world = world
+        self.upstreams = upstreams
+        self.lock = threading.Lock()
+        self.samples = {side: deque(maxlen=HISTORY_SECONDS) for side in ("current", "central")}
+        self.latest = {side: (None, "no sample yet") for side in self.samples}
+
+    def sample(self, side):
+        url = self.upstreams.get(side)
+        try:
+            if url:
+                with urllib.request.urlopen(url, timeout=3) as resp:
+                    metrics, error = json.load(resp), None
+            else:
+                with self.world.lock:
+                    sim = self.world.current if side == "current" else self.world.central
+                    metrics, error = sim.metrics(self.world.now), None
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            metrics, error = None, f"upstream {url}: {e}"
+        with self.lock:
+            self.latest[side] = (metrics, error)
+            if metrics:
+                self.samples[side].append((time.time() * 1000, metrics))
+
+    def run(self):
+        while True:
+            started = time.time()
+            # In parallel, so a slow endpoint doesn't delay the other side.
+            threads = [threading.Thread(target=self.sample, args=(side,)) for side in self.samples]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            time.sleep(max(0.0, 1.0 - (time.time() - started)))
+
+    def history(self, seconds):
+        cutoff = time.time() * 1000 - seconds * 1000
+        with self.lock:
+            return {side: [[t, m] for t, m in samples if t >= cutoff] for side, samples in self.samples.items()}
+
+
+def make_handler(world, upstreams, recorder):
     root = Path(__file__).resolve().parent
 
     class Handler(BaseHTTPRequestHandler):
@@ -405,26 +454,21 @@ def make_handler(world, upstreams):
             side = path.split("/")[1]
             if path == "/config":
                 return self.send(200, {"upstreams": upstreams})
-            if path in ("/current/scheduler/metrics", "/central/scheduler/metrics") and upstreams.get(side):
-                return self.proxy(upstreams[side])
+            if path == "/history":
+                query = dict(p.split("=", 1) for p in self.path.partition("?")[2].split("&") if "=" in p)
+                seconds = min(HISTORY_SECONDS, max(0, int(query.get("seconds", "900") or 0)))
+                return self.send(200, {"now": time.time() * 1000, "samples": recorder.history(seconds)})
             if path in ("/current/scheduler/metrics", "/central/scheduler/metrics"):
-                with world.lock:
-                    sim = world.current if path.startswith("/current") else world.central
-                    return self.send(200, sim.metrics(world.now))
+                # Real endpoints are proxied from this origin, which keeps the
+                # dashboard working over HTTPS (no mixed content) and CORS.
+                with recorder.lock:
+                    metrics, error = recorder.latest[side]
+                return self.send(200, metrics) if metrics else self.send(502, {"error": error})
             if path in STATIC_FILES:
                 name = STATIC_FILES[path]
                 ctype = "text/html; charset=utf-8" if name.endswith(".html") else "text/javascript; charset=utf-8"
                 return self.send(200, (root / name).read_bytes(), ctype)
             self.send(404, {"error": "not found"})
-
-        def proxy(self, url):
-            # Serving a real control plane's metrics from this origin keeps
-            # the dashboard working over HTTPS (no mixed content) and CORS.
-            try:
-                with urllib.request.urlopen(url, timeout=3) as resp:
-                    return self.send(200, resp.read())
-            except (urllib.error.URLError, OSError) as e:
-                return self.send(502, {"error": f"upstream {url}: {e}"})
 
         def do_POST(self):
             length = int(self.headers.get("Content-Length") or 0)
@@ -469,7 +513,9 @@ def main():
 
     world = World(args)
     threading.Thread(target=world.run, daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world, upstreams))
+    recorder = Recorder(world, upstreams)
+    threading.Thread(target=recorder.run, daemon=True).start()
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(world, upstreams, recorder))
     print(f"Dashboard:  http://localhost:{args.port}/")
     for side in ("current", "central"):
         source = f"proxied from {upstreams[side]}" if upstreams[side] else "simulated"

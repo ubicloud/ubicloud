@@ -126,6 +126,7 @@
     const S = state.sides[side];
     const prev = S.hist[S.hist.length - 1];
     const sample = { t, m, gen: Date.parse(m.generated_at) || t };
+    if (prev && prev.gen === sample.gen) return; // same snapshot polled twice
     sample.rates = {
       arrivals: rate(S.hist, sample, "requests_received_total"),
       allocations: rate(S.hist, sample, "allocated_total"),
@@ -226,10 +227,38 @@
     return upstreams[side] ? `${upstreams[side]} (via this server)` : "simulated by this server";
   }
 
+  // Start with what the serving process recorded before this page opened,
+  // so a reload or a late viewer doesn't begin with empty charts.
+  async function loadHistory() {
+    const sides = SIDES.filter((side) => cfg[side] === DEFAULTS[side]);
+    if (!sides.length) return;
+    try {
+      const r = await fetch(`/history?seconds=${Math.round(HISTORY_MS / 1000)}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const { now, samples } = await r.json();
+      const offset = now - Date.now(); // server clock vs this browser's
+      const merged = sides.flatMap((side) => (samples[side] || []).map(([t, m]) => ({ side, t: t - offset, m })));
+      merged.sort((a, b) => a.t - b.t);
+      for (const { side, t, m } of merged) {
+        try {
+          validate(m);
+          ingest(side, t, m);
+        } catch {
+          // Skip a malformed historical sample; live polling reports errors.
+        }
+      }
+    } catch {
+      // No history available; charts fill as polls arrive.
+    }
+  }
+
   async function loadServerConfig() {
     try {
       const r = await fetch("/config", { cache: "no-store" });
       if (r.ok) upstreams = (await r.json()).upstreams || {};
+      // A real endpoint saved by hand earlier is the one this server proxies:
+      // go through the server so it also works over HTTPS.
+      for (const side of SIDES) if (upstreams[side] && cfg[side] === upstreams[side]) cfg[side] = DEFAULTS[side];
     } catch {
       // Opened from a static server without /config; the defaults still work.
     }
@@ -496,7 +525,11 @@
           }
           const pts = run.map((s) => [X(s.t), Y(se.value(s))]);
           if (c.wash) el("path", { d: `${pathOf(pts)}L${pts.at(-1)[0].toFixed(1)},${Y(0)}L${pts[0][0].toFixed(1)},${Y(0)}Z`, style: `fill: ${se.color}`, "fill-opacity": 0.1 }, plot);
-          el("path", { d: pathOf(pts), fill: "none", style: `stroke: ${se.color}`, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, plot);
+          // In head-to-head charts the first side is drawn wider underneath, so
+          // when both sides report the same values it shows as an outline
+          // instead of disappearing behind the second line.
+          const under = c.series.length > 1 && se === c.series[0] && c.series.every((x) => x.side !== se.side || x === se);
+          el("path", { d: pathOf(pts), fill: "none", style: `stroke: ${se.color}`, "stroke-width": under ? 5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, plot);
         }
         const last = samples.at(-1);
         if (!se.lo && last && x1 - last.t <= gap) {
@@ -740,7 +773,7 @@
   const STATS = [
     { key: "waiting", label: "Waiting now", value: (s) => s.m.waiting.count, fmt: fmtInt, min: 5 },
     { key: "oldest", label: "Oldest wait", value: (s) => s.m.waiting.oldest_seconds, fmt: fmtDur, min: 2 },
-    { key: "p95", label: "p95 wait for host, 60s", value: (s) => s.m.latency.queue_to_allocated.p95_seconds, fmt: fmtDur, min: 2 },
+    { key: "p95", label: "p95 wait for host (last 60s)", value: (s) => s.m.latency.queue_to_allocated.p95_seconds, fmt: fmtDur, min: 2 },
   ];
 
   function buildColumns() {
@@ -813,6 +846,14 @@
     }
 
     const both = (value, fmt) => SIDES.map((side) => ({ side, label: SIDE_INFO[side].name, color: SIDE_INFO[side].color, fmt, value }));
+    addChart("h2h-incoming", {
+      group: "flow", height: 200, aria: "Incoming requests per minute, current vs central",
+      series: both((s) => s.rates.arrivals, fmtRate),
+    });
+    addChart("h2h-placed", {
+      group: "flow", height: 200, aria: "Requests placed on a host per minute, current vs central",
+      series: both((s) => s.rates.allocations, fmtRate),
+    });
     addChart("h2h-waiting", { height: 200, aria: "Requests waiting for a host, current vs central", series: both((s) => s.m.waiting.count, fmtInt) });
     addChart("h2h-wait", {
       height: 200, scaleKind: "duration", aria: "Wait time, current vs central",
@@ -937,8 +978,12 @@
     head.append(title, hint);
     host.appendChild(head);
     if (!mk) {
-      title.textContent = "Waiting for a burst";
-      hint.textContent = "python3 demo/scheduler-dashboard/inject.py --count 300";
+      title.textContent = "No burst yet";
+      // inject.py only reaches the simulated sides of this server.
+      const simulated = SIDES.some((side) => cfg[side] === DEFAULTS[side] && !upstreams[side]);
+      hint.textContent = simulated
+        ? "python3 demo/scheduler-dashboard/inject.py --count 300"
+        : `Marked when one poll sees ${BURST_MIN}+ new requests`;
       return;
     }
     title.textContent = `Burst of ${fmtInt(markerSize(mk))} requests: share placed on a host`;
@@ -1084,23 +1129,23 @@
     document.getElementById("load-down").addEventListener("click", () => control("/load", { delta_per_min: -10 }));
 
     const form = document.getElementById("settings");
-    const hint = (side) => {
-      const value = form.elements[side].value.trim();
-      form.querySelector(`[data-hint="${side}"]`).textContent = value === DEFAULTS[side]
-        ? (upstreams[side] ? `This server fetches it from ${upstreams[side]}` : "Simulated by this server")
-        : "Fetched directly by the browser: needs CORS, and https if the page is https";
-    };
+    // The fields show the real endpoint. Entering the one this server proxies
+    // keeps fetching through the server (HTTPS- and CORS-safe); any other URL
+    // is fetched by the browser directly.
     const fill = (v) => {
-      for (const k of Object.keys(DEFAULTS)) form.elements[k].value = v[k];
-      SIDES.forEach(hint);
+      for (const k of Object.keys(DEFAULTS)) {
+        form.elements[k].value = SIDES.includes(k) && v[k] === DEFAULTS[k] && upstreams[k] ? upstreams[k] : v[k];
+      }
     };
-    for (const side of SIDES) form.elements[side].addEventListener("input", () => hint(side));
-    form.closest("details").addEventListener("toggle", () => SIDES.forEach(hint));
+    form.closest("details").addEventListener("toggle", (e) => e.target.open && fill(cfg));
     fill(cfg);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const next = {};
       for (const k of Object.keys(DEFAULTS)) next[k] = form.elements[k].value.trim();
+      for (const side of SIDES) {
+        if (!next[side] || next[side] === upstreams[side]) next[side] = DEFAULTS[side];
+      }
       next.interval = Math.max(250, Number(next.interval) || DEFAULTS.interval);
       const endpointsChanged = next.current !== cfg.current || next.central !== cfg.central;
       Object.assign(cfg, next);
@@ -1125,5 +1170,8 @@
   buildColumns();
   bindControls();
   render();
-  loadServerConfig().then(poll);
+  loadServerConfig().then(loadHistory).then(() => {
+    render();
+    poll();
+  });
 })();

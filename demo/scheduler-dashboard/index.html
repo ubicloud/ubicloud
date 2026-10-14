@@ -135,7 +135,6 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%;
   }
   .panel .row { display: flex; gap: 8px; justify-content: flex-end; }
-  .panel .hint { font-size: 11px; color: var(--muted); }
   .col-head .col-err { color: var(--critical); font-weight: 600; }
   .col-err:empty { display: none; }
 
@@ -248,8 +247,8 @@
     <details class="settings">
       <summary>Endpoints</summary>
       <form class="panel" id="settings">
-        <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"><small class="hint" data-hint="current"></small></label>
-        <label>Central metrics URL <input name="central" autocomplete="off" spellcheck="false"><small class="hint" data-hint="central"></small></label>
+        <label>Current metrics URL <input name="current" autocomplete="off" spellcheck="false"></label>
+        <label>Central metrics URL <input name="central" autocomplete="off" spellcheck="false"></label>
         <label>Load control URL (for the buttons; leave empty until wired) <input name="control" autocomplete="off" spellcheck="false" placeholder="e.g. http://localhost:8787"></label>
         <label>Poll interval (ms) <input name="interval" type="number" min="250" step="250"></label>
         <div class="row"><button type="button" id="settings-reset">Defaults</button><button type="submit" class="primary">Apply</button></div>
@@ -261,6 +260,14 @@
 
   <h3 class="section">Head to head</h3>
   <section class="grid2">
+    <div class="card">
+      <div class="card-head"><h2>Incoming requests / min</h2><div class="legend" data-legend="sides"></div></div>
+      <div class="chart" id="h2h-incoming"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Placed on a host / min</h2><div class="legend" data-legend="sides"></div></div>
+      <div class="chart" id="h2h-placed"></div>
+    </div>
     <div class="card">
       <div class="card-head"><h2>Requests waiting for a host</h2><div class="legend" data-legend="sides"></div></div>
       <div class="chart" id="h2h-waiting"></div>
