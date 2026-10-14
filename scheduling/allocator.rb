@@ -133,7 +133,11 @@ module Scheduling::Allocator
   end
 
   class Allocation
-    attr_reader :score
+    attr_reader :score, :candidate_host
+
+    def storage_allocation
+      @device_allocations.first
+    end
 
     # simplecov:disable
     def self.freeze
@@ -560,11 +564,16 @@ module Scheduling::Allocator
 
     def best_allocation(request)
       key = request.to_h.except(:vm_id, :diagnostics)
-      equivalence_class = (@classes[key] ||= EquivalenceClass.new(request, @changed_host_ids.size))
+      equivalence_class = (@classes[key] ||= new_equivalence_class(request))
       hosts = equivalence_class.hosts(@changed_host_ids).reject do
-        (holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id
+        ((holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id) ||
+          (request.ip4_enabled && !it[:ipv4_available])
       end
       BestFitAllocation.best_of(hosts, request, free_provisionings: @free_provisionings)
+    end
+
+    def new_equivalence_class(request)
+      EquivalenceClass.new(request, @changed_host_ids.size)
     end
 
     def shortfall(host, request)
@@ -592,6 +601,53 @@ module Scheduling::Allocator
         end
         @hosts.values
       end
+
+      # Adds usage that the database does not have yet to a host's row.
+      def add_usage(host_id, usage)
+        return unless (row = @hosts[host_id])
+
+        row[:used_cores] += usage[:cores]
+        row[:used_hugepages_1g] += usage[:hugepages_1g]
+        row[:vm_provisioning_count] += 1
+        row[:ipv4_available] = usage[:ipv4_available]
+        row[:available_storage_gib] -= usage[:storage_gib].values.sum
+        row[:storage_devices] = row[:storage_devices]
+          .map { it.merge("available_storage_gib" => it["available_storage_gib"] - usage[:storage_gib].fetch(it["id"], 0)) }
+          .sort_by { it["available_storage_gib"] }
+      end
+    end
+  end
+
+  # Plans allocations for a Scheduling::BulkCommit instead of committing
+  # them. Hosts are not queried again after an allocation, as the database
+  # has no planned usage yet. Instead, every request class adds the usage
+  # planned on its hosts, including classes loaded later in the round.
+  class DeferredCandidateCache < CandidateCache
+    def initialize(bulk_commit:, **)
+      super(**)
+      @bulk_commit = bulk_commit
+      @planned_usage = []
+    end
+
+    # Returns whether it planned the allocation. A VM it cannot plan, e.g.,
+    # one with a GPU, needs a commit of its own.
+    def plan(vm, request)
+      allocation = best_allocation(request)
+      fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
+      return false unless @bulk_commit.plannable?(request, allocation)
+
+      usage = @bulk_commit.plan(vm, request, allocation)
+      @planned_usage << [allocation.vm_host_id, usage]
+      @classes.each_value { it.add_usage(allocation.vm_host_id, usage) }
+      true
+    end
+
+    private
+
+    def new_equivalence_class(request)
+      equivalence_class = super
+      @planned_usage.each { |host_id, usage| equivalence_class.add_usage(host_id, usage) }
+      equivalence_class
     end
   end
 
@@ -877,7 +933,7 @@ module Scheduling::Allocator
     # room for a new boot image or for an emergency.
     RESERVED_STORAGE_GIB = 100
 
-    attr_reader :is_valid, :total, :used, :requested, :volume_to_device_map
+    attr_reader :is_valid, :total, :used, :requested, :volume_to_device_map, :storage_device_allocations
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
