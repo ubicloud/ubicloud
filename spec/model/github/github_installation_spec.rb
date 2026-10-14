@@ -7,6 +7,15 @@ RSpec.describe GithubInstallation do
     described_class.create(installation_id: 123, project_id: Project.create(name: "default").id, name: "test-user", type: "User")
   }
 
+  it "creates the vcpu usage rows" do
+    expect(DB[:github_installation_vcpu_usage].where(installation_id: installation.id).select_order_map([:provider, :arch, :used_vcpus])).to eq([
+      ["aws", "x64", 0],
+      ["aws", "arm64", 0],
+      ["metal", "x64", 0],
+      ["metal", "arm64", 0],
+    ])
+  end
+
   it "returns sum of used vm cores" do
     vms = [2, 4, 8].map { create_vm(cores: it) }
 

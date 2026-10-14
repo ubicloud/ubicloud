@@ -16,6 +16,18 @@ class GithubInstallation < Sequel::Model
   plugin ResourceMethods
   dataset_module Pagination
 
+  VCPU_QUOTA_RESOURCE_TYPES = {
+    ["metal", "x64"] => "GithubRunnerVCpu",
+    ["metal", "arm64"] => "GithubRunnerVCpuArm",
+    ["aws", "x64"] => "GithubRunnerVCpuAws",
+    ["aws", "arm64"] => "GithubRunnerVCpuArmAws",
+  }.freeze
+
+  def after_create
+    super
+    DB[:github_installation_vcpu_usage].import([:installation_id, :provider, :arch, :used_vcpus], VCPU_QUOTA_RESOURCE_TYPES.keys.map { |provider, arch| [id, provider, arch, 0] })
+  end
+
   def self.with_github_installation_id(installation_id)
     first(installation_id:)
   end
