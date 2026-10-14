@@ -81,7 +81,10 @@ class Clover
       runner_id:,
     )
 
-    return {error: {message: "Unregistered runner"}} unless runner
+    unless runner
+      Clog.emit("Unregistered runner", {unregistered_runner: {installation_id:, repository_name:, runner_id:, action: data["action"]}}) if Config.simulation_mode
+      return {error: {message: "Unregistered runner"}}
+    end
 
     runner.this.update(workflow_job: Sequel.pg_jsonb(job.except("steps")))
 
