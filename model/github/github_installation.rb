@@ -78,5 +78,6 @@ end
 # Referenced By:
 #  github_custom_label                | github_custom_label_installation_id_fkey                       | (installation_id) REFERENCES github_installation(id)
 #  github_installation_private_subnet | github_installation_private_subnet_github_installation_id_fkey | (github_installation_id) REFERENCES github_installation(id)
+#  github_installation_vcpu_usage     | github_installation_vcpu_usage_installation_id_fkey            | (installation_id) REFERENCES github_installation(id) ON DELETE CASCADE
 #  github_repository                  | github_repository_installation_id_fkey                         | (installation_id) REFERENCES github_installation(id)
 #  github_runner                      | github_runner_installation_id_fkey                             | (installation_id) REFERENCES github_installation(id)
