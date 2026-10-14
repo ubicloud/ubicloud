@@ -57,6 +57,19 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(vms.map { it.strand.schedule }).to all(be < Time.now)
     end
 
+    it "counts the checks and allocations of runner vms in the scheduler metrics" do
+      create_host
+      runner_vm, failed_vm = Array.new(2) { create_waiting_vm }
+      [runner_vm, failed_vm].each { it.update(location_id: Location::GITHUB_RUNNERS_ID) }
+      create_runner(runner_vm)
+      create_runner(failed_vm)
+      failed_vm.update(vcpus: 30, memory_gib: 120)
+      create_waiting_vm
+
+      expect { nx.wait }.to nap(5)
+      expect(DB[:scheduler_metric_counter].to_hash(:name, :value)).to eq("scheduling_checks_total" => 2, "allocated_total" => 1)
+    end
+
     it "marks the vms without capacity as waiting for capacity once" do
       vm = create_waiting_vm
 
