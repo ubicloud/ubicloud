@@ -794,10 +794,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         project.set_ff_early_jit_registration(false)
         vm.update(allocated_at: nil, provisioned_at: nil)
         Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "wait_allocation")
-        expect(Config).to receive(:central_vm_scheduler).and_return(true)
       end
 
       it "replaces the metal vm of a runner that the scheduler spilled" do
+        expect(Config).to receive(:central_vm_scheduler).and_return(true)
         runner.incr_spill_over
 
         expect { nx.wait_vm }.to hop("allocate_vm")
@@ -807,10 +807,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "waits for the scheduler to allocate the vm" do
+        expect(Config).to receive(:central_vm_scheduler).and_return(true).twice
         vm.incr_waiting_for_capacity
         vm.update(created_at: now - 61)
 
-        expect { nx.wait_vm }.to nap(10)
+        expect { nx.wait_vm }.to nap(5 * 60)
         expect(runner.spill_over_set?).to be(false)
       end
     end
