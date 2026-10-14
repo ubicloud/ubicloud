@@ -5,8 +5,8 @@
 (() => {
   const SIDES = ["current", "central"];
   const SIDE_INFO = {
-    current: { name: "Current", sub: "Each runner polls; allocator retries on a 5–30s backoff", color: "var(--current)" },
-    central: { name: "Sorting Hat", sub: "One queue, dispatched when capacity changes", color: "var(--central)" },
+    current: { name: "Current", color: "var(--current)" },
+    central: { name: "Sorting Hat", color: "var(--central)" },
   };
   const STAGES = [
     { key: "waiting_admission", label: "Waiting: admission", color: "var(--stage-admission)" },
@@ -26,16 +26,13 @@
   const SIZE_STATS = {
     oldest: {
       kind: "duration", fmt: (v) => fmtDur(v), value: (s, size) => bucket(s, size)?.oldest_seconds ?? null,
-      note: "Large runners starving shows as the 16 and 30 vCPU charts climbing while the small ones stay flat.",
     },
     waiting: {
       kind: "count", fmt: (v) => fmtInt(v), value: (s, size) => bucket(s, size)?.waiting ?? null,
-      note: "How many requests of each size are waiting for a host.",
     },
     vcpus: {
       kind: "count", fmt: (v) => fmtInt(v),
       value: (s, size) => (bucket(s, size) ? bucket(s, size).waiting * size : null),
-      note: "Waiting requests × size: how much of the backlog each size really is.",
     },
   };
   const AGE_LABELS = ["≤10s", "≤30s", "≤1m", "≤2m", "≤5m", "≤10m", "≤30m", "≤1h", ">1h"];
@@ -76,8 +73,6 @@
     windowMs: [120000, 300000, 900000].includes(stored.windowMs) ? stored.windowMs : 300000,
     waitStat: WAIT_STATS[stored.waitStat] ? stored.waitStat : "oldest",
     sizeStat: SIZE_STATS[stored.sizeStat] ? stored.sizeStat : "oldest",
-    paused: false,
-    frozenEnd: null,
     hover: null, // {t, chartId}
     markers: [], // {t, last, n: {side: count}}
     sides: {},
@@ -190,7 +185,7 @@
   function latestT() {
     return Math.max(0, ...SIDES.map((s) => state.sides[s].hist.at(-1)?.t || 0)) || Date.now();
   }
-  const viewEnd = () => (state.paused ? state.frozenEnd : latestT());
+  const viewEnd = latestT;
 
   // Index of the last sample at or before t (or -1).
   function indexAtOrBefore(hist, t) {
@@ -836,13 +831,11 @@
       const titles = document.createElement("div");
       const h2 = document.createElement("h2");
       h2.textContent = info.name;
-      const p = document.createElement("p");
-      p.textContent = info.sub;
       const err = document.createElement("p");
       err.className = "col-err";
       err.id = `err-${side}`;
       err.setAttribute("role", "status");
-      titles.append(h2, p, err);
+      titles.append(h2, err);
       head.append(bar, titles);
       col.appendChild(head);
 
@@ -930,9 +923,6 @@
     }
   }
 
-  function renderSizeNote() {
-    document.getElementById("size-note").textContent = `Same scale for every size. ${SIZE_STATS[state.sizeStat].note}`;
-  }
 
   function renderScoreboard() {
     const samples = Object.fromEntries(SIDES.map((side) => [side, sampleAt(side)]));
@@ -951,9 +941,7 @@
 
   function renderConnections() {
     const lastOk = Math.max(...SIDES.map((side) => state.sides[side].lastOk));
-    document.getElementById("updated").textContent = state.paused
-      ? "Paused"
-      : lastOk ? `Updated ${Math.max(0, Math.round((Date.now() - lastOk) / 1000))}s ago` : "Connecting…";
+    document.getElementById("updated").textContent = lastOk ? `Updated ${Math.max(0, Math.round((Date.now() - lastOk) / 1000))}s ago` : "Connecting…";
     const labels = { live: "● Live", stale: "◐ Stale", error: "✕ Error", connecting: "… Connecting" };
     for (const side of SIDES) {
       const pill = document.getElementById(`conn-${side}`);
@@ -971,7 +959,7 @@
       pill.append(key, name, status);
       const error = state.sides[side].error;
       pill.title = `${sourceOf(side)}${error ? ` — ${error}` : ""}`;
-      document.getElementById(`col-${side}`).classList.toggle("stale", st !== "live" && !state.paused);
+      document.getElementById(`col-${side}`).classList.toggle("stale", st !== "live");
       document.getElementById(`err-${side}`).textContent = st === "live" || !error ? "" : `Can't load metrics from ${sourceOf(side)}: ${error}`;
     }
   }
@@ -1012,7 +1000,6 @@
   function render() {
     renderConnections();
     renderScoreboard();
-    renderSizeNote();
     renderCharts();
     renderTable();
   }
@@ -1156,18 +1143,9 @@
       state.sizeStat = v;
       writeStored({ sizeStat: v });
       for (const c of groups["by-size"]) c.scaleKind = SIZE_STATS[v].kind;
-      renderSizeNote();
       renderCharts();
     });
 
-    const pause = document.getElementById("pause");
-    pause.addEventListener("click", () => {
-      state.paused = !state.paused;
-      state.frozenEnd = state.paused ? latestT() : null;
-      pause.textContent = state.paused ? "Resume" : "Pause";
-      pause.setAttribute("aria-pressed", String(state.paused));
-      render();
-    });
     document.getElementById("clear").addEventListener("click", () => {
       for (const s of SIDES) state.sides[s].hist = [];
       state.markers = [];

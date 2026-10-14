@@ -110,7 +110,6 @@
   h3 { font-size: 11px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
   h3.section { display: flex; align-items: center; gap: 10px; }
   h3.section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-  .sub { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
   .muted { color: var(--muted); }
 
   .conns { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -139,7 +138,6 @@
   .seg.small button { font-size: 12px; padding: 2px 8px; }
   button.primary { background: var(--action); color: #fff; border-color: var(--action); font-weight: 600; }
   button.primary:hover { opacity: 0.9; background: var(--action); }
-  #pause[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
 
   details.settings { position: relative; }
   details.settings summary {
@@ -187,7 +185,6 @@
 
   /* By runner size */
   .size-card .card-head { margin-bottom: 8px; }
-  .size-note { margin: 0; flex: 1; min-width: 240px; font-size: 12px; color: var(--muted); }
   .size-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px 12px; }
   @media (max-width: 1100px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .size-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -303,7 +300,6 @@
   <div class="toolbar">
     <div>
       <h1>Current vs Sorting Hat scheduler</h1>
-      <p class="sub">Same job stream to both control planes. Side-by-side charts share a scale. Red lines are paging thresholds.</p>
     </div>
   <div class="controls">
     <div class="seg" role="group" aria-label="Time window">
@@ -311,7 +307,6 @@
       <button data-window="300000">5m</button>
       <button data-window="900000">15m</button>
     </div>
-    <button id="pause" aria-pressed="false">Pause</button>
     <button id="clear">Clear</button>
     <span class="spacer"></span>
     <details class="settings">
@@ -395,7 +390,6 @@
   <h3 class="section">By runner size</h3>
   <section class="card size-card">
     <div class="card-head">
-      <p class="size-note" id="size-note"></p>
       <div class="seg small" role="group" aria-label="By-size statistic">
         <button data-sizestat="oldest">Oldest wait</button><button data-sizestat="waiting">Waiting</button><button data-sizestat="vcpus">Waiting vCPU</button>
       </div>
