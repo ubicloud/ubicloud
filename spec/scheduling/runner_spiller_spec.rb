@@ -37,6 +37,14 @@ RSpec.describe Scheduling::RunnerSpiller do
     expect(spilled([small, large, recent])).to eq([small, large])
   end
 
+  it "spills nothing without spill capacity" do
+    runner = create_runner("ubicloud-standard-2", waited: 100)
+    expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(0).twice
+
+    expect(spiller.spill([runner.vm_id])).to eq([])
+    expect(runner.spill_over_set?).to be(false)
+  end
+
   it "does not spill runners that cannot spill" do
     runners = [
       create_runner("ubicloud-standard-2", waited: 10),
