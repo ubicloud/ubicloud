@@ -73,7 +73,19 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         .and change { GithubRunner.where(label: "ubicloud").count }.from(1).to(3)
         .and change { GithubRunner.where(label: "ubicloud-standard-4").count }.from(1).to(2)
         .and change { GithubRunner.where(label: "ubicloud-standard-8").count }.from(1).to(2)
+      expect(Strand.where(prog: "Github::GithubRunnerNexus").select_order_map(:schedule)).to eq([now, now + 1, now + 2, now + 3])
       expect(nx.polling_interval).to eq(5 * 60)
+    end
+
+    it "spreads the start of many runners over the start window" do
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [{id: 1, run_attempt: 1, status: "queued", created_at: now}]})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 1).and_return({jobs: Array.new(120) { {status: "queued", labels: ["ubicloud"]} }})
+
+      expect { nx.check_queued_jobs }.to change(GithubRunner, :count).from(0).to(120)
+      schedules = Strand.where(prog: "Github::GithubRunnerNexus").select_order_map(:schedule)
+      expect(schedules.first).to eq(now)
+      expect(schedules.last).to eq(now + 59.5)
     end
 
     it "raises if runtime is too long" do

@@ -16,7 +16,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
-  def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
+  def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil, schedule: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
@@ -31,7 +31,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         actual_label: actual_label || label,
       )
 
-      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start", **({schedule:} if schedule))
     end
   end
 

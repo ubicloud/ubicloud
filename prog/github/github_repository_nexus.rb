@@ -3,6 +3,8 @@
 class Prog::Github::GithubRepositoryNexus < Prog::Base
   subject_is :github_repository
 
+  RUNNER_START_WINDOW = 60.0
+
   def self.assemble(installation, name, default_branch)
     DB.transaction do
       repository = GithubRepository.new(installation_id: installation.id, name:)
@@ -64,7 +66,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       end
     end
 
-    queued_labels.each do |(actual_label, label), count|
+    required_runners = queued_labels.filter_map do |(actual_label, label), count|
       idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
       # The calculation of the required_runner_count isn't atomic because it
       # requires multiple API calls and database queries. However, it will
@@ -72,17 +74,28 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       # necessary, the excess will be recycled after 5 minutes at no extra cost
       # to the customer. If fewer runners are created than needed, the system
       # will generate more in the next cycle.
-      next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
+      next if (required_runner_count = count - idle_runner_count) <= 0
 
       Clog.emit("extra runner needed", {needed_extra_runner: {repository_name: github_repository.name, label:, actual_label:, count: required_runner_count}})
+      [actual_label, label, required_runner_count]
+    end
 
+    # The quota check of runners isn't atomic, so runners starting at the same
+    # time can all pass it together. Spread their start over a time window to
+    # let each runner see the usage of the previous ones.
+    total_runner_count = required_runners.sum { it[2] }
+    start_interval = [1.0, RUNNER_START_WINDOW / total_runner_count].min
+    schedule = Time.now
+    required_runners.each do |actual_label, label, required_runner_count|
       required_runner_count.times do
         Prog::Github::GithubRunnerNexus.assemble(
           github_repository.installation,
           repository_name: github_repository.name,
           label:,
           actual_label:,
+          schedule:,
         )
+        schedule += start_interval
       end
     end
 

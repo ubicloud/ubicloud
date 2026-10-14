@@ -48,6 +48,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.label).to eq("ubicloud-standard-8")
     end
 
+    it "schedules the runner strand at the given time" do
+      runner = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud", schedule: now + 30).subject
+
+      expect(runner.strand.schedule).to eq(now + 30)
+    end
+
     it "fails if label is not valid" do
       expect {
         described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-1")
