@@ -33,7 +33,7 @@ module Util
   def self.create_root_certificate(common_name:, duration:)
     create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{common_name}",
-      extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+      extensions: ["basicConstraints=critical,CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
       duration:,
     ).map(&:to_pem)
   end

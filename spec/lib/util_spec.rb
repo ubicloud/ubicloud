@@ -73,13 +73,14 @@ RSpec.describe Util do
   end
 
   describe "#create_certificate" do
-    it "verifies with roots sharing a name in either bundle order" do
+    it "verifies strictly with roots sharing a name in either bundle order" do
       roots = Array.new(2) { described_class.create_root_certificate(common_name: "test CA", duration: 60 * 60 * 24 * 365) }
       root_cert, root_cert_key = roots.last
       cert, _ = described_class.create_certificate(subject: "/CN=server", duration: 60 * 60 * 24 * 30, issuer_cert: OpenSSL::X509::Certificate.new(root_cert), issuer_key: OpenSSL::PKey::EC.new(root_cert_key))
 
       [roots, roots.reverse].each do |bundle|
         store = OpenSSL::X509::Store.new
+        store.flags = OpenSSL::X509::V_FLAG_X509_STRICT
         bundle.each { |root, _| store.add_cert(OpenSSL::X509::Certificate.new(root)) }
         expect(store.verify(cert)).to be true
       end
