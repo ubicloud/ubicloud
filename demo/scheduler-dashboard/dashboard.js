@@ -20,6 +20,12 @@
     oldest: { label: "Oldest", path: "waiting.oldest_seconds" },
   };
   const SIZES = [2, 4, 8, 16, 30];
+  // What the by-size panel plots for each runner size, from `by_vcpus`.
+  const SIZE_STATS = {
+    oldest: { kind: "duration", fmt: (v) => fmtDur(v), value: (b) => b.oldest_seconds },
+    waiting: { kind: "count", fmt: (v) => fmtInt(v), value: (b) => b.waiting },
+    vcpus: { kind: "count", fmt: (v) => fmtInt(v), value: (b) => b.waiting * b.vcpus },
+  };
   const AGE_LABELS = ["≤10s", "≤30s", "≤1m", "≤2m", "≤5m", "≤10m", "≤30m", "≤1h", ">1h"];
   const SEVERITY_COLOR = { page: "var(--critical)", monitor: "var(--warning)" };
   const DEFAULTS = { current: "/current/scheduler/metrics", central: "/central/scheduler/metrics", control: "", interval: 1000 };
@@ -57,6 +63,7 @@
   const state = {
     windowMs: [120000, 300000, 900000].includes(stored.windowMs) ? stored.windowMs : 300000,
     waitStat: WAIT_STATS[stored.waitStat] ? stored.waitStat : "oldest",
+    sizeStat: SIZE_STATS[stored.sizeStat] ? stored.sizeStat : "oldest",
     paused: false,
     frozenEnd: null,
     hover: null, // {t, chartId}
@@ -371,7 +378,7 @@
       if (mk.t < x0 || mk.t > x1) continue;
       const x = X(mk.t);
       el("line", { x1: x, x2: x, y1: m.t - 4, y2: m.t + ih, style: "stroke: var(--ink-2)", "stroke-width": 1, opacity: 0.45 }, svg);
-      text(svg, x + 4, m.t - 6, `+${fmtInt(markerSize(mk))} burst`, { class: "marker" });
+      if (!c.compact) text(svg, x + 4, m.t - 6, `+${fmtInt(markerSize(mk))} burst`, { class: "marker" });
     }
     const plot = el("g", { "clip-path": `url(#${clipId})` }, svg);
     c.geom = { m, iw, ih, x0, x1, W };
@@ -462,17 +469,20 @@
   }
 
   function dataMax(c, x0, x1) {
+    // Only samples inside the window count; visibleSamples also returns the
+    // one before it, which can hold a much larger, no longer visible value.
+    const inView = (side) => visibleSamples(side, x0, x1).filter((s) => s.t >= x0);
     let max = 0;
     if (c.kind === "heatmap") {
-      for (const s of visibleSamples(c.side, x0, x1)) max = Math.max(max, ...(s.m.waiting.age_histogram?.counts || [0]));
+      for (const s of inView(c.side)) max = Math.max(max, ...(s.m.waiting.age_histogram?.counts || [0]));
       return max;
     }
     if (c.kind === "stacked") {
-      for (const s of visibleSamples(c.series[0].side, x0, x1)) max = Math.max(max, c.series.reduce((a, se) => a + (se.value(s) || 0), 0));
+      for (const s of inView(c.series[0].side)) max = Math.max(max, c.series.reduce((a, se) => a + (se.value(s) || 0), 0));
       return max;
     }
     for (const se of c.series) {
-      for (const s of visibleSamples(se.side, x0, x1)) max = Math.max(max, se.value(s) || 0);
+      for (const s of inView(se.side)) max = Math.max(max, se.value(s) || 0);
     }
     return max;
   }
@@ -487,7 +497,7 @@
   }
 
   function renderLines(c, scale, x0, x1) {
-    const m = { l: 44, r: 58, t: 18, b: 22 };
+    const m = c.margin || { l: 44, r: 58, t: 18, b: 22 };
     const f = frame(c, scale, x0, x1, c.height, m);
     const { svg, plot, X, Y } = f;
     const gap = gapMs();
@@ -694,71 +704,6 @@
     tip.style.top = `${top + c.notes.offsetHeight}px`;
   }
 
-  // ---------------------------------------------------------------- size bars
-
-  const sizeCharts = [];
-
-  function sizeChart(hostId, side) {
-    const host = document.getElementById(hostId);
-    const tip = document.createElement("div");
-    tip.className = "tip";
-    host.appendChild(tip);
-    sizeCharts.push({ host, tip, side });
-  }
-
-  function renderSizeChart(c, scale) {
-    const W = Math.max(280, c.host.clientWidth);
-    const rowH = 26;
-    const m = { l: 56, r: 64, t: 4, b: 22 };
-    const H = m.t + rowH * SIZES.length + m.b;
-    const iw = W - m.l - m.r;
-    const X = (v) => m.l + (Math.min(v, scale.max) / scale.max) * iw;
-    const sample = sampleAt(c.side);
-    const rows = SIZES.map((v) => sample?.m.by_vcpus.find((b) => b.vcpus === v) || { vcpus: v, waiting: 0, oldest_seconds: 0 });
-
-    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": `Oldest waiting request by runner size, ${SIDE_INFO[c.side].name}` });
-    for (const v of scale.ticks) {
-      const x = X(v);
-      el("line", { x1: x, x2: x, y1: m.t, y2: H - m.b, style: `stroke: ${v === 0 ? "var(--axis)" : "var(--grid)"}`, "stroke-width": 1 }, svg);
-      text(svg, x, H - 6, fmtDurAxis(v), { "text-anchor": "middle" });
-    }
-    rows.forEach((r, i) => {
-      const yc = m.t + rowH * i + rowH / 2;
-      text(svg, m.l - 8, yc + 4, `${r.vcpus} vCPU`, { "text-anchor": "end" });
-      const len = X(r.oldest_seconds) - m.l;
-      if (r.waiting > 0 && len > 0.5) {
-        const h = 14;
-        const rr = Math.min(4, len);
-        const y = yc - h / 2;
-        // Square at the baseline, 4px rounded at the data end.
-        const d = `M${m.l},${y}H${m.l + len - rr}Q${m.l + len},${y} ${m.l + len},${y + rr}V${y + h - rr}Q${m.l + len},${y + h} ${m.l + len - rr},${y + h}H${m.l}Z`;
-        el("path", { d, style: `fill: ${SIDE_INFO[c.side].color}` }, svg);
-        text(svg, X(r.oldest_seconds) + 6, yc + 4, fmtDur(r.oldest_seconds), { class: "end" });
-      }
-      const hit = el("rect", { x: 0, y: yc - rowH / 2, width: W, height: rowH, fill: "transparent", tabindex: 0 }, svg);
-      const show = () => {
-        c.tip.replaceChildren();
-        const head = document.createElement("div");
-        head.className = "t";
-        head.textContent = `${r.vcpus} vCPU runners`;
-        const line = document.createElement("div");
-        const b = document.createElement("b");
-        b.textContent = r.waiting ? fmtDur(r.oldest_seconds) : "none";
-        line.append(b, document.createTextNode(r.waiting ? ` oldest · ${fmtInt(r.waiting)} waiting` : " waiting"));
-        c.tip.append(head, line);
-        c.tip.style.display = "block";
-        c.tip.style.left = `${Math.min(W - c.tip.offsetWidth, Math.max(0, X(r.oldest_seconds) - 40))}px`;
-        c.tip.style.top = `${yc + rowH / 2 + 2}px`;
-      };
-      hit.addEventListener("pointerenter", show);
-      hit.addEventListener("focus", show);
-      hit.addEventListener("pointerleave", () => (c.tip.style.display = "none"));
-      hit.addEventListener("blur", () => (c.tip.style.display = "none"));
-    });
-    c.host.querySelector("svg")?.remove();
-    c.host.insertBefore(svg, c.tip);
-  }
-
   // ---------------------------------------------------------------- layout
 
   function legend(host, items) {
@@ -883,7 +828,6 @@
       card(col, "Age of waiting requests", `heat-${side}`, [{ label: "fewer → more requests", color: `linear-gradient(90deg, transparent, ${info.color})`, kind: "ramp" }]);
       card(col, "Requests by stage", `stages-${side}`, STAGES.map((s) => ({ label: s.label, color: s.color })).reverse());
       card(col, "Time in stage (oldest) vs paging limits", `stage-age-${side}`, STAGES.map((s) => ({ label: s.label, color: s.color, kind: "line" })));
-      card(col, "Oldest waiting request by runner size", `sizes-${side}`);
       cols.appendChild(col);
 
       addChart(`spread-${side}`, {
@@ -905,7 +849,6 @@
         alertMetrics: STAGES.map((st) => `stage_oldest_seconds.${st.key}`),
         series: STAGES.map((st) => ({ side, label: st.label, color: st.color, fmt: fmtDur, value: (s) => metric(s, `stage_oldest_seconds.${st.key}`) })),
       });
-      sizeChart(`sizes-${side}`, side);
     }
 
     const both = (value, fmt) => SIDES.map((side) => ({ side, label: SIDE_INFO[side].name, color: SIDE_INFO[side].color, fmt, value }));
@@ -927,6 +870,28 @@
       series: both((s) => metric(s, "fleet.utilization"), fmtPct),
     });
     addChart("h2h-checks", { height: 200, aria: "Scheduling checks per minute, current vs central", series: both((s) => s.rates.checks, fmtRate) });
+    // One small head-to-head chart per runner size, all on one scale, so a
+    // size that starves while others are placed stands out.
+    const grid = document.getElementById("size-grid");
+    for (const size of SIZES) {
+      const cell = document.createElement("div");
+      const h4 = document.createElement("h4");
+      h4.textContent = `${size} vCPU`;
+      const chart = document.createElement("div");
+      chart.className = "chart";
+      chart.id = `size-${size}`;
+      cell.append(h4, chart);
+      grid.appendChild(cell);
+      const bySize = (s) => {
+        const b = s.m.by_vcpus.find((x) => x.vcpus === size);
+        return b ? SIZE_STATS[state.sizeStat].value(b) : null;
+      };
+      addChart(`size-${size}`, {
+        group: "by-size", compact: true, height: 140, margin: { l: 40, r: 44, t: 8, b: 22 },
+        scaleKind: SIZE_STATS[state.sizeStat].kind, aria: `${size} vCPU runners, current vs central`,
+        series: both(bySize, (v) => SIZE_STATS[state.sizeStat].fmt(v)),
+      });
+    }
     for (const lg of document.querySelectorAll('[data-legend="sides"]')) {
       legend(lg, SIDES.map((s) => ({ label: SIDE_INFO[s].name, color: SIDE_INFO[s].color, kind: "line" })));
     }
@@ -941,9 +906,6 @@
       const scale = groupScale(list, x0, x1);
       for (const c of list) (c.kind === "heatmap" ? renderHeatmap : renderLines)(c, scale, x0, x1);
     }
-    const sizeMax = Math.max(0, ...sizeCharts.flatMap((c) => sampleAt(c.side)?.m.by_vcpus.map((b) => b.oldest_seconds) || []));
-    const sizeScale = niceScale(sizeMax, "duration");
-    for (const c of sizeCharts) renderSizeChart(c, sizeScale);
   }
 
   function renderScoreboard() {
@@ -1161,6 +1123,12 @@
     bindSeg("[data-stat]", "stat", state.waitStat, (v) => {
       state.waitStat = v;
       writeStored({ waitStat: v });
+      renderCharts();
+    });
+    bindSeg("[data-sizestat]", "sizestat", state.sizeStat, (v) => {
+      state.sizeStat = v;
+      writeStored({ sizeStat: v });
+      for (const c of groups["by-size"]) c.scaleKind = SIZE_STATS[v].kind;
       renderCharts();
     });
 

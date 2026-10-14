@@ -172,6 +172,14 @@
   .col-head h2 { font-size: 16px; }
   .col-head p { margin: 0; font-size: 12px; color: var(--muted); }
 
+  /* By runner size */
+  .size-card { margin-top: 12px; }
+  .size-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .size-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px 12px; }
+  @media (max-width: 1100px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .size-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .size-grid h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+
   /* Scoreboard */
   .scoreboard { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
   @media (max-width: 1100px) {
@@ -301,6 +309,18 @@
       <div class="card-head"><h2>Scheduling checks / min</h2><div class="legend" data-legend="sides"></div></div>
       <div class="chart" id="h2h-checks"></div>
     </div>
+  </section>
+
+  <section class="card size-card">
+    <div class="card-head">
+      <h2>By runner size</h2>
+      <div class="seg small" role="group" aria-label="By-size statistic">
+        <button data-sizestat="oldest">Oldest wait</button><button data-sizestat="waiting">Waiting</button><button data-sizestat="vcpus">Waiting vCPU</button>
+      </div>
+      <div class="legend" data-legend="sides"></div>
+    </div>
+    <p class="size-note">Same scale for every size. Large runners starving shows as the 16 and 30 vCPU charts climbing while the small ones stay flat.</p>
+    <div class="size-grid" id="size-grid"></div>
   </section>
 
   <h3 class="section">Inside each scheduler</h3>
