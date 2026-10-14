@@ -62,23 +62,26 @@ At runtime, `inject.py` options adjust the load:
 
 ## Point it at real control planes
 
-**Recommended:** have the server proxy the real endpoint, so the dashboard
+**Recommended:** have the server proxy the real endpoints, so the dashboard
 keeps fetching from its own origin:
 
 ```bash
 python3 demo/scheduler-dashboard/mock_server.py \
-  --current-url http://144.76.171.226:9292/scheduler/metrics \
-  --hosts 6 --host-vcpus 48 --rate 0
+  --current-url http://144.76.169.97:9292/scheduler/metrics \
+  --central-url http://144.76.169.97:3000/scheduler/metrics
 ```
 
 - **Why proxy:** this avoids CORS, and avoids the browser blocking plain-HTTP
   endpoints when the page is served over HTTPS (e.g. through a Cloudflare
   tunnel).
-- **The other side:** pass `--central-url` too once the central scheduler
-  has an endpoint. Until then that side stays simulated.
-- **Sizing the simulation:** match `--hosts` and `--host-vcpus` to the real
-  fleet. Pass `--rate 0` so the simulated side only gets the bursts you
-  inject, not made-up background traffic.
+- **Settings panel:** the Endpoints panel keeps the default paths
+  (`/current/scheduler/metrics`, `/central/scheduler/metrics`) and shows
+  which real endpoint the server fetches for each.
+- **Unreachable endpoints:** if one can't be reached, its column says so
+  with the error, e.g. connection refused.
+- **Mixing real and simulated:** leave out either flag to keep that side
+  simulated. Then match `--hosts` and `--host-vcpus` to the real fleet, and
+  pass `--rate 0` so the simulated side only gets the bursts you inject.
 
 **Alternatively, fetch directly from the browser.** Use the **Endpoints** menu
 in the top bar, or URL parameters:
@@ -105,12 +108,14 @@ set the URL to `http://localhost:8787`.
 
 From top to bottom:
 
-1. **Head to head.** Four charts with both control planes on each:
+1. **Burst race.** One bar per control plane showing how much of the latest
+   burst has been placed on a host, with a ✓ and the drain time once done.
+2. **Head to head.** Four charts with both control planes on each:
    - Requests waiting for a host.
    - Wait time, switchable between p50, p95 and oldest.
    - Fleet utilization, with the 80% admission gate as an amber line.
    - Scheduling checks per minute: control-plane work spent on scheduling.
-2. **Inside each scheduler.** One column per control plane; side-by-side
+3. **Inside each scheduler.** One column per control plane; side-by-side
    charts share a scale.
    - Three headline numbers. Central's show the change versus current.
    - Wait time spread: a p50–p95 band with the oldest request as a line.
@@ -124,7 +129,7 @@ From top to bottom:
      the data shows as a note in the corner until the data gets within 25%
      of it.
    - Oldest waiting request by runner size, to show large runners starving.
-3. **Snapshot table.** Collapsed at the bottom: the latest values as a
+4. **Snapshot table.** Collapsed at the bottom: the latest values as a
    table.
 
 Every time chart has a crosshair that's synced across all charts. When one

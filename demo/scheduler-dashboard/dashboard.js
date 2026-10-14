@@ -64,6 +64,8 @@
     sides: {},
   };
   for (const s of SIDES) state.sides[s] = { hist: [], error: null, lastOk: 0 };
+  // Real endpoints the serving process proxies each default path to (GET /config).
+  let upstreams = {};
 
   // ---------------------------------------------------------------- format
 
@@ -208,10 +210,28 @@
     const timer = setTimeout(() => ctl.abort(), Math.max(1500, cfg.interval * 2));
     try {
       const r = await fetch(cfg[side], { signal: ctl.signal, cache: "no-store" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) {
+        const detail = await r.json().then((b) => b.error).catch(() => null);
+        throw new Error(detail || `HTTP ${r.status}`);
+      }
       return await r.json();
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  // Where a side's data really comes from, for the settings panel and errors.
+  function sourceOf(side) {
+    if (cfg[side] !== DEFAULTS[side]) return cfg[side];
+    return upstreams[side] ? `${upstreams[side]} (via this server)` : "simulated by this server";
+  }
+
+  async function loadServerConfig() {
+    try {
+      const r = await fetch("/config", { cache: "no-store" });
+      if (r.ok) upstreams = (await r.json()).upstreams || {};
+    } catch {
+      // Opened from a static server without /config; the defaults still work.
     }
   }
 
@@ -740,7 +760,11 @@
       h2.textContent = info.name;
       const p = document.createElement("p");
       p.textContent = info.sub;
-      titles.append(h2, p);
+      const err = document.createElement("p");
+      err.className = "col-err";
+      err.id = `err-${side}`;
+      err.setAttribute("role", "status");
+      titles.append(h2, p, err);
       head.append(bar, titles);
       col.appendChild(head);
 
@@ -859,9 +883,91 @@
       status.className = "state";
       status.textContent = labels[st];
       pill.append(key, name, status);
-      pill.title = `${cfg[side]}${state.sides[side].error ? ` — ${state.sides[side].error}` : ""}`;
+      const error = state.sides[side].error;
+      pill.title = `${sourceOf(side)}${error ? ` — ${error}` : ""}`;
       document.getElementById(`col-${side}`).classList.toggle("stale", st !== "live" && !state.paused);
+      document.getElementById(`err-${side}`).textContent = st === "live" || !error ? "" : `Can't load metrics from ${sourceOf(side)}: ${error}`;
     }
+  }
+
+  function burstOutcome(side, mk) {
+    const h = state.sides[side].hist;
+    const before = h[indexAtOrBefore(h, mk.t - 1)];
+    const baseline = before ? before.m.waiting.count : 0;
+    const start = Math.max(0, indexAtOrBefore(h, mk.t));
+    const end = indexAtOrBefore(h, viewEnd());
+    let peakIdx = -1;
+    let peak = 0;
+    for (let i = start; i <= end; i++) {
+      if (h[i].m.waiting.count > peak) {
+        peak = h[i].m.waiting.count;
+        peakIdx = i;
+      }
+    }
+    // Durations use the control plane's own clock (generated_at), so they
+    // agree with its wait times even when a mock runs faster than real time.
+    const startGen = before ? before.gen : h[start]?.gen;
+    let drainedMs = null;
+    if (peakIdx >= 0) {
+      for (let i = peakIdx; i <= end; i++) {
+        if (h[i].m.waiting.count <= baseline + 2) {
+          drainedMs = h[i].gen - startGen;
+          break;
+        }
+      }
+    }
+    const remaining = end >= 0 ? Math.max(0, h[end].m.waiting.count - baseline) : 0;
+    return {
+      served: drainedMs != null ? 1 : Math.min(1, Math.max(0, 1 - remaining / markerSize(mk))),
+      drainedMs,
+      elapsedMs: end >= 0 && startGen != null ? h[end].gen - startGen : 0,
+    };
+  }
+
+  // The burst as a race: how much of it each control plane has placed.
+  function renderBurst() {
+    const host = document.getElementById("burst-race");
+    host.replaceChildren();
+    const mk = state.markers.at(-1);
+    const head = document.createElement("div");
+    head.className = "burst-head";
+    const title = document.createElement("b");
+    const hint = document.createElement("span");
+    hint.className = "muted";
+    head.append(title, hint);
+    host.appendChild(head);
+    if (!mk) {
+      title.textContent = "Waiting for a burst";
+      hint.textContent = "python3 demo/scheduler-dashboard/inject.py --count 300";
+      return;
+    }
+    title.textContent = `Burst of ${fmtInt(markerSize(mk))} requests: share placed on a host`;
+    hint.textContent = `${fmtDur(Math.max(0, (viewEnd() - mk.t) / 1000))} ago`;
+    const race = document.createElement("div");
+    race.className = "race";
+    for (const side of SIDES) {
+      const o = burstOutcome(side, mk);
+      const who = document.createElement("span");
+      who.className = "who";
+      const key = document.createElement("i");
+      key.style.background = SIDE_INFO[side].color;
+      who.append(key, document.createTextNode(SIDE_INFO[side].name));
+      const track = document.createElement("div");
+      track.className = "track";
+      track.setAttribute("role", "progressbar");
+      track.setAttribute("aria-label", `${SIDE_INFO[side].name} share of burst placed`);
+      track.setAttribute("aria-valuenow", String(Math.round(o.served * 100)));
+      const fill = document.createElement("div");
+      fill.className = "fill";
+      fill.style.width = `${(o.served * 100).toFixed(1)}%`;
+      fill.style.background = SIDE_INFO[side].color;
+      track.appendChild(fill);
+      const out = document.createElement("span");
+      out.className = `out${o.drainedMs != null ? " done" : ""}`;
+      out.textContent = o.drainedMs != null ? `✓ ${fmtDur(o.drainedMs / 1000)}` : `${Math.round(o.served * 100)}% · ${fmtDur(o.elapsedMs / 1000)}`;
+      race.append(who, track, out);
+    }
+    host.appendChild(race);
   }
 
   function renderTable() {
@@ -899,6 +1005,7 @@
 
   function render() {
     renderConnections();
+    renderBurst();
     renderStats();
     renderCharts();
     renderTable();
@@ -977,9 +1084,18 @@
     document.getElementById("load-down").addEventListener("click", () => control("/load", { delta_per_min: -10 }));
 
     const form = document.getElementById("settings");
+    const hint = (side) => {
+      const value = form.elements[side].value.trim();
+      form.querySelector(`[data-hint="${side}"]`).textContent = value === DEFAULTS[side]
+        ? (upstreams[side] ? `This server fetches it from ${upstreams[side]}` : "Simulated by this server")
+        : "Fetched directly by the browser: needs CORS, and https if the page is https";
+    };
     const fill = (v) => {
       for (const k of Object.keys(DEFAULTS)) form.elements[k].value = v[k];
+      SIDES.forEach(hint);
     };
+    for (const side of SIDES) form.elements[side].addEventListener("input", () => hint(side));
+    form.closest("details").addEventListener("toggle", () => SIDES.forEach(hint));
     fill(cfg);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -1009,5 +1125,5 @@
   buildColumns();
   bindControls();
   render();
-  poll();
+  loadServerConfig().then(poll);
 })();

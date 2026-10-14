@@ -403,6 +403,8 @@ def make_handler(world, upstreams):
         def do_GET(self):
             path = self.path.split("?")[0]
             side = path.split("/")[1]
+            if path == "/config":
+                return self.send(200, {"upstreams": upstreams})
             if path in ("/current/scheduler/metrics", "/central/scheduler/metrics") and upstreams.get(side):
                 return self.proxy(upstreams[side])
             if path in ("/current/scheduler/metrics", "/central/scheduler/metrics"):
