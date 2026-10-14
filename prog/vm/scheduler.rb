@@ -7,8 +7,9 @@ class Prog::Vm::Scheduler < Prog::Base
 
   label def wait
     reservations = live_reservations
-    batch_ids, next_retry_cursor, more_waiting = next_batch
-    strands = lock_strands(batch_ids)
+    holder_ids = reservations.values
+    batch_ids, next_retry_cursor, more_waiting = next_batch(holder_ids)
+    strands = lock_strands(holder_ids + batch_ids)
     candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
     allocated_ids = []
     no_capacity = {}
@@ -31,6 +32,7 @@ class Prog::Vm::Scheduler < Prog::Base
     Semaphore.incr(no_capacity_ids - Semaphore.where(strand_id: no_capacity_ids, name: "waiting_for_capacity").select_map(:strand_id), :waiting_for_capacity)
     spilled_ids = no_capacity.empty? ? [] : Scheduling::RunnerSpiller.new.spill(no_capacity_ids)
     reservations.delete_if { |_, vm_id| allocated_ids.include?(vm_id) || spilled_ids.include?(vm_id) }
+    release_unfitting(reservations, no_capacity)
     reserve(no_capacity.except(*spilled_ids), reservations, candidates)
     self.reservations = reservations
 
@@ -43,11 +45,32 @@ class Prog::Vm::Scheduler < Prog::Base
     frame["free_provisionings"] || Config.central_vm_scheduler_free_provisionings
   end
 
-  # A VM keeps its reservation while it waits for allocation.
+  # A VM keeps its reservation while it waits for allocation. Each round
+  # tries the holders first, outside the batch, so a holder gets its host
+  # as soon as the host has drained.
   def live_reservations
     reserved = reservations || {}
     waiting_ids = Strand.where(id: reserved.values, prog: "Vm::Metal::Nexus", label: "wait_allocation").select_map(:id)
     reserved.select { |_, vm_id| waiting_ids.include?(vm_id) }
+  end
+
+  # A holder that does not fit although its host has drained enough is
+  # held back by a filter other than free space, e.g., a boot image, so it
+  # would never fit there. Its host, or a host that no longer exists, goes
+  # to another VM.
+  def release_unfitting(reservations, no_capacity)
+    held = reservations.select { |_, vm_id| no_capacity.key?(vm_id) }
+    hosts = VmHost.where(id: held.keys).to_hash(:id)
+    held.each do |host_id, vm_id|
+      request = no_capacity[vm_id]
+      if (host = hosts[host_id])
+        next if host.total_cores - host.used_cores < request.cores_for_vcpus(host.total_cpus / host.total_cores)
+        next if host.total_hugepages_1g - host.used_hugepages_1g < request.memory_gib
+      end
+
+      reservations.delete(host_id)
+      Clog.emit("central vm scheduler released reservation", {central_vm_scheduler_release: {vm: UBID.to_ubid(vm_id), vm_host: UBID.to_ubid(host_id), reason: host ? "unfitting" : "host gone"}})
+    end
   end
 
   # Large VMs that fit on no host reserve the host closest to fitting them,
@@ -82,7 +105,7 @@ class Prog::Vm::Scheduler < Prog::Base
   # in a round, so VMs that still do not fit cannot block the ones behind
   # them. A retry can move to an earlier turn when an older VM of its
   # customer gets a host, and then waits for the next pass over the retries.
-  def next_batch
+  def next_batch(skip_ids)
     customer = Sequel.function(:coalesce, Sequel[:github_runner][:installation_id], Sequel[:vm][:project_id])
     failed = Semaphore.where(strand_id: Sequel[:strand][:id], name: "waiting_for_capacity").exists
     fresh, retries = waiting_dataset
@@ -92,6 +115,7 @@ class Prog::Vm::Scheduler < Prog::Base
       .order(Sequel[:vm][:created_at], Sequel[:strand][:id])
       .naked
       .all
+      .reject { skip_ids.include?(it[:id]) }
       .partition { !it[:failed] }
     retries = take_turns(retries)
     retries.select! { (it[:position] <=> retry_cursor).positive? } if retry_cursor
