@@ -1200,6 +1200,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.register_runner }.to raise_error Octokit::Conflict
     end
 
+    it "destroys the runner if the generate request fails due to 'Octokit::NotFound'" do
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s)).and_raise(Octokit::NotFound)
+      expect(Clog).to receive(:emit).with("Repository not found", {repository_not_found: {installation_ubid: runner.installation.ubid, label: runner.label, repository_name: runner.repository_name}}).and_call_original
+      expect { nx.register_runner }.to nap(0)
+      expect(runner.destroy_set?).to be(true)
+    end
+
     it "fails without a log if the ssh error doesn't match" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error).and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
