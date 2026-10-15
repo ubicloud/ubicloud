@@ -163,7 +163,7 @@ RSpec.describe Invoice do
       expect(payment_intents_service).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id))
         .and_raise(Stripe::CardError.new("Declined", {}))
       expect(payment_intents_service).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id))
-        .and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+        .and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890", created: 1760000000))
       expect(payment_intents_service).not_to receive(:create).with(hash_including(payment_method: payment_method3.stripe_id))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.", instance_of(Hash)).and_call_original
@@ -174,6 +174,7 @@ RSpec.describe Invoice do
       expect(project.reload.reputation).to eq("verified")
       expect(invoice.content["payment_method"]["id"]).to eq(payment_method2.id)
       expect(invoice.content["payment_intent"]).to eq("pi_1234567890")
+      expect(invoice.reload.content["paid_at"]).to eq("2025-10-09 08:53:20 UTC")
       expect(Mail::TestMailer.deliveries.length).to eq 1
       expect(Mail::TestMailer.deliveries.first.attachments.length).to eq 1
     end
@@ -196,7 +197,7 @@ RSpec.describe Invoice do
       update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, cost: 4)
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+      expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890", created: 1760000000))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
