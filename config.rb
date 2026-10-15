@@ -115,7 +115,7 @@ module Config
   optional :leaseweb_eu_api_key, string, clear: true
   override :leaseweb_connection_string, "https://api.leaseweb.com", string
   override :managed_service, false, bool
-  override :sanctioned_countries, "CU,IR,KP,SY", array(string)
+  override :sanctioned_countries, "CU,IR,KP", array(string)
   override :hetzner_ssh_public_key, nil, string
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
