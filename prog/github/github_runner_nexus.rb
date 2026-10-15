@@ -660,6 +660,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:}}])
     github_runner.update(runner_id:, ready_at: Time.now)
     hop_wait
+  rescue Octokit::NotFound
+    Clog.emit("Repository not found", {repository_not_found: {installation_ubid: github_runner.installation.ubid, label: github_runner.label, repository_name: github_runner.repository_name}})
+    github_runner.incr_destroy
+    nap 0
   end
 
   def generate_jit_config(regenerate: false)
