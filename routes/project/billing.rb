@@ -208,7 +208,7 @@ class Clover
           handle_validation_failure("project/billing")
           session_id = typecast_params.str!("session_id")
           begin
-            checkout_session = StripeClient.checkout.sessions.retrieve(session_id)
+            checkout_session = StripeClient.checkout.sessions.retrieve(session_id, {expand: ["payment_intent"]})
           rescue Stripe::InvalidRequestError => e
             Clog.emit("invalid invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}})
             raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")
@@ -217,7 +217,11 @@ class Clover
             Clog.emit("unsuccessful invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:}})
             raise_web_error("Invoice payment was not successful")
           end
-          invoice.update(status: "paid")
+          payment_intent = checkout_session["payment_intent"]
+          invoice.update(status: "paid", content: invoice.content.merge(
+            "payment_intent" => payment_intent["id"],
+            "paid_at" => Time.at(payment_intent["created"]).utc,
+          ))
           invoice.send_success_email
           flash["notice"] = "Invoice #{invoice.invoice_number} paid successfully"
 

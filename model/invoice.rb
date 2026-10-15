@@ -136,6 +136,7 @@ class Invoice < Sequel::Model
           "stripe_id" => pm.stripe_id,
         },
         "payment_intent" => payment_intent.id,
+        "paid_at" => Time.at(payment_intent.created).utc,
       })
       save(columns: [:status, :content])
       project.update(reputation: "verified") if amount > 5

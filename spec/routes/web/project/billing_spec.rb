@@ -778,7 +778,7 @@ RSpec.describe Clover, "billing" do
           hash_including(billing_address_collection: "auto"),
         ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
         # rubocop:enable RSpec/VerifiedDoubles
-        expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
+        expect(checkout_sessions_service).to receive(:retrieve).with("session_123", {expand: ["payment_intent"]}).and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid", "payment_intent" => {"id" => "pi_1234567890", "created" => 1760000000}))
 
         visit "#{project.path}/billing"
 
@@ -794,6 +794,7 @@ RSpec.describe Clover, "billing" do
           expect(page).to have_content "paid"
           expect(page).to have_no_content "Pay Now"
         end
+        expect(invoice.reload.content.slice("payment_intent", "paid_at")).to eq("payment_intent" => "pi_1234567890", "paid_at" => "2025-10-09 08:53:20 UTC")
       end
 
       it "fails if the invoice id doesn’t match the invoice id in the checkout session" do
@@ -805,7 +806,7 @@ RSpec.describe Clover, "billing" do
           hash_including(billing_address_collection: "auto"),
         ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123")).at_least(:once)
         # rubocop:enable RSpec/VerifiedDoubles
-        expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("metadata" => {"invoice" => "1vvc31wac0za4gx65xd6mt2a42"}, "payment_status" => "paid"))
+        expect(checkout_sessions_service).to receive(:retrieve).with("session_123", {expand: ["payment_intent"]}).and_return(stripe_object("metadata" => {"invoice" => "1vvc31wac0za4gx65xd6mt2a42"}, "payment_status" => "paid"))
 
         visit "#{project.path}/billing"
 
@@ -818,7 +819,7 @@ RSpec.describe Clover, "billing" do
         expect(page.title).to eq("Ubicloud - Project Billing")
         expect(page).to have_flash_error "Invoice payment was not successful"
 
-        expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_raise(Stripe::InvalidRequestError.new("No such checkout session", "id"))
+        expect(checkout_sessions_service).to receive(:retrieve).with("session_123", {expand: ["payment_intent"]}).and_raise(Stripe::InvalidRequestError.new("No such checkout session", "id"))
 
         within("#invoice-#{invoice.ubid}") do
           expect(page).to have_content "unpaid"
