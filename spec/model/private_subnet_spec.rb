@@ -121,6 +121,7 @@ RSpec.describe PrivateSubnet do
       it "returns random private ipv6" do
         expect(SecureRandom).to receive(:random_number).with(32766).and_return(5, 6)
         expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:e::/79"
+        expect(private_subnet.associations).not_to have_key(:nics)
       end
     end
   end
