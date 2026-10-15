@@ -28,8 +28,13 @@
   }
 ) %>
 
-<% rows = customer_vm_dataset
-  .where(project_id: obj.id)
+<% project_vm_ids = DB[:vm].where(project_id: obj.id).select(:id)
+  .union(DB[:postgres_server].where(resource_id: obj.postgres_resources_dataset.select(:id)).select(:vm_id), all: true, from_self: false)
+  .union(DB[:kubernetes_node].where(kubernetes_cluster_id: obj.kubernetes_clusters_dataset.select(:id)).select(:vm_id), all: true, from_self: false)
+  .union(DB[:github_runner].where(installation_id: obj.github_installations_dataset.select(:id)).select(:vm_id), all: true, from_self: false)
+
+rows = customer_vm_dataset
+  .where(project_id: obj.id, vm_id: project_vm_ids)
   .order(:vm_host_id, :created_at)
   .all
 
