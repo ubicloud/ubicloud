@@ -6,9 +6,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
 
   # Hosts running CloudHypervisor versions newer than the Ubuntu 22.04 default
-  # are only available on Ubuntu 24.04, so a VM pinned to one of these versions
-  # must be allocated to a matching host.
-  CH_VERSION_OS_VERSIONS = {"46.0" => "ubuntu-24.04", "53.0" => "ubuntu-24.04"}.freeze
+  # are only available on Ubuntu 24.04 and later, so a VM pinned to one of these
+  # versions must be allocated to a matching host.
+  CH_VERSION_OS_VERSIONS = ["46.0", "53.0"].to_h { [it, ["ubuntu-24.04", "ubuntu-26.04"].freeze] }.freeze
 
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,

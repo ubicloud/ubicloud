@@ -37,6 +37,12 @@ RSpec.describe SystemParser do
         mount_points = described_class.get_device_mount_points_from_lsblk_json(lsblk_json, "nvme0n1")
         expect(mount_points["nvme0n1"]).not_to include("/boot")
       end
+
+      it "excludes the EFI system partition of the second of mirrored boot drives" do
+        lsblk_json = '{"blockdevices": [{"name": "nvme1n1", "type": "disk", "mountpoints": [null], "children": [{"name": "nvme1n1p1", "type": "part", "mountpoints": ["/boot/efi2"]}, {"name": "nvme1n1p2", "type": "part", "mountpoints": ["/"]}]}]}'
+        mount_points = described_class.get_device_mount_points_from_lsblk_json(lsblk_json, "nvme1n1")
+        expect(mount_points["nvme1n1"]).to eq(["/"])
+      end
     end
 
     context "when mountpoints is nil for a device" do

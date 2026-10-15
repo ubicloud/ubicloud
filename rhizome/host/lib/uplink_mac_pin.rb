@@ -7,9 +7,13 @@ require "yaml"
 
 class UplinkMacPin
   def run
-    ifname = uplink_interface
-    path, id = name_keyed_entry(ifname)
-    return "netplan does not select #{ifname} by name, nothing to pin" unless path
+    ifnames = uplink_interfaces
+    entries = ifnames.filter_map { |ifname| name_keyed_entry(ifname) }
+    return "netplan does not select #{ifnames.join(", ")} by name, nothing to pin" if entries.empty?
+    fail "netplan selects uplinks #{ifnames.join(", ")} of a multipath default route by name, which can't all be pinned as uplink" if ifnames.size > 1
+
+    ifname = ifnames.first
+    path, id = entries.first
 
     fail "netplan already has an ethernet named uplink" if ethernet_ids.include?("uplink")
 
@@ -23,10 +27,10 @@ class UplinkMacPin
 
   private
 
-  def uplink_interface
-    dev = JSON.parse(r("ip", "-j", "route", "show", "default")).filter_map { |route| route["dev"] }.first
-    fail "no default route to identify the uplink interface" unless dev
-    dev
+  def uplink_interfaces
+    route = JSON.parse(r("ip", "-j", "route", "show", "default")).find { |route| route["dev"] || route["nexthops"] }
+    fail "no default route to identify the uplink interface" unless route
+    route["dev"] ? [route["dev"]] : route["nexthops"].map { |nexthop| nexthop["dev"] }.uniq
   end
 
   def permanent_mac(ifname)

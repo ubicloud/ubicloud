@@ -6,6 +6,16 @@ require "octokit"
 RSpec.describe Project do
   subject(:project) { described_class.create(name: "test") }
 
+  it "#visible_location_names returns feature flagged locations and locations of hosts owned by the project" do
+    expect(project.visible_location_names).to eq []
+    project.set_ff_visible_locations(["latitude-ai"])
+    other_project_id = described_class.create(name: "other").id
+    [["latitude-fra", project.id], ["latitude-ai", project.id], ["us-west-u1-ps", other_project_id], ["tr-ist-u1", nil]].each do |location_name, project_id|
+      create_vm_host(location_id: Location[name: location_name].id, project_id:)
+    end
+    expect(project.visible_location_names).to contain_exactly("latitude-ai", "latitude-fra")
+  end
+
   it "#project_id_match? should return whether the given project_id matches the project's id" do
     expect(project.project_id_match?(project.id)).to be true
     expect(project.project_id_match?(described_class.generate_uuid)).to be false
@@ -173,6 +183,23 @@ RSpec.describe Project do
     expect(project.get_ff_dummy_flag1).to eq("new-value")
     expect(project.get_ff_dummy_flag2).to eq("val2")
     expect(project.feature_flags).not_to have_key("not_exists_flag")
+  end
+
+  it "does not count vms in dedicated locations with hosts owned by the project against the vcpu quota" do
+    dedicated_location_id = Location[name: "us-west-u1-dedicated"].id
+    Prog::Vm::Nexus.assemble("a a", project.id, location_id: dedicated_location_id, size: "standard-4")
+    create_vm_host(location_id: dedicated_location_id, project_id: described_class.create(name: "other").id)
+    create_vm_host(location_id: dedicated_location_id)
+    expect(project.dedicated_location_ids_dataset.select_map(:id)).to eq []
+    expect(project.current_resource_usage("VmVCpu")).to eq 4
+
+    create_vm_host(location_id: dedicated_location_id, project_id: project.id)
+    expect(project.dedicated_location_ids_dataset.select_map(:id)).to eq [dedicated_location_id]
+    expect(project.current_resource_usage("VmVCpu")).to eq 0
+
+    Location.where(id: dedicated_location_id).update(dedicated: false)
+    expect(project.dedicated_location_ids_dataset.select_map(:id)).to eq []
+    expect(project.current_resource_usage("VmVCpu")).to eq 4
   end
 
   it "calculates current resource usage" do

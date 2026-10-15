@@ -15,7 +15,7 @@ RSpec.describe Scheduling::Allocator do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], minimum_vhost_block_backend_version: nil, os_filter: nil)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], minimum_vhost_block_backend_version: nil, os_filter: nil, project_id: nil)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -43,6 +43,7 @@ RSpec.describe Scheduling::Allocator do
       family_filter,
       minimum_vhost_block_backend_version,
       os_filter,
+      project_id,
     )
   end
 
@@ -216,6 +217,29 @@ RSpec.describe Scheduling::Allocator do
                  score_offset: 0.0}])
     end
 
+    it "retrieves owned hosts only for their project, and unowned hosts only outside dedicated locations, unless the host is forced" do
+      project_id = Project.create(name: "owner").id
+      shared, owned = Array.new(2) do |i|
+        vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2, project_id: (project_id if i == 1))
+        StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+        Address.create(cidr: "#{i + 1}.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
+        BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+        vmh
+      end
+
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([shared.id])
+      req.project_id = Project.create(name: "other").id
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([shared.id])
+      req.host_filter = [owned.id]
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([owned.id])
+      req.host_filter = []
+      req.project_id = project_id
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to contain_exactly(shared.id, owned.id)
+
+      Location.where(id: shared.location_id).update(dedicated: true)
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([owned.id])
+    end
+
     it "does not filter out storage devices with >= threshold available for a small request" do
       large = Config.allocator_large_storage_device_gib
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
@@ -237,7 +261,7 @@ RSpec.describe Scheduling::Allocator do
 
       expect(req).to receive(:diagnostics).and_return(true).at_least(:once)
       expect(Clog).to receive(:emit).with("Allocator query for vm", instance_of(Hash)) do |_, b|
-        expect(b[:allocator_query][:counts]).to eq [[:base, 1], [:space, 1], [:boot_image, 1], [:ipv4, 1], [:allocation_state, 1], [:non_gpu, 1]]
+        expect(b[:allocator_query][:counts]).to eq [[:base, 1], [:space, 1], [:boot_image, 1], [:ipv4, 1], [:owner, 1], [:allocation_state, 1], [:non_gpu, 1]]
       end
       expect(Al::Allocation.candidate_hosts(req))
         .to eq([{location_id: vmh.location_id,
@@ -361,6 +385,16 @@ RSpec.describe Scheduling::Allocator do
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.map { it[:vm_host_id] }).to eq([vmh1.id])
+
+      vmh3 = create_vm_host(os_version: "ubuntu-26.04", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh3.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "3.1.1.0/30", routed_to_host_id: vmh3.id).populate_ipv4_addresses
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh3.id, activated_at: Time.now, size_gib: 3)
+
+      req.os_filter = ["ubuntu-24.04", "ubuntu-26.04"]
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.map { it[:vm_host_id] }).to contain_exactly(vmh1.id, vmh3.id)
     end
 
     it "filters hosts by minimum vhost block backend version" do
@@ -1019,6 +1053,23 @@ RSpec.describe Scheduling::Allocator do
       expect {
         described_class.allocate(vm, vol, gpu_count: 4)
       }.to raise_error(Scheduling::Allocator::NoSpaceLeft, /no space left on any eligible host/)
+    end
+
+    it "allocates VMs on a host owned by a project only for that project, unless the host is forced" do
+      vmh = VmHost.first
+      vm = create_vm
+      vmh.update(project_id: vm.project_id)
+
+      described_class.allocate(vm, vol)
+      expect(vm.reload.vm_host_id).to eq(vmh.id)
+
+      other_vm = create_vm
+      expect {
+        described_class.allocate(other_vm, vol)
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
+
+      described_class.allocate(other_vm, vol, host_filter: [vmh.id])
+      expect(other_vm.reload.vm_host_id).to eq(vmh.id)
     end
 
     it "allows concurrent allocations" do
@@ -1801,6 +1852,48 @@ RSpec.describe Scheduling::Allocator do
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 14..16).update(numa_node: 4)
 
       expect(al.select_cpuset(vh.id, 6)).to eq([2, 3, 4, 5, 6, 7])
+    end
+
+    it "select_cpuset prefers the given numa node if it has enough free cpus" do
+      vm = create_vm
+      req = create_req(vm, vol)
+      al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
+
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..6).update(numa_node: 0) # 5 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 7..10).update(numa_node: 1) # 4 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..16).update(numa_node: 2) # 6 free cpus
+
+      expect(al.select_cpuset(vh.id, 4, 2)).to eq([11, 12, 13, 14])
+      expect(al.select_cpuset(vh.id, 6, 0)).to eq([11, 12, 13, 14, 15, 16])
+    end
+
+    it "allocates a slice with the memory of the vm and cpus on the numa node of its gpus" do
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..8).update(numa_node: 0) # 7 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 9..16).update(numa_node: 1) # 8 free cpus
+      PciDevice.create(vm_host_id: vh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 1, iommu_group: 3)
+
+      vm = create_vm(vcpus: 2, memory_gib: 16)
+      create_storage_volumes(vm, vol)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, gpu_count: 1))
+      expect { al.update(vm) }.to change { vh.reload.used_hugepages_1g }.by(16)
+
+      slice = vm.vm_host_slice
+      expect(slice.total_memory_gib).to eq(16)
+      expect(slice.allowed_cpus_cgroup).to eq("9-10")
+      expect(vm.pci_devices.map(&:numa_node)).to eq([1])
+    end
+
+    it "GpuAllocation#numa_node is nil if the gpus span numa nodes" do
+      vh = VmHost.first
+      PciDevice.create(vm_host_id: vh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: 3)
+      PciDevice.create(vm_host_id: vh.id, slot: "02:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 1, iommu_group: 4)
+      candidate_host = {vm_host_id: vh.id, num_gpus: 2, available_gpus: 2, use_gpu_partition: false,
+                        available_iommu_groups: [{"iommu_group" => 3, "numa_node" => 0}, {"iommu_group" => 4, "numa_node" => 1}]}
+
+      expect(Al::GpuAllocation.new(candidate_host, create_req(vm, vol, gpu_count: 2)).numa_node).to be_nil
+      expect(Al::GpuAllocation.new(candidate_host, create_req(vm, vol, gpu_count: 1)).numa_node).to eq(0)
     end
 
     it "keeps a slice's cpuset within a single numa node when allocating" do

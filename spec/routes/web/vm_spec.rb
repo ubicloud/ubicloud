@@ -612,6 +612,72 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "latitude-ai"
       end
 
+      it "shows locations with gpus on hosts owned by the project, but not those owned by other projects" do
+        project
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["us-west-u1-ps"])
+        other_project_id = Project.create(name: "other").id
+        [["::1", "us-west-u1-dedicated", project.id], ["::2", "us-west-u1-ps", other_project_id]].each do |ip, location_name, project_id|
+          vmh = Prog::Vm::HostNexus.assemble(ip, location_id: Location[name: location_name].id).subject
+          vmh.update(project_id:)
+          PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "10de", device: "3182", numa_node: nil, iommu_group: 0)
+        end
+
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "SF Bay Area, US (Dedicated)"
+        expect(page).to have_content "$0.00/mo"
+        expect(page).to have_no_content "PS: SF Bay Area, US"
+      end
+
+      it "does not offer gpus of hosts without an owner in dedicated locations" do
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["us-west-u1-dedicated"])
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "us-west-u1-dedicated"].id).subject
+        PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: 0)
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        expect(page).to have_flash_error("Unfortunately, no virtual machines with GPUs are currently available.")
+      end
+
+      it "offers sizes with gpus with their gpus, with one volume per gpu" do
+        project.set_ff_gpu_vm(true)
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "us-west-u1-dedicated"].id).subject
+        vmh.update(project_id: project.id)
+        8.times do
+          PciDevice.create(vm_host_id: vmh.id, slot: "0#{it}:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: it / 4, iommu_group: it)
+        end
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "96 vCPUs / 864 GB RAM"
+        expect(page).to have_content "4 × 1600GB"
+        expect(page).to have_content "4 × 3200GB"
+        expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
+        expect(page.all("input[name=size][value=standard-2]", visible: false).flat_map { it.find(:xpath, "..")[:class].split }).not_to include(start_with("form_gpu_"))
+      end
+
+      it "offers sizes with gpus only in dedicated locations" do
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["us-west-u1-ps"])
+        dedicated, ps = [["::1", "us-west-u1-dedicated", project.id], ["::2", "us-west-u1-ps", nil]].map do |ip, location_name, project_id|
+          vmh = Prog::Vm::HostNexus.assemble(ip, location_id: Location[name: location_name].id).subject
+          vmh.update(project_id:)
+          4.times { PciDevice.create(vm_host_id: vmh.id, slot: "0#{it}:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: it) }
+          vmh.location
+        end
+
+        visit "#{project.path}/vm/create?show_gpu=true"
+
+        size_classes = ->(size) { page.all("input[name=size][value=#{size}]", visible: false).map { it.find(:xpath, "..", visible: false)[:class].split } }
+        expect(size_classes["b300-4"]).to all(include("form_location_#{dedicated.ubid}"))
+        expect(size_classes["standard-30"]).to include(include("form_location_#{ps.ubid}", "form_gpu_4:3182"))
+      end
+
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
         project
         vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject

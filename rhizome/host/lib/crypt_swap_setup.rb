@@ -22,7 +22,10 @@ module CryptSwapSetup
     end
 
     swap_line_idx = fstab.find_index { |l| l.split[2] == "swap" }
-    fail "No swap entry found in /etc/fstab" unless swap_line_idx
+    unless swap_line_idx
+      puts "no swap entry in #{FSTAB}; skipping cryptswap setup"
+      return
+    end
 
     swap_real = resolve_swap_device(fstab[swap_line_idx])
 

@@ -245,7 +245,7 @@ function redrawChildOptions(name) {
     let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');
     let classes = $("input[name=" + name + "]:checked").parent().attr('class');
     classes = classes ? classes.split(" ") : [];
-    classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
+    classes = classes.concat("form_" + name, "form_" + name + "_" + value).map((c) => "." + $.escapeSelector(c)).join('');
 
     option_children[name].forEach(function (child_name) {
       let child_type = document.getElementsByName(child_name)[0].nodeName.toLowerCase();
@@ -266,7 +266,7 @@ function redrawChildOptions(name) {
           $("input[name=" + child_name + "]").parent(classes + available).children("input[name=" + child_name + "]").prop('disabled', false);
 
           if (option_dirty[child_name]) {
-            elements2select = $("input[name=" + child_name + "][value=" + option_dirty[child_name] + "]").parent(classes + available);
+            elements2select = $("input[name=" + child_name + "][value=\"" + option_dirty[child_name] + "\"]").parent(classes + available);
           }
 
           if (elements2select.length == 0) {
@@ -288,7 +288,7 @@ function redrawChildOptions(name) {
           $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
 
           if (option_dirty[child_name]) {
-            elements2select = $("select[name=" + child_name + "]").children(classes + "[value=" + option_dirty[child_name] + "]");
+            elements2select = $("select[name=" + child_name + "]").children(classes + "[value=\"" + option_dirty[child_name] + "\"]");
           }
 
           if (elements2select.length == 0) {

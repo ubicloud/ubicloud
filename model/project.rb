@@ -220,7 +220,7 @@ class Project < Sequel::Model
 
   def current_resource_usage(resource_type)
     case resource_type
-    when "VmVCpu" then vms_dataset.sum(:vcpus) || 0
+    when "VmVCpu" then vms_dataset.exclude(location_id: dedicated_location_ids_dataset).sum(:vcpus) || 0
     when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).exclude(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).metal_active_runner_vcpus
     when "GithubRunnerVCpuArm" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).where(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).metal_active_runner_vcpus
     when "GithubRunnerVCpuAws" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).exclude(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).aws_active_runner_vcpus
@@ -259,6 +259,14 @@ class Project < Sequel::Model
     location_id = location.id
     ps = private_subnets_dataset.first(location_id:, name:)
     ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
+  end
+
+  def visible_location_names
+    (get_ff_visible_locations || []) | Location.where(id: DB[:vm_host].where(project_id: id).select(:location_id)).select_map(:name)
+  end
+
+  def dedicated_location_ids_dataset
+    Location.where(dedicated: true, id: DB[:vm_host].where(project_id: id).select(:location_id)).select(:id)
   end
 
   def total_github_amount(begin_time, end_time)
@@ -394,3 +402,4 @@ end
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)
 #  vm                        | vm_project_id_fkey                        | (project_id) REFERENCES project(id)
+#  vm_host                   | vm_host_project_id_fkey                   | (project_id) REFERENCES project(id)
