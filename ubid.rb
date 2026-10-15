@@ -375,17 +375,14 @@ class UBID
   end
 
   def to_s
-    result = ""
     # type
-    result += UBID.from_base32(UBID.get_bits(@value, 69, 73))
-    result += UBID.from_base32(UBID.get_bits(@value, 64, 68))
+    result = UBID.from_base32_n(UBID.get_bits(@value, 64, 73), 2)
     # top-bits: 127..74 (54 bits)
     top_bits = UBID.get_bits(@value, 74, 127)
-    result += UBID.from_base32_n((top_bits << 1) | UBID.parity(top_bits), 11)
+    result << UBID.from_base32_n((top_bits << 1) | UBID.parity(top_bits), 11)
     # bottom-bits: 63..0 (64 bits)
     bottom_bits = UBID.get_bits(@value, 0, 63)
-    result += UBID.from_base32_n((bottom_bits << 1) | UBID.parity(bottom_bits), 13)
-    result
+    result << UBID.from_base32_n((bottom_bits << 1) | UBID.parity(bottom_bits), 13)
   end
 
   def to_i
@@ -418,13 +415,7 @@ class UBID
   end
 
   def self.get_bits(n, from, to)
-    result = 0
-    (from..to).each { |i|
-      if (n & (1 << i)) != 0
-        result |= (1 << (i - from))
-      end
-    }
-    result
+    (n >> from) & ((1 << (to - from + 1)) - 1)
   end
 
   BASE32_DATA = [
@@ -435,6 +426,8 @@ class UBID
     "J", "K", "M", "N", "P", "Q", "R", "S",
     "T", "V", "W", "X", "Y", "Z",
   ]
+
+  BASE32_ENCODING = BASE32_DATA.map { it[0].downcase }.join.freeze
 
   def self.to_base32(c)
     c = c.upcase
@@ -458,23 +451,17 @@ class UBID
   def self.from_base32(num)
     fail UBIDParseError.new("Invalid base32 number: #{num}") if num < 0 || num >= 32
 
-    BASE32_DATA[num][0].downcase
+    BASE32_ENCODING[num]
   end
 
   def self.from_base32_n(num, cnt)
-    (cnt - 1).downto(0).map { |i|
-      from_base32(get_bits(num, 5 * i, 5 * i + 4))
-    }.join
+    result = String.new(capacity: cnt)
+    (cnt - 1).downto(0) { result << BASE32_ENCODING[(num >> (5 * it)) & 31] }
+    result
   end
 
   def self.parity(num)
-    if num == 0
-      0
-    elsif (num & 1) == 0
-      parity(num >> 1)
-    else
-      1 - parity(num >> 1)
-    end
+    num.to_s(2).count("1") & 1
   end
 
   def self.extract_bits_as_hex(value, from_digit, digit_count)
