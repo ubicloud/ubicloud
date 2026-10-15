@@ -159,7 +159,7 @@ class Invoice < Sequel::Model
         "paid_at" => Time.at(payment_intent.created).utc,
       })
       save(columns: [:status, :content])
-      project.update(reputation: "verified") if amount > 5
+      project.verify_by_payment(amount)
 
       send_success_email
       return true

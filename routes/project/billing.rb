@@ -222,6 +222,7 @@ class Clover
             "payment_intent" => payment_intent["id"],
             "paid_at" => Time.at(payment_intent["created"]).utc,
           ))
+          @project.verify_by_payment(invoice.cost.to_f)
           invoice.send_success_email
           flash["notice"] = "Invoice #{invoice.invoice_number} paid successfully"
 

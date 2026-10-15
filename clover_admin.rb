@@ -815,7 +815,7 @@ class CloverAdmin < Roda
           now = Time.now.utc
           DB.transaction do
             obj.add_active_resource_credit(name: "Prepaid Credit", amount:, active_from: Time.utc(now.year, now.month))
-            obj.update(reputation: "verified")
+            obj.verify_by_payment(amount)
           end
         end
       end

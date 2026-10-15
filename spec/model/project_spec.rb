@@ -324,6 +324,14 @@ RSpec.describe Project do
     expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 500
   end
 
+  it "verifies the project only if the payment is more than 5" do
+    project.verify_by_payment(5)
+    expect(project.reload.reputation).to eq "new"
+
+    project.verify_by_payment(5.01)
+    expect(project.reload.reputation).to eq "verified"
+  end
+
   it "checks if quota is available" do
     Prog::Vm::Nexus.assemble("a a", project.id, size: "standard-4")
     Prog::Vm::Nexus.assemble("a a", project.id, size: "standard-4")
