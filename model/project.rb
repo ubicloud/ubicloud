@@ -127,6 +127,10 @@ class Project < Sequel::Model
     false
   end
 
+  def verify_by_payment(amount)
+    update(reputation: "verified") if amount > 5
+  end
+
   def default_location
     location_max_capacity = DB[:vm_host]
       .join(:location, id: :location_id)
