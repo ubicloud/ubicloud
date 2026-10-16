@@ -407,6 +407,16 @@ TIMER
       hop_configure_metrics
     end
 
+    when_enable_csum_guard_set? do
+      hop_enable_csum_guard
+    end
+
+    # Checked after enable, so a host with both set ends up without the
+    # guard.
+    when_disable_csum_guard_set? do
+      hop_disable_csum_guard
+    end
+
     when_patch_set? do
       unless vm_host.allocation_state == "draining"
         vm_host.update(allocation_state: "draining")
@@ -428,6 +438,26 @@ TIMER
     end
 
     nap 6 * 60 * 60
+  end
+
+  # Decremented even when the setup paged, so a rollout moves past a
+  # failing host.
+  label def enable_csum_guard
+    if retval
+      decr_enable_csum_guard
+      hop_wait
+    end
+
+    push Prog::SetupCsumGuard, {"enable" => true}
+  end
+
+  label def disable_csum_guard
+    if retval
+      decr_disable_csum_guard
+      hop_wait
+    end
+
+    push Prog::SetupCsumGuard, {"enable" => false}
   end
 
   label def unavailable

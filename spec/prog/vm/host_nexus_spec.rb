@@ -339,6 +339,43 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#enable_csum_guard" do
+    it "pushes the setup program to install the guard" do
+      expect { nx.enable_csum_guard }.to hop("start", "SetupCsumGuard") { |hop|
+        expect(hop.strand_update_args[:stack].first).to include("enable" => true)
+      }
+    end
+
+    it "decrements the semaphore and hops to wait once the guard is installed" do
+      nx.incr_enable_csum_guard
+      nx.strand.retval = {"msg" => "csum guard installed"}
+      expect { nx.enable_csum_guard }.to hop("wait")
+      expect(vm_host.enable_csum_guard_set?).to be false
+    end
+
+    it "decrements the semaphore and hops to wait after a failed install, which paged" do
+      nx.incr_enable_csum_guard
+      nx.strand.retval = {"msg" => "csum guard install failed"}
+      expect { nx.enable_csum_guard }.to hop("wait")
+      expect(vm_host.enable_csum_guard_set?).to be false
+    end
+  end
+
+  describe "#disable_csum_guard" do
+    it "pushes the setup program to uninstall the guard" do
+      expect { nx.disable_csum_guard }.to hop("start", "SetupCsumGuard") { |hop|
+        expect(hop.strand_update_args[:stack].first).to include("enable" => false)
+      }
+    end
+
+    it "decrements the semaphore and hops to wait once the guard is uninstalled" do
+      nx.incr_disable_csum_guard
+      nx.strand.retval = {"msg" => "csum guard uninstalled"}
+      expect { nx.disable_csum_guard }.to hop("wait")
+      expect(vm_host.disable_csum_guard_set?).to be false
+    end
+  end
+
   describe "#check_ip_reachability" do
     it "pushes the ip reachability program" do
       expect { nx.check_ip_reachability }.to hop("start", "CheckIpReachability")
@@ -547,6 +584,22 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to configure_metrics when needed" do
       nx.incr_configure_metrics
       expect { nx.wait }.to hop("configure_metrics")
+    end
+
+    it "hops to enable_csum_guard when needed" do
+      nx.incr_enable_csum_guard
+      expect { nx.wait }.to hop("enable_csum_guard")
+    end
+
+    it "hops to disable_csum_guard when needed" do
+      nx.incr_disable_csum_guard
+      expect { nx.wait }.to hop("disable_csum_guard")
+    end
+
+    it "enables the checksum guard before disabling it when both are set" do
+      nx.incr_enable_csum_guard
+      nx.incr_disable_csum_guard
+      expect { nx.wait }.to hop("enable_csum_guard")
     end
 
     it "hops to unavailable based on the host's available status" do
