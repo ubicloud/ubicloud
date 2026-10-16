@@ -33,7 +33,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
         location_id: vm.location_id,
         boot_image: vm.boot_image,
         private_subnet_id: vm.user_nic.private_subnet_id,
-        storage_volumes: [{encrypted: true, remote_storage_server_id: remote_storage_server.id}],
+        storage_volumes: [{encrypted: true, size_gib: volume.size_gib, remote_storage_server_id: remote_storage_server.id}],
         enable_ip4: vm.ip4_enabled,
         arch: vm.arch,
         force_host_id: vm_host.id,
