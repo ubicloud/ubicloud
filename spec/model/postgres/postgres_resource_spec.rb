@@ -1856,7 +1856,14 @@ RSpec.describe PostgresResource do
       )
     end
 
-    it "tells accounts with access that an unplanned promotion follows an unavailable primary" do
+    it "does not send an email for an unplanned promotion unless enabled" do
+      postgres_resource.send_failover_notification(mode: "unplanned")
+
+      expect(Util).not_to have_received(:send_email)
+    end
+
+    it "tells accounts with access that an unplanned promotion follows an unavailable primary when enabled" do
+      allow(Config).to receive(:postgres_unplanned_failover_notification_enabled).and_return(true)
       postgres_resource.send_failover_notification(mode: "unplanned")
 
       expect(Util).to have_received(:send_email).with(
