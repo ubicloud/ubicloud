@@ -527,6 +527,14 @@ class CloverAdmin < Roda
       end
     end
 
+    model Cert do
+      action "restart", "Restart ACME Order" do
+        flash "Restart scheduled for Cert"
+        allow_if { Prog::Vnet::CertNexus::ACME_ORDER_LABELS.include?(it.strand&.label) }
+        run(&:incr_restarted)
+      end
+    end
+
     model DnsZone do
       action "add_record", "Add DNS Record" do
         flash "Added DNS Record"
