@@ -19,4 +19,20 @@ RSpec.describe CloverAdmin, "Cert" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - Cert #{@instance.ubid}"
   end
+
+  it "can restart the ACME order of a Cert" do
+    Strand.create_with_id(@instance, prog: "Vnet::CertNexus", label: "wait_dns_validation")
+    visit "/model/Cert/#{@instance.ubid}"
+    click_link "Restart ACME Order"
+    click_button "Restart ACME Order"
+
+    expect(page).to have_content("Restart scheduled for Cert")
+    expect(Semaphore.where(strand_id: @instance.id, name: "restarted").count).to eq 1
+  end
+
+  it "does not show the restart action when the Cert is not waiting on an ACME order" do
+    Strand.create_with_id(@instance, prog: "Vnet::CertNexus", label: "wait")
+    visit "/model/Cert/#{@instance.ubid}"
+    expect(page).to have_no_link "Restart ACME Order"
+  end
 end
