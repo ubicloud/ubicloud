@@ -61,9 +61,7 @@ class Prog::Vm::HostNexus < Prog::Base
     hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
 
     register_deadline("setup_ssh_keys", 2 * 60 * 60, allow_extension: true)
-    hop_setup_ssh_keys if retval&.dig("msg") == "operating system installed"
-
-    push Prog::Hetzner::InstallOs
+    hop_push :setup_ssh_keys, Prog::Hetzner::InstallOs
   end
 
   label def setup_ssh_keys
@@ -85,15 +83,11 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def bootstrap_rhizome
     register_deadline("download_boot_images", 10 * 60)
-    hop_check_ip_reachability if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
-
-    push Prog::BootstrapRhizome, {"target_folder" => "host"}
+    hop_push :check_ip_reachability, Prog::BootstrapRhizome, new_frame: {"target_folder" => "host"}
   end
 
   label def check_ip_reachability
-    hop_prep if retval&.dig("msg") == "all ip addresses are reachable"
-
-    push Prog::CheckIpReachability
+    hop_push :prep, Prog::CheckIpReachability
   end
 
   label def prep
@@ -154,15 +148,11 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    hop_setup_storage_backend if retval&.dig("msg") == "hugepages installed"
-
-    push Prog::SetupHugepages
+    hop_push :setup_storage_backend, Prog::SetupHugepages
   end
 
   label def setup_storage_backend
-    hop_download_boot_images if retval&.dig("msg") == "VhostBlockBackend was setup"
-
-    push Prog::Storage::SetupVhostBlockBackend, {
+    hop_push :download_boot_images, Prog::Storage::SetupVhostBlockBackend, new_frame: {
       "version" => vhost_block_backend_version,
       "allocation_weight" => 100,
     }

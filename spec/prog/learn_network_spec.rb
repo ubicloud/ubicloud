@@ -85,8 +85,7 @@ JSON
     end
 
     it "learns the ip6 once networking is configured" do
-      ln.strand.retval = {"msg" => "leaseweb networking configured"}
-      expect { ln.start }.to hop("learn_ip6")
+      expect { ln.start }.to hop("start", "Leaseweb::SetupNetworking") { it.strand_update_args[:stack].first["link"] == ["LearnNetwork", "learn_ip6"] }
     end
   end
 

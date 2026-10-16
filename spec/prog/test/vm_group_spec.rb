@@ -209,16 +209,15 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
 
-    it "hops to verify_firewall_rules if tests are done" do
-      st.retval = {"msg" => "Verified VM Host Slices!"}
-      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
+    it "returns to verify_firewall_rules when tests are done" do
+      expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices") { it.strand_update_args[:stack].first["link"] == ["Test::VmGroup", "verify_firewall_rules"] }
     end
   end
 
   describe "#verify_firewall_rules" do
-    it "hops to verify_connected_subnets if tests are done" do
-      st.retval = {"msg" => "Verified Firewall Rules!"}
-      expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
+    it "returns to verify_connected_subnets when tests are done" do
+      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id]})
+      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules") { it.strand_update_args[:stack].first["link"] == ["Test::VmGroup", "verify_connected_subnets"] }
     end
 
     it "runs tests for the first firewall with the other subnet as the outside subnet" do
@@ -230,9 +229,9 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#verify_connected_subnets" do
-    it "hops to test_reboot if tests are done" do
-      st.retval = {"msg" => "Verified Connected Subnets!"}
-      expect { vg_test.verify_connected_subnets }.to hop("test_reboot")
+    it "returns to test_reboot when tests are done" do
+      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id]})
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets") { it.strand_update_args[:stack].first["link"] == ["Test::VmGroup", "test_reboot"] }
     end
 
     it "runs tests for the first connected subnet" do
@@ -251,10 +250,9 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
     end
 
-    it "hops to destroy_resources if tests are done and reboot is not set" do
-      st.retval = {"msg" => "Verified Connected Subnets!"}
-      refresh_frame(vg_test, new_values: {"test_reboot?" => false})
-      expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
+    it "returns to destroy_resources when tests are done and reboot is not set" do
+      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id], "test_reboot?" => false})
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets") { it.strand_update_args[:stack].first["link"] == ["Test::VmGroup", "destroy_resources"] }
     end
   end
 

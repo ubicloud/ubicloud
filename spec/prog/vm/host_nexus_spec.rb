@@ -262,10 +262,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { described_class.new(st).install_host_os }.to hop("setup_ssh_keys")
     end
 
-    it "hops to setup_ssh_keys once the OS is installed" do
+    it "returns to setup_ssh_keys once the OS is installed" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
-      nx.strand.retval = {"msg" => "operating system installed"}
-      expect { nx.install_host_os }.to hop("setup_ssh_keys")
+      expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs") { it.strand_update_args[:stack].first["link"] == ["Vm::HostNexus", "setup_ssh_keys"] }
     end
   end
 
@@ -327,15 +326,10 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#bootstrap_rhizome" do
-    it "pushes a bootstrap rhizome process" do
+    it "pushes a bootstrap rhizome process, returning to check_ip_reachability" do
       expect { nx.bootstrap_rhizome }.to hop("start", "BootstrapRhizome") { |hop|
-        expect(hop.strand_update_args[:stack].first).to include("target_folder" => "host")
+        expect(hop.strand_update_args[:stack].first).to include("target_folder" => "host", "link" => ["Vm::HostNexus", "check_ip_reachability"])
       }
-    end
-
-    it "hops to check_ip_reachability once BootstrapRhizome has returned" do
-      nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
-      expect { nx.bootstrap_rhizome }.to hop("check_ip_reachability")
     end
   end
 
@@ -377,13 +371,8 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#check_ip_reachability" do
-    it "pushes the ip reachability program" do
-      expect { nx.check_ip_reachability }.to hop("start", "CheckIpReachability")
-    end
-
-    it "hops to prep once CheckIpReachability has returned" do
-      nx.strand.retval = {"msg" => "all ip addresses are reachable"}
-      expect { nx.check_ip_reachability }.to hop("prep")
+    it "pushes the ip reachability program, returning to prep" do
+      expect { nx.check_ip_reachability }.to hop("start", "CheckIpReachability") { it.strand_update_args[:stack].first["link"] == ["Vm::HostNexus", "prep"] }
     end
   end
 
@@ -492,13 +481,8 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#setup_hugepages" do
-    it "pushes the hugepage program" do
-      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages")
-    end
-
-    it "hops once SetupHugepages has returned" do
-      nx.strand.retval = {"msg" => "hugepages installed"}
-      expect { nx.setup_hugepages }.to hop("setup_storage_backend")
+    it "pushes the hugepage program, returning to setup_storage_backend" do
+      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages") { it.strand_update_args[:stack].first["link"] == ["Vm::HostNexus", "setup_storage_backend"] }
     end
   end
 
@@ -506,13 +490,8 @@ RSpec.describe Prog::Vm::HostNexus do
     it "pushes the vhost_block_backend program by default" do
       vm_host.update(arch: "x64")
       expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupVhostBlockBackend") { |hop|
-        expect(hop.strand_update_args[:stack].first).to include("allocation_weight" => 100)
+        expect(hop.strand_update_args[:stack].first).to include("allocation_weight" => 100, "link" => ["Vm::HostNexus", "download_boot_images"])
       }
-    end
-
-    it "hops once SetupVhostBlockBackend has returned" do
-      nx.strand.retval = {"msg" => "VhostBlockBackend was setup"}
-      expect { nx.setup_storage_backend }.to hop("download_boot_images")
     end
   end
 

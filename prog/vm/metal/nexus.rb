@@ -357,12 +357,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def update_firewall_rules
-    if retval&.dig("msg") == "firewall rule is added"
-      hop_wait
-    end
-
     decr_update_firewall_rules
-    push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+    hop_push :wait, vm.update_firewall_rules_prog, label: :update_firewall_rules
   end
 
   label def update_spdk_dependency
@@ -702,9 +698,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   # balancer rules the namespace was serving, so they have to be reinstalled.
   label def restore_load_balancer
     load_balancer = vm.load_balancer
-    hop_wait if retval || load_balancer.nil?
+    hop_wait unless load_balancer
 
-    push Prog::Vnet::UpdateLoadBalancerNode, {"load_balancer_id" => load_balancer.id}, :update_load_balancer
+    hop_push :wait, Prog::Vnet::UpdateLoadBalancerNode, new_frame: {"load_balancer_id" => load_balancer.id}, label: :update_load_balancer
   end
 
   def available?

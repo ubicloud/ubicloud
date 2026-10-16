@@ -93,33 +93,18 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vm_host_slices
-    if retval&.dig("msg") == "Verified VM Host Slices!"
-      hop_verify_firewall_rules
-    end
-
     slice_ids = vms.map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
-    push Prog::Test::VmHostSlices, {"slice_ids" => slice_ids}
+    hop_push :verify_firewall_rules, Prog::Test::VmHostSlices, new_frame: {"slice_ids" => slice_ids}
   end
 
   label def verify_firewall_rules
-    if retval&.dig("msg") == "Verified Firewall Rules!"
-      hop_verify_connected_subnets
-    end
-
-    push Prog::Test::FirewallRules, {"subject_id" => PrivateSubnet[subnets.first].firewalls.first.id, "subnet_id_outside" => subnets.last}
+    hop_push :verify_connected_subnets, Prog::Test::FirewallRules, new_frame: {"subject_id" => PrivateSubnet[subnets.first].firewalls.first.id, "subnet_id_outside" => subnets.last}
   end
 
   label def verify_connected_subnets
-    if retval&.dig("msg") == "Verified Connected Subnets!"
-      if test_reboot? && first_boot
-        hop_test_reboot
-      else
-        hop_destroy_resources
-      end
-    end
-
+    next_label = (test_reboot? && first_boot) ? :test_reboot : :destroy_resources
     ps1, ps2 = subnets.map { PrivateSubnet[it] }
-    push Prog::Test::ConnectedSubnets, {"subnet_id_multiple" => ((ps1.vms.count > 1) ? ps1.id : ps2.id), "subnet_id_single" => ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
+    hop_push next_label, Prog::Test::ConnectedSubnets, new_frame: {"subnet_id_multiple" => ((ps1.vms.count > 1) ? ps1.id : ps2.id), "subnet_id_single" => ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
   end
 
   label def test_reboot
