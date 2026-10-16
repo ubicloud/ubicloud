@@ -95,7 +95,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     seven_days_ago = Time.now - 7 * 24 * 60 * 60
     cond = Sequel.expr { (last_accessed_at < seven_days_ago) | ((last_accessed_at =~ nil) & (created_at < seven_days_ago)) }
     github_repository.cache_entries_dataset
-      .where(cond)
       .limit(200)
       .destroy_where(cond)
 
@@ -107,7 +106,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     cond = Sequel.expr(committed_at: nil)
     github_repository.cache_entries_dataset
       .where { created_at < Time.now - 30 * 60 }
-      .where(cond)
       .limit(200)
       .destroy_where(cond)
 

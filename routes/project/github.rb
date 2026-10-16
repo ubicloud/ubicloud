@@ -217,11 +217,14 @@ class Clover
               end
 
               r.delete do
-                DB.transaction do
-                  entry.destroy
+                begin
+                  entry.delete_blob_storage
                 rescue Aws::S3::Errors::InternalError
                   raise CloverError.new(500, "InternalError", "Internal error when destroying cache entry")
-                else
+                end
+
+                DB.transaction do
+                  entry.destroy
                   audit_log(entry, "destroy")
                 end
 
