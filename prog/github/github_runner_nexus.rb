@@ -39,7 +39,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # Pool VMs are provisioned without installation context, so they cannot
     # honor per-installation location preferences; allocate a fresh VM instead.
     has_location_preferences = installation.allocator_preferences.values_at("location_filter", "location_preference").any?
-    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set? || has_location_preferences
+    skip_pool = project.get_ff_skip_runner_pool || (alien_allowed? && github_runner.spill_over_set?) || has_location_preferences
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
@@ -65,7 +65,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     size = label_data["vm_size"]
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    if alien_allowed? && (github_runner.spill_over_set? || (support_alien? && rand < alien_ratio))
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
@@ -350,6 +350,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     label_data["vcpus"] <= 30
   end
 
+  def alien_allowed?
+    !project.get_ff_no_alien_runners
+  end
+
   def before_destroy
     register_deadline(nil, 15 * 60)
     update_billing_record
@@ -395,6 +399,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       !vm.allocated_at &&
       vm.waiting_for_capacity_set? &&
       Time.now - vm.created_at > 60 &&
+      alien_allowed? &&
       project.get_ff_spill_to_alien_runners &&
       aws_quota_available? &&
       aws_spill_capacity_available?
@@ -411,7 +416,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   label def wait_concurrency_limit
     # An operator can set the spill over semaphore by hand to override the checks below.
-    hop_allocate_vm if spill_over_set?
+    hop_allocate_vm if spill_over_set? && alien_allowed?
 
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
@@ -420,6 +425,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if project.reputation == "limited"
       Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      nap rand(5..15)
+    end
+
+    if project.get_ff_hard_runner_concurrency_limit
+      Clog.emit("not allowed because of hard concurrency limit", {hard_concurrency_limit: {label: github_runner.label, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
@@ -447,6 +457,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if is_high_util
       should_spill_over = support_alien? &&
+        alien_allowed? &&
         project.get_ff_spill_to_alien_runners &&
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds &&
         aws_quota_available?
