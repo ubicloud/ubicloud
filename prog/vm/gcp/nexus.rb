@@ -249,12 +249,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def update_firewall_rules
-    if retval&.dig("msg") == "firewall rule is added"
-      hop_wait
-    end
-
     decr_update_firewall_rules
-    push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+    hop_push :wait, vm.update_firewall_rules_prog, label: :update_firewall_rules
   end
 
   label def prevent_destroy
