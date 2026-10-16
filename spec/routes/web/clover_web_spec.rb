@@ -127,13 +127,13 @@ RSpec.describe Clover do
 
     pg = Page.active.first!(tag: "Clover500-RuntimeError")
     expect(pg.severity).to eq("warning")
-    expect(pg.details).not_to have_key("exception_message")
-    expect(pg.details["exception_class"]).to eq("RuntimeError")
+    expect(pg.details["exception"]["class"]).to eq("RuntimeError")
+    expect(pg.details["exception"]["message"]).to eq("test error")
     expect(pg.details["request_method"]).to eq("GET")
     expect(pg.details["request_path"]).to eq("/webhook/test-error")
     expect(pg.resource_id).to be_nil
-    expect(pg.details["backtrace"]).to be_a(Array)
-    expect(pg.details["backtrace"].first).to include("clover.rb")
+    expect(pg.details["exception"]["backtrace"]).to be_a(Array)
+    expect(pg.details["exception"]["backtrace"].first).to include("clover.rb")
 
     visit "/webhook/test-error"
     expect(Page.active.where(tag: "Clover500-RuntimeError").count).to eq 1
@@ -147,10 +147,13 @@ RSpec.describe Clover do
       resource_id: nil,
       severity: "warning",
       extra_data: {
-        exception_class: "RuntimeError",
         request_method: "GET",
         request_path: "/webhook/test-error",
-        backtrace: instance_of(Array),
+        exception: {
+          message: "test error",
+          class: "RuntimeError",
+          backtrace: instance_of(Array),
+        },
       },
     ).and_raise(RuntimeError.new("paging failure"))
     allow(Clog).to receive(:emit).and_call_original
