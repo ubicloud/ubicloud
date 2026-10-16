@@ -17,6 +17,7 @@ class Strand < Sequel::Model
   one_to_many :semaphores
 
   plugin ResourceMethods
+  plugin :update_refresh, columns: :schedule
 
   def subject
     return @subject if defined?(@subject) && @subject != :reload
@@ -277,7 +278,8 @@ SQL
 
       case prog_action
       when Prog::Base::Nap
-        save_changes
+        raise validation_failed_error unless valid?
+
         seconds = prog_action.seconds
         unless seconds == 0
           closest_unnotified_deadline = stack.filter_map do |frame|
@@ -296,19 +298,11 @@ SQL
         # lease-time value. A concurrent wake wrote through
         # SCHEDULE_NO_LATER_THAN_NOW, guaranteed to differ from it, so
         # the wake-up schedule survives the nap.
-        scheduled = DB[<<SQL, schedule, seconds, id].get
-UPDATE strand
-SET try = 0,
-    schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
-                      ELSE schedule END
-WHERE id = ?
-RETURNING schedule
-SQL
-        # For convenience, reflect the updated record's schedule content
-        # in the model object, but since it's fresh, remove it from the
-        # changed columns so save_changes won't update it again.
-        self.schedule = scheduled
-        changed_columns.delete(:schedule)
+        values[:schedule] = Sequel.lit("CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval) ELSE schedule END", schedule, seconds)
+        modified!(:schedule)
+
+        self.try = 0
+        save_changes(validate: false)
       when Prog::Base::Hop
         hp = prog_action
         last_changed_at = Time.new(top_frame["last_label_changed_at"])
