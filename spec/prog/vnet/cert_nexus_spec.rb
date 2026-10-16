@@ -89,6 +89,32 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
+  describe "#before_run" do
+    it "hops to restart if restarted is set while waiting on the ACME order" do
+      st.update(label: "wait_dns_validation")
+      nx.incr_restarted
+      expect { nx.before_run }.to hop("restart")
+    end
+
+    it "does not hop to restart if restarted is set outside the ACME order labels" do
+      st.update(label: "restart")
+      nx.incr_restarted
+      expect { nx.before_run }.not_to hop
+    end
+
+    it "does not hop to restart if restarted is not set" do
+      st.update(label: "wait_dns_validation")
+      expect { nx.before_run }.not_to hop
+    end
+
+    it "hops to destroy before restart if both are set" do
+      st.update(label: "wait_dns_validation")
+      nx.incr_restarted
+      nx.incr_destroy
+      expect { nx.before_run }.to hop("destroy")
+    end
+  end
+
   describe "#before_destroy" do
     it "replaces the provisioning deadline with a destroy deadline" do
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => Time.now.to_s})

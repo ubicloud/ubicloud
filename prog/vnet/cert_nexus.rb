@@ -10,6 +10,8 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
+  ACME_ORDER_LABELS = %w[wait_dns_update wait_dns_validation cert_finalization wait_cert_finalization].freeze
+
   ACME_CLIENT_OPTIONS = {
     connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
     bad_nonce_retry: 3,
@@ -24,6 +26,14 @@ class Prog::Vnet::CertNexus < Prog::Base
       cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
 
       Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "waiting_strand_id" => waiting_strand_id, "wait_deadline" => wait_deadline}])
+    end
+  end
+
+  def before_run
+    super
+
+    when_restarted_set? do
+      hop_restart if ACME_ORDER_LABELS.include?(strand.label)
     end
   end
 
