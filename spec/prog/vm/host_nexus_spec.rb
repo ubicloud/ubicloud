@@ -401,11 +401,14 @@ RSpec.describe Prog::Vm::HostNexus do
         "LearnOs",
         "LearnPci",
         "LearnStorage",
+        "SetupCsumGuard",
         "SetupNftables",
         "SetupNodeExporter",
         "SetupSysstat",
         "Vm::PrepHost",
       ])
+      csum_guard = Strand.first(parent_id: st.id, prog: "SetupCsumGuard")
+      expect(csum_guard.stack.first["enable"]).to be true
     end
 
     it "sets up the ndp proxy when the host needs ndp" do

@@ -25,8 +25,9 @@ against libbpf, so a host needs no compiler and no bpftool.
 
 ## Operational surface
 
-Two `VmHost` semaphores turn the guard on and off. Nothing sets them on
-its own, so a deploy or a rhizome rollout changes no host.
+Two `VmHost` semaphores turn the guard on and off on existing hosts.
+A new host installs the guard during `HostNexus#prep`, before it
+accepts VMs. A deploy or a rhizome rollout changes no existing host.
 
 - `enable_csum_guard`: `HostNexus#wait` pushes `Prog::SetupCsumGuard`,
   which runs `host/bin/setup-csum-guard install`. That refuses kernels
@@ -72,7 +73,8 @@ installed with `bpftool map dump name counters`.
 ## Rollout
 
 1. Deploy the migration, then the code. The column is false on every
-   host and nothing sets the semaphores, so no host changes.
+   host and nothing sets the semaphores on existing hosts, so no host
+   changes. New hosts get the guard during prep.
 2. Roll rhizome out (`Prog::RolloutRhizome`), which puts
    `setup-csum-guard` and the `VmSetup` hook on the hosts. The hook
    does nothing until a host is installed.
