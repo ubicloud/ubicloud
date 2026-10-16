@@ -79,19 +79,14 @@ class IoThrottle
     pid
   end
 
-  def find_immune_pids
-    postmaster_pid = find_postmaster_pid
-    children = File.read("/proc/#{postmaster_pid}/task/#{postmaster_pid}/children").split.map { Integer(_1, 10) }
-
-    immune_pids = [postmaster_pid]
-    children.each do |pid|
+  def find_immune_pids(children)
+    children.select do |pid|
       cmdline = File.read("/proc/#{pid}/cmdline").tr("\0", " ")
-      immune_pids << pid if immune_patterns.any? { |pattern| cmdline.include?(pattern) }
+      immune_patterns.any? { |pattern| cmdline.include?(pattern) }
     rescue Errno::ENOENT
       # Process exited between enumeration and read
-      nil
+      false
     end
-    immune_pids
   end
 
   # Patterns matching the Postgres children throttling must leave alone, because
@@ -111,6 +106,12 @@ class IoThrottle
   rescue Errno::ESRCH
     # Process no longer exists
     nil
+  end
+
+  def get_pid_children(pid)
+    File.read("/proc/#{pid}/task/#{pid}/children").split.map { Integer(_1, 10) }
+  rescue Errno::ENOENT
+    []
   end
 
   private
@@ -170,22 +171,13 @@ class IoThrottle
   end
 
   def classify_processes
-    immune_pids = find_immune_pids
+    postmaster_pid = find_postmaster_pid
+    children = get_pid_children(postmaster_pid)
+    immune_pids = [postmaster_pid, *find_immune_pids(children)]
+    immune_pids.each { move_pid_to_cgroup(_1, @immune_cgroup) }
 
-    immune_pids.each do |pid|
-      move_pid_to_cgroup(pid, @immune_cgroup)
-    end
-
-    (get_cgroup_pids(@service_cgroup) + get_cgroup_pids(@immune_cgroup)).each do |pid|
-      next if immune_pids.include?(pid)
-      move_pid_to_cgroup(pid, @throttled_cgroup)
-    end
-
-    get_cgroup_pids(@throttled_cgroup).each do |pid|
-      move_pid_to_cgroup(pid, @immune_cgroup) if immune_pids.include?(pid)
-    end
-
-    immune_pids
+    # Children of other immune processes (e.g. wal-g under the archiver) stay immune.
+    (children - immune_pids).each { move_pid_to_cgroup(_1, @throttled_cgroup) }
   end
 end
 

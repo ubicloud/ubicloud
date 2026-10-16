@@ -24,39 +24,26 @@ RSpec.describe IoThrottle do
 
   describe "#find_immune_pids" do
     it "identifies immune processes by cmdline patterns" do
-      expect(throttle).to receive(:find_postmaster_pid).and_return(1000)
-      expect(File).to receive(:read).with("/proc/1000/task/1000/children")
-        .and_return("1001 1002 1003 1004 1005")
-
       expect(File).to receive(:read).with("/proc/1001/cmdline").and_return("postgres: 17/main: logger")
       expect(File).to receive(:read).with("/proc/1002/cmdline").and_return("postgres: 17/main: checkpointer")
       expect(File).to receive(:read).with("/proc/1003/cmdline").and_return("postgres: 17/main: background writer")
       expect(File).to receive(:read).with("/proc/1004/cmdline").and_return("postgres: 17/main: archiver")
       expect(File).to receive(:read).with("/proc/1005/cmdline").and_return("postgres: 17/main: autovacuum launcher")
 
-      immune_pids = throttle.find_immune_pids
-
-      expect(immune_pids).to include(1000, 1001, 1002, 1003, 1004)
-      expect(immune_pids).not_to include(1005)
+      expect(throttle.find_immune_pids([1001, 1002, 1003, 1004, 1005])).to eq([1001, 1002, 1003, 1004])
     end
 
     it "includes walwriter via the 'writer' pattern" do
-      expect(throttle).to receive(:find_postmaster_pid).and_return(100)
-      expect(File).to receive(:read).with("/proc/100/task/100/children").and_return("101")
       expect(File).to receive(:read).with("/proc/101/cmdline").and_return("postgres: 17/main: walwriter")
 
-      expect(throttle.find_immune_pids).to include(101)
+      expect(throttle.find_immune_pids([101])).to eq([101])
     end
 
     it "skips processes that have exited between enumeration and read" do
-      expect(throttle).to receive(:find_postmaster_pid).and_return(100)
-      expect(File).to receive(:read).with("/proc/100/task/100/children").and_return("101 102")
       expect(File).to receive(:read).with("/proc/101/cmdline").and_raise(Errno::ENOENT)
       expect(File).to receive(:read).with("/proc/102/cmdline").and_return("postgres: 17/main: checkpointer")
 
-      result = nil
-      expect { result = throttle.find_immune_pids }.not_to raise_error
-      expect(result).to include(100)
+      expect(throttle.find_immune_pids([101, 102])).to eq([102])
     end
   end
 
@@ -128,7 +115,7 @@ RSpec.describe IoThrottle do
 
     it "sets io.max with correct wbps value" do
       expect(File).to receive_messages(directory?: true, read: "")
-      expect(throttle).to receive_messages(find_immune_pids: [1000], get_cgroup_pids: [])
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_cgroup_pids: [])
 
       expect(File).to receive(:write).with("/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@17-main.service/cgroup.subtree_control", "+io")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=104857600")
@@ -140,8 +127,9 @@ RSpec.describe IoThrottle do
     it "rewrites the limit every tick and reports no change when io.max already holds it" do
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=104857600 riops=max wiops=max\n")
-      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=104857600")
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
 
       expect(throttle.apply_throttle(100)).to be(false)
     end
@@ -204,45 +192,39 @@ RSpec.describe IoThrottle do
   end
 
   describe "#classify_processes" do
-    it "moves non-immune cgroup pids to throttled cgroup" do
-      # pid 1001 is in service_cgroup but not immune → move to throttled
-      expect(throttle).to receive(:find_immune_pids).and_return([1000])
-      expect(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([1001])
-      expect(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([])
+    before { expect(throttle).to receive(:find_postmaster_pid).and_return(1000) }
+
+    it "moves non-immune postmaster children to throttled cgroup" do
+      expect(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("1001 1002")
+      expect(File).to receive(:read).with("/proc/1001/cmdline").and_return("postgres: 17/main: postgres app [local] idle")
+      expect(File).to receive(:read).with("/proc/1002/cmdline").and_return("postgres: 17/main: archiver")
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1002")
       expect(File).to receive(:write).with("#{throttled_cgroup}/cgroup.procs", "1001")
-      expect(File).to receive(:write).with("/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@17-main.service/immune/cgroup.procs", "1000")
       throttle.send(:classify_processes)
     end
 
-    it "skips immune pids when iterating service+immune cgroups" do
-      # pid 1000 is in immune_cgroup AND in immune_pids → next (skip it, don't move to throttled)
-      expect(throttle).to receive(:find_immune_pids).and_return([1000])
-      expect(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([1000])
-      expect(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([])
+    it "leaves descendants of immune processes in immune cgroup" do
+      # e.g. wal-g spawned by the archiver is in immune cgroup but not a postmaster child
+      expect(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("1002")
+      expect(File).to receive(:read).with("/proc/1002/cmdline").and_return("postgres: 17/main: archiver")
+      expect(throttle).not_to receive(:get_cgroup_pids)
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1002")
       expect(File).not_to receive(:write).with("#{throttled_cgroup}/cgroup.procs", anything)
       throttle.send(:classify_processes)
     end
+  end
 
-    it "moves immune pids from throttled cgroup back to immune cgroup" do
-      # pid 1000 ended up in throttled_cgroup but is actually immune → move to immune
-      expect(throttle).to receive(:find_immune_pids).and_return([1000])
-      expect(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([1000])
-      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000").twice
-      throttle.send(:classify_processes)
+  describe "#get_pid_children" do
+    it "parses PIDs from the children file" do
+      expect(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("1001 1002 ")
+      expect(throttle.get_pid_children(1000)).to eq([1001, 1002])
     end
 
-    it "does not move non-immune throttled pids back to immune" do
-      # No immune pids; pid 1001 is in throttled_cgroup but not immune → stays there (else branch)
-      expect(throttle).to receive(:find_immune_pids).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([1001])
-      expect(File).not_to receive(:write).with("#{immune_cgroup}/cgroup.procs", anything)
-      throttle.send(:classify_processes)
+    it "returns empty array if the process has exited" do
+      expect(File).to receive(:read).with("/proc/1000/task/1000/children").and_raise(Errno::ENOENT)
+      expect(throttle.get_pid_children(1000)).to eq([])
     end
   end
 
@@ -308,7 +290,8 @@ RSpec.describe IoThrottle do
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=#{80 * 1024 * 1024} riops=max wiops=max\n")
-      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
       expect(logger).not_to receive(:info)
 
@@ -322,7 +305,8 @@ RSpec.describe IoThrottle do
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
-      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
 
       # 150 files hits moderate tier (100+): 80% of baseline 100 MB/s = 80 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
@@ -340,7 +324,8 @@ RSpec.describe IoThrottle do
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
-      expect(throttle_leaseweb).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(throttle_leaseweb).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
 
       # 150 files hits moderate tier (100+): 80% of baseline 35 MB/s = 28 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{28 * 1024 * 1024}")
@@ -355,8 +340,8 @@ RSpec.describe IoThrottle do
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
-      expect(throttle).to receive(:find_immune_pids).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
 
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
       expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: 55, effective: 55 MB/s")
@@ -373,8 +358,8 @@ RSpec.describe IoThrottle do
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
-      expect(throttle).to receive(:find_immune_pids).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+      expect(throttle).to receive_messages(find_postmaster_pid: 1000, get_pid_children: [])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
 
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
 
