@@ -1378,16 +1378,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    it "hops to wait_firewall_rules" do
+    it "pushes firewall rules prog, returning to wait" do
       vm.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
-      expect { nx.update_firewall_rules }
-        .to change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
-    end
-
-    it "hops to wait if firewall rules are applied" do
-      expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
-      expect { nx.update_firewall_rules }.to hop("wait")
+      expect { nx.update_firewall_rules }.to hop(:update_firewall_rules, "Vnet::Metal::UpdateFirewallRules") { it.strand_update_args[:stack].first["link"] == [st.prog, "wait"] }
+      expect(vm.update_firewall_rules_set?(cached: false)).to be false
     end
   end
 
@@ -1895,15 +1889,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#restore_load_balancer" do
-    it "reinstalls the load balancer rules in the recreated network namespace" do
+    it "reinstalls the load balancer rules in the recreated network namespace, returning to wait" do
       lb = create_load_balancer
-      expect { nx.restore_load_balancer }.to hop(:update_load_balancer, "Vnet::UpdateLoadBalancerNode") { it.strand_update_args[:stack].first["load_balancer_id"] == lb.id }
-    end
-
-    it "hops to wait after the rules are reinstalled" do
-      create_load_balancer
-      st.update(retval: {"msg" => "load balancer is updated"})
-      expect { nx.restore_load_balancer }.to hop("wait")
+      expect { nx.restore_load_balancer }.to hop(:update_load_balancer, "Vnet::UpdateLoadBalancerNode") { it.strand_update_args[:stack].first.values_at("load_balancer_id", "link") == [lb.id, [st.prog, "wait"]] }
     end
 
     it "hops to wait if the vm is no longer part of a load balancer" do

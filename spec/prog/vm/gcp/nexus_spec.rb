@@ -953,16 +953,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    it "pushes firewall rules prog" do
+    it "pushes firewall rules prog, returning to wait" do
       nx.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::Gcp::UpdateFirewallRules, {}, :update_firewall_rules)
-      nx.update_firewall_rules
+      expect { nx.update_firewall_rules }.to hop(:update_firewall_rules, "Vnet::Gcp::UpdateFirewallRules") { it.strand_update_args[:stack].first["link"] == [st.prog, "wait"] }
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").all).to be_empty
-    end
-
-    it "hops to wait if firewall rules are applied" do
-      expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
-      expect { nx.update_firewall_rules }.to hop("wait")
     end
   end
 
