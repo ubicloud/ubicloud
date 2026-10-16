@@ -60,6 +60,18 @@ class Prog::Test < Prog::Base
     pop test_level
   end
 
+  label def hop_pusher
+    hop_push :hop_pushed, Prog::Test, new_frame: {test_level: "2"}, label: :pusher3
+  end
+
+  label def hop_pushed
+    pop "hop_push returned #{retval["msg"]}"
+  end
+
+  label def hop_push_defaults
+    hop_push "hop_pushed", Prog::Test
+  end
+
   label def hop_entry
     hop_hop_exit
   end
