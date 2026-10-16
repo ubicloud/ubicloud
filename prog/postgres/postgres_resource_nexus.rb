@@ -15,7 +15,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def_delegators :postgres_resource, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
-    target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
+    target_version: nil,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
     hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil,
@@ -117,6 +117,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
       postgres_resource_id ||= PostgresResource.generate_uuid
 
+      flavor = PostgresResource::STANDARD_FLAVOR
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:, target_vm_size:,
         target_storage_size_gib:, server_cert:, server_cert_key:, superuser_password:,
@@ -211,7 +212,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         target_vm_size: v["target_vm_size"],
         target_storage_size_gib: v["target_storage_size_gib"],
         target_version: v["target_version"],
-        flavor: v["flavor"],
         ha_type: v["ha_type"],
         tags: v["tags"] || [],
         user_config: v["user_config"] || {},
@@ -410,7 +410,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_update_billing_records
 
     if postgres_resource.project.billable
-      flavor = postgres_resource.flavor
       current_vm_size = Option::POSTGRES_SIZE_OPTIONS[postgres_resource.vm_size]
       vm_family = current_vm_size.family
       vcpu_count = current_vm_size.vcpu_count
@@ -420,8 +419,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|
         resource_type, slot_prefix, slot_suffix = index.zero? ? ["", "primary", ""] : ["Standby", "standby", "-#{index - 1}"]
         [
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count, slot: "#{slot_prefix}-vcpu#{slot_suffix}"},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{postgres_resource.flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count, slot: "#{slot_prefix}-vcpu#{slot_suffix}"},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", postgres_resource.flavor, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
         ]
       end
 

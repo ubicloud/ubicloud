@@ -496,7 +496,7 @@ class PostgresResource < Sequel::Model
   end
 
   def can_upgrade?
-    target_version.to_i < Option::POSTGRES_VERSION_OPTIONS[flavor].map(&:to_i).max
+    target_version.to_i < Option::POSTGRES_VERSION_OPTIONS.map(&:to_i).max
   end
 
   def ready_for_read_replica?
@@ -590,7 +590,7 @@ class PostgresResource < Sequel::Model
   end
 
   def next_storage_auto_scale_option
-    option_tree, parents = PostgresResource.generate_postgres_options(project, flavor:, location:)
+    option_tree, parents = PostgresResource.generate_postgres_options(project, location:)
     all_storage_size_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
 
     current_vm_size = Option::POSTGRES_SIZE_OPTIONS[vm_size]
@@ -777,21 +777,19 @@ class PostgresResource < Sequel::Model
     Authorization.allowed_accounts_dataset(project.id, "Postgres:view", self).distinct.select_map(:email)
   end
 
-  def self.generate_postgres_options(project, flavor: nil, location: nil)
+  def self.generate_postgres_options(project, location: nil)
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
 
-    options.add_option(name: "flavor", values: flavor || Option::POSTGRES_FLAVOR_OPTIONS.keys)
-
     available_families_and_sizes_by_location = {}
-    options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor")
+    options.add_option(name: "location", values: location || postgres_locations(project))
 
-    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |location, family|
       (available_families_and_sizes_by_location[location.name] ||= available_families_and_sizes(location, project)).any? { |f, _| f == family }
     end
 
-    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |location, family, size|
       next false unless Option::POSTGRES_SIZE_OPTIONS[size].family == family
       available_families_and_sizes_by_location[location.name].include?([family, size])
     end
@@ -801,13 +799,13 @@ class PostgresResource < Sequel::Model
         .values
         .flat_map { |h| h.values.flatten }
     storage_size_options.uniq!
-    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
       storage_sizes(location, family, vcpu_count).include?(storage_size)
     end
 
-    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
-      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS) do |version|
+      Option::POSTGRES_VERSION_OPTIONS.include?(version)
     end
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
@@ -847,13 +845,7 @@ class PostgresResource < Sequel::Model
     HaType::NONE
   end
 
-  module Flavor
-    STANDARD = "standard"
-  end
-
-  def self.default_flavor
-    Flavor::STANDARD
-  end
+  STANDARD_FLAVOR = "standard"
 
   # Bumped on its own schedule: a version is offered in POSTGRES_VERSION_OPTIONS
   # for a while before new databases are created with it by default.
