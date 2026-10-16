@@ -748,6 +748,7 @@ class PostgresResource < Sequel::Model
 
   def send_failover_notification(mode:)
     planned = mode == "planned"
+    return unless planned || Config.postgres_unplanned_failover_notification_enabled
 
     body = [
       "A standby server has been promoted to primary for your PostgreSQL database '#{name}' (#{ubid}).",
