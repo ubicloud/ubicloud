@@ -72,7 +72,11 @@ Our specific rules are condensed below:
 - **No AI Garbage:** When using AI to generate your commit messages,
   have some respect for other developers who may have to read the
   message. Do not include test suite output, coverage information,
-  rubocop status, or any other pointless filler.
+  rubocop status, AI model or session information, AI co-author or
+  committer metadata, or any other pointless filler. Also, make the
+  author name match your earlier commits to the repository: for
+  example, use your full name, not only your first name, if your
+  earlier commits use your full name.
 
 ### References
 
