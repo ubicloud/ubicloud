@@ -286,17 +286,20 @@ LOCK
 
     if block
       Net::SSH.start(host, unix_user, **args) do |session|
-        add_host_keys(new_host_keys) unless new_host_keys.empty?
+        add_host_keys(new_host_keys)
         yield session
       end
     else
       sess = Net::SSH.start(host, unix_user, **args)
-      add_host_keys(new_host_keys) unless new_host_keys.empty?
+      add_host_keys(new_host_keys)
       sess
     end
   end
 
   def add_host_keys(keys)
+    return if new?
+    return if keys.empty?
+
     if this.where(host_keys:).update(host_keys: Sequel.pg_array((host_keys || []) + keys, :text)) == 1
       Clog.emit("sshable host keys added", {sshable_host_keys_added: {sshable: ubid, keys:}})
     end

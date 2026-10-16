@@ -318,6 +318,24 @@ LOCK
       sa.add_host_keys(["ssh-ed25519 b"])
       expect(sa.host_keys).to eq ["ssh-ed25519 c"]
     end
+
+    it "does nothing when there are no keys to add" do
+      sa.update(host_keys: ["ssh-ed25519 a"])
+      expect(sa).not_to receive(:reload)
+      expect(Clog).not_to receive(:emit)
+
+      sa.add_host_keys([])
+      expect(described_class[sa.id].host_keys).to eq ["ssh-ed25519 a"]
+    end
+
+    it "does nothing for a new sshable" do
+      new_sa = described_class.new(host: "new.localhost", unix_user: "testuser")
+      expect(new_sa).not_to receive(:reload)
+      expect(Clog).not_to receive(:emit)
+
+      new_sa.add_host_keys(["ssh-ed25519 b"])
+      expect(new_sa.host_keys).to be_nil
+    end
   end
 
   describe "#check_for_new_host_keys" do
@@ -430,7 +448,7 @@ LOCK
       expect_host_keys_session([known.blob, ecdsa.blob],
         [true, Net::SSH::Buffer.from(:string, proof(other_ecdsa, "ecdsa-sha2-nistp256", blob: ecdsa.blob))])
       expect(Clog).not_to receive(:emit)
-      expect(sa).not_to receive(:add_host_keys)
+      expect(sa).to receive(:add_host_keys).with([]).and_call_original
 
       sa.check_for_new_host_keys
       expect(sa.reload.host_keys).to eq [known.str]
@@ -442,7 +460,7 @@ LOCK
       sa.update(host_keys: [known.str])
 
       requests = expect_host_keys_session([known.blob, ecdsa.blob], [false, nil])
-      expect(sa).not_to receive(:add_host_keys)
+      expect(sa).to receive(:add_host_keys).with([]).and_call_original
 
       sa.check_for_new_host_keys
       expect(requests).to eq [["keepalive@openssh.com"], [prove_request, :string, ecdsa.blob]]
@@ -455,7 +473,7 @@ LOCK
       sa.update(host_keys: [known.str])
 
       requests = expect_host_keys_session([ecdsa.blob])
-      expect(sa).not_to receive(:add_host_keys)
+      expect(sa).to receive(:add_host_keys).with([]).and_call_original
 
       sa.check_for_new_host_keys
       expect(requests).to eq [["keepalive@openssh.com"]]
@@ -472,7 +490,7 @@ LOCK
       sa.update(host_keys: [known.str])
 
       requests = expect_host_keys_session([known.blob])
-      expect(sa).not_to receive(:add_host_keys)
+      expect(sa).to receive(:add_host_keys).with([]).and_call_original
 
       sa.check_for_new_host_keys
       expect(requests).to eq [["keepalive@openssh.com"]]
