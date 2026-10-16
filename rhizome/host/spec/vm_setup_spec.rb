@@ -1603,6 +1603,7 @@ NFTABLES_CONF
 
   describe "#interfaces" do
     it "can setup interfaces without multiqueue" do
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test.service", "test-dnsmasq.service", expect: [0, 5])
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(true, false)
       expect(vs).to receive(:sleep).with(0.1).once
@@ -1618,6 +1619,7 @@ NFTABLES_CONF
     end
 
     it "can setup interfaces with multiqueue" do
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test.service", "test-dnsmasq.service", expect: [0, 5])
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
 
@@ -1632,11 +1634,13 @@ NFTABLES_CONF
     end
 
     it "fails if network namespace can not be deleted" do
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test.service", "test-dnsmasq.service", expect: [0, 5])
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(CommandFail.new("", "", "error"))
       expect { vs.interfaces([VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")], false) }.to raise_error(CommandFail)
     end
 
     it "ignores 'No such file or directory' error when deleting netns" do
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test.service", "test-dnsmasq.service", expect: [0, 5])
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(
         CommandFail.new("", "", 'Cannot remove namespace file "/var/run/netns/test": No such file or directory'),
       )

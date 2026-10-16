@@ -236,6 +236,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # the "ip link add" step generates the MAC addresses randomly,
     # which makes it unsuitable for error message matching. Deleting
     # and recreating the network namespace seems easier and safer.
+    #
+    # But "ip netns del" only unmaps the namespace name; a dnsmasq (or the VM
+    # itself) left running inside it by a failed earlier attempt pins the
+    # namespace, and its vetho, alive, so the delete below never reclaims it and
+    # every retry wedges on the non-idempotent "ip link add". Stop those services
+    # first; both are Restart=no, and prep recreates and starts them later.
+    # expect 5 ("not loaded") covers the first prep, before the units exist.
+    r "systemctl", "stop", "#{@vm_name}.service", "#{@vm_name}-dnsmasq.service", expect: [0, 5]
     begin
       r "ip", "netns", "del", @vm_name
     rescue CommandFail => ex
