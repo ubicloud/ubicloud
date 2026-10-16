@@ -817,7 +817,7 @@ RSpec.describe Clover, "billing" do
           hash_including(line_items: [hash_including(price_data: hash_including(currency: "eur", unit_amount: ((invoice.cost * 0.5).round(2) * 100).round))]),
         ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
         # rubocop:enable RSpec/VerifiedDoubles
-        expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
+        expect(checkout_sessions_service).to receive(:retrieve).with("session_123", {expand: ["payment_intent"]}).and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid", "payment_intent" => {"id" => "pi_1234567890", "created" => 1760000000}))
 
         visit "#{project.path}/billing"
 

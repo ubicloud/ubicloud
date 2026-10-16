@@ -183,7 +183,7 @@ RSpec.describe Invoice do
       update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, invoice_version: 2, discounts: [], credits: [], cost: 10.005, usd_to_eur_rate: 0.9)
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(payment_intents_service).to receive(:create).with(hash_including(amount: 900, currency: "eur")).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+      expect(payment_intents_service).to receive(:create).with(hash_including(amount: 900, currency: "eur")).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890", created: 1760000000))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
