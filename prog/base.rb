@@ -241,10 +241,18 @@ end
     strand.retval
   end
 
+  def hop_push(next_label, prog, **)
+    next_label = next_label.to_s if Symbol === next_label
+    _push(prog, **, old_label: next_label)
+  end
+
   def push(prog, new_frame = {}, label = "start")
+    _push(prog, new_frame:, label:)
+  end
+
+  private def _push(prog, new_frame: {}, label: "start", old_label: strand.label)
     old_prog = strand.prog
-    old_label = strand.label
-    new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
+    new_frame = {"subject_id" => @subject_id, "link" => [old_prog, old_label]}.merge(new_frame)
 
     prog_return Hop.new(old_prog, old_label,
       {prog: Strand.prog_verify(prog), label:,

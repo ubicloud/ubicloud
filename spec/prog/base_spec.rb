@@ -181,6 +181,33 @@ RSpec.describe Prog::Base do
     expect { st.reload }.to raise_error Sequel::NoExistingObject
   end
 
+  it "can push prog and frames on the stack and return to a different label using hop_push" do
+    st = Strand.create(prog: "Test", label: "hop_pusher")
+    expect {
+      st.run
+    }.to change { st.label }.from("hop_pusher").to("pusher3")
+    expect(st.retval).to be_nil
+    expect(st.stack.length).to eq 2
+    expect(st.reload.stack.first).to eq("subject_id" => st.id, "link" => ["Test", "hop_pushed"], "test_level" => "2")
+
+    expect {
+      st.run
+    }.to change { st.label }.from("pusher3").to("hop_pushed")
+    expect(st.retval).to eq({"msg" => "2"})
+    expect(st.stack.length).to eq 1
+
+    st.run
+    expect(st.exitval).to eq({"msg" => "hop_push returned 2"})
+  end
+
+  it "uses start label and empty frame by default for hop_push" do
+    st = Strand.create(prog: "Test", label: "hop_push_defaults")
+    expect {
+      st.run
+    }.to change { st.label }.from("hop_push_defaults").to("start")
+    expect(st.stack.first).to eq("subject_id" => st.id, "link" => ["Test", "hop_pushed"])
+  end
+
   it "can nap" do
     st = Strand.create(prog: "Test", label: "napper")
     ante = st.schedule
