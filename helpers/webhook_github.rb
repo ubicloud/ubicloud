@@ -63,7 +63,7 @@ class Clover
         label:,
         actual_label:,
         default_branch: data["repository"]["default_branch"],
-      ).subject
+      )
 
       return {message: "GithubRunner[#{runner.ubid}] created"}
     end
