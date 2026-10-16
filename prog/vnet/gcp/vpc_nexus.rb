@@ -11,6 +11,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
   DENY_RULE_BASE_PRIORITY = 65534
+  # IPv4 rule at the base priority, IPv6 rule at base + 1.
+  MANAGEMENT_SSH_ALLOW_PRIORITY = 1000
+  MANAGEMENT_EGRESS_DENY_PRIORITY = 1002
   DENY_RULE_DIRECTIONS = {"INGRESS" => :src_ip_ranges, "EGRESS" => :dest_ip_ranges}.freeze
   VERIFY_ASSOC_MAX_TRIES = 5
   DELETE_TAG_VALUE_MAX_TRIES = 30
@@ -173,6 +176,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def create_vpc_deny_rules
+    hop_create_management_rules if gcp_vpc.management?
+
     # 2 address families x 2 directions = 4 rules. Priorities walk down
     # from DENY_RULE_BASE_PRIORITY in the order emitted (IPv4 ingress,
     # IPv4 egress, IPv6 ingress, IPv6 egress).
@@ -182,6 +187,27 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         ensure_firewall_policy_rule(priority:, direction:, action: "deny", layer4_configs: [{ip_protocol: "all"}], **{ip_arg => ranges})
         priority -= 1
       end
+    end
+
+    hop_wait
+  end
+
+  # The management VPC holds only management NICs and gets no tag-targeted
+  # rules: SSH from the control plane in, nothing out. The firewall is
+  # stateful, so SSH replies still pass the egress deny.
+  label def create_management_rules
+    ipv6_cidrs, ipv4_cidrs = Config.control_plane_outbound_cidrs.partition { it.include?(":") }
+    [ipv4_cidrs, ipv6_cidrs].each_with_index do |cidrs, i|
+      priority = MANAGEMENT_SSH_ALLOW_PRIORITY + i
+      if cidrs.empty?
+        remove_firewall_policy_rule(priority)
+      else
+        ensure_firewall_policy_rule(priority:, direction: "INGRESS", action: "allow", src_ip_ranges: cidrs, layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}])
+      end
+    end
+
+    [["0.0.0.0/0"], ["::/0"]].each_with_index do |ranges, i|
+      ensure_firewall_policy_rule(priority: MANAGEMENT_EGRESS_DENY_PRIORITY + i, direction: "EGRESS", action: "deny", dest_ip_ranges: ranges, layer4_configs: [{ip_protocol: "all"}])
     end
 
     hop_wait
@@ -207,6 +233,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     decr_update_firewall_rules
+    hop_create_management_rules if gcp_vpc.management?
     push Prog::Vnet::Gcp::VpcUpdateFirewallRules, {}, "update_firewall_rules"
   end
 
@@ -546,6 +573,17 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   def firewall_policy_name
     gcp_vpc.name
+  end
+
+  def remove_firewall_policy_rule(priority)
+    credential.network_firewall_policies_client.remove_rule(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name,
+      priority:,
+    )
+  rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
+    # No rule at this priority.
+    nil
   end
 
   def emit_vpc_created
