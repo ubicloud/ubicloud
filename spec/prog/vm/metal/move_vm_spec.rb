@@ -131,6 +131,17 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(st.stack.first["unset_prevent_destroy"]).to be true
     end
 
+    it "retains the source volume's non-default storage size" do
+      vm.vm_storage_volumes.first.update(size_gib: 80)
+      vm_host
+
+      described_class.assemble(vm, vm_host)
+
+      new_vm = Vm.first(name: "old-vm")
+      expect(new_vm.id).not_to eq(vm.id)
+      expect(new_vm.vm_storage_volumes.first.size_gib).to eq(80)
+    end
+
     it "creates an sshable if current vm has sshable" do
       parent_st = Strand.create(prog: "Test::MoveVm", label: "start")
       old_sshable = Sshable.create_with_id(vm, unix_user: "test", host: "t_#{vm.id}", raw_private_key_1: SshKey.generate.keypair)
