@@ -14,6 +14,17 @@ RSpec.describe Clover, "machine-image" do
 
   before { login_api }
 
+  def login_as_other_user(*actions)
+    other_user = create_account("other_user@example.com")
+    other_user.add_project(project)
+    other_pat = ApiKey.create_personal_access_token(other_user, project:)
+    header "Authorization", "Bearer pat-#{other_pat.ubid}-#{other_pat.key}"
+
+    [other_user.id, other_pat.id].each do |sid|
+      actions.each { AccessControlEntry.create(project_id: project.id, subject_id: sid, action_id: ActionType::NAME_MAP[it]) }
+    end
+  end
+
   describe "list" do
     it "returns images in the location" do
       mi_version_metal
@@ -117,20 +128,35 @@ RSpec.describe Clover, "machine-image" do
 
     it "rejects when destroy_source is true and the caller lacks permission to destroy the source VM" do
       store
-      other_user = create_account("other_user@example.com")
-      other_user.add_project(project)
-      other_pat = ApiKey.create_personal_access_token(other_user, project:)
-      header "Authorization", "Bearer pat-#{other_pat.ubid}-#{other_pat.key}"
-
-      [other_user.id, other_pat.id].each do |sid|
-        AccessControlEntry.create(project_id: project.id, subject_id: sid, action_id: ActionType::NAME_MAP["MachineImage:create"])
-        AccessControlEntry.create(project_id: project.id, subject_id: sid, action_id: ActionType::NAME_MAP["Vm:view"])
-      end
+      login_as_other_user("MachineImage:create", "Vm:capture")
 
       # fails with destroy_source since other_user doesn't have Vm:delete permission
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
         {vm: source_vm.ubid, destroy_source: true}.to_json
       expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+    end
+
+    it "rejects capturing a VM the caller can only view" do
+      store
+      login_as_other_user("MachineImage:create", "Vm:view")
+
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "Source VM not found")
+    end
+
+    it "allows capturing a VM the caller has Vm:capture on" do
+      store
+      login_as_other_user("MachineImage:create", "Vm:capture")
+
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response.status).to eq(200)
+      new_mi = MachineImage[name: "new-mi"]
+      expect(new_mi).not_to be_nil
+      strand = new_mi.versions.first.strand
+      expect(strand.prog).to eq("MachineImage::VersionMetalNexus")
+      expect(strand.stack.first["source_vm_id"]).to eq(source_vm.id)
     end
 
     it "falls back to the platform default machine image store" do

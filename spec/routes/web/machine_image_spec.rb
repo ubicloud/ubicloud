@@ -221,6 +221,23 @@ RSpec.describe Clover, "machine-image" do
           expect(page).to have_no_select("vm", with_options: [ineligible.name])
         end
       end
+
+      it "offers only VMs the user has Vm:capture on in the source VM dropdown" do
+        source_vm
+        u = create_account("capture@example.com", with_project: false)
+        u.add_project(project)
+        AccessControlEntry.create(project_id: project.id, subject_id: u.id, action_id: ActionType::NAME_MAP["MachineImage:create"])
+        AccessControlEntry.create(project_id: project.id, subject_id: u.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        click_button "Log out"
+        login(u.email)
+
+        visit "#{project.path}/machine-image/create"
+        expect(page).to have_no_select("vm", with_options: [source_vm.name])
+
+        AccessControlEntry.create(project_id: project.id, subject_id: u.id, action_id: ActionType::NAME_MAP["Vm:capture"])
+        visit "#{project.path}/machine-image/create"
+        expect(page).to have_select("vm", with_options: [source_vm.name])
+      end
     end
 
     describe "create version" do
