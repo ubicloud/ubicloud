@@ -561,6 +561,7 @@ end
 #  family             | text                     | NOT NULL
 #  score_offset       | double precision         | NOT NULL DEFAULT 0
 #  project_id         | uuid                     |
+#  csum_guard_enabled | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  vm_host_pkey             | PRIMARY KEY btree (id)
 #  vm_host_ip6_key          | UNIQUE btree (ip6)

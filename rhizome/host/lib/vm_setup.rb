@@ -14,6 +14,7 @@ require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
+require_relative "csum_guard_setup"
 
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
@@ -277,6 +278,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       r(*cmd)
       r "ip", "-n", @vm_name, "addr", "replace", nic.private_ipv4_gateway, "dev", nic.tap
     end
+
+    # A no-op unless setup-csum-guard install has run on this host. Once it
+    # has, every tap gets the guard, not only the multiqueue ones created
+    # with vnet_hdr: the VMM enables vnet_hdr itself when it opens a tap.
+    CsumGuardSetup.maybe_attach_vm(@vm_name, nics.map(&:tap))
   end
 
   def subdivide_network(net)

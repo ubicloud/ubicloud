@@ -1,0 +1,16 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/csum_guard_setup"
+
+setup = CsumGuardSetup.new
+
+case (action = ARGV.shift)
+when "install"
+  setup.install
+when "uninstall"
+  setup.uninstall
+else
+  puts "invalid action #{action.inspect}, expected install or uninstall"
+  exit 1
+end

@@ -1614,6 +1614,7 @@ NFTABLES_CONF
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
+      expect(CsumGuardSetup).to receive(:maybe_attach_vm).with("test", ["nctest"])
       vs.interfaces(nics, false)
     end
 
@@ -1628,6 +1629,7 @@ NFTABLES_CONF
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test", "multi_queue", "vnet_hdr")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
+      expect(CsumGuardSetup).to receive(:maybe_attach_vm).with("test", ["nctest"])
       vs.interfaces(nics, true)
     end
 
@@ -1645,6 +1647,7 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
+      expect(CsumGuardSetup).to receive(:maybe_attach_vm).with("test", [])
       vs.interfaces([], false)
     end
   end
