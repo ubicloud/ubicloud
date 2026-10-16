@@ -8,10 +8,10 @@ class Clover
   end
 
   # Resolves the "vm" body param into an authorized Vm in @location, raising
-  # 400 if the user can't see it or it's in a different location.
+  # 400 if the user can't capture it or it's in a different location.
   def source_vm_from_params
     source_vm_id = typecast_params.ubid_uuid!("vm")
-    source_vm = dataset_authorize(@project.vms_dataset, "Vm:view").first(id: source_vm_id, location_id: @location.id)
+    source_vm = dataset_authorize(@project.vms_dataset, "Vm:capture").first(id: source_vm_id, location_id: @location.id)
     raise CloverError.new(400, "InvalidRequest", "Source VM not found") unless source_vm
     source_vm
   end
@@ -34,7 +34,7 @@ class Clover
   end
 
   def stopped_vms_for_machine_image(location_id: nil, arch: nil)
-    dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
+    dataset = dataset_authorize(@project.vms_dataset, "Vm:capture")
       .association_join(:strand)
       .where(Sequel[:strand][:label] => "stopped")
       .exclude(Sequel[:vm][:vm_host_id] => nil)
