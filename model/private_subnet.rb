@@ -70,6 +70,10 @@ class PrivateSubnet < Sequel::Model
     !ps_aws.mgmt_security_group_id.nil? && ps_aws.mgmt_security_group_id != ps_aws.user_security_group_id
   end
 
+  def self.gcp_management_subnet(location)
+    first(project_id: Config.postgres_service_project_id, location_id: location.id, name: GCP_MANAGEMENT_SUBNET_NAME)
+  end
+
   def gcp_management?
     name == GCP_MANAGEMENT_SUBNET_NAME && project_id == Config.postgres_service_project_id
   end

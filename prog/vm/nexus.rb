@@ -112,7 +112,7 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
-        availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic
+        availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic && location.aws?
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, use_eip:, create_network_interface:).subject
       end
 
@@ -139,8 +139,14 @@ class Prog::Vm::Nexus < Prog::Base
       nic.update(vm_id: vm.id)
 
       if use_separate_management_nic
+        # On GCP every NIC of an instance needs its own subnet.
+        mgmt_subnet = if location.gcp?
+          PrivateSubnet.gcp_management_subnet(location) || fail("No GCP management subnet in #{location.name}")
+        else
+          subnet
+        end
         Prog::Vnet::NicNexus.assemble(
-          subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, is_management: true, use_eip: management_nic_use_eip,
+          mgmt_subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, is_management: true, use_eip: management_nic_use_eip,
         ).subject.update(vm_id: vm.id)
       end
 
