@@ -1162,6 +1162,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_catch_up" do
+    it "hops a catching up standby to configure when configure is set" do
+      standby_nx = create_standby_nexus
+      standby_nx.postgres_server.update(synchronization_status: "catching_up")
+      standby_nx.incr_configure
+      expect { standby_nx.wait_catch_up }.to hop("configure")
+      expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "configure").count).to eq(0)
+    end
+
+    it "keeps a read replica catching up and leaves configure for wait" do
+      replica_resource = create_read_replica_resource(parent: postgres_resource)
+      replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
+      replica_server.update(synchronization_status: "catching_up")
+      replica_nx = described_class.new(replica_server.strand)
+      replica_nx.incr_configure
+      expect(replica_nx.postgres_server).to receive(:lsn_caught_up).and_return(true)
+      expect { replica_nx.wait_catch_up }.to hop("wait")
+      expect(Semaphore.where(strand_id: replica_server.id, name: "configure").count).to eq(1)
+    end
+
     it "naps if the lag is too high and extends deadline when lsn progresses" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return("0/1000000")
@@ -1230,6 +1249,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     before do
       @standby_nx, @representative_sshable = create_standby_nexus(prime_sshable: true)
+    end
+
+    it "hops to configure before checking replication after a failover" do
+      standby_nx.postgres_server.update(synchronization_status: "catching_up")
+      standby_nx.incr_configure
+      expect(representative_sshable).not_to receive(:_cmd)
+      expect { standby_nx.wait_synchronization }.to hop("configure")
+      expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "configure").count).to eq(0)
+    end
+
+    it "keeps checking replication of a ready standby and leaves configure for wait" do
+      standby_nx.postgres_server.update(synchronization_status: "ready")
+      standby_nx.incr_configure
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum")
+      expect { standby_nx.wait_synchronization }.to hop("wait")
+      expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "configure").count).to eq(1)
     end
 
     it "hops to wait if sync replication is established" do
