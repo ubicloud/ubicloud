@@ -159,6 +159,12 @@ RSpec.describe Strand do
     end
   end
 
+  it "raises if the strand is not valid when napping" do
+    st.update(label: "napper")
+    st.lease = nil
+    expect { st.unsynchronized_run }.to raise_error(Strand::RunError) { expect(it.cause).to be_a(Sequel::ValidationFailed) }
+  end
+
   it "keeps the nap when the prog increments its own semaphore through the snap" do
     st.update(label: "snap_signal_napper", schedule: Time.now - 100)
 
