@@ -459,7 +459,7 @@ TIMER
         hop_wait_recovery_completion
       end
 
-      hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
+      hop_wait_catch_up if catching_up_standby?
 
       if postgres_server.primary?
         resource.servers.select { it.standby? && it.synchronization_status == "ready" && it.physical_slot_ready_id != postgres_server.id }.each do |standby|
@@ -546,6 +546,13 @@ SQL
     # after we can check if the lsn is caught up.
     decr_initial_provisioning
 
+    if catching_up_standby?
+      when_configure_set? do
+        decr_configure
+        hop_configure
+      end
+    end
+
     if postgres_server.lsn_caught_up
       delete_from_stack("previous_lsn", "previous_disk_usage")
       hop_wait if postgres_server.read_replica?
@@ -574,6 +581,13 @@ SQL
 
   label def wait_synchronization
     register_deadline("wait", 5 * 60)
+
+    if catching_up_standby?
+      when_configure_set? do
+        decr_configure
+        hop_configure
+      end
+    end
 
     query = DB["SELECT sync_state FROM pg_stat_replication WHERE application_name = :ubid", ubid: postgres_server.ubid]
     sync_state = resource.representative_server.run_query(query).chomp
@@ -986,6 +1000,11 @@ SQL
     representative_server&.incr_configure
 
     pop "postgres server is deleted"
+  end
+
+  # Only these return to wait_catch_up after configure.
+  def catching_up_standby?
+    postgres_server.standby? && postgres_server.synchronization_status != "ready"
   end
 
   def available?
