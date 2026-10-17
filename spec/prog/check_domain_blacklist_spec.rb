@@ -31,7 +31,7 @@ RSpec.describe Prog::CheckDomainBlacklist do
       expect(surbl_dns).to receive(:getaddress).with("suspicious-domain.com.multi.surbl.org").and_return(Resolv::IPv4.create("127.0.0.64"))
 
       expect(Clog).to receive(:emit).with("Account email domain listed in SURBL", {account_surbl_hit: {account_ubid: account.ubid, domain: "suspicious-domain.com", lists: ["ABUSE"]}})
-      expect(prog.account).to receive(:suspend)
+      expect(prog.account).to receive(:suspend).with(send_email: false)
 
       expect { prog.start }.to exit({"msg" => "domain check completed"})
     end
@@ -40,7 +40,7 @@ RSpec.describe Prog::CheckDomainBlacklist do
       expect(surbl_dns).to receive(:getaddress).with("suspicious-domain.com.multi.surbl.org").and_return(Resolv::IPv4.create("127.0.0.80"))
 
       expect(Clog).to receive(:emit).with("Account email domain listed in SURBL", {account_surbl_hit: {account_ubid: account.ubid, domain: "suspicious-domain.com", lists: ["MW", "ABUSE"]}})
-      expect(prog.account).to receive(:suspend)
+      expect(prog.account).to receive(:suspend).with(send_email: false)
 
       expect { prog.start }.to exit({"msg" => "domain check completed"})
     end

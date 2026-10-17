@@ -56,12 +56,27 @@ class Account < Sequel::Model(:accounts)
       .first_project_with_resources
   end
 
-  def suspend
+  def suspend(send_email: true)
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete
     api_keys_dataset.update(is_valid: false)
     PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
     ProjectInvitation.where(inviter_id: id).destroy
+    return unless send_email
+
+    reason = if Invoice.where(project_id: projects_dataset.select(:id), status: %w[unpaid fraud doubtful]).empty?
+      ["Our monitoring system has detected unusual activity from your account.",
+        "We stopped your resources and suspended your account for security reasons."]
+    else
+      ["Your account has unpaid invoices.",
+        "We stopped your resources and suspended your account because of these unpaid invoices."]
+    end
+
+    Util.send_email(email, "Your Ubicloud account has been suspended",
+      greeting: "Hi #{name},",
+      body: ["We're reaching out to you regarding your account.",
+        *reason,
+        "If you think this was a mistake, please send us a support request via support@ubicloud.com."])
   end
 
   def unsuspend

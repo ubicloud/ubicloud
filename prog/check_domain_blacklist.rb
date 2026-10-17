@@ -38,7 +38,7 @@ class Prog::CheckDomainBlacklist < Prog::Base
     matched_lists = SURBL_LISTS.filter_map { |name, bit| name if (last_octet & bit) > 0 }
     if matched_lists.any?
       Clog.emit("Account email domain listed in SURBL", {account_surbl_hit: {account_ubid: account.ubid, domain:, lists: matched_lists}})
-      account.suspend
+      account.suspend(send_email: false)
     end
 
     pop "domain check completed"

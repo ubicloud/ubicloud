@@ -28,6 +28,27 @@ RSpec.describe Account do
       .and change { DB[:account_active_session_keys].where(account_id: account.id).count }.from(1).to(0)
       .and change { payment_method.reload.fraud }.from(false).to(true)
       .and change { project.invitations_dataset.count }.from(1).to(0)
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    mail = Mail::TestMailer.deliveries.first
+    expect(mail.to).to eq ["test@example.com"]
+    expect(mail.subject).to eq "Your Ubicloud account has been suspended"
+    expect(mail.text_part.body.decoded).to include("unusual activity")
+  end
+
+  it "suspend sends unpaid invoice email when account has unpaid invoices" do
+    project = account.create_project_with_default_policy("project-1")
+    Invoice.create(project_id: project.id, invoice_number: "1", begin_time: Time.now, end_time: Time.now, content: {}, status: "doubtful")
+    account.suspend
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    body = Mail::TestMailer.deliveries.first.text_part.body.decoded
+    expect(body).to include("unpaid invoices")
+    expect(body).not_to include("unusual activity")
+  end
+
+  it "suspend does not send email when send_email is false" do
+    account.suspend(send_email: false)
+    expect(account.suspended_at).not_to be_nil
+    expect(Mail::TestMailer.deliveries).to be_empty
   end
 
   it "unsuspend" do
