@@ -12,6 +12,21 @@ Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, 
 and AWS Bare Metal. You can set it up yourself on these providers or you can use our
 [managed service](https://console.ubicloud.com).
 
+## What you can run
+
+| Service | What you get |
+|---------|--------------|
+| **Virtual machines** | Linux VMs on Cloud Hypervisor, with public IPv4 and IPv6, private networking, and encrypted disks. |
+| **Managed PostgreSQL** | Postgres 16, 17, and 18 with high availability (one or two standbys), read replicas, point-in-time restore, major version upgrades, PgBouncer, and metrics and log export. Runs on bare metal and on AWS, with GCP in preview. |
+| **Kubernetes** | Managed Kubernetes clusters with node pools. |
+| **GitHub Actions runners** | x64 and arm64 runners in standard and premium sizes. You switch by changing `runs-on`. |
+| **AI inference** | Inference endpoints for open-weight models, with API keys and a playground. |
+| **Networking** | Private subnets, firewalls, and load balancers. |
+
+You can manage all of these from the [cloud console](https://console.ubicloud.com),
+the REST API ([OpenAPI spec](openapi/openapi.yml)), the [`ubi` CLI](cli/), or
+[Terraform](https://github.com/ubicloud/terraform-provider-ubicloud).
+
 ## Quick start
 
 ### Managed platform
@@ -84,21 +99,50 @@ Today, AWS offers about two hundred cloud services. Ultimately, we will implemen
 
 Example workloads and reasons to use Ubicloud today include:
 
-* You have an ephemeral workload like a CI/CD pipeline (we're integrating with
-GitHub Actions), or you'd like to run compute/memory heavy tests. Our managed
-cloud is ~3x cheaper than AWS, so you save on costs.
+* You run CI on GitHub Actions and want faster, cheaper runners. Our managed
+cloud is ~3x cheaper than AWS, and moving a workflow is a one-line change.
+
+* You want a managed Postgres database with high availability and backups, and
+you want to choose where it runs: on bare metal for price, or on AWS next to the
+rest of your stack.
 
 * You have bare metal machines sitting somewhere. You'd like to build your own
 cloud for portability, security, or compliance reasons.
 
-## Status
+## How a service is built
 
-You can provide us your feedback, get help, or ask us questions regarding your
-Ubicloud installations in the [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
+Every Ubicloud service follows the same pattern. The control plane stores the
+desired state of each resource in Postgres. State machines, which we call progs
+(see [`prog/`](prog/)), move each resource toward that state by running commands
+on data plane hosts over SSH. A higher-level service is a composition of the same
+primitives that you can use directly: VMs, block storage, private subnets, and
+firewalls.
+
+Managed PostgreSQL is a good example, because it asks the most of those
+primitives: it needs fast and durable disks, a stable private network, and
+careful failover.
+
+* On bare metal, each Postgres server is a Ubicloud VM with ubiblk block storage,
+inside a private subnet, behind a firewall.
+* [WAL-G](https://github.com/wal-g/wal-g) sends base backups and WAL to object
+storage: Ubicloud's own MinIO clusters on bare metal, S3 on AWS, and Cloud
+Storage on GCP. Point-in-time restore reads from there.
+* Three progs manage the database. `Prog::Postgres::PostgresResourceNexus` owns
+the database as a whole, `PostgresServerNexus` owns each primary, standby, and
+read replica, and `PostgresTimelineNexus` owns the backups. Failover, read
+replicas, and major version upgrades are steps in these state machines.
+* On AWS and GCP, the same progs drive the provider's instances and disks. The
+provider-specific parts are in [`model/postgres/aws/`](model/postgres/aws/) and
+[`model/postgres/gcp/`](model/postgres/gcp/).
+
+Kubernetes, GitHub Actions runners, and AI inference use the same building
+blocks in the same way.
+
+## Architecture
 
 We follow an established architectural pattern in building public cloud services.
 A control plane manages a data plane, where the data plane leverages open source
-software.  You can find our current cloud components / services below.
+software. You can find our cloud components below.
 
 * **Elastic Compute**: Our control plane communicates with Linux bare metal servers
 using SSH. We use [Cloud
@@ -114,29 +158,25 @@ each customer’s VMs operate in their own networking namespace. For
 and [load balancers](https://www.ubicloud.com/blog/ubicloud-load-balancer-simple-and-cost-free),
 we use Linux nftables.
 
-* **Block Storage, non replicated**: We use Storage Performance Development Toolkit
-([SPDK](https://spdk.io)) to provide virtualized block storage to VMs. SPDK enables
-us to add enterprise features such as snapshot and replication in the future. We
-follow security best practices and encrypt the data encryption key itself.
+* **Block Storage, non replicated**: We use [ubiblk](https://github.com/ubicloud/ubiblk),
+our own vhost-user block device backend, to provide virtualized block storage to
+VMs. We follow security best practices and encrypt the data encryption key itself.
 
 * **Attribute-Based Access Control (ABAC)**: With ABAC, you can define attributes,
 roles, and permissions for users and give them fine-grained access to resources. You
 can read more about our [ABAC design here](https://www.ubicloud.com/docs/architecture/attribute-based-access-control-abac#attribute-based-access-control-abac-design).
 
-* **What's Next?**: We're planning to work on a managed K8s or metrics/monitoring
-service next. If you have a workload that would benefit from a specific cloud
-service, please get in touch with us through our [Community
-Forum](https://github.com/ubicloud/ubicloud/discussions).
+* **Control plane**: Manages data plane services and resources. This is a Ruby
+program, and it is a Postgres application itself: all of its state, including the
+progs in flight, lives in one Postgres database. We use the
+[Roda](https://roda.jeremyevans.net/) framework to serve HTTP requests and
+[Sequel](http://sequel.jeremyevans.net/) to access the database. We manage web
+authentication with [Rodauth](http://rodauth.jeremyevans.net/). We communicate
+with data plane servers using SSH, via the library
+[net-ssh](https://github.com/net-ssh/net-ssh). For our tests, we use
+[RSpec](https://rspec.info/).
 
-* Control plane: Manages data plane services and resources. This is a Ruby program
-that stores its data in Postgres. We use the [Roda](https://roda.jeremyevans.net/)
-framework to serve HTTP requests and [Sequel](http://sequel.jeremyevans.net/) to
-access the database. We manage web authentication with
-[Rodauth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
-using SSH, via the library [net-ssh](https://github.com/net-ssh/net-ssh). For our
-tests, we use [RSpec](https://rspec.info/).
-
-* Cloud console: Server-side web app served by the Roda framework. For the visual
+* **Cloud console**: Server-side web app served by the Roda framework. For the visual
 design, we use [Tailwind CSS](https://tailwindcss.com) with components from
 [Tailwind UI](https://tailwindui.com). We also use jQuery for interactivity.
 
@@ -148,6 +188,9 @@ detail](DEVELOPERS.md).
 [Greptile](https://greptile.com/) provides an AI/LLM that indexes
 Ubicloud's source code [can answer questions about
 it](https://learnthisrepo.com/ubicloud).
+
+You can provide us your feedback, get help, or ask us questions regarding your
+Ubicloud installations in the [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
 ## FAQ
 
@@ -165,9 +208,10 @@ software). This way, you can get started in minutes rather than weeks. Since Ubi
 is designed for multi-tenancy, it comes with built-in features such as encryption
 at rest and in transit, virtual networking, secrets rotation, etc.
 
-Second, we're initially targeting developers. This -we hope- will give us fast feedback
-cycles and enable us to have 6 key services in GA form in the next two years. OpenStack
-is still primarily used for 3 cloud services.
+Second, we're initially targeting developers. This gives us fast feedback cycles.
+Today Ubicloud runs compute, networking, block storage, managed Postgres,
+Kubernetes, GitHub Actions runners, and AI inference. OpenStack is still
+primarily used for 3 cloud services.
 
 Last, we're designing for simplicity. With OpenStack, you pick between 10 hypervisors,
 10 S3 implementations, and 5 block storage implementations. The software needs to work
