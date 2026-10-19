@@ -57,8 +57,8 @@ RSpec.describe Prog::CheckUsageAlerts do
       expect(prog.last_usage_alert_id).to eq alert_id(100)
       expect(alert.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
 
-      expect { prog.process_alerts }.to hop("wait")
-      expect(prog.last_usage_alert_id).to be_nil
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
+      expect(prog.last_usage_alert_id).to eq "00000000-0000-0000-0000-000000000000"
       expect(alert.reload.last_triggered_at).to be_within(5).of(Time.now)
     end
 
@@ -68,7 +68,7 @@ RSpec.describe Prog::CheckUsageAlerts do
       after_alert = create_alert(alert_id(3), project, user_id, limit: 100, last_triggered_at:)
       prog.last_usage_alert_id = alert_id(2)
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(before_alert.reload.last_triggered_at).to be_within(5).of(last_triggered_at)
       expect(after_alert.reload.last_triggered_at).to be_within(5).of(Time.now)
     end
@@ -78,7 +78,7 @@ RSpec.describe Prog::CheckUsageAlerts do
       triggered_at = Time.utc(Time.now.year, Time.now.month)
       alert = create_alert(alert_id(1), project, user_id, limit: 100, last_triggered_at: triggered_at)
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(alert.reload.last_triggered_at).to eq triggered_at
     end
 
@@ -95,7 +95,7 @@ RSpec.describe Prog::CheckUsageAlerts do
         create_billing_record(project, amount)
       end
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(alert1.reload.last_triggered_at).not_to eq(last_triggered_at)
       expect(alert2.reload.last_triggered_at).to eq(last_triggered_at)
     end
@@ -108,7 +108,7 @@ RSpec.describe Prog::CheckUsageAlerts do
       ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Full discount")
       create_billing_record(project, 1000000)
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
     end
 
@@ -123,7 +123,7 @@ RSpec.describe Prog::CheckUsageAlerts do
       ResourceCredit.create(project_id: project.id, amount: usage * 1.2, active_from: Time.utc(Time.now.year, Time.now.month), name: "Credit")
       expect(project.current_invoice.content["cost"]).to eq 0
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(alert.reload.last_triggered_at).not_to eq(last_triggered_at)
     end
 
@@ -175,7 +175,7 @@ RSpec.describe Prog::CheckUsageAlerts do
 
       alert = UsageAlert.create(project_id: project.id, name: "alert", user_id:, limit:, last_triggered_at:)
 
-      expect { prog.process_alerts }.to hop("wait")
+      expect { prog.process_alerts }.to hop("wait", nap: 5 * 60)
       expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
     end
   end

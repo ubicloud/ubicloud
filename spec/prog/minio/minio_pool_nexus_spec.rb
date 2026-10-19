@@ -71,14 +71,14 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
     it "hops to wait if all servers are waiting" do
       nx.minio_pool.servers.each { it.strand.update(label: "wait") }
-      expect { nx.wait_servers }.to hop("wait")
+      expect { nx.wait_servers }.to hop("wait", nap: 6 * 60 * 60)
     end
 
     it "triggers reconfigure if addition_pool_set" do
       minio_cluster_strand
       nx.minio_pool.servers.each { it.strand.update(label: "wait") }
       nx.incr_add_additional_pool
-      expect { nx.wait_servers }.to hop("wait")
+      expect { nx.wait_servers }.to hop("wait", nap: 6 * 60 * 60)
       expect(Semaphore.where(strand_id: nx.minio_pool.id, name: "add_additional_pool").count).to eq(0)
       expect(Semaphore.where(strand_id: minio_cluster.id, name: "reconfigure").count).to eq(1)
     end
