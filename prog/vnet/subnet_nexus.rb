@@ -65,7 +65,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       else
         "Vnet::Metal::SubnetNexus"
       end
-      Strand.create_with_id(id, prog:, label: "start")
+      Strand.create_with_id(ps, prog:, label: "start")
     end
   end
 

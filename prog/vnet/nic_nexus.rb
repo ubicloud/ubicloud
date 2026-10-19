@@ -26,9 +26,9 @@ class Prog::Vnet::NicNexus < Prog::Base
         ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing", nil]
       end
 
-      Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:, is_management:)
+      nic = Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:, is_management:)
       label = (subnet.location_id == Location::GITHUB_RUNNERS_ID) ? "wait" : "start"
-      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr, "aws_subnet_id" => aws_subnet_id, "use_eip" => use_eip, "create_network_interface?" => create_network_interface}])
+      Strand.create_with_id(nic, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr, "aws_subnet_id" => aws_subnet_id, "use_eip" => use_eip, "create_network_interface?" => create_network_interface}])
     end
   end
 

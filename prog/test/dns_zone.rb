@@ -40,7 +40,7 @@ class Prog::Test::DnsZone < Prog::Test::Base
       last_purged_at: Time.now,
     )
     dz.add_dns_server(ds)
-    Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
+    Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
 
     setup_st = Prog::DnsZone::SetupDnsServerVm.assemble(ds, name: "dns-e2e-#{zone_label}")
 

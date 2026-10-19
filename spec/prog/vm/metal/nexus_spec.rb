@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       project_id: project.id,
       vm_host_id: vm_host.id,
     )
-    Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "start")
+    Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "start")
     vm
   }
   let(:project) { Project.create(name: "default") }
@@ -1171,7 +1171,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       sv = vm.vm_storage_volumes_dataset.first(boot: false)
       sv.update(machine_image_version_id: miv.id)
       rvm = create_vm(vm_host_id: vm.vm_host_id)
-      Strand.create_with_id(rvm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      Strand.create_with_id(rvm, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
       VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm.vm_host_id)
       rsv = VmStorageVolume.create(vm_id: rvm.id, boot: false, size_gib: 15, disk_index: 0, use_bdev_ubi: false, storage_device_id: sv.storage_device_id, key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "abcdef1234567890").id)
       rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rsv.id).subject
@@ -1310,7 +1310,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       target_host = create_vm_host
       rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
       sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
-      Strand.create_with_id(rss_source_vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      Strand.create_with_id(rss_source_vm, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
       VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: target_host.id)
       rss_source_volume = VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
@@ -1793,7 +1793,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "#destroy_slice with a slice" do
       vm_host_slice = VmHostSlice.create(vm_host_id: vm_host.id, enabled: true, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0)
-      Strand.create_with_id(vm_host_slice.id, prog: "Vm::VmHostSliceNexus", label: "prep")
+      Strand.create_with_id(vm_host_slice, prog: "Vm::VmHostSliceNexus", label: "prep")
       vm.update(vm_host_slice_id: vm_host_slice.id)
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
@@ -1804,7 +1804,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "skips destroy slice when slice already disabled" do
       vm_host_slice = VmHostSlice.create(vm_host_id: vm_host.id, enabled: false, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0)
-      Strand.create_with_id(vm_host_slice.id, prog: "Vm::VmHostSliceNexus", label: "prep")
+      Strand.create_with_id(vm_host_slice, prog: "Vm::VmHostSliceNexus", label: "prep")
       vm.update(vm_host_slice_id: vm_host_slice.id)
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
@@ -1817,7 +1817,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#final_clean_up" do
     it "detaches from nic" do
       nic.update(vm_id: vm.id)
-      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "start")
+      Strand.create_with_id(nic, prog: "Vnet::NicNexus", label: "start")
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
         .and change { nic.reload.destroy_set? }.from(false).to(true)

@@ -22,7 +22,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
       minio_pool.server_count.times do |i|
         Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
       end
-      Strand.create_with_id(id, prog: "Minio::MinioPoolNexus", label: "wait_servers")
+      Strand.create_with_id(minio_pool, prog: "Minio::MinioPoolNexus", label: "wait_servers")
     end
   end
 

@@ -29,7 +29,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       port = free_port(vm_host.id)
       ubid = RemoteStorageServer.generate_ubid
       id = ubid.to_uuid
-      RemoteStorageServer.create_with_id(
+      remote_storage_server = RemoteStorageServer.create_with_id(
         id,
         source_vm_storage_volume_id: source_volume.id,
         vm_host_id: vm_host.id,
@@ -37,7 +37,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
         psk_identity: ubid.to_s,
         port:,
       )
-      Strand.create_with_id(id, prog: "Storage::RemoteStorageServer::Nexus", label: "start")
+      Strand.create_with_id(remote_storage_server, prog: "Storage::RemoteStorageServer::Nexus", label: "start")
     end
   end
 

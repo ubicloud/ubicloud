@@ -23,12 +23,12 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
         allow_private_subnet_in_other_project: true,
         exclude_host_ids:).subject
 
-      KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
+      kubernetes_node = KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
 
       internal_firewall = kubernetes_nodepool_id ? cluster.internal_worker_vm_firewall : cluster.internal_cp_vm_firewall
       vm.add_vm_firewall(internal_firewall)
 
-      Strand.create_with_id(id, prog: "Kubernetes::KubernetesNodeNexus", label: "start")
+      Strand.create_with_id(kubernetes_node, prog: "Kubernetes::KubernetesNodeNexus", label: "start")
     end
   end
 

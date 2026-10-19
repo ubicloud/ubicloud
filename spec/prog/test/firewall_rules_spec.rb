@@ -4,7 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::FirewallRules do
   subject(:firewall_test) {
-    described_class.new(Strand.create_with_id(firewall.id, prog: "Test::FirewallRules", label: "start"))
+    described_class.new(Strand.create_with_id(firewall, prog: "Test::FirewallRules", label: "start"))
   }
 
   let(:strand) { firewall_test.strand }
