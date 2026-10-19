@@ -15,5 +15,10 @@ RSpec.describe Prog::Github::ReleaseRunnerVmAllocations do
       expect(allocation).not_to exist
       expect(vm.strand.label).to eq("release_held_allocation")
     end
+
+    it "naps for the configured retention period" do
+      allow(Config).to receive(:github_runner_vm_allocation_retention_seconds).and_return(300)
+      expect { rrva.wait }.to nap(300)
+    end
   end
 end

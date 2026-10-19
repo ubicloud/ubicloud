@@ -41,7 +41,7 @@ class GithubRunnerVmAllocation < Sequel::Model
   end
 
   def self.release_expired
-    where { created_at < Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 minute", :interval) }
+    where { created_at < Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 second", :interval) * Config.github_runner_vm_allocation_retention_seconds }
       .or(vm_host_id: VmHost.exclude(allocation_state: "accepting").select(:id))
       .for_update
       .skip_locked

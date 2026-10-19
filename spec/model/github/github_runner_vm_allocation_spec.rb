@@ -154,6 +154,18 @@ RSpec.describe GithubRunnerVmAllocation do
       expect(recent).to exist
       expect(Strand.where(prog: "Vm::Metal::Nexus", label: "release_held_allocation").select_order_map(:id)).to eq([held_vm.id, draining_vm.id].sort)
     end
+
+    it "uses the configured retention period" do
+      allow(Config).to receive(:github_runner_vm_allocation_retention_seconds).and_return(300)
+      recent = hold(created_at: Time.now - 120)
+      expired_vm = create_vm(name: "expired", project_id: project.id, vm_host_id: vm_host.id, local_vetho_ip: "169.254.0.6/32")
+      expired = hold(expired_vm, created_at: Time.now - 301)
+
+      described_class.release_expired
+
+      expect(recent).to exist
+      expect(expired).not_to exist
+    end
   end
 
   describe "#release" do
