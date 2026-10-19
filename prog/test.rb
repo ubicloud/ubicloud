@@ -80,6 +80,10 @@ class Prog::Test < Prog::Base
     pop({msg: "hop finished"})
   end
 
+  label def nap_hopper
+    nap_hop(123, :hop_exit)
+  end
+
   label def reaper
     # below loop is only for ensuring we are able to process reaped strands
     reap(reaper: :exitval.to_proc)

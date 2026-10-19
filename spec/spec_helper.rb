@@ -195,7 +195,7 @@ RSpec.configure do |config|
   # Custom matcher to expect Progs to hop new label
   # If expected_label is not provided, it expects to hop any label.
   # If expected_prog is not provided, it expects to hop to label at old prog.
-  RSpec::Matchers.define :hop do |expected_label, expected_prog|
+  RSpec::Matchers.define :hop do |expected_label, expected_prog, nap: nil|
     supports_block_expectations
 
     match do |block|
@@ -204,6 +204,7 @@ RSpec.configure do |config|
       if hop.is_a?(Prog::Base::Hop)
         (expected_label.nil? || hop.new_label == expected_label) &&
           ((expected_prog.nil? && hop.old_prog == hop.new_prog) || hop.new_prog == expected_prog) &&
+          (nap == hop.nap) &&
           (block_arg.nil? || block_arg.call(hop))
       else
         false
@@ -218,13 +219,13 @@ RSpec.configure do |config|
     expected_value_message = ->(hop, prefix) do
       got = case hop
       when Prog::Base::Hop
-        "hop to #{default_prog.call(hop, hop.new_prog) + hop.new_label}"
+        "hop to #{default_prog.call(hop, hop.new_prog) + hop.new_label} (#{hop.nap} nap)"
       when nil
         "no prog action returned"
       else
         hop.class.name
       end
-      "#{prefix}expected: ".rjust(16) + "hop to " + default_prog.call(hop, expected_prog) + (expected_label || "any_label") + "\n" +
+      "#{prefix}expected: ".rjust(16) + "hop to " + default_prog.call(hop, expected_prog) + (expected_label || "any_label") + " (#{nap} nap)\n" +
         "got: ".rjust(16) + got
     end
 

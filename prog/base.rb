@@ -217,7 +217,7 @@ end
       old_label = strand.label
       prog, label = link
 
-      prog_return Hop.new(old_prog, old_label,
+      prog_return Hop.new(old_prog, old_label, nil,
         {retval: outval,
          stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
          prog:, label:})
@@ -240,7 +240,7 @@ end
     end
   end
 
-  Hop = Data.define(:old_prog, :old_label, :strand_update_args) do
+  Hop = Data.define(:old_prog, :old_label, :nap, :strand_update_args) do
     def new_label
       strand_update_args[:label] || old_label
     end
@@ -249,8 +249,13 @@ end
       strand_update_args[:prog] || old_prog
     end
 
+    def schedule
+      ts = Sequel::CURRENT_TIMESTAMP
+      nap ? (ts + Sequel.cast("1 seconds", :interval) * nap) : ts
+    end
+
     def to_s
-      "hop #{old_prog}##{old_label} -> #{new_prog}##{new_label}"
+      "hop #{old_prog}##{old_label} -> #{new_prog}##{new_label}#{" (nap #{nap})" if nap}"
     end
   end
 
@@ -303,7 +308,7 @@ end
     old_prog = strand.prog
     new_frame = {"subject_id" => @subject_id, "link" => [old_prog, old_label]}.merge(new_frame)
 
-    prog_return Hop.new(old_prog, old_label,
+    prog_return Hop.new(old_prog, old_label, nil,
       {prog: Strand.prog_verify(prog), label:,
        stack: [new_frame] + strand.stack, retval: nil})
   end
@@ -464,12 +469,16 @@ end
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.
-  private def dynamic_hop(label)
+  private def dynamic_hop(label, nap: nil)
     raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
     raise Strand::InternalError, "BUG: not valid hop target" unless self.class.labels.include? label
 
     label = label.to_s
-    prog_return Hop.new(@strand.prog, @strand.label, {label:, retval: nil})
+    prog_return Hop.new(@strand.prog, @strand.label, nap, {label:, retval: nil})
+  end
+
+  def nap_hop(nap, label)
+    dynamic_hop(label, nap:)
   end
 
   private def time_string(time)
