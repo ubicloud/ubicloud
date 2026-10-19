@@ -1416,12 +1416,17 @@ NFTABLES_CONF
       expect(dnsmasq_conf).to include("address=/.docker.io/::")
     end
 
-    it "uses dhcp-option=6 dns config when ipv6 is disabled" do
+    it "serves dns from dnsmasq with ipv4 upstreams when ipv6 is disabled" do
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: true)
-      dnsmasq_conf = vps.writes["dnsmasq.conf"]
-      expect(dnsmasq_conf).to include("dhcp-option=6,8.8.8.8")
-      expect(dnsmasq_conf).not_to include("server=")
-      expect(dnsmasq_conf).not_to include("all-servers")
+      expect(vps.writes["dnsmasq.conf"]).to end_with(<<~DNS)
+        all-servers
+        server=8.8.8.8
+        server=1.1.1.1
+        dhcp-option=6,10.0.0.2
+        listen-address=10.0.0.2
+        dhcp-option=54,10.0.0.2
+
+      DNS
     end
   end
 

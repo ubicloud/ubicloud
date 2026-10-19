@@ -527,7 +527,12 @@ DHCP
     end
     ip_config = if ipv6_disabled
       <<~IP6_CONFIG
-dhcp-option=6,8.8.8.8
+all-servers
+server=8.8.8.8
+server=1.1.1.1
+dhcp-option=6,#{dns_ipv4}
+listen-address=#{dns_ipv4}
+dhcp-option=54,#{dns_ipv4}
       IP6_CONFIG
     else
       # all-servers: forward each query to every listed upstream and use
