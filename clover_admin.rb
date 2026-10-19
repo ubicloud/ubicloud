@@ -1467,7 +1467,7 @@ class CloverAdmin < Roda
 
     model Project do
       order [Sequel.desc(:created_at), Sequel.desc(:id)]
-      columns [:name, :reputation, :billing_info_id, :credit, :created_at]
+      columns [:name, :reputation, :billing_info_id, :created_at]
       column_options reputation: {type: "select", options: %w[new verified limited].freeze, add_blank: true},
         created_at: {type: "text"}
     end

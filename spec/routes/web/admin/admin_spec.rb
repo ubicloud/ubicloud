@@ -403,7 +403,7 @@ RSpec.describe CloverAdmin do
     fill_in "Name", with: "Def"
     fill_in "Created at", with: project.created_at.strftime("%Y-%m")
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["Default", "new", "", "0.0", project.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["Default", "new", "", project.created_at.to_s]
 
     invoice = Invoice.create(
       project_id: project.id,
