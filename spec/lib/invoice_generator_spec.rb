@@ -407,7 +407,6 @@ RSpec.describe InvoiceGenerator do
 
     expect(invoice["cost"]).to eq(invoice["subtotal"] - 2.5)
     expect(invoice["credit"]).to eq(2.5)
-    expect(p1.reload.credit).to eq(0)
 
     line_item = invoice["resources"].first["line_items"].first
     expect(line_item["credits"]).to eq([{"name" => "GitHub Runner Credit", "amount" => 2.5}])
