@@ -129,9 +129,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       else
         10
       end
-      if waiting_seconds >= page_after_minutes * 60
+      page_tag_parts = ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family]
+      if waiting_seconds >= page_after_minutes * 60 && !Page.from_tag_parts(*page_tag_parts)
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", page_tag_parts, queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
       nap capacity_wait_seconds
@@ -140,7 +141,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
     wakeup_waiting_strand("allocated_waiting_strand_id")
-    if (page = Page.from_tag_parts("NoCapacity", vm.location.display_name, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
+    if (page = Page.from_tag_parts("NoCapacity", vm.location.display_name, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.limit(2).count <= 1
       page.incr_resolve
     end
 
