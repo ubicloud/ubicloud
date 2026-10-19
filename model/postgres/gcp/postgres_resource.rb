@@ -41,7 +41,7 @@ class PostgresResource < Sequel::Model
     end
 
     def gcp_lockout_mechanisms
-      ["pg_stop", "hba"].freeze
+      ["pg_stop", "hba", "firewall_reset"].freeze
     end
 
     def gcp_new_server_exclusion_filters
