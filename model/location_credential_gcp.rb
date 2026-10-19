@@ -10,6 +10,8 @@ require "googleauth"
 class LocationCredentialGcp < Sequel::Model
   V1 = Google::Cloud::Compute::V1
   CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
+  LOCKOUT_GET_TIMEOUT = 2
+  LOCKOUT_MUTATE_TIMEOUT = 5
 
   plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:credentials_json]
 
@@ -67,6 +69,21 @@ class LocationCredentialGcp < Sequel::Model
     end
   end
 
+  def lockout_compute_client
+    @lockout_compute_client ||= V1::Instances::Rest::Client.new do |config|
+      config.credentials = lockout_credentials
+      config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
+      config.rpcs.delete_network_interface.timeout = LOCKOUT_MUTATE_TIMEOUT
+    end
+  end
+
+  def lockout_zone_operations_client
+    @lockout_zone_operations_client ||= V1::ZoneOperations::Rest::Client.new do |config|
+      config.credentials = lockout_credentials
+      config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
+    end
+  end
+
   def storage_client
     @storage_client ||= Google::Cloud::Storage.new(
       project_id:,
@@ -86,6 +103,18 @@ class LocationCredentialGcp < Sequel::Model
 
   def config_block
     @config_block ||= proc { |config| config.credentials = auth_credentials }
+  end
+
+  def lockout_credentials
+    @lockout_credentials ||= if credentials_json
+      Google::Auth::ServiceAccountCredentials.make_creds(
+        json_key_io: StringIO.new(credentials_json),
+        scope: CLOUD_PLATFORM_SCOPE,
+        enable_self_signed_jwt: true,
+      )
+    else
+      auth_credentials
+    end
   end
 
   def auth_credentials
