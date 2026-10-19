@@ -18,6 +18,15 @@ class Strand < Sequel::Model
 
   plugin ResourceMethods
 
+  def self.create_with_id(id_or_model_object, **)
+    strand = super
+    if Sequel::Model === id_or_model_object && UBID.class_for_ubid(id_or_model_object.ubid) == id_or_model_object.class
+      strand.instance_variable_set(:@subject, id_or_model_object)
+      id_or_model_object.associations[:strand] = strand
+    end
+    strand
+  end
+
   def subject
     return @subject if defined?(@subject) && @subject != :reload
 

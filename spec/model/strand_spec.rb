@@ -43,6 +43,33 @@ RSpec.describe Strand do
       expect { described_class.create_with_id(nil, prog: "Prog::Base", label: "start") }.to raise_error(RuntimeError)
     end
 
+    it "create_with_id caches the given model object as the subject" do
+      project = Project.create(name: "test")
+      strand = described_class.create_with_id(project, prog: "Test", label: "start")
+      expect(strand.id).to eq project.id
+      expect(strand.subject).to equal project
+      expect(project.associations[:strand]).to equal strand
+      project.destroy
+      expect(strand.subject).to equal project
+    end
+
+    it "create_with_id does not cache a subject when given an id" do
+      project = Project.create(name: "test")
+      strand = described_class.create_with_id(project.id, prog: "Test", label: "start")
+      expect(strand.id).to eq project.id
+      expect(strand.subject).to eq project
+      expect(strand.subject).not_to equal project
+      expect(project.associations).not_to include(:strand)
+    end
+
+    it "create_with_id does not cache the given model object as the subject if its ubid is for a different class" do
+      project = Project.create_with_id(Vm.generate_uuid, name: "test")
+      strand = described_class.create_with_id(project, prog: "Test", label: "start")
+      expect(strand.id).to eq project.id
+      expect(strand.subject).to be_nil
+      expect(project.associations).not_to include(:strand)
+    end
+
     it "clears cached instance state" do
       st.save_changes
       st.set(label: "smoke_test_0")
