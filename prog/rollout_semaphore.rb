@@ -98,7 +98,8 @@ class Prog::RolloutSemaphore < Prog::Base
       Semaphore.incr(next_id, semaphore)
       if wait_label
         self.current = next_id
-        hop_wait_current
+        # The semaphore was just incremented, so wait_current would nap.
+        nap_hop(wait_current_nap_seconds, :wait_current)
       end
     else
       Semaphore.where(strand_id: next_id, name: semaphore).delete
@@ -117,12 +118,18 @@ class Prog::RolloutSemaphore < Prog::Base
       hop_start
     end
 
-    nap((gap / 10).clamp(5, 300))
+    nap(wait_current_nap_seconds)
   end
 
   label def destroy
     pop("rollout completed") if auto_exit || destroy_set?
 
     nap(60 * 60 * 24 * 365)
+  end
+
+  private
+
+  def wait_current_nap_seconds
+    (gap / 10).clamp(5, 300)
   end
 end

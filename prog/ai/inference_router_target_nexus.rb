@@ -32,7 +32,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
 
   label def start
     hop_setup if inference_router_target.type == "runpod"
-    hop_wait
+    nap_hop(60 * 60 * 24 * 30, :wait)
   end
 
   label def setup
@@ -47,7 +47,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
 
   label def wait_setup
     pod = runpod_client.get_pod(inference_router_target.state["pod_id"])
-    hop_wait unless pod["publicIp"].to_s.empty?
+    nap_hop(60 * 60 * 24 * 30, :wait) unless pod["publicIp"].to_s.empty?
     nap 10
   end
 

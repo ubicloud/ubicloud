@@ -81,7 +81,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   describe "#start" do
     it "hops to wait for manual target" do
       target_strand.subject.update(type: "manual")
-      expect { nexus.start }.to hop("wait")
+      expect { nexus.start }.to hop("wait", nap: 60 * 60 * 24 * 30)
     end
 
     it "hops to setup for runpod target" do
@@ -118,7 +118,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       stub_request(:get, "https://rest.runpod.io/v1/pods/pod-123")
         .to_return(status: 200, body: {publicIp: "1.1.1.1"}.to_json)
 
-      expect { nexus.wait_setup }.to hop("wait")
+      expect { nexus.wait_setup }.to hop("wait", nap: 60 * 60 * 24 * 30)
     end
   end
 
