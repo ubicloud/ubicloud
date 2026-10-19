@@ -265,6 +265,7 @@ module Config
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
   override :github_actions_ch_53_percent, 0.0, float
   override :github_runner_vm_allocation_ratio, 0.01, float
+  override :github_runner_vm_allocation_generation_max, 100, int
 
   # e2e
   override :e2e_hetzner_server_id, nil, string

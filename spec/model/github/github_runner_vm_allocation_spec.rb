@@ -25,8 +25,8 @@ RSpec.describe GithubRunnerVmAllocation do
     vm
   }
 
-  def hold(vm = held_vm, label: "ubicloud-standard-2-ubuntu-2404", created_at: Time.now)
-    described_class.create(vm_id: vm.id, label:, location_id: vm.location_id, vm_host_id: vm.vm_host_id, created_at:)
+  def hold(vm = held_vm, label: "ubicloud-standard-2-ubuntu-2404", created_at: Time.now, generation: 1)
+    described_class.create(vm_id: vm.id, label:, location_id: vm.location_id, vm_host_id: vm.vm_host_id, created_at:, generation:)
   end
 
   before do
@@ -94,7 +94,7 @@ RSpec.describe GithubRunnerVmAllocation do
       hold
       expect(Clog).to receive(:emit).with("vm allocation reused", instance_of(Hash)).and_call_original
 
-      expect(described_class.claim(new_vm, storage_volumes)).to be(true)
+      expect(described_class.claim(new_vm, storage_volumes)).to eq(1)
 
       new_vm.reload
       expect(new_vm.vm_host_id).to eq(vm_host.id)
@@ -126,9 +126,15 @@ RSpec.describe GithubRunnerVmAllocation do
       hold(newer_vm)
       hold(created_at: Time.now - 30)
 
-      expect(described_class.claim(new_vm, storage_volumes)).to be(true)
+      expect(described_class.claim(new_vm, storage_volumes)).to eq(1)
       expect(held_vm).not_to exist
       expect(newer_vm).to exist
+    end
+
+    it "returns the generation of the reused resources" do
+      hold(generation: 5)
+      expect(described_class.claim(new_vm, storage_volumes)).to eq(5)
+      expect(held_vm).not_to exist
     end
   end
 

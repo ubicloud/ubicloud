@@ -13,7 +13,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
     :force_host_id, :storage_volumes, :ch_version
-  frame_accessor :reason_determined
+  frame_accessor :reason_determined, :allocation_generation
 
   def vm_name
     @vm_name ||= vm.inhost_name
@@ -100,7 +100,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
       os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
-      unless prefs&.empty? && host_exclusion_filter.empty? && GithubRunnerVmAllocation.claim(vm, storage_volumes)
+      unless prefs&.empty? && host_exclusion_filter.empty? && (self.allocation_generation = GithubRunnerVmAllocation.claim(vm, storage_volumes))
         Scheduling::Allocator.allocate(
           vm, storage_volumes,
           distinct_storage_devices:,
@@ -618,11 +618,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, log: :on_error)
     end
 
-    if (label = held_allocation_label)
+    if (label = held_allocation_label) && (allocation_generation.nil? || allocation_generation < Config.github_runner_vm_allocation_generation_max)
       detach_nics
       # Keep the held VM from counting towards its pool's size.
       vm.update(pool_id: nil)
-      GithubRunnerVmAllocation.create(vm_id: vm.id, label:, location_id: vm.location_id, vm_host_id: host.id)
+      GithubRunnerVmAllocation.create(vm_id: vm.id, label:, location_id: vm.location_id, vm_host_id: host.id, generation: (allocation_generation || 0) + 1)
       pop "vm held for reuse"
     end
 

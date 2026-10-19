@@ -594,6 +594,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         expect { nx.start }.to hop("create_unix_user")
         expect(vm.reload.vm_host_id).to eq(runner_host.id)
         expect(held_vm).not_to exist
+        expect(st.reload.stack.first["allocation_generation"]).to eq(1)
+      end
+
+      it "records the generation of the reused resources" do
+        GithubRunnerVmAllocation[held_vm.id].update(generation: 7)
+        expect(Scheduling::Allocator).not_to receive(:allocate)
+        expect { nx.start }.to hop("create_unix_user")
+        expect(st.reload.stack.first["allocation_generation"]).to eq(7)
       end
 
       it "allocates when there are no held resources to reuse" do
@@ -601,6 +609,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         expect(Scheduling::Allocator).to receive(:allocate)
         expect { nx.start }.to hop("create_unix_user")
         expect(held_vm).to exist
+        expect(st.reload.stack.first["allocation_generation"]).to be_falsey
       end
 
       it "does not reuse held resources for installations with allocator preferences" do
@@ -1857,12 +1866,27 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         expect(allocation.label).to eq("ubicloud-standard-2-ubuntu-2404")
         expect(allocation.location_id).to eq(Location::GITHUB_RUNNERS_ID)
         expect(allocation.vm_host_id).to eq(vm_host.id)
+        expect(allocation.generation).to eq(1)
         expect(vm.reload.pool_id).to be_nil
         expect(nic.reload.vm_id).to be_nil
         expect(nic.destroy_set?).to be(true)
         expect(vm.assigned_vm_address.ip.to_s).to eq("1.1.1.1/32")
         expect(dev.reload.available_storage_gib).to eq(500)
         expect([slice.reload.used_cpu_percent, slice.used_memory_gib, slice.enabled]).to eq([200, 8, true])
+      end
+
+      it "increments the generation of reused host resources" do
+        refresh_frame(nx, new_values: {"allocation_generation" => 3})
+        expect { nx.destroy }.to exit({"msg" => "vm held for reuse"})
+        expect(GithubRunnerVmAllocation[vm.id].generation).to eq(4)
+      end
+
+      it "releases the host resources if they have reached the maximum generation" do
+        allow(Config).to receive(:github_runner_vm_allocation_generation_max).and_return(3)
+        refresh_frame(nx, new_values: {"allocation_generation" => 3})
+        expect { nx.destroy }.to hop("destroy_slice")
+        expect(GithubRunnerVmAllocation.count).to eq(0)
+        expect(dev.reload.available_storage_gib).to eq(575)
       end
 
       it "releases the host resources if the host is not accepting" do

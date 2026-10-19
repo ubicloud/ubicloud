@@ -24,7 +24,8 @@ class GithubRunnerVmAllocation < Sequel::Model
   end
 
   # Moves the resources of a held VM with the same label to the given VM.
-  # Returns whether held resources were found and reused.
+  # Returns the generation of the reused resources, or false if no held
+  # resources were found.
   def self.claim(vm, storage_volumes)
     return false unless (label = label_for(vm, storage_volumes.map { it["size_gib"] }))
 
@@ -37,7 +38,6 @@ class GithubRunnerVmAllocation < Sequel::Model
     return false unless allocation
 
     allocation.reuse_for(vm, storage_volumes)
-    true
   end
 
   def self.release_expired
@@ -77,6 +77,7 @@ class GithubRunnerVmAllocation < Sequel::Model
     destroy
     old_vm.destroy
     Clog.emit("vm allocation reused", {vm_allocation_reused: {vm: new_vm.ubid, previous_vm: old_vm.ubid, vm_host: host.ubid, label:, duration: Time.now - new_vm.created_at}})
+    generation
   end
 
   # Returns the held resources to the host, by restarting the old VM's strand
