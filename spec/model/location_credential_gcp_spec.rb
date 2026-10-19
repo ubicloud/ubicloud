@@ -20,9 +20,10 @@ RSpec.describe LocationCredentialGcp do
     )
   }
 
+  let(:key) { OpenSSL::PKey::RSA.new(2048) }
   let(:key_json) {
     {
-      type: "service_account", project_id: "test-gcp-project", private_key_id: "key-1", private_key: OpenSSL::PKey::RSA.new(2048).to_pem,
+      type: "service_account", project_id: "test-gcp-project", private_key_id: "key-1", private_key: key.to_pem,
       client_email: "test@test-gcp-project.iam.gserviceaccount.com", client_id: "1",
       token_uri: "https://oauth2.googleapis.com/token",
     }.to_json
@@ -126,6 +127,32 @@ RSpec.describe LocationCredentialGcp do
       expect(location_credential_gcp.storage_client.service.service.authorization).to be(creds)
       expect(Google::Auth::ImpersonatedServiceAccountCredentials).to have_received(:make_creds).once
       expect(Google::Auth).to have_received(:get_application_default).once
+    end
+
+    it "gives the lockout client the shared impersonated credentials" do
+      expect(location_credential_gcp.lockout_compute_client.configure.credentials).to be(creds)
+    end
+  end
+
+  describe "#lockout_compute_client" do
+    it "gives the lockout RPCs a short timeout" do
+      compute = location_credential_gcp.lockout_compute_client
+      expect(compute.configure.rpcs.get.timeout).to eq 2
+      expect(compute.configure.rpcs.delete_network_interface.timeout).to eq 5
+      expect(location_credential_gcp.lockout_compute_client).to be(compute)
+    end
+
+    it "signs a JWT locally, on credentials that the other clients do not use" do
+      lockout_creds = location_credential_gcp.lockout_compute_client.configure.credentials
+      expect(creds).not_to be(lockout_creds)
+      expect(creds.enable_self_signed_jwt?).to be false
+
+      jwt = lockout_creds.apply({})[:authorization].delete_prefix("Bearer ")
+      claims, = JWT.decode(jwt, key.public_key, true, algorithm: "RS256")
+      expect(claims).to include(
+        "iss" => "test@test-gcp-project.iam.gserviceaccount.com",
+        "scope" => "https://www.googleapis.com/auth/cloud-platform",
+      )
     end
   end
 end
