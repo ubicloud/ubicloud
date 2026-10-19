@@ -185,6 +185,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
         expect(args[:instance_resource].tags).to be_nil
         expect(args[:instance_resource].labels.to_h).to eq("ubicloud" => "555666777")
+        expect(args[:instance_resource].scheduling.skip_guest_os_shutdown).to be true
 
         ni = args[:instance_resource].network_interfaces.first
         expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
