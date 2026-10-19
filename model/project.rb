@@ -362,8 +362,6 @@ end
 #  name                      | text                     | NOT NULL
 #  visible                   | boolean                  | NOT NULL DEFAULT true
 #  billing_info_id           | uuid                     |
-#  credit                    | numeric                  | NOT NULL DEFAULT 0
-#  discount                  | integer                  | NOT NULL DEFAULT 0
 #  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
 #  feature_flags             | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  billable                  | boolean                  | NOT NULL DEFAULT true
@@ -374,9 +372,7 @@ end
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
 #  project_billing_info_id_index     | btree (billing_info_id)
 # Check constraints:
-#  max_discount_amount | (discount <= 100)
-#  min_credit_amount   | (credit >= 0::numeric)
-#  reputation_check    | (reputation = ANY (ARRAY['new'::text, 'verified'::text, 'limited'::text]))
+#  reputation_check | (reputation = ANY (ARRAY['new'::text, 'verified'::text, 'limited'::text]))
 # Foreign key constraints:
 #  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 # Referenced By:
