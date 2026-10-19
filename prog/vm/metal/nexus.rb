@@ -51,6 +51,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
   end
 
+  def queued_vms
+    Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
+  end
+
   def before_destroy
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
@@ -59,7 +63,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start
-    queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
       distinct_storage_devices = self.distinct_storage_devices || false
       host_exclusion_filter = exclude_host_ids || []
