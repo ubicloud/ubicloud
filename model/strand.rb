@@ -384,9 +384,7 @@ SQL
         raise(ret.exception) if ret.is_a?(Prog::Base::ChildRunError)
 
         now = Time.now
-        if now > deadline ||
-            (ret.is_a?(Prog::Base::Nap) && ret.seconds != 0) ||
-            ret.is_a?(Prog::Base::Exit)
+        if now > deadline || !ret.allow_another_run?
           return ret
         end
       end
