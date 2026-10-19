@@ -14,7 +14,7 @@ GCP firewall policy rule priorities are non-negative integers where
 **lower number = higher precedence**. We use the range 0-65535 (the
 Layer-3 allocator caps every new rule at `TAG_RULE_MAX_PRIORITY =
 65530`, staying below the VPC-wide deny band) and partition it into
-three bands (see [Priority Bands](#priority-bands)).
+four bands (see [Priority Bands](#priority-bands)).
 
 ## Ubicloud Data Model
 
@@ -96,6 +96,7 @@ for a given VM to match its desired tags.
 ```
 Priority Range   Band                   Purpose
 --------------   --------------------   ----------------------------------------
+0 - 999          Postgres fence DENY    Postgres ports of a locked-out primary
 1000 - 8999      Subnet ALLOW EGRESS    Intra-subnet traffic for tagged VMs
 10000 - 65530    Per-firewall INGRESS   Tag-targeted allow rules per firewall
 65531 - 65534    VPC-wide DENY          Block private traffic by default
@@ -200,6 +201,18 @@ VM is bound to every `active` tag for firewalls in its effective set
 that have any rules, plus the subnet's `active` tag. Firewalls with
 zero rules are intentionally skipped; binding their tag would have no
 matching policy rule and just consume one of the 10 per-VM tag slots.
+
+### Layer 4: Postgres fence DENY (priorities 0-999)
+
+Created by the `firewall_reset` mechanism of
+`Prog::Postgres::PostgresLockout` when it locks out an old primary. Two
+INGRESS deny rules, one per IP version, match the Postgres and PgBouncer
+ports on the VM's private IPv4 and its IPv6 range, from any source. GCP
+evaluates ingress rules after it translates an external IPv4 to the
+internal one, so the private IPv4 rule covers both. No
+`target_secure_tags`; the destination selects the VM. Each rule takes
+the first free priority from 0, and is named
+`ubicloud-fence-{vm.ubid}-ipv4` or `-ipv6`.
 
 ## Worked Example: Multi-VM, Multi-Firewall
 
@@ -384,6 +397,11 @@ anyway). Cleanup of now-unused policy rules, tag values, and tag keys
 for firewalls that have no remaining references runs opportunistically
 inside `VpcUpdateFirewallRules#cleanup_orphaned_firewall_rules` the next
 time a rule edit or attach lands on this VPC.
+
+Postgres fence rules match addresses, not tags, so the next VM with the
+same private IPv4 would match them too. `Vm::Gcp::Nexus` removes the
+VM's `ubicloud-fence-{vm.ubid}-` rules after the instance is deleted and
+before its NICs are released.
 
 ## Sharp Edges
 

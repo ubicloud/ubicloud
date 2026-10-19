@@ -74,11 +74,27 @@ class LocationCredentialGcp < Sequel::Model
       config.credentials = lockout_credentials
       config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
       config.rpcs.delete_network_interface.timeout = LOCKOUT_MUTATE_TIMEOUT
+      config.rpcs.reset.timeout = LOCKOUT_MUTATE_TIMEOUT
     end
   end
 
   def lockout_zone_operations_client
     @lockout_zone_operations_client ||= V1::ZoneOperations::Rest::Client.new do |config|
+      config.credentials = lockout_credentials
+      config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
+    end
+  end
+
+  def lockout_network_firewall_policies_client
+    @lockout_network_firewall_policies_client ||= V1::NetworkFirewallPolicies::Rest::Client.new do |config|
+      config.credentials = lockout_credentials
+      config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
+      config.rpcs.add_rule.timeout = LOCKOUT_MUTATE_TIMEOUT
+    end
+  end
+
+  def lockout_global_operations_client
+    @lockout_global_operations_client ||= V1::GlobalOperations::Rest::Client.new do |config|
       config.credentials = lockout_credentials
       config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
     end

@@ -46,6 +46,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   let(:compute_client) { instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client) }
   let(:nfp_client) { instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client) }
   let(:zone_ops_client) { instance_double(Google::Cloud::Compute::V1::ZoneOperations::Rest::Client) }
+  let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }
 
   def ensure_nic_gcp_resource(nic, **overrides)
     return if NicGcpResource[nic.id]
@@ -69,6 +70,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       compute_client:,
       network_firewall_policies_client: nfp_client,
       zone_operations_client: zone_ops_client,
+      global_operations_client: global_ops_client,
     )
     %w[a b c].freeze.each do |suffix|
       LocationAz.create(location_id: location.id, az: suffix)
@@ -997,9 +999,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.stack.first.dig("delete_vm", "name")).to eq("op-del-123")
     end
 
-    it "handles already-deleted instances by hopping to finalize_destroy" do
+    it "handles already-deleted instances by hopping to remove_fence_rules" do
       expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect { nx.destroy }.to hop("finalize_destroy")
+      expect { nx.destroy }.to hop("remove_fence_rules")
     end
 
     it "uses zone from VM strand frame when NIC is already destroyed" do
@@ -1031,10 +1033,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_destroy_op }.to nap(5)
     end
 
-    it "hops to finalize_destroy when operation completes" do
+    it "hops to remove_fence_rules when operation completes" do
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect { nx.wait_destroy_op }.to hop("finalize_destroy")
+      expect { nx.wait_destroy_op }.to hop("remove_fence_rules")
     end
 
     it "raises when operation completes with an error" do
@@ -1042,6 +1044,76 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE, error:)
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect { nx.wait_destroy_op }.to raise_error(RuntimeError, /GCE instance deletion failed/)
+    end
+  end
+
+  describe "#remove_fence_rules" do
+    let(:v1) { Google::Cloud::Compute::V1 }
+    let(:prefix) { "ubicloud-fence-#{vm.ubid}-" }
+
+    def expect_policy(*rule_names)
+      rules = rule_names.each_with_index.map { |rule_name, i| v1::FirewallPolicyRule.new(priority: 10 + i, rule_name:) }
+      expect(nfp_client).to receive(:get).with(project: "test-gcp-project", firewall_policy: gcp_vpc.name)
+        .and_return(v1::FirewallPolicy.new(rules:))
+    end
+
+    it "skips the policy when the VM has no NIC" do
+      vm.nics.each do |n|
+        n.strand.destroy
+        n.destroy
+      end
+      expect { nx.remove_fence_rules }.to hop("finalize_destroy")
+    end
+
+    it "skips the policy when the NIC never got its GCP resource" do
+      expect { nx.remove_fence_rules }.to hop("finalize_destroy")
+    end
+
+    context "when the NIC has its GCP resource" do
+      before { ensure_nic_gcp_resource(nic) }
+
+      it "hops to finalize_destroy when no fence rule of the VM is left" do
+        expect_policy("", "ubicloud-fence-#{Vm.generate_ubid}-ipv4")
+        expect { nx.remove_fence_rules }.to hop("finalize_destroy")
+      end
+
+      it "hops to finalize_destroy when the policy is gone" do
+        expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
+        expect { nx.remove_fence_rules }.to hop("finalize_destroy")
+      end
+
+      it "removes a fence rule of the VM and saves the operation" do
+        expect_policy("", "#{prefix}ipv4", "#{prefix}ipv6")
+        expect(nfp_client).to receive(:remove_rule).with(project: "test-gcp-project", firewall_policy: gcp_vpc.name, priority: 11)
+          .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-rm"))
+        expect { nx.remove_fence_rules }.to hop("wait_remove_fence_rule")
+        expect(st.stack.first["remove_fence_rule"]).to eq("name" => "op-rm", "scope" => "global", "scope_value" => nil)
+      end
+    end
+  end
+
+  describe "#wait_remove_fence_rule" do
+    before do
+      refresh_frame(nx, new_values: {"remove_fence_rule" => {"name" => "op-rm", "scope" => "global", "scope_value" => nil}})
+    end
+
+    it "naps while the operation runs" do
+      expect(global_ops_client).to receive(:get).with(project: "test-gcp-project", operation: "op-rm")
+        .and_return(Google::Cloud::Compute::V1::Operation.new(status: :RUNNING))
+      expect { nx.wait_remove_fence_rule }.to nap(5)
+    end
+
+    it "looks for the next fence rule when the operation is done" do
+      expect(global_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
+      expect { nx.wait_remove_fence_rule }.to hop("remove_fence_rules")
+      expect(st.stack.first).not_to have_key("remove_fence_rule")
+    end
+
+    it "logs a failed removal and looks again" do
+      error = Google::Cloud::Compute::V1::Error.new(errors: [Google::Cloud::Compute::V1::Errors.new(code: "BUSY", message: "policy busy")])
+      expect(global_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE, error:))
+      expect(Clog).to receive(:emit).with("GCP fence rule removal failed, retrying", {gcp_fence_rule_removal_failed: {vm: vm.ubid, error: "policy busy (code: BUSY)"}}).and_call_original
+      expect { nx.wait_remove_fence_rule }.to hop("remove_fence_rules")
     end
   end
 

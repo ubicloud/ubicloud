@@ -230,16 +230,28 @@ RSpec.describe LocationCredentialGcp do
       compute = location_credential_gcp.lockout_compute_client
       expect(compute.configure.rpcs.get.timeout).to eq 2
       expect(compute.configure.rpcs.delete_network_interface.timeout).to eq 5
+      expect(compute.configure.rpcs.reset.timeout).to eq 5
       expect(location_credential_gcp.lockout_compute_client).to be(compute)
 
       zone_operations = location_credential_gcp.lockout_zone_operations_client
       expect(zone_operations.configure.rpcs.get.timeout).to eq 2
       expect(location_credential_gcp.lockout_zone_operations_client).to be(zone_operations)
+
+      policies = location_credential_gcp.lockout_network_firewall_policies_client
+      expect(policies.configure.rpcs.get.timeout).to eq 2
+      expect(policies.configure.rpcs.add_rule.timeout).to eq 5
+      expect(location_credential_gcp.lockout_network_firewall_policies_client).to be(policies)
+
+      global_operations = location_credential_gcp.lockout_global_operations_client
+      expect(global_operations.configure.rpcs.get.timeout).to eq 2
+      expect(location_credential_gcp.lockout_global_operations_client).to be(global_operations)
     end
 
     it "signs a JWT locally, on credentials that the other clients do not use" do
       creds = location_credential_gcp.lockout_compute_client.configure.credentials
       expect(location_credential_gcp.lockout_zone_operations_client.configure.credentials).to be(creds)
+      expect(location_credential_gcp.lockout_network_firewall_policies_client.configure.credentials).to be(creds)
+      expect(location_credential_gcp.lockout_global_operations_client.configure.credentials).to be(creds)
       shared = location_credential_gcp.compute_client.configure.credentials
       expect(shared).not_to be(creds)
       expect(shared.enable_self_signed_jwt?).to be false
@@ -265,6 +277,8 @@ RSpec.describe LocationCredentialGcp do
         creds = location_credential_gcp.lockout_compute_client.configure.credentials
         expect(creds).to be_a(Google::Auth::ImpersonatedServiceAccountCredentials)
         expect(location_credential_gcp.lockout_zone_operations_client.configure.credentials).to be(creds)
+        expect(location_credential_gcp.lockout_network_firewall_policies_client.configure.credentials).to be(creds)
+        expect(location_credential_gcp.lockout_global_operations_client.configure.credentials).to be(creds)
         expect(location_credential_gcp.compute_client.configure.credentials).to be(creds)
       end
     end
