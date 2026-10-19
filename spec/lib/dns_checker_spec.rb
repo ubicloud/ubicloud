@@ -43,6 +43,22 @@ RSpec.describe DnsChecker do
     end).to eq [{actual_value: "fe80::2", expected_value: "fe80::1", record_name: "rec", type: :AAAA}]
   end
 
+  it ".open normalizes AAAA record addresses when comparing" do
+    expect(described_class.open(["127.0.0.1"]) do
+      expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::AAAA)
+        .and_return(Resolv::DNS::Resource::IN::AAAA.new(Resolv::IPv6.create("2001:0:0:1:0:0:0:1")))
+      it.check(:AAAA, "rec", "2001:0:0:1::1")
+    end).to eq []
+  end
+
+  it ".open returns normalized AAAA record addresses in failures" do
+    expect(described_class.open(["127.0.0.1"]) do
+      expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::AAAA)
+        .and_return(Resolv::DNS::Resource::IN::AAAA.new(Resolv::IPv6.create("2001:0:0:1:0:0:0:2")))
+      it.check(:AAAA, "rec", "2001:0:0:1::1")
+    end).to eq [{actual_value: "2001:0:0:1::2", expected_value: "2001:0:0:1::1", record_name: "rec", type: :AAAA}]
+  end
+
   it ".open returns empty array if there are no failures" do
     expect(described_class.open(["127.0.0.1"]) do
       expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::CNAME)
