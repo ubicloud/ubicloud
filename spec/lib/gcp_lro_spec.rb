@@ -54,6 +54,18 @@ RSpec.describe GcpLro do
         .and_return(op)
       expect(nx.send(:poll_gcp_op, "my_lro")).to eq(op)
     end
+
+    it "polls through the given client instead of the scope's default client" do
+      client = instance_double(Google::Cloud::Compute::V1::ZoneOperations::Rest::Client)
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      {"zone" => "us-central1-a", "region" => "us-central1", "global" => nil}.each do |scope, scope_value|
+        refresh_frame(nx, new_values: {"my_lro" => {"name" => "op-#{scope}", "scope" => scope, "scope_value" => scope_value}})
+        request = {project: "test-gcp-project", operation: "op-#{scope}"}
+        request[scope.to_sym] = scope_value if scope_value
+        expect(client).to receive(:get).with(**request).and_return(op)
+        expect(nx.send(:poll_gcp_op, "my_lro", client:)).to eq(op)
+      end
+    end
   end
 
   def build_op(error: nil, http_error_status_code: 0, http_error_message: "")
