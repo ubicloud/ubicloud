@@ -218,8 +218,8 @@ RSpec.describe PostgresResource do
     end
 
     describe "#lockout_mechanisms" do
-      it "returns pg_stop and hba" do
-        expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba"])
+      it "returns pg_stop, hba and stop_vm" do
+        expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "stop_vm"])
       end
     end
 
