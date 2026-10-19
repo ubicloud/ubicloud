@@ -309,17 +309,28 @@ SQL
         Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
         top_frame["last_label_changed_at"] = time_string(Time.now)
         modified!(:stack)
+        set(**hp.strand_update_args, try: 0)
+        raise validation_failed_error unless valid?
 
-        update(**hp.strand_update_args, try: 0)
+        values[:schedule] = Sequel::CURRENT_TIMESTAMP
+        modified!(:schedule)
+        save_changes(validate: false)
       when Prog::Base::Exit
         ext = prog_action
         last_changed_at = Time.new(top_frame["last_label_changed_at"])
         Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
-        update(exitval: ext.exitval, retval: nil)
+        self.exitval = ext.exitval
+        self.retval = nil
+
         if parent_id
+          raise validation_failed_error unless valid?
+          values[:schedule] = Sequel::CURRENT_TIMESTAMP
+          modified!(:schedule)
+          save_changes(validate: false)
           @exited = true
         else
+          save_changes
           # No parent Strand to reap here, so self-reap.
           semaphores_dataset.destroy
           destroy
