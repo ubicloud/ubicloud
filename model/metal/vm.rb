@@ -82,6 +82,10 @@ class Vm < Sequel::Model
       incr_update_spdk_dependency
     end
 
+    def ipv6_disabled?
+      project.get_ff_ipv6_disabled || vm_host.ipv6_disabled
+    end
+
     def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
       topo = cloud_hypervisor_cpu_topology
 
@@ -94,7 +98,7 @@ class Vm < Sequel::Model
       # shouldn't be stored in the host for security reasons.
       JSON.pretty_generate(
         vm_name: name,
-        public_ipv6: project.get_ff_ipv6_disabled ? user_nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
+        public_ipv6: ipv6_disabled? ? user_nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
         public_ipv4: ip4.to_s,
         local_ipv4: local_vetho_ip.to_s,
         dns_ipv4: user_nic.private_subnet.net4.nth(2).to_s,
@@ -118,7 +122,7 @@ class Vm < Sequel::Model
         firmware_version:,
         hugepages:,
         init_script: init_script&.init_script || "",
-        ipv6_disabled: project.get_ff_ipv6_disabled || false,
+        ipv6_disabled: ipv6_disabled?,
         append_serial_console: location_id == Location::GITHUB_RUNNERS_ID,
       )
     end

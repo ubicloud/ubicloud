@@ -620,6 +620,11 @@ RSpec.describe Vm do
       vm.update(location_id: Location::GITHUB_RUNNERS_ID)
       expect(JSON.parse(vm.params_json)["append_serial_console"]).to be true
     end
+
+    it "disables ipv6 for vms on a host with ipv6 disabled" do
+      vmh.update(ipv6_disabled: true)
+      expect(JSON.parse(vm.params_json)["ipv6_disabled"]).to be true
+    end
   end
 
   describe "#private_ipv4_string" do
