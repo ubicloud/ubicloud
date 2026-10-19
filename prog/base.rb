@@ -189,6 +189,10 @@ end
     def to_s
       "Strand exits from #{strand.prog}##{strand.label} with #{exitval}"
     end
+
+    def allow_another_run?
+      false
+    end
   end
 
   Hop = Data.define(:old_prog, :old_label, :nap, :strand_update_args) do
@@ -205,6 +209,10 @@ end
       nap ? (ts + Sequel.cast("1 seconds", :interval) * nap) : ts
     end
 
+    def allow_another_run?
+      nap.nil?
+    end
+
     def to_s
       "hop #{old_prog}##{old_label} -> #{new_prog}##{new_label}#{" (nap #{nap})" if nap}"
     end
@@ -216,6 +224,10 @@ end
     def initialize(seconds)
       @seconds = seconds
       freeze
+    end
+
+    def allow_another_run?
+      seconds == 0
     end
 
     def to_s
