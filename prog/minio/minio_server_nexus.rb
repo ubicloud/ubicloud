@@ -37,8 +37,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       )
 
       id = ubid.to_uuid
-      MinioServer.create_with_id(id, minio_pool_id:, vm_id: vm_st.id, index:)
-      Strand.create_with_id(id, prog: "Minio::MinioServerNexus", label: "start")
+      minio_server = MinioServer.create_with_id(id, minio_pool_id:, vm_id: vm_st.id, index:)
+      Strand.create_with_id(minio_server, prog: "Minio::MinioServerNexus", label: "start")
     end
   end
 

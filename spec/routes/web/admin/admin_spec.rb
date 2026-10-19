@@ -1414,7 +1414,7 @@ RSpec.describe CloverAdmin do
   it "supports adding DNS records to zones and deleteing DNS records" do
     project = Project.create(name: "dns-test")
     dns_zone = DnsZone.create(name: "test.example.com", project_id: project.id)
-    Strand.create_with_id(dns_zone.id, prog: "DnsZone::DnsZoneNexus", label: "start")
+    Strand.create_with_id(dns_zone, prog: "DnsZone::DnsZoneNexus", label: "start")
 
     visit "/model/DnsZone/#{dns_zone.ubid}"
     expect(page.title).to eq "Ubicloud Admin - DnsZone #{dns_zone.ubid}"
@@ -2706,8 +2706,8 @@ RSpec.describe CloverAdmin do
       fsn1_vm = create_vm
       hel1_vm = create_vm(location_id: Location::HETZNER_HEL1_ID)
 
-      Strand.create_with_id(fsn1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
-      Strand.create_with_id(hel1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
+      Strand.create_with_id(fsn1_vm, prog: "Vm::Metal::Nexus", label: "start")
+      Strand.create_with_id(hel1_vm, prog: "Vm::Metal::Nexus", label: "start")
 
       select "Vm - update_firewall_rules", from: "Class - Semaphore"
       select "hetzner-fsn1"

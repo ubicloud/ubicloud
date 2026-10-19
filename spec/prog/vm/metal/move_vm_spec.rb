@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         storage_device_id: sd.id, vhost_block_backend_id: vbb.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "src").id,
         vring_workers: 1, track_written: true)
-      Strand.create_with_id(v.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      Strand.create_with_id(v, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
       v.incr_prepare_to_move
       v
     }
@@ -200,7 +200,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     let(:new_vm) {
       v = create_vm(vm_host_id: target_host.id, name: "new-vm")
-      Strand.create_with_id(v.id, prog: "Vm::Metal::Nexus", label: "start")
+      Strand.create_with_id(v, prog: "Vm::Metal::Nexus", label: "start")
       sd = StorageDevice.create(vm_host_id: target_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 50)
       VmStorageVolume.create(vm_id: v.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id)
       v
@@ -208,7 +208,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     let(:rss_source_volume) {
       rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
-      Strand.create_with_id(rss_source_vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      Strand.create_with_id(rss_source_vm, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
       sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
       VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)

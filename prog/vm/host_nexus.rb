@@ -29,7 +29,7 @@ class Prog::Vm::HostNexus < Prog::Base
         AssignedHostAddress.create(ip: sshable_hostname, address_id: id, host_id: id)
       end
 
-      Strand.create_with_id(id,
+      Strand.create_with_id(vmh,
         prog: "Vm::HostNexus",
         label: "start",
         stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images, "install_os" => install_os}])

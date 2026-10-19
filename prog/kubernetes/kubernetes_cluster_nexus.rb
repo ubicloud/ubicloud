@@ -51,9 +51,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       )
 
       id = ubid.to_uuid
-      KubernetesCluster.create_with_id(id, name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
+      kubernetes_cluster = KubernetesCluster.create_with_id(id, name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
 
-      Strand.create_with_id(id, prog: "Kubernetes::KubernetesClusterNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id, "hostname_version" => hostname_version}])
+      Strand.create_with_id(kubernetes_cluster, prog: "Kubernetes::KubernetesClusterNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id, "hostname_version" => hostname_version}])
     end
   end
 

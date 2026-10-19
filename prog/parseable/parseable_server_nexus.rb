@@ -30,8 +30,8 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
       )
 
       id = ubid.to_uuid
-      ParseableServer.create_with_id(id, parseable_resource_id: parseable_resource.id, vm_id: vm_st.id)
-      Strand.create_with_id(id, prog: "Parseable::ParseableServerNexus", label: "start")
+      parseable_server = ParseableServer.create_with_id(id, parseable_resource_id: parseable_resource.id, vm_id: vm_st.id)
+      Strand.create_with_id(parseable_server, prog: "Parseable::ParseableServerNexus", label: "start")
     end
   end
 

@@ -233,7 +233,7 @@ RSpec.describe Prog::Test::DnsZone do
       ds = DnsServer.create(name: "ns-e2e-#{zone_label}.#{parent_zone_name}")
       dz = DnsZone.create(name: zone_name, project_id: kubernetes_service_project_id, neg_ttl: 30, last_purged_at: Time.now)
       dz.add_dns_server(ds)
-      Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
+      Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
       dz.insert_record(record_name: "foo.#{zone_name}", type: "A", ttl: 30, data: "1.2.3.4")
 
       refresh_frame(dns_zone_test, new_values: {"dns_zone_id" => dz.id, "dns_server_id" => ds.id})
