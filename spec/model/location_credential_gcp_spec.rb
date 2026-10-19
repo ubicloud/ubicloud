@@ -230,6 +230,7 @@ RSpec.describe LocationCredentialGcp do
       compute = location_credential_gcp.lockout_compute_client
       expect(compute.configure.rpcs.get.timeout).to eq 2
       expect(compute.configure.rpcs.delete_network_interface.timeout).to eq 5
+      expect(compute.configure.rpcs.stop.timeout).to eq 5
       expect(location_credential_gcp.lockout_compute_client).to be(compute)
 
       zone_operations = location_credential_gcp.lockout_zone_operations_client

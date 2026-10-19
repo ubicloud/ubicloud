@@ -1662,7 +1662,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
     end
 
-    it "skips host_routing lockout on cloud providers" do
+    it "runs stop_vm instead of host_routing on GCP" do
       gcp_location = Location.create(
         name: "us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1",
         visible: true, provider: "gcp", project:,
@@ -1675,7 +1675,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect { nx.lockout }.to hop("wait_lockout_attempt")
       child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
-      expect(child_mechanisms).to contain_exactly("pg_stop", "hba")
+      expect(child_mechanisms).to contain_exactly("pg_stop", "hba", "stop_vm")
     end
 
     it "dispatches detach_nic on AWS" do

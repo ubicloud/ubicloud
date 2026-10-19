@@ -74,6 +74,7 @@ class LocationCredentialGcp < Sequel::Model
       config.credentials = lockout_credentials
       config.rpcs.get.timeout = LOCKOUT_GET_TIMEOUT
       config.rpcs.delete_network_interface.timeout = LOCKOUT_MUTATE_TIMEOUT
+      config.rpcs.stop.timeout = LOCKOUT_MUTATE_TIMEOUT
     end
   end
 
