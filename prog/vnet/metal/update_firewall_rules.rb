@@ -12,12 +12,12 @@ class Prog::Vnet::Metal::UpdateFirewallRules < Prog::Base
   label def update_firewall_rules
     ip6_rules, ip4_rules = vm.firewall_rules.partition(&:ip6?)
     allowed_ingress_ip4_tcp_port_set, allowed_ingress_ip4_lb_dest_set, allowed_ingress_ip4_udp_port_set = consolidate_rules_by_protocol(ip4_rules)
-    allowed_ingress_ip6_tcp_port_set, allowed_ingress_ip6_lb_dest_set, allowed_ingress_ip6_udp_port_set = if vm.project.get_ff_ipv6_disabled
+    allowed_ingress_ip6_tcp_port_set, allowed_ingress_ip6_lb_dest_set, allowed_ingress_ip6_udp_port_set = if vm.ipv6_disabled?
       [[].freeze] * 3
     else
       consolidate_rules_by_protocol(ip6_rules)
     end
-    guest_ephemeral, clover_ephemeral = vm.project.get_ff_ipv6_disabled ? ["::/0", "::/0"] : subdivide_network(vm.ephemeral_net6).map(&:to_s)
+    guest_ephemeral, clover_ephemeral = vm.ipv6_disabled? ? ["::/0", "::/0"] : subdivide_network(vm.ephemeral_net6).map(&:to_s)
 
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
@@ -192,7 +192,7 @@ TEMPLATE
         if ip.version == 4
           globally_blocked_ipv4s << "#{ip}/32"
         else
-          globally_blocked_ipv6s << "#{ip}/128" unless vm.project.get_ff_ipv6_disabled
+          globally_blocked_ipv6s << "#{ip}/128" unless vm.ipv6_disabled?
         end
       end
     end
