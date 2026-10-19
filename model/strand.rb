@@ -312,7 +312,7 @@ SQL
         set(**hp.strand_update_args, try: 0)
         raise validation_failed_error unless valid?
 
-        values[:schedule] = Sequel::CURRENT_TIMESTAMP
+        values[:schedule] = hp.schedule
         modified!(:schedule)
         save_changes(validate: false)
       when Prog::Base::Exit
@@ -368,9 +368,7 @@ SQL
         raise(ret.exception) if ret.is_a?(Prog::Base::ChildRunError)
 
         now = Time.now
-        if now > deadline ||
-            (ret.is_a?(Prog::Base::Nap) && ret.seconds != 0) ||
-            ret.is_a?(Prog::Base::Exit)
+        if now > deadline || !ret.allow_another_run?
           return ret
         end
       end

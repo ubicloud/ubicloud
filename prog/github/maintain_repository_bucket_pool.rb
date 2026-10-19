@@ -30,7 +30,7 @@ class Prog::Github::MaintainRepositoryBucketPool < Prog::Base
     GithubRepositoryBucketPool.create_with_id(ubid.to_uuid, access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
     Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
     self.last_bucket_created = now
-    hop_wait
+    nap_hop(MIN_WAIT_BETWEEN_BUCKETS_SECONDS, :wait)
   end
 
   def now

@@ -131,7 +131,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       miv.machine_image.update(latest_version_id: miv.id)
     end
 
-    hop_wait
+    nap_hop(365 * 24 * 60 * 60, :wait)
   end
 
   label def wait

@@ -305,7 +305,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       metal.update(status: "failed")
       refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
 
-      expect { prog.wait_capture }.to hop("failed")
+      expect { prog.wait_capture }.to hop("failed", nap: 60 * 60)
 
       page = Page.first
       expect(page.summary).to eq "Kubernetes node image kubernetes-v1_35@20260730.1.0 capture failed"

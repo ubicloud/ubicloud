@@ -74,7 +74,7 @@ RSpec.describe Prog::Github::MaintainRepositoryBucketPool do
       end
       refresh_frame(prog, new_values: {"last_bucket_created" => 0})
 
-      expect { prog.create_bucket }.to hop("wait")
+      expect { prog.create_bucket }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_BUCKETS_SECONDS)
         .and change(GithubRepositoryBucketPool, :count).from(0).to(1)
 
       bucket = GithubRepositoryBucketPool.first

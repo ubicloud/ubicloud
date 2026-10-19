@@ -38,7 +38,7 @@ class Prog::CheckUsageAlerts < Prog::Base
       nap 0
     end
 
-    self.last_usage_alert_id = nil
-    hop_wait
+    self.last_usage_alert_id = "00000000-0000-0000-0000-000000000000"
+    nap_hop(5 * 60, :wait)
   end
 end

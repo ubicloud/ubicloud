@@ -101,7 +101,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       skip_verification ? hop_promote : hop_verify
     when "failed"
       trigger_page("capture failed")
-      hop_failed
+      nap_hop(60 * 60, :failed)
     else
       nap 15
     end
