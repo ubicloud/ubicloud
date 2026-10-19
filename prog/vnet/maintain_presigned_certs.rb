@@ -63,7 +63,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     self.resource_id = nil
     self.cert_id = nil
     self.last_cert_created = now
-    hop_wait
+    nap_hop(MIN_WAIT_BETWEEN_CERTS_SECONDS, :wait)
   end
 
   def now
