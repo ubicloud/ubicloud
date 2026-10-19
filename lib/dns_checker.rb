@@ -36,7 +36,7 @@ module DnsChecker
         actual_value = name.to_s
         actual_value += "." if name.absolute?
       else
-        actual_value = resource.address.to_s
+        actual_value = NetAddr.parse_ip(resource.address.to_s).to_s
       end
     rescue Resolv::ResolvError => e
       # Deliberately avoid Util.exception_to_hash here, as backtrace is not helpful
