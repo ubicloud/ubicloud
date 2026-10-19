@@ -580,6 +580,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       # Second run does not generate another page
       vm.created_at = Time.now - 11 * 60
       expect(nx).not_to receive(:incr_waiting_for_capacity)
+      expect(Prog::PageNexus).not_to receive(:assemble)
       expect { nx.start }.to nap(5)
       expect(Page.active.count).to eq(1)
     end
