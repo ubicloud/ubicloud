@@ -82,7 +82,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
 
     it "emits and hops if cert strand does not exist" do
       expect(Clog).to receive(:emit).with("Strand for presigned cert deleted", {"presigned_cert_strand_deleted" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and not_change { DB[:presigned_postgres_cert].count }
       frame = prog.strand.stack[0]
       expect(frame.fetch("postgres_resource_id")).to be_nil
@@ -103,7 +103,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       cert = Cert.create_with_id(frame.fetch("cert_id"), hostname: "test")
       refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 16 * 60})
       expect(Clog).to receive(:emit).with("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and not_change { DB[:presigned_postgres_cert].count }
         .and change { cert.destroy_set?(cached: false) }.from(false).to(true)
       frame = prog.strand.stack[0]
@@ -119,7 +119,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       Strand.create_with_id(expect_cert_id, prog: "Vnet::CertNexus", label: "wait")
       Cert.create_with_id(expect_cert_id, hostname: "*.#{UBID.to_ubid(expect_postgres_resource_id)}.pg.ubicloud.app")
 
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and change { DB[:presigned_postgres_cert].count }.from(0).to(1)
       postgres_resource_id, cert_id, created_at = DB[:presigned_postgres_cert].get([:postgres_resource_id, :cert_id, :created_at])
       expect(postgres_resource_id).to eq expect_postgres_resource_id

@@ -85,7 +85,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
 
     it "emits and hops if cert strand does not exist" do
       expect(Clog).to receive(:emit).with("Strand for presigned cert deleted", {"presigned_cert_strand_deleted" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and not_change { DB[:presigned_load_balancer_cert].count }
       frame = prog.strand.stack[0]
       expect(frame.fetch("load_balancer_id")).to be_nil
@@ -106,7 +106,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
       cert = Cert.create_with_id(frame.fetch("cert_id"), hostname: "test")
       refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 16 * 60})
       expect(Clog).to receive(:emit).with("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and not_change { DB[:presigned_load_balancer_cert].count }
         .and change { cert.destroy_set?(cached: false) }.from(false).to(true)
       frame = prog.strand.stack[0]
@@ -122,7 +122,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
       Strand.create_with_id(expect_cert_id, prog: "Vnet::CertNexus", label: "wait")
       Cert.create_with_id(expect_cert_id, hostname: "*.#{UBID.to_ubid(expect_load_balancer_id)}.lb2.ubicloud.com")
 
-      expect { prog.wait_for_signed_cert }.to hop("wait")
+      expect { prog.wait_for_signed_cert }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_CERTS_SECONDS)
         .and change { DB[:presigned_load_balancer_cert].count }.from(0).to(1)
       load_balancer_id, cert_id, created_at = DB[:presigned_load_balancer_cert].get([:load_balancer_id, :cert_id, :created_at])
       expect(load_balancer_id).to eq expect_load_balancer_id
