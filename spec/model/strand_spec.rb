@@ -165,6 +165,20 @@ RSpec.describe Strand do
     expect { st.unsynchronized_run }.to raise_error(Strand::RunError) { expect(it.cause).to be_a(Sequel::ValidationFailed) }
   end
 
+  it "raises if the strand is not valid when hopping" do
+    st.update(label: "hop_entry")
+    st.lease = nil
+    expect { st.unsynchronized_run }.to raise_error(Strand::RunError) { expect(it.cause).to be_a(Sequel::ValidationFailed) }
+    expect(st.reload.label).to eq "hop_entry"
+  end
+
+  it "raises if the strand is not valid when exiting" do
+    st.update(label: "hop_exit", parent_id: st.id)
+    st.lease = nil
+    expect { st.unsynchronized_run }.to raise_error(Strand::RunError) { expect(it.cause).to be_a(Sequel::ValidationFailed) }
+    expect(st.reload.exitval).to be_nil
+  end
+
   it "keeps the nap when the prog increments its own semaphore through the snap" do
     st.update(label: "snap_signal_napper", schedule: Time.now - 100)
 
