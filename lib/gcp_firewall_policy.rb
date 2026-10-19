@@ -11,6 +11,10 @@ module GcpFirewallPolicy
   # short name is just an identifier slot, not a relationship label.
   TAG_VALUE = "active"
 
+  def self.fence_rule_prefix(vm)
+    "ubicloud-fence-#{vm.ubid}-"
+  end
+
   private
 
   def ensure_firewall_policy_rule(priority:, direction:, action:, layer4_configs:, src_ip_ranges: nil, dest_ip_ranges: nil, target_secure_tags: nil)

@@ -284,7 +284,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       nil
     end
 
-    hop_finalize_destroy
+    hop_remove_fence_rules
   end
 
   label def wait_destroy_op
@@ -294,7 +294,29 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     raise "GCE instance deletion failed: #{op_error_message(op)}" if op_error?(op)
     clear_gcp_op("delete_vm")
+    hop_remove_fence_rules
+  end
+
+  label def remove_fence_rules
+    hop_finalize_destroy unless (policy = user_nic&.nic_gcp_resource&.vpc_name)
+
+    prefix = GcpFirewallPolicy.fence_rule_prefix(vm)
+    rule = credential.network_firewall_policies_client.get(project: gcp_project_id, firewall_policy: policy)
+      .rules.find { it.rule_name.start_with?(prefix) }
+    hop_finalize_destroy unless rule
+
+    op = credential.network_firewall_policies_client.remove_rule(project: gcp_project_id, firewall_policy: policy, priority: rule.priority)
+    save_gcp_op("remove_fence_rule", op_name: op.name, scope: "global")
+    hop_wait_remove_fence_rule
+  rescue Google::Cloud::NotFoundError
     hop_finalize_destroy
+  end
+
+  label def wait_remove_fence_rule
+    poll_and_clear_gcp_op("remove_fence_rule") do |op|
+      Clog.emit("GCP fence rule removal failed, retrying", {gcp_fence_rule_removal_failed: {vm: vm.ubid, error: op_error_message(op)}})
+    end
+    hop_remove_fence_rules
   end
 
   label def finalize_destroy
