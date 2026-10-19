@@ -90,7 +90,7 @@ RSpec.describe Prog::RolloutSemaphore do
     end
 
     it "increments semaphore on next object and hops to wait_current" do
-      expect { nx.start }.to hop("wait_current")
+      expect { nx.start }.to hop("wait_current", nap: 6)
         .and change { pages.first.resolve_set?(cached: false) }.from(false).to(true)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
       expect(st.stack[0]["completed"]).to eq []
@@ -116,7 +116,7 @@ RSpec.describe Prog::RolloutSemaphore do
 
     it "naps using regular gap after passing the initial number of records" do
       refresh_frame(nx, new_values: {"initial_num" => 0})
-      expect { nx.start }.to hop("wait_current")
+      expect { nx.start }.to hop("wait_current", nap: 6)
         .and change { pages.first.resolve_set?(cached: false) }.from(false).to(true)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 60)
       expect(st.stack[0]["completed"]).to eq []

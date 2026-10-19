@@ -42,7 +42,7 @@ RSpec.describe Prog::DnsZone::DnsServerNexus do
     it "accepts a manual rollout and keeps it waiting until configuration completes" do
       st
       rollout = Prog::RolloutSemaphore.new(Prog::RolloutSemaphore.assemble(semaphore: "configure", ids: [server.id]))
-      expect { rollout.start }.to hop("wait_current")
+      expect { rollout.start }.to hop("wait_current", nap: 6)
       st.unsynchronized_run
       expect(st.reload.label).to eq "configure"
       expect { rollout.wait_current }.to nap(6)

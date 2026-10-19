@@ -50,7 +50,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
         cluster.incr_reconfigure
       end
 
-      hop_wait
+      nap_hop(6 * 60 * 60, :wait)
     end
 
     nap 5

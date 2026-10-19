@@ -191,7 +191,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
 
     it "marks ready, bills, sets latest, clears pinned_source_vm_id, hops wait" do
       expect(prog.sshable).to receive(:_cmd).with("sudo rm -f #{stats_path}")
-      expect { prog.finish_archive }.to hop("wait")
+      expect { prog.finish_archive }.to hop("wait", nap: 365 * 24 * 60 * 60)
       expect(metal.reload).to have_attributes(status: "ready", archive_size_mib: 10, pinned_source_vm_id: nil)
       expect(miv.reload.actual_size_mib).to eq(100)
       expect(BillingRecord.where(resource_id: metal.id).count).to eq(1)
@@ -201,14 +201,14 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
     it "destroys the source VM when destroy_source_after is set" do
       refresh_frame(prog, new_values: {"destroy_source_after" => true})
       expect(prog.sshable).to receive(:_cmd).with("sudo rm -f #{stats_path}")
-      expect { prog.finish_archive }.to hop("wait")
+      expect { prog.finish_archive }.to hop("wait", nap: 365 * 24 * 60 * 60)
         .and change { source_vm.destroy_set?(cached: false) }.from(false).to(true)
     end
 
     it "skips latest update when set_as_latest is false" do
       refresh_frame(prog, new_values: {"set_as_latest" => false})
       expect(prog.sshable).to receive(:_cmd).with("sudo rm -f #{stats_path}")
-      expect { prog.finish_archive }.to hop("wait")
+      expect { prog.finish_archive }.to hop("wait", nap: 365 * 24 * 60 * 60)
       expect(machine_image.reload.latest_version_id).to be_nil
     end
   end
