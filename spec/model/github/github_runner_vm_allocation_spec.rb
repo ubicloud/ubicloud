@@ -146,6 +146,7 @@ RSpec.describe GithubRunnerVmAllocation do
       draining = hold(draining_vm)
       recent_vm = create_vm(name: "recent", project_id: project.id, vm_host_id: vm_host.id, local_vetho_ip: "169.254.0.6/32")
       recent = hold(recent_vm)
+      expect(Clog).to receive(:emit).with("vm allocations released without reuse", {vm_allocations_released: {count: 2}}).and_call_original
 
       described_class.release_expired
 
@@ -165,6 +166,15 @@ RSpec.describe GithubRunnerVmAllocation do
 
       expect(recent).to exist
       expect(expired).not_to exist
+    end
+
+    it "does not emit a log message when there are no held resources to release" do
+      recent = hold
+      expect(Clog).not_to receive(:emit)
+
+      described_class.release_expired
+
+      expect(recent).to exist
     end
   end
 

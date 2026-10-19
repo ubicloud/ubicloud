@@ -41,12 +41,16 @@ class GithubRunnerVmAllocation < Sequel::Model
   end
 
   def self.release_expired
-    where { created_at < Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 second", :interval) * Config.github_runner_vm_allocation_retention_seconds }
+    allocations = where { created_at < Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 second", :interval) * Config.github_runner_vm_allocation_retention_seconds }
       .or(vm_host_id: VmHost.exclude(allocation_state: "accepting").select(:id))
       .for_update
       .skip_locked
       .all
-      .each(&:release)
+
+    unless allocations.empty?
+      allocations.each(&:release)
+      Clog.emit("vm allocations released without reuse", {vm_allocations_released: {count: allocations.size}})
+    end
   end
 
   def reuse_for(new_vm, storage_volumes)
