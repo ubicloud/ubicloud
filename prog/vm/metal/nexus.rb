@@ -121,7 +121,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     rescue Scheduling::Allocator::NoSpaceLeft
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
 
-      Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}})
+      Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
 
       waiting_seconds = Time.now - vm.created_at
       page_after_minutes = if vm.location_id == Location::GITHUB_RUNNERS_ID
