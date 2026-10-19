@@ -327,7 +327,7 @@ SQL
           set(**hp.strand_update_args, try: 0)
           raise validation_failed_error unless valid?
 
-          values[:schedule] = Sequel::CURRENT_TIMESTAMP
+          values[:schedule] = hp.schedule
           modified!(:schedule)
           save_changes(validate: false)
         when Prog::Base::Exit

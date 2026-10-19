@@ -213,6 +213,14 @@ RSpec.describe Prog::Base do
     expect(post - ante).to be > 121
   end
 
+  it "can hop with a nap" do
+    st = Strand.create(prog: "Test", label: "nap_hopper")
+    st.run(10)
+    expect(st.label).to eq "hop_exit"
+    expect(st.exitval).to be_nil
+    expect(st.this.get(:schedule)).to be_within(5).of(Time.now + 123)
+  end
+
   it "can push new subject_id" do
     st = Strand.create(prog: "Test", label: "push_subject_id")
     st.run
@@ -355,9 +363,14 @@ RSpec.describe Prog::Base do
   context "when rendering FlowControl strings" do
     it "can render hop" do
       expect(
-        described_class::Hop.new("OldProg", "old_label",
+        described_class::Hop.new("OldProg", "old_label", nil,
           Strand.new(prog: "NewProg", label: "new_label")).to_s,
       ).to eq("hop OldProg#old_label -> NewProg#new_label")
+
+      expect(
+        described_class::Hop.new("OldProg", "old_label", 10,
+          Strand.new(prog: "NewProg", label: "new_label")).to_s,
+      ).to eq("hop OldProg#old_label -> NewProg#new_label (nap 10)")
     end
 
     it "can render nap" do
