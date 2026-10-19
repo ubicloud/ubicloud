@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
+require_relative "../../common/lib/util"
 require "base64"
 require "openssl"
 require "perfect_toml"
 require "yaml"
-require_relative "../../common/lib/util"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
 require_relative "vhost_block_backend"
