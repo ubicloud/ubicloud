@@ -72,6 +72,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
+    it "sets an init script to distrust revoked CA certificates" do
+      vm = nx.pick_vm
+      expect(vm.init_script.init_script).to eq <<~'INIT_SCRIPT'
+        sed -i \
+          -e 's|^mozilla/emSign_ECC_Root_CA_-_G3.crt|!&|' \
+          -e 's|^mozilla/Comodo_AAA_Services_root.crt|!&|' \
+          /etc/ca-certificates.conf && update-ca-certificates
+      INIT_SCRIPT
+    end
+
     it "uses ch_version 53.0 if randomly selected" do
       expect(Config).to receive(:github_actions_ch_53_percent).and_return(100)
       vm = nx.pick_vm

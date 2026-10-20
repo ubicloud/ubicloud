@@ -113,6 +113,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ipv4_range_size: 28,
     ).subject
 
+    init_script = <<~'INIT_SCRIPT'
+      sed -i \
+        -e 's|^mozilla/emSign_ECC_Root_CA_-_G3.crt|!&|' \
+        -e 's|^mozilla/Comodo_AAA_Services_root.crt|!&|' \
+        /etc/ca-certificates.conf && update-ca-certificates
+    INIT_SCRIPT
+
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
       unix_user: "runneradmin",
@@ -131,6 +138,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       waiting_strand_id: strand.id,
       allocated_waiting_strand_id: strand.id,
       ch_version:,
+      init_script:,
     )
 
     vm_st.subject
