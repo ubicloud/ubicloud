@@ -32,7 +32,9 @@ class OptionTreeFilter
         families.each do |family_name, family_data|
           next if options[:family] && options[:family] != family_name
 
-          sizes = family_data["sizes"]
+          # A provider may list each size once under instance_types and name
+          # it in each location, or give a location its sizes in full.
+          sizes = family_data.is_a?(Array) ? family_data.map { {"name" => it}.merge(provider_data.fetch("instance_types").fetch(it)) } : family_data["sizes"]
           next unless sizes
           sizes.each do |size_data|
             size_name = size_data["name"]
