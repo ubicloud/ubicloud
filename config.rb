@@ -264,6 +264,9 @@ module Config
   override :allocator_protected_large_storage_location_ids, "caa7a807-36c5-8420-a75c-f906839dad71", array(uuid)
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
   override :github_actions_ch_53_percent, 0.0, float
+  override :github_runner_vm_allocation_ratio, 0.01, float
+  override :github_runner_vm_allocation_generation_max, 100, int
+  override :github_runner_vm_allocation_retention_seconds, 60, int
 
   # e2e
   override :e2e_hetzner_server_id, nil, string

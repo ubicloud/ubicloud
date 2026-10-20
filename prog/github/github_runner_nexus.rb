@@ -888,8 +888,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm_destroy
-    register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
-    nap 10 unless vm.nil?
+    if vm
+      register_deadline(nil, 15 * 60, allow_extension: true) if vm.prevent_destroy_set?
+      # The VM row outlives its strand when its resources are held for reuse.
+      nap 10 if vm.strand
+    end
 
     github_runner.destroy
     pop "github runner deleted"

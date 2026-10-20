@@ -13,7 +13,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
     :force_host_id, :storage_volumes, :ch_version
-  frame_accessor :reason_determined
+  frame_accessor :reason_determined, :allocation_generation
 
   def vm_name
     @vm_name ||= vm.inhost_name
@@ -100,20 +100,22 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
       os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
-      Scheduling::Allocator.allocate(
-        vm, storage_volumes,
-        distinct_storage_devices:,
-        allocation_state_filter:,
-        location_filter:,
-        location_preference:,
-        host_filter:,
-        host_exclusion_filter:,
-        data_center_exclusion_filter:,
-        gpu_count:,
-        gpu_device:,
-        os_filter:,
-        family_filter:,
-      )
+      unless prefs&.empty? && host_exclusion_filter.empty? && (self.allocation_generation = GithubRunnerVmAllocation.claim(vm, storage_volumes))
+        Scheduling::Allocator.allocate(
+          vm, storage_volumes,
+          distinct_storage_devices:,
+          allocation_state_filter:,
+          location_filter:,
+          location_preference:,
+          host_filter:,
+          host_exclusion_filter:,
+          data_center_exclusion_filter:,
+          gpu_count:,
+          gpu_device:,
+          os_filter:,
+          family_filter:,
+        )
+      end
     rescue Scheduling::Allocator::HostsBusy
       Clog.emit("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
 
@@ -616,6 +618,33 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, log: :on_error)
     end
 
+    if (label = held_allocation_label) && (allocation_generation.nil? || allocation_generation < Config.github_runner_vm_allocation_generation_max)
+      detach_nics
+      # Keep the held VM from counting towards its pool's size.
+      vm.update(pool_id: nil)
+      GithubRunnerVmAllocation.create(vm_id: vm.id, label:, location_id: vm.location_id, vm_host_id: host.id, generation: (allocation_generation || 0) + 1)
+      pop "vm held for reuse"
+    end
+
+    release_host_resources
+
+    hop_remove_vm_from_load_balancer if vm.load_balancer
+
+    hop_destroy_slice
+  end
+
+  label def release_held_allocation
+    release_host_resources
+    hop_destroy_slice
+  end
+
+  def held_allocation_label
+    return unless host&.allocation_state == "accepting" && vm.vm_host_slice_id && vm.assigned_vm_address && !vm.load_balancer
+
+    GithubRunnerVmAllocation.label_for(vm, vm.vm_storage_volumes.map(&:size_gib))
+  end
+
+  def release_host_resources
     vm.vm_storage_volumes.each do |vol|
       vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
     end
@@ -639,10 +668,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     vm.pci_devices_dataset.update(vm_id: nil)
     vm.gpu_partition_dataset.update(vm_id: nil)
-
-    hop_remove_vm_from_load_balancer if vm.load_balancer
-
-    hop_destroy_slice
   end
 
   label def remove_vm_from_load_balancer
@@ -686,11 +711,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def final_clean_up
-    vm.nics.map do |nic|
-      nic.update(vm_id: nil)
-      nic.incr_destroy
-    end
+    detach_nics
     vm.destroy
+  end
+
+  def detach_nics
+    Nic.incr_destroy(vm.nics_dataset.select(:id))
+    vm.nics_dataset.update(vm_id: nil)
   end
 
   label def start_after_host_reboot
