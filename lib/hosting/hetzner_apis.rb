@@ -156,6 +156,36 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     create_connection.post(path: "/server/#{server_id}", body: URI.encode_www_form(server_name:), expects: 200)
   end
 
+  def pull_ipv4_subnets
+    response = create_connection.get(path: "/subnet", query: {server_ip: @provider.vm_host.sshable.host}, expects: [200, 404])
+    return [] if response.status == 404
+
+    JSON.parse(response.body).filter_map do
+      subnet = it["subnet"]
+      "#{subnet["ip"]}/#{subnet["mask"]}" unless subnet["ip"].include?(":")
+    end
+  end
+
+  def pull_open_ipv4_subnet_orders
+    response = create_connection.get(path: "/order/server_addon/transaction", expects: [200, 404])
+    return [] if response.status == 404
+
+    JSON.parse(response.body).filter_map do
+      transaction = it["transaction"]
+      server_order = transaction["server_number"].to_s == server_id
+      subnet_order = transaction["product"]["id"].start_with?("subnet_ipv4_")
+      transaction["id"] if server_order && subnet_order && transaction["status"] != "cancelled"
+    end
+  end
+
+  def order_ipv4_subnet(prefix)
+    reason = "We provision virtual machines on this server. We assign IPv4 addresses to them from the additional subnet."
+    response = create_connection.post(path: "/order/server_addon/transaction",
+      body: URI.encode_www_form(server_number: server_id, product_id: "subnet_ipv4_#{prefix}", reason:),
+      expects: 201)
+    JSON.parse(response.body).dig("transaction", "id")
+  end
+
   def create_connection
     Excon.new(Config.hetzner_connection_string, user: Config.hetzner_user, password: Config.hetzner_password, headers: {"Content-Type" => "application/x-www-form-urlencoded"})
   end
