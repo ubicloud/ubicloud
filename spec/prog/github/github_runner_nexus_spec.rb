@@ -235,20 +235,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.id).to eq(vm.id)
     end
 
-    it "creates a private subnet for each alien vm unless the project shares a VPC between them" do
-      runner.incr_spill_over
-      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
-
-      ps = nx.pick_vm.private_subnets.first
-      expect(installation.private_subnets_dataset.all).to eq []
-      expect(ps.net4.netmask.prefix_len).to eq(28)
-    end
-
     it "creates a private subnet for the alien vms of the installation" do
-      project.set_ff_aws_alien_runners_shared_vpc(true)
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
@@ -269,7 +256,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "places alien vms in the private subnet of the installation in the location" do
-      project.set_ff_aws_alien_runners_shared_vpc(true)
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
@@ -288,7 +274,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "places alien vms in the private subnet another runner of the installation created while waiting for the lock" do
-      project.set_ff_aws_alien_runners_shared_vpc(true)
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
@@ -314,7 +299,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       before do
-        project.set_ff_aws_alien_runners_shared_vpc(true)
         runner.incr_spill_over
         installation.add_private_subnet(installation_ps)
         expect(Config).to receive(:github_runner_aws_location_id).and_return(installation_ps.location_id)
