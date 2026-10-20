@@ -61,6 +61,7 @@ class Prog::Vm::Scheduler < Prog::Base
     batch_size = Config.central_vm_scheduler_batch_size
     more_waiting = false
     tried = 0
+    runner_checks = 0
 
     (holders + take_turns(queue)).each do |vm|
       if allocated_ids.size + planned.size >= batch_size
@@ -77,6 +78,7 @@ class Prog::Vm::Scheduler < Prog::Base
       timer.lap(:lock)
       if st
         tried += 1
+        runner_checks += 1 if vm[:installation_id]
         result = bulk_commit ? try_plan(st, candidates) : try_allocate(st, candidates)
         timer.lap(:plan)
         case result
@@ -105,6 +107,7 @@ class Prog::Vm::Scheduler < Prog::Base
     release_unfitting(reservations, no_capacity)
     reserve(no_capacity.except(*spilled_ids), reservations, candidates)
     self.reservations = reservations
+    SchedulerMetrics.increment("scheduling_checks_total", runner_checks) if runner_checks > 0
     timer.lap(:finish)
 
     Clog.emit("central vm scheduler round", {central_vm_scheduler_round: {
@@ -116,9 +119,7 @@ class Prog::Vm::Scheduler < Prog::Base
 
   # Returns :allocated, the request of a VM that does not fit, or :failed.
   def try_allocate(st, candidates)
-    nx = st.load
-    SchedulerMetrics.increment("scheduling_checks_total") if nx.runner
-    commit_one(nx, candidates)
+    commit_one(st.load, candidates)
   end
 
   def commit_one(nx, candidates)
@@ -139,7 +140,6 @@ class Prog::Vm::Scheduler < Prog::Base
   def try_plan(st, candidates)
     nx = st.load
     request = nx.allocation_request
-    SchedulerMetrics.increment("scheduling_checks_total") if nx.runner
     candidates.plan(nx.vm, request) ? :planned : :unplannable
   rescue Scheduling::Allocator::NoSpaceLeft
     request
@@ -157,18 +157,15 @@ class Prog::Vm::Scheduler < Prog::Base
     one_by_one = unplannable
     begin
       DB.transaction(savepoint: true) { bulk_commit.write }
-      timer.lap(:bulk_write)
-      allocated_ids = planned.map do |st|
-        runner = st.load.runner
-        SchedulerMetrics.record_allocation(runner) if runner
-        st.id
-      end
-      timer.lap(:record_metrics)
+      allocated_ids = planned.map(&:id)
     rescue Sequel::Error, RuntimeError => ex
       Clog.emit("central vm scheduler bulk commit failed", Util.exception_to_hash(ex, into: {central_vm_scheduler_bulk_failure: {vms: planned.size}}))
       allocated_ids = []
       one_by_one = planned + unplannable
     end
+    timer.lap(:bulk_write)
+    SchedulerMetrics.record_allocations(GithubRunner.where(vm_id: allocated_ids).all)
+    timer.lap(:record_metrics)
 
     candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
     allocated_ids += one_by_one.select { commit_one(it.load, candidates) == :allocated }.map(&:id)

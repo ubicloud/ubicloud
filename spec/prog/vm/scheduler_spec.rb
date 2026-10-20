@@ -255,6 +255,16 @@ RSpec.describe Prog::Vm::Scheduler do
         expect(counter_increments { expect { nx.wait }.to nap(5) }).to eq("scheduling_checks_total" => 1, "allocated_total" => 1)
       end
 
+      it "counts an order inversion when an older runner of the same size still waits" do
+        create_slice_host
+        vm = create_waiting_vm
+        vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+        create_runner(vm)
+        create_runner(nil).update(created_at: Time.now - 60)
+
+        expect(counter_increments { expect { nx.wait }.to nap(5) }).to eq("scheduling_checks_total" => 1, "allocated_total" => 1, "order_inversions_total" => 1)
+      end
+
       it "marks the vms without capacity" do
         vm = create_waiting_vm
 

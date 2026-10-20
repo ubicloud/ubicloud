@@ -32,10 +32,10 @@ module SchedulerMetrics
   # lazily, so each forked process gets its own connection.
   COUNTER_DB = Sequel.connect(Config.clover_database_url, max_connections: 1, test: false)
 
-  def self.increment(name)
+  def self.increment(name, by = 1)
     COUNTER_DB[:scheduler_metric_counter]
-      .insert_conflict(target: :name, update: {value: Sequel[:scheduler_metric_counter][:value] + 1})
-      .insert(name:, value: 1)
+      .insert_conflict(target: :name, update: {value: Sequel[:scheduler_metric_counter][:value] + by})
+      .insert(name:, value: by)
   end
 
   # Called once a runner's VM has its host capacity reserved.
@@ -49,6 +49,27 @@ module SchedulerMetrics
       .where { Sequel[:github_runner][:created_at] < runner.created_at }
       .exclude(Sequel[:github_runner][:id] => runner.id)
     increment("order_inversions_total") unless older_waiting.empty?
+  end
+
+  # As record_allocation, for the runners that got their hosts together,
+  # with a query for the oldest waiting runner of each label instead of
+  # one per runner. None of these runners counts as waiting for another.
+  def self.record_allocations(runners)
+    return if runners.empty?
+
+    increment("allocated_total", runners.size)
+    oldest_waiting = waiting_runners_dataset
+      .exclude(Sequel[:github_runner][:id] => runners.map(&:id))
+      .group(Sequel[:github_runner][:label])
+      .select_hash(Sequel[:github_runner][:label], Sequel.function(:min, Sequel[:github_runner][:created_at]).as(:oldest_created_at))
+    inversions = runners.count do |runner|
+      label_data = Github.runner_labels.fetch(runner.label)
+      oldest_waiting.any? do |label, created_at|
+        waiting_data = Github.runner_labels.fetch(label)
+        waiting_data["arch"] == label_data["arch"] && waiting_data["vcpus"] <= label_data["vcpus"] && created_at < runner.created_at
+      end
+    end
+    increment("order_inversions_total", inversions) if inversions > 0
   end
 
   def self.live_runners_dataset
