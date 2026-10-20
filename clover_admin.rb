@@ -2007,6 +2007,9 @@ class CloverAdmin < Roda
         location_id = typecast_params.ubid_uuid!("location_id")
         default_boot_images = typecast_params.array(:nonempty_str, "default_boot_images") || []
         install_os = typecast_params.bool("install_os") || false
+        ipv4_subnet_prefix = if typecast_params.bool("order_ipv4_subnet") && provider_name == HostProvider::HETZNER_PROVIDER_NAME
+          {"standard" => 27, "premium" => 28}.freeze.fetch(family)
+        end
 
         hosts = hosts_input.lines.map(&:strip).reject(&:empty?).map do |line|
           unless /\A(?<server_identifier>[^,\s]+)\s*,\s*(?<host>[^,\s]+)\z/ =~ line
@@ -2035,7 +2038,7 @@ class CloverAdmin < Roda
             hosts.map do |server_identifier, host, id|
               st = Prog::Vm::HostNexus.assemble(host, location_id:, family:, provider_name:,
                 server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:,
-                id:, set_server_name: false)
+                ipv4_subnet_prefix:, id:, set_server_name: false)
               "#{st.ubid} (#{provider_name} #{server_identifier})"
             end
           end
