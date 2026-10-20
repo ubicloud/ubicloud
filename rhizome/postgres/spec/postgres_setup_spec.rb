@@ -26,11 +26,20 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_memory_overcommit(strict: true, hugepage_percent: 50)
     end
 
-    it "caps the reserve at 8 GiB on large VMs" do
-      # 256 GB = 268435456 KB -> non_hugepage = 201326592 KB; cap branch wins:
-      # 201326592 - 8 * 1048576 = 192937984 (vs 0.8 branch: 163158426)
+    it "reserves 4 GiB + 2% of memory on large VMs" do
+      # 256 GB = 268435456 KB -> non_hugepage = 201326592 KB
+      # 201326592 - (4 * 1048576 + 268435456 * 0.02) = 191763579 (vs 0.8 factor: 163158426)
       allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        268435456 kB\n")
-      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=192937984\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=191763579\n")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
+      pg_setup.configure_memory_overcommit(strict: true)
+    end
+
+    it "uses the 4 GiB + 2% margin starting at 60 GiB" do
+      # 60 GB = 62914560 KB -> non_hugepage = 47185920 KB
+      # 47185920 - (4 * 1048576 + 62914560 * 0.02) = 41733325 (vs 0.8 factor: 39845888)
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        62914560 kB\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=41733325\n")
       expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
       pg_setup.configure_memory_overcommit(strict: true)
     end
