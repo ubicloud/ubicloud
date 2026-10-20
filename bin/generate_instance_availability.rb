@@ -16,6 +16,8 @@ class InstanceAvailabilityGenerator
 
   def initialize
     @data = {"providers" => {"aws" => {"locations" => {}}}}
+    # Facts that do not vary by region, once per instance type.
+    @instance_types = {}
     @data_mutex = Mutex.new
     @log_mutex = Mutex.new
   end
@@ -50,6 +52,7 @@ class InstanceAvailabilityGenerator
 
     # Canonical region order; parallel fetch inserts out of order
     @data["providers"]["aws"]["locations"] = @data["providers"]["aws"]["locations"].sort.to_h
+    @data["providers"]["aws"]["instance_types"] = @instance_types.sort.to_h
     @data
   end
 
@@ -99,25 +102,27 @@ class InstanceAvailabilityGenerator
       # Skip if not in our interested families
       next unless INSTANCE_FAMILIES.include?(family)
 
+      # The file records a type once, so a region that reports it differently
+      # needs a per-location override before it can be written.
+      facts = instance_type_facts(instance_type)
+      @data_mutex.synchronize do
+        known = (@instance_types[type_name] ||= facts)
+        fail "#{type_name} in #{region} differs from another region: #{facts} vs #{known}" unless known == facts
+      end
       families[family] ||= []
-      families[family] << {
-        "name" => type_name,
-        "vcpus" => instance_type.v_cpu_info.default_v_cpus,
-        "memory_gib" => instance_type.memory_info.size_in_mi_b / 1024,
-        "storage_size_options" => extract_storage_options(instance_type),
-      }
+      families[family] << type_name
     end
 
     # Sort sizes within each family
-    families.each do |family, sizes|
-      sizes.sort_by! { |s| [s["vcpus"], s["memory_gib"]] }
+    families.each_value do |sizes|
+      sizes.sort_by! { @instance_types[it].values_at("vcpus", "memory_gib") }
     end
 
     # Add to data structure if we found any instances
     unless families.empty?
       @data_mutex.synchronize do
         @data["providers"]["aws"]["locations"][region] = {
-          "families" => families.sort.to_h.transform_values { |sizes| {"sizes" => sizes} },
+          "families" => families.sort.to_h,
         }
       end
     end
@@ -130,18 +135,35 @@ class InstanceAvailabilityGenerator
     instance_type.split(".").first
   end
 
-  def extract_storage_options(instance_type)
-    # Check if instance storage is supported
-    return [] unless instance_type.instance_storage_supported
-
-    # Extract storage information from instance storage
-    storage_info = instance_type.instance_storage_info
-    return [] if storage_info.nil?
-
-    # Get total storage in GB
-    total_storage = storage_info.total_size_in_gb || 0
-
-    (total_storage > 0) ? [total_storage] : []
+  # What a type offers in every region. Local storage is recorded only as
+  # identical NVMe SSDs, [count, size_gb], whose sizes add up to the total AWS
+  # reports, and storage_size_options is derived from them; EBS limits are
+  # in MB/s.
+  def instance_type_facts(instance_type)
+    facts = {
+      "vcpus" => instance_type.v_cpu_info.default_v_cpus,
+      "memory_gib" => instance_type.memory_info.size_in_mi_b / 1024,
+      "storage_size_options" => [],
+    }
+    if (storage = instance_type.instance_storage_info)
+      name = instance_type.instance_type
+      disks = storage.disks
+      fail "#{name}: local disks of several kinds" unless disks.size == 1
+      disk = disks.first
+      fail "#{name}: local disks are #{disk.type}, not NVMe SSD" unless disk.type == "ssd" && storage.nvme_support == "required"
+      fail "#{name}: #{disk.count} x #{disk.size_in_gb} GB is not the #{storage.total_size_in_gb} GB total" unless disk.count * disk.size_in_gb == storage.total_size_in_gb
+      facts["local_disks"] = [disk.count, disk.size_in_gb]
+      facts["storage_size_options"] = [disk.count * disk.size_in_gb]
+    end
+    if (ebs = instance_type.ebs_info&.ebs_optimized_info)
+      facts["ebs"] = {
+        "baseline_iops" => ebs.baseline_iops,
+        "baseline_throughput_mbps" => ebs.baseline_throughput_in_m_bps,
+        "maximum_iops" => ebs.maximum_iops,
+        "maximum_throughput_mbps" => ebs.maximum_throughput_in_m_bps,
+      }
+    end
+    facts
   end
 end
 

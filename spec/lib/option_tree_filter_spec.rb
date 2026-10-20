@@ -52,6 +52,17 @@ RSpec.describe OptionTreeFilter do
   end
 
   describe ".filter_data" do
+    it "looks up sizes a location names in the provider's instance types" do
+      data = {"providers" => {"aws" => {
+        "instance_types" => {"m8gd.large" => {"vcpus" => 2, "storage_size_options" => [118]}},
+        "locations" => {"us-east-1" => {"families" => {"m8gd" => ["m8gd.large"]}}},
+      }}}
+      result = described_class.filter_data(data)
+      expect(result.size).to eq(1)
+      expect(result.first).to include(provider: "aws", location: "us-east-1", family: "m8gd", size: "m8gd.large")
+      expect(result.first).to include("vcpus" => 2, "storage_size_options" => [118])
+    end
+
     it "returns empty when data is nil" do
       expect(described_class.filter_data(nil)).to be_empty
     end

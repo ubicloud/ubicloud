@@ -164,35 +164,16 @@ module Option
 
   GCP_FAMILY_OPTIONS = GCP_FAMILY_VM_CONFIG.keys.freeze
 
-  non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
-  AWS_STORAGE_SIZE_OPTIONS = {
-    "c6gd" => non_storage_optimized_vm_storage_size_options,
-    "c6id" => non_storage_optimized_vm_storage_size_options,
-    "c7gd" => non_storage_optimized_vm_storage_size_options,
-    "c8gd" => non_storage_optimized_vm_storage_size_options,
-    "c8id" => non_storage_optimized_vm_storage_size_options,
-    "m6a" => non_storage_optimized_vm_storage_size_options,
-    "m6id" => non_storage_optimized_vm_storage_size_options,
-    "m6gd" => non_storage_optimized_vm_storage_size_options,
-    "m7a" => non_storage_optimized_vm_storage_size_options,
-    "m7i" => non_storage_optimized_vm_storage_size_options,
-    "m8a" => non_storage_optimized_vm_storage_size_options,
-    "m7g" => non_storage_optimized_vm_storage_size_options,
-    "m7gd" => non_storage_optimized_vm_storage_size_options,
-    "m8g" => non_storage_optimized_vm_storage_size_options,
-    "m8gd" => non_storage_optimized_vm_storage_size_options,
-    "m8i" => non_storage_optimized_vm_storage_size_options,
-    "m8id" => non_storage_optimized_vm_storage_size_options,
-    "m9g" => non_storage_optimized_vm_storage_size_options,
-    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500], 192 => [45000]},
-    "i8ge" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000], 192 => [120000]},
-    "i7i" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500], 192 => [45000]},
-    "i7ie" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000], 192 => [120000]},
-    "r6gd" => non_storage_optimized_vm_storage_size_options,
-    "r6id" => non_storage_optimized_vm_storage_size_options,
-    "r7gd" => non_storage_optimized_vm_storage_size_options,
-    "r8gd" => non_storage_optimized_vm_storage_size_options,
-    "r8id" => non_storage_optimized_vm_storage_size_options,
+  # What AWS publishes per instance type: local disks as [count, size_gb]
+  # and EBS limits. bin/generate_instance_availability.rb writes it.
+  AWS_INSTANCE_TYPES = OptionTreeFilter.data.dig("providers", "aws", "instance_types").freeze
+
+  # Families without local disks get a data volume of these sizes, which
+  # match the local disks of same-sized families that have them.
+  ebs_volume_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}.freeze
+  AWS_STORAGE_SIZE_OPTIONS = AWS_FAMILY_VM_CONFIG.to_h { |family, config|
+    disks = config[:vcpus].to_h { |vcpu| [vcpu, AWS_INSTANCE_TYPES.fetch(aws_instance_type_name(family, vcpu))["local_disks"]] }
+    [family, disks.values.all? ? disks.transform_values { |count, size_gb| [count * size_gb] }.freeze : ebs_volume_size_options]
   }.freeze
 
   GCP_STORAGE_SIZE_OPTIONS = GCP_FAMILY_VM_CONFIG.transform_values { |config|
