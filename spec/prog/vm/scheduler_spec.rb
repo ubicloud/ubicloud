@@ -24,10 +24,13 @@ RSpec.describe Prog::Vm::Scheduler do
     vm
   end
 
-  def create_runner(vm)
+  def create_installation
     customer = Project.create(name: "customer")
     customer.set_ff_spill_to_alien_runners(true)
-    installation = GithubInstallation.create(installation_id: GithubInstallation.count + 1, project_id: customer.id, name: "ubicloud", type: "Organization")
+    GithubInstallation.create(installation_id: GithubInstallation.count + 1, project_id: customer.id, name: "ubicloud", type: "Organization")
+  end
+
+  def create_runner(vm, installation: create_installation)
     runner = GithubRunner.create(installation_id: installation.id, vm_id: vm&.id, location_id: vm && Location::GITHUB_RUNNERS_ID, repository_name: "test-repo", label: "ubicloud-standard-2")
     Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
     runner
@@ -168,23 +171,77 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(vm.reload.vm_host_id).to be_nil
     end
 
-    it "allocates the oldest vms first, not in id order, and continues after the last vm of a full batch" do
+    it "picks the oldest vms first, not in id order" do
       create_host
-      second, first = Array.new(2) { create_waiting_vm }.sort_by(&:id)
-      first.update(created_at: Time.now - 60)
-      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(1).exactly(6).times
+      newer, older = Array.new(2) { create_waiting_vm }.sort_by(&:id)
+      older.update(created_at: Time.now - 60)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(1)
 
       expect { nx.wait }.to nap(0)
-      expect(st.stack.first["cursor"]).to eq([first.reload.created_at.utc.iso8601(6), first.id])
-      expect(first.vm_host_id).not_to be_nil
-      expect(second.reload.vm_host_id).to be_nil
+      expect(older.reload.vm_host_id).not_to be_nil
+      expect(newer.reload.vm_host_id).to be_nil
+    end
 
-      expect { described_class.new(st).wait }.to nap(0)
-      expect(st.stack.first["cursor"]).to eq([second.reload.created_at.utc.iso8601(6), second.id])
-      expect(second.vm_host_id).not_to be_nil
+    it "takes turns between customers" do
+      create_host(total_cpus: 64, total_cores: 32, total_hugepages_1g: 200)
+      *busy, other = Array.new(4) { create_waiting_vm }
+      other.update(project_id: Project.create(name: "other").id)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(2)
 
+      expect { nx.wait }.to nap(0)
+      expect([*busy, other].select { it.reload.vm_host_id }).to eq([busy.first, other])
+    end
+
+    it "takes turns between the installations of runners" do
+      create_host(total_cpus: 64, total_cores: 32, total_hugepages_1g: 200)
+      *busy, other = Array.new(4) { create_waiting_vm }
+      installation = create_installation
+      busy.each { create_runner(it, installation:) }
+      create_runner(other)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(2)
+
+      expect { nx.wait }.to nap(0)
+      expect([*busy, other].select { it.reload.vm_host_id }).to eq([busy.first, other])
+    end
+
+    it "tries the vms that did not fail to fit before the ones that did" do
+      create_host
+      failed = create_waiting_vm
+      failed.incr_waiting_for_capacity
+      fresh = create_waiting_vm
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(1)
+
+      expect { nx.wait }.to nap(0)
+      expect(fresh.reload.vm_host_id).not_to be_nil
+      expect(failed.reload.vm_host_id).to be_nil
+      expect(st.stack.first["retry_cursor"]).to be_nil
+    end
+
+    it "takes turns between customers over the vms that failed to fit" do
+      create_host(total_cpus: 64, total_cores: 32, total_hugepages_1g: 200)
+      *busy, other = Array.new(4) { create_waiting_vm }
+      other.update(project_id: Project.create(name: "other").id)
+      [*busy, other].each(&:incr_waiting_for_capacity)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(2)
+
+      expect { nx.wait }.to nap(0)
+      expect([*busy, other].select { it.reload.vm_host_id }).to eq([busy.first, other])
+      expect(st.stack.first["retry_cursor"]).to eq([0, other.reload.created_at.utc.iso8601(6), other.id])
+    end
+
+    it "takes turns over the vms that failed to fit with the cursor" do
+      first, second = Array.new(2) { create_waiting_vm }
+      [first, second].each(&:incr_waiting_for_capacity)
+      expect(Config).to receive(:central_vm_scheduler_batch_size).and_return(1).twice
+
+      expect { nx.wait }.to nap(0)
+      expect(st.stack.first["retry_cursor"]).to eq([0, first.reload.created_at.utc.iso8601(6), first.id])
+
+      create_host
       expect { described_class.new(st).wait }.to nap(5)
-      expect(st.stack.first["cursor"]).to be_nil
+      expect(first.reload.vm_host_id).to be_nil
+      expect(second.reload.vm_host_id).not_to be_nil
+      expect(st.stack.first["retry_cursor"]).to be_nil
     end
 
     it "logs the vms it fails to allocate and allocates the rest" do
