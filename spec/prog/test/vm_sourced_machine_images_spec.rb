@@ -56,13 +56,35 @@ RSpec.describe Prog::Test::VmSourcedMachineImages do
   end
 
   describe "#wait_vm_from_machine_image_running" do
-    before { refresh_frame(prog, new_values: {"vm_id" => starting_vm.id}) }
+    let(:serial_log_cmd) { "sudo tail -c 65536 /vm/#{starting_vm.inhost_name}/serial.log" }
+
+    before do
+      starting_vm.update(vm_host_id: create_vm_host.id)
+      refresh_frame(prog, new_values: {"vm_id" => starting_vm.id})
+    end
 
     it "naps while the vm is not running" do
       expect { prog.wait_vm_from_machine_image_running }.to nap(10)
     end
 
-    it "hops to verify_markers once the vm is running" do
+    it "logs the serial log and hops to verify_markers once the vm is running" do
+      starting_vm.update(display_state: "running")
+      starting_vm.strand.update(label: "wait")
+      expect(prog.vm.vm_host.sshable).to receive(:_cmd).with(serial_log_cmd).and_return("boot ok")
+      expect(Clog).to receive(:emit).with("serial log of vm from machine image", {serial_log: {vm: starting_vm.ubid, round: 1, output: "boot ok"}}).and_call_original
+      expect { prog.wait_vm_from_machine_image_running }.to hop("verify_markers")
+    end
+
+    it "logs the fetch error and naps if the vm is not running after 10 minutes" do
+      starting_vm.update(created_at: Time.now - 11 * 60)
+      expect(prog.vm.vm_host.sshable).to receive(:_cmd).with(serial_log_cmd).and_raise(Sshable::SshError.new(serial_log_cmd, "", "", 1, nil))
+      expect(Clog).to receive(:emit).with("Failed to fetch serial log of vm from machine image", anything).and_call_original
+      expect { prog.wait_vm_from_machine_image_running }.to nap(10)
+      expect(prog.serial_log_attempted).to be(true)
+    end
+
+    it "does not log the serial log again" do
+      refresh_frame(prog, new_values: {"serial_log_attempted" => true})
       starting_vm.update(display_state: "running")
       starting_vm.strand.update(label: "wait")
       expect { prog.wait_vm_from_machine_image_running }.to hop("verify_markers")
@@ -158,6 +180,7 @@ RSpec.describe Prog::Test::VmSourcedMachineImages do
       miv = create_machine_image_version_metal(project_id: mi.project_id, machine_image_id: mi.id, version: "v1").machine_image_version
       mi.update(latest_version_id: miv.id)
       expect { prog.create_vm_from_machine_image }.to hop("wait_vm_from_machine_image_running")
+      expect(prog.serial_log_attempted).to be(false)
       expect(Vm[prog.vm_id].vm_storage_volumes_dataset.first(boot: true).machine_image_version_id).to eq(miv.id)
     end
   end

@@ -2,7 +2,7 @@
 
 class Prog::Test::VmSourcedMachineImages < Prog::Test::Base
   frame_reader :location_id, :arch, :project_id, :machine_image_id
-  frame_accessor :vm_id, :round, :machine_image_version_ids, :markers
+  frame_accessor :vm_id, :round, :machine_image_version_ids, :markers, :serial_log_attempted
 
   MARKERS_PER_ROUND = 5
   NUM_ROUNDS = 2
@@ -104,10 +104,19 @@ class Prog::Test::VmSourcedMachineImages < Prog::Test::Base
       boot_image: "#{machine_image.name}@latest",
       enable_ip4: true,
     ).id
+    self.serial_log_attempted = false
     hop_wait_vm_from_machine_image_running
   end
 
   label def wait_vm_from_machine_image_running
+    if !serial_log_attempted && (vm.display_state == "running" || Time.now - vm.created_at > 10 * 60)
+      begin
+        Clog.emit("serial log of vm from machine image", {serial_log: {vm: vm.ubid, round:, output: vm.fetch_serial_log}})
+      rescue Sshable::SshError => e
+        Clog.emit("Failed to fetch serial log of vm from machine image", {failed_serial_log: Util.exception_to_hash(e, into: {vm: vm.ubid, round:})})
+      end
+      self.serial_log_attempted = true
+    end
     nap 10 unless vm.display_state == "running"
     hop_verify_markers
   end
