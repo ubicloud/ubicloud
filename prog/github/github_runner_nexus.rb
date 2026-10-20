@@ -84,7 +84,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ch_version = "53.0"
     end
 
-    if location_id != Location::GITHUB_RUNNERS_ID && project.get_ff_aws_alien_runners_shared_vpc
+    if location_id != Location::GITHUB_RUNNERS_ID
       unless (ps = installation_private_subnet(location_id))
         # Only the first runner of the installation creates the subnet. FOR NO KEY UPDATE lets webhooks keep
         # inserting runners, and the lock lasts until the label commits, so keep network requests out of it.
