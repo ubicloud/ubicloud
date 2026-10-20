@@ -8,6 +8,33 @@ class Prog::Vm::Scheduler < Prog::Base
 
   frame_accessor :reservations
 
+  # Adds up the time of each phase of a round, for the round log.
+  class RoundTimer
+    attr_reader :seconds
+
+    def initialize
+      @seconds = Hash.new(0.0)
+      @last = now
+    end
+
+    # Adds the time since the last lap to the phase.
+    def lap(phase)
+      time = now
+      @seconds[phase] += time - @last
+      @last = time
+    end
+
+    def milliseconds
+      seconds.transform_values { (it * 1000).round }
+    end
+
+    private
+
+    def now
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    end
+  end
+
   # A round places VMs oldest first, taking turns between customers, after
   # the reservation holders. VMs of the same request class ask for the
   # same allocation, so once one of them does not fit, the round skips the
@@ -15,8 +42,10 @@ class Prog::Vm::Scheduler < Prog::Base
   # cannot block smaller VMs that fit in the gaps. A round ends after it
   # placed central_vm_scheduler_batch_size VMs, or when no class fits.
   label def wait
+    timer = RoundTimer.new
     reservations = live_reservations
     holders, queue = waiting_queue.partition { reservations.value?(it[:id]) }
+    timer.lap(:queue)
     bulk_commit = Scheduling::BulkCommit.new if Config.central_vm_scheduler_bulk_commit
     candidates = if bulk_commit
       Scheduling::Allocator::DeferredCandidateCache.new(bulk_commit:, reservations:, free_provisionings:)
@@ -31,6 +60,7 @@ class Prog::Vm::Scheduler < Prog::Base
     unplaced_ids = []
     batch_size = Config.central_vm_scheduler_batch_size
     more_waiting = false
+    tried = 0
 
     (holders + take_turns(queue)).each do |vm|
       if allocated_ids.size + planned.size >= batch_size
@@ -40,8 +70,16 @@ class Prog::Vm::Scheduler < Prog::Base
 
       if full_classes.include?(vm[:class])
         unplaced_ids << vm[:id]
-      elsif (st = lock_strands([vm[:id]]).first)
-        case (result = bulk_commit ? try_plan(st, candidates) : try_allocate(st, candidates))
+        next
+      end
+
+      st = lock_strands([vm[:id]]).first
+      timer.lap(:lock)
+      if st
+        tried += 1
+        result = bulk_commit ? try_plan(st, candidates) : try_allocate(st, candidates)
+        timer.lap(:plan)
+        case result
         when :allocated
           allocated_ids << st.id
         when :planned
@@ -57,7 +95,7 @@ class Prog::Vm::Scheduler < Prog::Base
     end
 
     if bulk_commit
-      allocated_ids.concat(commit_planned(bulk_commit, planned, unplannable, reservations))
+      allocated_ids.concat(commit_planned(bulk_commit, planned, unplannable, reservations, timer))
     end
 
     Strand.where(id: allocated_ids).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
@@ -67,7 +105,12 @@ class Prog::Vm::Scheduler < Prog::Base
     release_unfitting(reservations, no_capacity)
     reserve(no_capacity.except(*spilled_ids), reservations, candidates)
     self.reservations = reservations
+    timer.lap(:finish)
 
+    Clog.emit("central vm scheduler round", {central_vm_scheduler_round: {
+      waiting: holders.size + queue.size, tried:, allocated: allocated_ids.size, unplaced: unplaced_ids.size,
+      milliseconds: timer.milliseconds,
+    }})
     nap(more_waiting ? 0 : 5)
   end
 
@@ -110,15 +153,17 @@ class Prog::Vm::Scheduler < Prog::Base
   # bulk write fails, e.g., as another process took planned capacity, its
   # savepoint undoes it and the planned VMs are committed one by one too.
   # Returns the ids of the VMs that got a host.
-  def commit_planned(bulk_commit, planned, unplannable, reservations)
+  def commit_planned(bulk_commit, planned, unplannable, reservations, timer)
     one_by_one = unplannable
     begin
       DB.transaction(savepoint: true) { bulk_commit.write }
+      timer.lap(:bulk_write)
       allocated_ids = planned.map do |st|
         runner = st.load.runner
         SchedulerMetrics.record_allocation(runner) if runner
         st.id
       end
+      timer.lap(:record_metrics)
     rescue Sequel::Error, RuntimeError => ex
       Clog.emit("central vm scheduler bulk commit failed", Util.exception_to_hash(ex, into: {central_vm_scheduler_bulk_failure: {vms: planned.size}}))
       allocated_ids = []
@@ -126,7 +171,9 @@ class Prog::Vm::Scheduler < Prog::Base
     end
 
     candidates = Scheduling::Allocator::CandidateCache.new(reservations:, free_provisionings:)
-    allocated_ids + one_by_one.select { commit_one(it.load, candidates) == :allocated }.map(&:id)
+    allocated_ids += one_by_one.select { commit_one(it.load, candidates) == :allocated }.map(&:id)
+    timer.lap(:one_by_one)
+    allocated_ids
   end
 
   # An operator can override the configured value live in the frame.
