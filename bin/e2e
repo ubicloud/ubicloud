@@ -206,6 +206,13 @@ def test_gcp(options, test_cases)
       st
     end
   end
+  if options[:test_cases].include?("postgres_n2d")
+    tests_to_wait << DB.transaction do
+      st = Prog::Test::PostgresResource.assemble(provider: "gcp", family: "n2d-highmem", gcp_location_name: "gcp-us-east4")
+      Project[st.stack.first["postgres_test_project_id"]].set_ff_enable_n2d_highmem(true)
+      st
+    end
+  end
   if options[:test_cases].include?("postgres_ubuntu_2604")
     tests_to_wait << Prog::Test::PostgresImageFamily.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
   end
