@@ -1245,9 +1245,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { standby_nx.wait_synchronization }.to nap(30)
     end
 
-    it "hops to wait_catch_up if replication is async" do
+    it "hops to wait_catch_up if replication is async and the standby is not ready" do
+      standby_nx.postgres_server.update(synchronization_status: "catching_up")
       expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("async")
       expect { standby_nx.wait_synchronization }.to hop("wait_catch_up")
+    end
+
+    it "naps briefly if replication is async but the standby is already ready" do
+      standby_nx.postgres_server.update(synchronization_status: "ready")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("async")
+      expect { standby_nx.wait_synchronization }.to nap(5)
+    end
+
+    it "naps without hopping back while a ready standby is only a potential sync candidate" do
+      standby_nx.postgres_server.update(synchronization_status: "ready")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("potential")
+      expect { standby_nx.wait_synchronization }.to nap(30)
     end
 
     it "naps if sync replication is not established" do

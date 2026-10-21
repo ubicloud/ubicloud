@@ -578,7 +578,16 @@ SQL
     query = DB["SELECT sync_state FROM pg_stat_replication WHERE application_name = :ubid", ubid: postgres_server.ubid]
     sync_state = resource.representative_server.run_query(query).chomp
     hop_wait if ["quorum", "sync"].include?(sync_state)
-    hop_wait_catch_up if sync_state == "async"
+
+    if sync_state == "async"
+      if postgres_server.synchronization_status != "ready"
+        # wait for the standby to catch up and mark ready
+        hop_wait_catch_up
+      else
+        # wait for the primary to reconfigure the standby to sync or quorum.
+        nap 5
+      end
+    end
 
     nap 30
   end
