@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/sequel.git
-  revision: 9d5b67466bb3a172176925eb8a18c82a193af643
-  ref: 9d5b67466bb3a172176925eb8a18c82a193af643
+  revision: eeb97e334f1a13d7301d065f226b725c68928d6b
+  ref: eeb97e334f1a13d7301d065f226b725c68928d6b
   specs:
     sequel (5.109.0)
       bigdecimal
