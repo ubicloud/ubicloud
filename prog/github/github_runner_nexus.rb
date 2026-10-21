@@ -394,7 +394,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   # Large runners may not fit on a fragmented metal fleet even at low
   # utilization, so spill them over to AWS once, after a short wait.
   def spill_unallocated_vm?
-    [16, 30].include?(label_data["vcpus"]) &&
+    [8, 16, 30].include?(label_data["vcpus"]) &&
       vm.location_id == Location::GITHUB_RUNNERS_ID &&
       !vm.allocated_at &&
       vm.waiting_for_capacity_set? &&
