@@ -847,7 +847,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "does not spill over smaller runners" do
-        runner.update(label: "ubicloud-standard-8")
+        runner.update(label: "ubicloud-standard-2")
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
       end
