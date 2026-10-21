@@ -46,8 +46,8 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/nvme0n3   /var/storage/devices/stor2  3331416064   1531276800
 EOS
 
-      allow(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n2\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id1")
-      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n3\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id2")
+      allow(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n2\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id1")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n3\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id2")
 
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["nvme0n1"])
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
@@ -171,8 +171,8 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/md2       /                         452564664320 381456842752
 EOS
 
-      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme1n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
-      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme1n1\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
       expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme-eui.random-id1", "nvme-eui.random-id2"]])
     end
 
@@ -206,8 +206,8 @@ nvme8n1p2 part
 nvme8n1 disk
 EOS
 
-      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme7n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
-      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme8n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme7n1\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme8n1\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
       expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme-eui.random-id1", "nvme-eui.random-id2"]])
     end
 
