@@ -93,11 +93,12 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   SQL
 
   # One row per table: its objects, and a query that counts its rows with a
-  # character outside ASCII (0x01-0x7F) in any column they read. The regex
-  # compares code points only, so glibc cannot change its answer. The query
-  # prints a marker, so its counts can be found in the journal. A materialized
-  # view gets "refresh", and an object with no columns found gets
-  # "unresolved", so it is not passed as safe.
+  # character outside ASCII (0x01-0x7F) in any column they read, and its size
+  # with its partitions (pg_partition_tree has no rows for a table that is not
+  # partitioned). The regex compares code points only, so glibc cannot change
+  # its answer. The query prints a marker, so its counts can be found in the
+  # journal. A materialized view gets "refresh", and an object with no columns
+  # found gets "unresolved", so it is not passed as safe.
   TARGETS_SQL = <<~SQL.freeze
     WITH audit AS (#{AUDIT_OBJECTS_SQL.chomp}),
     cols(kind, object, relid, attnum) AS (
@@ -105,13 +106,14 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
     )
     SELECT 'scan' AS action, c.relid::regclass::text AS relation,
       jsonb_agg(DISTINCT jsonb_build_object('kind', c.kind, 'object', c.object))::text AS objects,
+      coalesce((SELECT sum(pg_table_size(relid))::bigint FROM pg_partition_tree(c.relid)), pg_table_size(c.relid)) AS size_bytes,
       format('SELECT %L AS marker, count(*) FILTER (WHERE %s) AS nonascii, count(*) AS total FROM %s', 'ctype_scan_counts',
         string_agg(DISTINCT format('%I::text ~ ''[^\\x01-\\x7f]''', att.attname), ' OR '), c.relid::regclass) AS query
     FROM cols c JOIN pg_attribute att ON att.attrelid = c.relid AND att.attnum = c.attnum
     GROUP BY c.relid
     UNION ALL
     SELECT CASE WHEN kind = 'materialized_view' THEN 'refresh' ELSE 'unresolved' END, object,
-      jsonb_build_array(jsonb_build_object('kind', kind, 'object', object))::text, NULL
+      jsonb_build_array(jsonb_build_object('kind', kind, 'object', object))::text, NULL, NULL
     FROM audit a
     WHERE kind = 'materialized_view' OR NOT EXISTS (SELECT 1 FROM cols c WHERE c.kind = a.kind AND c.object = a.object)
     ORDER BY 1, 2;
@@ -125,12 +127,16 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   # as failed.
   LOG_READ_LIMIT = 12
 
-  EMPTY_RESULT = {"safe" => 0, "rebuild" => [], "failed" => [], "refresh" => [], "unresolved" => []}.freeze
+  EMPTY_RESULT = {"safe" => 0, "rebuild" => [], "large" => [], "failed" => [], "refresh" => [], "unresolved" => []}.freeze
 
+  frame_reader :max_table_gib
   frame_accessor :databases, :targets, :step, :results, :log_reads
 
-  def self.assemble(postgres_resource_id)
-    Strand.create(prog: "Postgres::ScanResourceCtype", label: "start", stack: [{"subject_id" => postgres_resource_id}])
+  # A table larger than max_table_gib is not scanned, but listed as "large"
+  # for a scan on a fork. nil scans every table, as on a fork.
+  def self.assemble(postgres_resource_id, max_table_gib: 10)
+    Strand.create(prog: "Postgres::ScanResourceCtype", label: "start",
+      stack: [{"subject_id" => postgres_resource_id, "max_table_gib" => max_table_gib}])
   end
 
   def before_run
@@ -154,14 +160,16 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   end
 
   # Lists the tables to scan in the next database, and records the objects
-  # that need no scan.
+  # that need no scan and the tables too large to scan here.
   label def list_targets
     database = databases[results.size]
-    rows = CSV.parse(server.run_query(TARGETS_SQL, dbname: PostgresServer.conninfo(database))).map do |action, relation, objects, query|
-      {"action" => action, "relation" => relation, "objects" => JSON.parse(objects).map { "#{it["kind"]}: #{it["object"]}" }, "query" => query}
+    rows = CSV.parse(server.run_query(TARGETS_SQL, dbname: PostgresServer.conninfo(database))).map do |action, relation, objects, size_bytes, query|
+      {"action" => action, "relation" => relation, "objects" => JSON.parse(objects).map { "#{it["kind"]}: #{it["object"]}" }, "size_bytes" => size_bytes&.to_i, "query" => query}
     end
     scans, others = rows.partition { it["query"] }
-    start_database(database, scans, others.group_by { it["action"] }.transform_values { it.flat_map { it["objects"] } })
+    large, scans = scans.partition { max_table_gib && it["size_bytes"] > max_table_gib * 2**30 }
+    outcome = others.group_by { it["action"] }.transform_values { it.flat_map { it["objects"] } }
+    start_database(database, scans, outcome.merge("large" => large.map { it.slice("relation", "objects", "size_bytes") }))
   rescue Sshable::SshError => e
     start_database(database, [], {"failed" => [{"error" => e.stderr.lines.first.to_s.strip}]})
   end
@@ -186,7 +194,7 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
       log = server.vm.sshable.d_logs(unit, lines: 20)
       if (counts = log.scan(COUNTS_LINE).last)
         nonascii, total = counts.map(&:to_i)
-        record(nonascii.zero? ? {"safe" => 1} : {"rebuild" => [target.slice("relation", "objects").merge("nonascii" => nonascii, "total" => total)]})
+        record(nonascii.zero? ? {"safe" => 1} : {"rebuild" => [target.slice("relation", "objects", "size_bytes").merge("nonascii" => nonascii, "total" => total)]})
       elsif (self.log_reads = log_reads.to_i + 1) >= LOG_READ_LIMIT
         record("failed" => [target.slice("relation", "objects").merge("error" => ["no counts in the log"] + log.lines.map(&:chomp))])
       end
@@ -199,19 +207,21 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   end
 
   label def report
-    rebuild, failed, refresh, unresolved = %w[rebuild failed refresh unresolved].map do |key|
+    rebuild, large, failed, refresh, unresolved = %w[rebuild large failed refresh unresolved].map do |key|
       results.select { |_, result| result[key].any? }.keys
     end
     msg = if failed.any? || unresolved.any?
       "review"
+    elsif large.any?
+      "fork_scan"
     elsif rebuild.any?
       "rebuild"
     else
       "clean"
     end
 
-    result = {"msg" => msg, "rebuild_databases" => rebuild, "failed_databases" => failed, "refresh_databases" => refresh,
-              "unresolved_databases" => unresolved, "databases" => results}
+    result = {"msg" => msg, "rebuild_databases" => rebuild, "large_databases" => large, "failed_databases" => failed,
+              "refresh_databases" => refresh, "unresolved_databases" => unresolved, "databases" => results}
     Clog.emit("postgres ctype scan", {postgres_ctype_scan: result.merge("resource" => postgres_resource.ubid)})
     pop result
   end

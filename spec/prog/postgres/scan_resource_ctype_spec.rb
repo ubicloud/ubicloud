@@ -9,7 +9,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
   let(:postgres_resource) { create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID) }
   let(:st) { described_class.assemble(postgres_resource.id) }
   let(:unit) { "ctype_scan_#{st.ubid}_0" }
-  let(:target) { {"action" => "scan", "relation" => "users", "objects" => ["citext: users_email_key"], "query" => counts_query("email::text ~ '[^\\x01-\\x7f]'", "users")} }
+  let(:target) { {"action" => "scan", "relation" => "users", "objects" => ["citext: users_email_key"], "size_bytes" => 8192, "query" => counts_query("email::text ~ '[^\\x01-\\x7f]'", "users")} }
   let(:empty_result) { described_class::EMPTY_RESULT }
 
   # Returns the sshable of the server the prog reads, loaded through the
@@ -32,6 +32,11 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       expect(st.prog).to eq("Postgres::ScanResourceCtype")
       expect(st.label).to eq("start")
       expect(st.stack[0]["subject_id"]).to eq(postgres_resource.id)
+      expect(st.stack[0]["max_table_gib"]).to eq(10)
+    end
+
+    it "takes no size limit for a scan on a fork" do
+      expect(described_class.assemble(postgres_resource.id, max_table_gib: nil).stack[0]["max_table_gib"]).to be_nil
     end
   end
 
@@ -108,16 +113,31 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
   describe "#list_targets" do
     before { refresh_frame(nx, new_values: {"databases" => ["app"], "results" => {}, "step" => 0}) }
 
-    it "keeps the tables to scan and records the objects that need no scan" do
-      sshable = prime_sshable
+    let(:large_query) { counts_query("body::text ~ '[^\\x01-\\x7f]'", "events") }
+
+    def stub_targets(sshable)
       expect(sshable).to receive(:_cmd).with(psql_cmd("dbname\\=\\'app\\'"), stdin: described_class::TARGETS_SQL).and_return(<<~CSV)
-        refresh,mv,"[{""kind"": ""materialized_view"", ""object"": ""mv""}]",
-        scan,users,"[{""kind"": ""citext"", ""object"": ""users_email_key""}]","#{target["query"]}"
-        unresolved,parted,"[{""kind"": ""partition_key"", ""object"": ""parted""}]",
+        refresh,mv,"[{""kind"": ""materialized_view"", ""object"": ""mv""}]",,
+        scan,events,"[{""kind"": ""pg_trgm"", ""object"": ""events_body_trgm""}]",#{11 * 2**30},"#{large_query}"
+        scan,users,"[{""kind"": ""citext"", ""object"": ""users_email_key""}]",8192,"#{target["query"]}"
+        unresolved,parted,"[{""kind"": ""partition_key"", ""object"": ""parted""}]",,
       CSV
+    end
+
+    it "keeps the tables to scan, and records the objects that need no scan and the tables over the size limit" do
+      stub_targets(prime_sshable)
       expect { nx.list_targets }.to hop("wait_table_scan")
       expect(frame_value(nx, "targets")).to eq([target])
-      expect(frame_value(nx, "results")).to eq({"app" => empty_result.merge("refresh" => ["materialized_view: mv"], "unresolved" => ["partition_key: parted"])})
+      expect(frame_value(nx, "results")).to eq({"app" => empty_result.merge("refresh" => ["materialized_view: mv"], "unresolved" => ["partition_key: parted"],
+        "large" => [{"relation" => "events", "objects" => ["pg_trgm: events_body_trgm"], "size_bytes" => 11 * 2**30}])})
+    end
+
+    it "scans every table when there is no size limit" do
+      refresh_frame(nx, new_values: {"max_table_gib" => nil})
+      stub_targets(prime_sshable)
+      expect { nx.list_targets }.to hop("wait_table_scan")
+      expect(frame_value(nx, "targets").map { it["relation"] }).to eq(["events", "users"])
+      expect(frame_value(nx, "results")["app"]["large"]).to eq([])
     end
 
     it "records a failed database and scans nothing in it" do
@@ -193,7 +213,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       expect_log(sshable, scan_log("3,12"))
       expect_cleanup(sshable)
       expect { nx.wait_table_scan }.to nap(5)
-      expect(frame_value(nx, "results")).to eq({"app" => empty_result.merge("rebuild" => [{"relation" => "users", "objects" => ["citext: users_email_key"], "nonascii" => 3, "total" => 12}])})
+      expect(frame_value(nx, "results")).to eq({"app" => empty_result.merge("rebuild" => [{"relation" => "users", "objects" => ["citext: users_email_key"], "size_bytes" => 8192, "nonascii" => 3, "total" => 12}])})
     end
 
     it "reads the log again while journald has not received the counts" do
@@ -233,17 +253,22 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
 
     it "pops clean when every table is safe" do
       results = {"app" => empty_result.merge("safe" => 2, "refresh" => ["materialized_view: mv"])}
-      expect { report_with(results) }.to exit({"msg" => "clean", "rebuild_databases" => [], "failed_databases" => [], "refresh_databases" => ["app"], "unresolved_databases" => [], "databases" => results})
+      expect { report_with(results) }.to exit({"msg" => "clean", "rebuild_databases" => [], "large_databases" => [], "failed_databases" => [], "refresh_databases" => ["app"], "unresolved_databases" => [], "databases" => results})
     end
 
     it "pops rebuild when a table has non-ASCII rows" do
       results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}]), "postgres" => empty_result}
-      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results})
+      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results})
+    end
+
+    it "pops fork_scan when a table is over the size limit, before rebuild" do
+      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}]), "postgres" => empty_result.merge("large" => [{"relation" => "events"}])}
+      expect { report_with(results) }.to exit({"msg" => "fork_scan", "rebuild_databases" => ["app"], "large_databases" => ["postgres"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results})
     end
 
     it "pops review when a scan failed or an object is unresolved, before rebuild" do
       results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}], "unresolved" => ["partition_key: parted"]), "postgres" => empty_result.merge("failed" => [{"error" => "boom"}])}
-      expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results})
+      expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results})
     end
   end
 
@@ -277,6 +302,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
         "scan_part" => counts_query("region::text ~ '[^\\x01-\\x7f]'", "scan_part"),
         "scan_t" => counts_query("body::text ~ '[^\\x01-\\x7f]' OR code::text ~ '[^\\x01-\\x7f]' OR id::text ~ '[^\\x01-\\x7f]' OR low::text ~ '[^\\x01-\\x7f]' OR name::text ~ '[^\\x01-\\x7f]'", "scan_t"),
       )
+      expect(targets.to_h { it.values_at(:relation, :size_bytes) }).to eq("scan_mv" => nil, "scan_part" => 0, "scan_t" => DB.get(Sequel.function(:pg_table_size, Sequel.cast("scan_t", :regclass))))
     end
 
     it "scans every text-like column of a table with a plain tsvector column" do
@@ -287,13 +313,17 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       ])
     end
 
-    it "counts the rows with a character outside ASCII" do
+    it "counts the rows with a character outside ASCII, and sums the size of the partitions" do
       DB.run(<<~SQL)
-        CREATE TABLE "scan_We.ird" ("Na me" text COLLATE scan_c_utf8);
+        CREATE TABLE "scan_We.ird" ("Na me" text COLLATE scan_c_utf8, k int) PARTITION BY RANGE (k);
+        CREATE TABLE "scan_We.ird_a" PARTITION OF "scan_We.ird" FOR VALUES FROM (0) TO (10);
+        CREATE TABLE "scan_We.ird_b" PARTITION OF "scan_We.ird" FOR VALUES FROM (10) TO (20);
         CREATE INDEX ON "scan_We.ird" (upper("Na me"));
-        INSERT INTO "scan_We.ird" VALUES ('plain'), ('Ünïcode'), ('emoji 🙂'), (NULL);
+        INSERT INTO "scan_We.ird" VALUES ('plain', 1), ('Ünïcode', 2), ('emoji 🙂', 11), (NULL, 12);
       SQL
       expect(DB.fetch(targets.first[:query].freeze).single_record.values).to eq(["ctype_scan_counts", 2, 4])
+      sizes = %w[scan_We.ird_a scan_We.ird_b].sum { DB.get(Sequel.function(:pg_table_size, Sequel.cast(DB.literal(Sequel.identifier(it)), :regclass))) }
+      expect(targets.first[:size_bytes]).to eq(sizes).and be > 0
     end
   end
 end
