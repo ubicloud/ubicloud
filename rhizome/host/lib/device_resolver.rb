@@ -18,11 +18,12 @@ module DeviceResolver
 
       # Choose stable symlink types by subsystem:
       #  - SSDs: Use identifiers starting with 'wwn' (World Wide Name), globally unique.
-      #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique.
+      #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique,
+      #    or 'nvme-nvme' (vendor, serial, model) when the kernel has no EUI.
       #  - MD devices: Use uuid identifiers.
       #  - LVM/device-mapper: Use LVM uuid identifiers.
       dev = File.basename(dev_path)
-      return id if (dev.start_with?("nvme") && id.include?("nvme-eui.")) ||
+      return id if (dev.start_with?("nvme") && (id.include?("nvme-eui.") || id.include?("nvme-nvme."))) ||
         (dev.start_with?("sd") && id.include?("wwn-")) ||
         (dev.start_with?("md") && id.include?("md-uuid-")) ||
         (dev.start_with?("dm") && id.include?("dm-uuid-"))

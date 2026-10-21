@@ -932,6 +932,17 @@ RSpec.describe StorageVolume do
       expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
     end
 
+    it "returns the persistent device id for a path with NVMe device identified by vendor, serial and model" do
+      paths = ["nvme-INTEL_SSDPE2KX040T8_BTLJ115201JF4P0DGN-part3",
+        "nvme-nvme.8086-42544c4a3131353230314a4634503044474e-494e54454c205353445045324b583034305438-00000001-part3"]
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
+      expect(File).to receive(:realpath).with(paths[0]).and_return("/dev/nvme0n1p3")
+      expect(File).to receive(:realpath).with(paths[1]).and_return("/dev/nvme0n1p3")
+      expect(File).to receive(:stat).with("/dev/nvme0n1p3").and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 3)).twice
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 259, dev_minor: 3))
+      expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
+    end
+
     it "handles system call errors gracefully" do
       paths = ["/dev/disk/by-id/md-name-rescue:0", "/dev/disk/by-id/md-uuid-8e4083eb:4c4a19fb:f1c64530:5faaca1b"]
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
