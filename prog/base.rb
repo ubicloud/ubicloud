@@ -302,7 +302,7 @@ end
       # after exitval is set, though it doesn't do anything) and any
       # such incements will prevent deletion of a Strand via
       # foreign_key
-      child.semaphores_dataset.destroy
+      child.semaphores_dataset.delete
       child.destroy
       reaper&.call(child)
     end

@@ -336,7 +336,7 @@ SQL
           @exited = true
         else
           # No parent Strand to reap here, so self-reap.
-          semaphores_dataset.destroy
+          semaphores_dataset.delete
           destroy
           @deleted = true
         end

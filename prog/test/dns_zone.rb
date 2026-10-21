@@ -112,7 +112,7 @@ class Prog::Test::DnsZone < Prog::Test::Base
     DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_zone.records_dataset.select(:id)).delete
     dns_zone.records_dataset.destroy
     DB[:dns_servers_dns_zones].where(dns_zone_id: dns_zone.id).delete
-    dns_zone.strand.semaphores_dataset.destroy
+    dns_zone.strand.semaphores_dataset.delete
     # DnsZoneNexus has no destroy label, so we tear the strand and zone down directly.
     dns_zone.strand.destroy
     dns_zone.destroy

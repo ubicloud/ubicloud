@@ -418,7 +418,7 @@ RSpec.describe Kubernetes::Client do
     it "increments update_firewall_rules on attached VMs when rules change" do
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "test-np", node_count: 1, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-2").subject
       vm = Prog::Kubernetes::KubernetesNodeNexus.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "worker-vm", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kn.id).subject.vm
-      vm.semaphores_dataset.destroy
+      vm.semaphores_dataset.delete
       kubernetes_cluster.services_lb.add_port(443, 31234)
       kubernetes_client.sync_lb_firewall_rules
       expect(vm.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]

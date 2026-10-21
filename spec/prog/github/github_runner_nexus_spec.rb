@@ -865,7 +865,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "does not spill over if the metal allocator has not run out of capacity" do
-        vm.semaphores_dataset.destroy
+        vm.semaphores_dataset.delete
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
       end
