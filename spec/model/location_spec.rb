@@ -121,6 +121,13 @@ RSpec.describe Location do
       expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-us-east4") }.not_to raise_error
     end
 
+    it "prices n2d storage on its own meter" do
+      %w[n2d-standard n2d-highmem].each do |family|
+        expect(BillingRate.from_resource_properties("PostgresStorage", "standard-#{family}", "gcp-us-east4")["unit_price"]).to be > 0
+        expect(BillingRate.from_resource_properties("PostgresStandbyStorage", "standard-#{family}", "gcp-us-east4")["unit_price"]).to be > 0
+      end
+    end
+
     it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do
       Option::GCP_FAMILY_OPTIONS.each do |family|
         expect(BillingRate.from_resource_properties("VmVCpu", family, "gcp-us-east4")).not_to be_nil
@@ -155,6 +162,13 @@ RSpec.describe Location do
       expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-europe-west3") }.not_to raise_error
     end
 
+    it "prices n2d storage on its own meter" do
+      %w[n2d-standard n2d-highmem].each do |family|
+        expect(BillingRate.from_resource_properties("PostgresStorage", "standard-#{family}", "gcp-europe-west3")["unit_price"]).to be > 0
+        expect(BillingRate.from_resource_properties("PostgresStandbyStorage", "standard-#{family}", "gcp-europe-west3")["unit_price"]).to be > 0
+      end
+    end
+
     it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do
       Option::GCP_FAMILY_OPTIONS.each do |family|
         expect(BillingRate.from_resource_properties("VmVCpu", family, "gcp-europe-west3")).not_to be_nil
@@ -187,6 +201,13 @@ RSpec.describe Location do
       end
       expect { Validation.validate_billing_rate("PostgresStorage", "standard", "gcp-europe-west1") }.not_to raise_error
       expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-europe-west1") }.not_to raise_error
+    end
+
+    it "prices n2d storage on its own meter" do
+      %w[n2d-standard n2d-highmem].each do |family|
+        expect(BillingRate.from_resource_properties("PostgresStorage", "standard-#{family}", "gcp-europe-west1")["unit_price"]).to be > 0
+        expect(BillingRate.from_resource_properties("PostgresStandbyStorage", "standard-#{family}", "gcp-europe-west1")["unit_price"]).to be > 0
+      end
     end
 
     it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do

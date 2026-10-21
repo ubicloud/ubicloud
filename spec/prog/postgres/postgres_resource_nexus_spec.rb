@@ -907,6 +907,28 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage", "standby-vcpu-0", "standby-storage-0")
     end
 
+    it "bills vcpu and storage on the family rows for n2d resources" do
+      postgres_server.vm.update(family: "n2d-highmem", vcpus: 8, cpu_percent_limit: nil)
+      postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
+      project.update(billable: true)
+
+      expect { nx.update_billing_records }.to hop("wait")
+      rates = BillingRecord.where(resource_id: postgres_resource.id).to_h { [it.resource_tags["slot"], it.billing_rate] }
+      expect(rates["primary-vcpu"]["resource_family"]).to eq("standard-n2d-highmem")
+      expect(rates["primary-storage"]["resource_family"]).to eq("standard-n2d-highmem")
+      expect(rates["primary-storage"]["unit_price"]).to be > 0
+    end
+
+    it "bills storage on the flavor row for families with storage included" do
+      postgres_server.vm.update(family: "c4a-standard", vcpus: 8, arch: "arm64", cpu_percent_limit: nil)
+      postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
+      project.update(billable: true)
+
+      expect { nx.update_billing_records }.to hop("wait")
+      storage = BillingRecord.where(resource_id: postgres_resource.id).find { it.resource_tags["slot"] == "primary-storage" }
+      expect(storage.billing_rate["resource_family"]).to eq("standard")
+    end
+
     it "does not recreate billing records when they match existing records" do
       postgres_server
       project.update(billable: true)

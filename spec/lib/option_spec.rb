@@ -48,6 +48,7 @@ RSpec.describe Option do
         "c3-standard",
         "c3d-standard", "c3d-highmem",
         "z3-standardlssd", "z3-highlssd",
+        "n2d-standard", "n2d-highmem",
       ])
     end
 
@@ -63,12 +64,27 @@ RSpec.describe Option do
       end
     end
 
-    it "has a single fixed storage value per GCP family and vcpu" do
+    it "has a single fixed storage value per bundled GCP family and vcpu" do
       Option::GCP_STORAGE_SIZE_OPTIONS.each do |family, vcpu_map|
+        next unless Option::GCP_FAMILY_VM_CONFIG[family][:gce_suffix]
         vcpu_map.each do |vcpu, storage_options|
           expect(storage_options.length).to eq(1), "Expected 1 storage option for #{family} #{vcpu} vCPUs, got #{storage_options.length}"
         end
       end
+    end
+
+    it "offers one and two local SSDs per vcpu for an n2d size, capped at 24 disks" do
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-highmem"][2]).to eq([750, 1500])
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-highmem"][8]).to eq([3000, 6000])
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-highmem"][16]).to eq([6000, 9000])
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-highmem"][32]).to eq([9000])
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-standard"][224]).to eq([9000])
+    end
+
+    it "counts the local SSDs the VM nexus attaches from the data volume size" do
+      expect(described_class.gcp_local_ssd_count("n2d-highmem", 6000)).to eq(16)
+      expect(described_class.gcp_local_ssd_count("n2d-highmem", 0)).to eq(0)
+      expect(described_class.gcp_local_ssd_count("c4a-standard", 750)).to eq(0)
     end
 
     it "has matching size options for each GCP family and vcpu" do
@@ -115,6 +131,8 @@ RSpec.describe Option do
       expect(described_class.gcp_instance_type_name("c3d-highmem", 360)).to eq("c3d-highmem-360-lssd")
       expect(described_class.gcp_instance_type_name("z3-standardlssd", 44)).to eq("z3-highmem-44-standardlssd")
       expect(described_class.gcp_instance_type_name("z3-highlssd", 32)).to eq("z3-highmem-32-highlssd")
+      expect(described_class.gcp_instance_type_name("n2d-highmem", 8)).to eq("n2d-highmem-8")
+      expect(described_class.gcp_instance_type_name("n2d-standard", 224, lssd: false)).to eq("n2d-standard-224")
     end
 
     it "terminates rather than live migrates above the local SSD migration limit" do
@@ -122,6 +140,7 @@ RSpec.describe Option do
       expect(described_class.gcp_on_host_maintenance("z3-highlssd", 88)).to eq("TERMINATE")
       expect(described_class.gcp_on_host_maintenance("z3-standardlssd", 176)).to eq("TERMINATE")
       expect(described_class.gcp_on_host_maintenance("c4-standard", 288)).to eq("MIGRATE")
+      expect(described_class.gcp_on_host_maintenance("n2d-highmem", 96)).to eq("MIGRATE")
     end
 
     it "raises rather than building a machine type for an unknown family" do
@@ -141,6 +160,8 @@ RSpec.describe Option do
         "c3d-highmem" => {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]},
         "z3-standardlssd" => {14 => [3000], 22 => [6000], 44 => [9000], 88 => [18000], 176 => [36000]},
         "z3-highlssd" => {8 => [3000], 16 => [6000], 22 => [9000], 32 => [12000], 44 => [18000], 88 => [36000]},
+        "n2d-standard" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000], 128 => [9000], 224 => [9000]},
+        "n2d-highmem" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000]},
       })
     end
 

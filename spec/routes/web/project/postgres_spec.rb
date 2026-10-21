@@ -123,6 +123,15 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.first.flavor).to eq(PostgresResource::Flavor::STANDARD)
       end
 
+      it "prices n2d storage from the family's own rate on the create page" do
+        project.set_ff_enable_n2d_highmem(true)
+        project.set_ff_visible_postgres_locations(["gcp-us-central1"])
+        visit "#{project.path}/postgres/create"
+
+        rate = BillingRate.from_resource_properties("PostgresStorage", "standard-n2d-highmem", "gcp-us-central1")
+        expect(page.html).to include("$#{"%.2f" % (3000 * rate["unit_price"].to_f * 60 * 672)}/mo")
+      end
+
       it "can create new PostgreSQL database in a custom AWS region" do
         project.set_ff_private_locations(true)
         private_location = create_private_location(project:)

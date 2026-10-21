@@ -421,7 +421,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         resource_type, slot_prefix, slot_suffix = index.zero? ? ["", "primary", ""] : ["Standby", "standby", "-#{index - 1}"]
         [
           {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count, slot: "#{slot_prefix}-vcpu#{slot_suffix}"},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
+          {billing_rate_id: BillingRate.postgres_storage_rate("Postgres#{resource_type}Storage", flavor, vm_family, location)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
         ]
       end
 

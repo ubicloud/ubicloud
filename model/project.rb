@@ -320,6 +320,8 @@ class Project < Sequel::Model
     :enable_m6gd,
     :enable_m7gd,
     :enable_m8id,
+    :enable_n2d_highmem,
+    :enable_n2d_standard,
     :enable_r6gd,
     :enable_r6id,
     :enable_r7gd,

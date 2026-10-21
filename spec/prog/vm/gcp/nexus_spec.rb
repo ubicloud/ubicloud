@@ -333,6 +333,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(disks.length).to eq(1)
         expect(disks[0].boot).to be true
         expect(disks[0].initialize_params.source_image).to eq(vm.boot_image)
+        expect(disks[0].initialize_params.has_disk_type?).to be false
         op
       end
 
@@ -353,6 +354,43 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(disks.length).to eq(1)
         expect(disks[0].boot).to be true
         expect(disks.map(&:type)).not_to include("SCRATCH")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "attaches the local SSDs itself for a family without an -lssd machine type" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      nx.vm.update(family: "n2d-highmem", vcpus: 8)
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 1500, disk_index: 1)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-n2d")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].machine_type).to end_with("machineTypes/n2d-highmem-8")
+        disks = args[:instance_resource].disks
+        expect(disks.length).to eq(5)
+        expect(disks[0].boot).to be true
+        expect(disks[1..].map(&:type).uniq).to eq(["SCRATCH"])
+        expect(disks[1..].map(&:interface).uniq).to eq(["NVME"])
+        expect(disks[1..].map { it.initialize_params.disk_type }.uniq).to eq(["zones/us-central1-#{nx.send(:gcp_zone_suffix)}/diskTypes/local-ssd"])
+        expect(disks[0].initialize_params.disk_type).to end_with("/diskTypes/pd-balanced")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "attaches no local SSD to a family without an -lssd machine type when only a boot volume exists" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      nx.vm.update(family: "n2d-highmem", vcpus: 8)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-n2d-boot")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].machine_type).to end_with("machineTypes/n2d-highmem-8")
+        expect(args[:instance_resource].disks.length).to eq(1)
         op
       end
 
@@ -1158,6 +1196,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "picks a plain machine type when the VM only has a boot volume" do
       nx.vm.update(family: "c4a-standard", vcpus: 8)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8")
+    end
+
+    it "never suffixes a family without an -lssd machine type" do
+      nx.vm.update(family: "n2d-standard", vcpus: 16)
+      VmStorageVolume.create(vm_id: vm.id, size_gib: 9000, boot: false, use_bdev_ubi: false, disk_index: 1)
+      expect(nx.send(:gce_machine_type)).to eq("n2d-standard-16")
     end
 
     it "reads GCP zone suffix from VM strand frame" do

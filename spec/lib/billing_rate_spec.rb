@@ -15,6 +15,22 @@ RSpec.describe BillingRate do
     end
   end
 
+  describe ".postgres_storage_rate" do
+    it "prefers the family's own storage row in every GCP location" do
+      %w[gcp-us-central1 gcp-us-east4 gcp-europe-west1 gcp-europe-west3].product(%w[n2d-standard n2d-highmem], %w[PostgresStorage PostgresStandbyStorage]).each do |name, family, type|
+        rate = described_class.postgres_storage_rate(type, "standard", family, Location[name:])
+        expect(rate["resource_family"]).to eq("standard-#{family}")
+        expect(rate["unit_price"]).to be > 0
+      end
+    end
+
+    it "falls back to the flavor row for families priced with storage included" do
+      location = Location[name: "gcp-us-central1"]
+      expect(described_class.postgres_storage_rate("PostgresStorage", "standard", "c4a-standard", location)["resource_family"]).to eq("standard")
+      expect(described_class.postgres_storage_rate("PostgresStandbyStorage", "standard", "standard", Location[Location::HETZNER_FSN1_ID])["resource_family"]).to eq("standard")
+    end
+  end
+
   describe ".line_item_description" do
     it "returns for VmVCpu" do
       expect(described_class.line_item_description("VmVCpu", "standard", 8)).to eq("standard-8 Virtual Machine")

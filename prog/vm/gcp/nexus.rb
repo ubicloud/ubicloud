@@ -46,21 +46,33 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       ],
     }.to_yaml.delete_prefix("---\n")
 
-    # Only the boot disk is declared; GCE attaches the local SSDs bundled with
-    # an -lssd machine type itself. The guest sees them as
+    # An -lssd machine type bundles its local SSDs, so only the boot disk is
+    # declared for it; a family without one gets them attached here. GCE
+    # names local SSDs itself, so either way the guest sees
     # /dev/disk/by-id/google-local-nvme-ssd-N (see
     # PostgresServer::Gcp#gcp_storage_device_paths).
     boot_volume = vm.vm_storage_volumes_dataset.order(:disk_index).first(boot: true)
+    boot_params = {source_image: gce_source_image, disk_size_gb: boot_volume.size_gib}
+    if (boot_disk_type = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:boot_disk_type])
+      boot_params[:disk_type] = "zones/#{gcp_zone}/diskTypes/#{boot_disk_type}"
+    end
     disks = [
       Google::Cloud::Compute::V1::AttachedDisk.new(
         auto_delete: true,
         boot: true,
-        initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
-          source_image: gce_source_image,
-          disk_size_gb: boot_volume.size_gib,
-        ),
+        initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(**boot_params),
       ),
     ]
+    Option.gcp_local_ssd_count(vm.family, data_volume_gib).times do
+      disks << Google::Cloud::Compute::V1::AttachedDisk.new(
+        auto_delete: true,
+        type: "SCRATCH",
+        interface: "NVME",
+        initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
+          disk_type: "zones/#{gcp_zone}/diskTypes/local-ssd",
+        ),
+      )
+    end
 
     gcp_res = user_nic.nic_gcp_resource
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
@@ -346,9 +358,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @gcp_region ||= vm.location.name.delete_prefix("gcp-")
   end
 
+  def data_volume_gib
+    @data_volume_gib ||= vm.vm_storage_volumes_dataset.exclude(boot: true).sum(:size_gib).to_i
+  end
+
   def gce_machine_type
     # -lssd is needed only when there are non-boot (data) volumes
-    @gce_machine_type ||= Option.gcp_instance_type_name(vm.family, vm.vcpus, lssd: !vm.vm_storage_volumes_dataset.where(boot: false).empty?)
+    @gce_machine_type ||= Option.gcp_instance_type_name(vm.family, vm.vcpus, lssd: data_volume_gib > 0)
   end
 
   GCE_BOOT_IMAGE_FAMILIES = {
