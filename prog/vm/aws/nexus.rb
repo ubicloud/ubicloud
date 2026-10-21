@@ -251,7 +251,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     unless user_nic.nic_aws_resource.create_network_interface
       network_interface = instance.network_interfaces.first
-      user_nic.update(private_ipv4: network_interface.private_ip_address)
+      private_ipv4 = network_interface.private_ip_address
+      if (nic = user_nic.private_subnet.nics_dataset.first(private_ipv4:)) && (runner = GithubRunner[vm_id: vm.id])
+        Clog.emit("private ipv4 is taken by another nic", {private_ipv4_taken: {vm:, private_ipv4:, nic:}})
+        runner.provision_spare_runner
+        runner.incr_destroy
+        nap 60
+      end
+      user_nic.update(private_ipv4:)
       user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
