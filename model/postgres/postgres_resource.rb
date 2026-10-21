@@ -802,6 +802,7 @@ class PostgresResource < Sequel::Model
         .values
         .flat_map { |h| h.values.flatten }
     storage_size_options.uniq!
+    storage_size_options.sort!
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
       storage_sizes(location, family, vcpu_count).include?(storage_size)

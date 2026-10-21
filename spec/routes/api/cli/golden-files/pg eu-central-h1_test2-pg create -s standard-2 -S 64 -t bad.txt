@@ -69,5 +69,10 @@ Allowed Option Values:
           z3-standardlssd-14 z3-standardlssd-22 z3-standardlssd-44
           z3-standardlssd-88 z3-standardlssd-176 z3-highlssd-8 z3-highlssd-16
           z3-highlssd-22 z3-highlssd-32 z3-highlssd-44 z3-highlssd-88
+          n2d-standard-2 n2d-standard-4 n2d-standard-8 n2d-standard-16
+          n2d-standard-32 n2d-standard-48 n2d-standard-64 n2d-standard-80
+          n2d-standard-96 n2d-standard-128 n2d-standard-224 n2d-highmem-2
+          n2d-highmem-4 n2d-highmem-8 n2d-highmem-16 n2d-highmem-32
+          n2d-highmem-48 n2d-highmem-64 n2d-highmem-80 n2d-highmem-96
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Version: 18 17 16

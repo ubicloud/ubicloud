@@ -66,7 +66,14 @@ module Option
   # so both come from the family config.
   def self.gcp_instance_type_name(family, vcpu_count, lssd: true)
     config = GCP_FAMILY_VM_CONFIG.fetch(family)
-    "#{config[:gce_prefix]}-#{vcpu_count}#{"-#{config[:gce_suffix]}" if lssd}"
+    "#{config[:gce_prefix]}-#{vcpu_count}#{"-#{config[:gce_suffix]}" if lssd && config[:gce_suffix]}"
+  end
+
+  # Local SSDs the VM nexus attaches itself: none when the machine type
+  # bundles them, otherwise one per ssd_gib of data volume.
+  def self.gcp_local_ssd_count(family, data_gib)
+    config = GCP_FAMILY_VM_CONFIG.fetch(family)
+    config[:gce_suffix] ? 0 : data_gib / config[:ssd_gib]
   end
 
   # Whole GiB, since vm.memory_gib is an integer column: c4 ratios are
@@ -127,9 +134,14 @@ module Option
   c4_shapes = {4 => 1, 8 => 1, 16 => 2, 24 => 4, 32 => 5, 48 => 8, 96 => 16, 144 => 24, 192 => 32, 288 => 48}
   c4d_shapes = {8 => 1, 16 => 1, 32 => 2, 48 => 4, 64 => 6, 96 => 8, 192 => 16, 384 => 32}
   c3d_shapes = {8 => 1, 16 => 1, 30 => 2, 60 => 4, 90 => 8, 180 => 16, 360 => 32}
+  # n2d has no lssd machine type: the VM nexus attaches the local SSDs itself,
+  # one or two per vcpu within the 24 GCE allows, and GCE would default the
+  # boot disk to pd-standard.
+  n2d_shapes = {2 => [2, 4], 4 => [4, 8], 8 => [8, 16], 16 => [16, 24], 32 => [24], 48 => [24], 64 => [24], 80 => [24], 96 => [24]}
 
-  # shapes maps a vcpu count to the number of bundled local SSDs, not to a
-  # storage size: the size is that count times ssd_gib.
+  # shapes maps a vcpu count to the number of bundled local SSDs, or to the
+  # counts a customer can pick, not to a storage size: the size is a count
+  # times ssd_gib.
   GCP_FAMILY_VM_CONFIG = {
     "c4a-standard" => {gce_prefix: "c4a-standard", gce_suffix: "lssd", arch: "arm64", mem_ratio: 4, ssd_gib: 375, shapes: c4a_shapes},
     "c4a-highmem" => {gce_prefix: "c4a-highmem", gce_suffix: "lssd", arch: "arm64", mem_ratio: 8, ssd_gib: 375, shapes: c4a_shapes},
@@ -149,6 +161,8 @@ module Option
                           memory_gib_overrides: {176 => 1406}},
     "z3-highlssd" => {gce_prefix: "z3-highmem", gce_suffix: "highlssd", arch: "x64", mem_ratio: 8, ssd_gib: 3000,
                       shapes: {8 => 1, 16 => 2, 22 => 3, 32 => 4, 44 => 6, 88 => 12}},
+    "n2d-standard" => {gce_prefix: "n2d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n2d_shapes.merge(128 => [24], 224 => [24]), boot_disk_type: "pd-balanced"},
+    "n2d-highmem" => {gce_prefix: "n2d-highmem", gce_suffix: nil, arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: n2d_shapes, boot_disk_type: "pd-balanced"},
   }.freeze
 
   # GCE can live migrate a VM with at most this much attached local SSD.
@@ -196,7 +210,7 @@ module Option
   }.freeze
 
   GCP_STORAGE_SIZE_OPTIONS = GCP_FAMILY_VM_CONFIG.transform_values { |config|
-    config[:shapes].transform_values { |disk_count| [disk_count * config[:ssd_gib]] }.freeze
+    config[:shapes].transform_values { |disk_counts| Array(disk_counts).map { it * config[:ssd_gib] } }.freeze
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -302,6 +316,8 @@ module Option
     ["c3d-highmem", "Memory Optimized, AMD EPYC", "memory-optimized"],
     ["z3-standardlssd", "Storage Optimized, Intel Xeon", "storage-optimized"],
     ["z3-highlssd", "Storage Optimized, Intel Xeon, double storage per vCPU", "storage-optimized"],
+    ["n2d-standard", "General Purpose, AMD EPYC, configurable storage", "general-purpose"],
+    ["n2d-highmem", "Memory Optimized, AMD EPYC, configurable storage", "memory-optimized"],
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)

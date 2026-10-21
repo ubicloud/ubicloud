@@ -159,7 +159,8 @@ class Prog::Vm::Nexus < Prog::Base
         end
         "Vm::Aws::Nexus"
       elsif location.gcp?
-        # As above, but GCE attaches the disks bundled with the -lssd machine type.
+        # As above, but the disks come bundled with the -lssd machine type or
+        # are attached by Vm::Gcp::Nexus.
         disk_index = 0
         storage_volumes.each do |volume|
           next unless volume[:boot] || volume[:size_gib] > 0
