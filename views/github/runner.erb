@@ -88,6 +88,13 @@
                     "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
                   ], {}
                 ]
+            elsif runner.strand && runner.strand.label == "wait_allocation_slot"
+              [
+                [
+                  "Queued for provisioning",
+                  "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                ], {}
+              ]
             elsif runner.strand && runner.strand.label == "apply_custom_label_quota"
               [
                 [

@@ -366,7 +366,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
-    hop_allocate_vm
+    hop_wait_allocation_slot
   end
 
   def quota_available?
@@ -420,7 +420,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
-      hop_allocate_vm
+      hop_wait_allocation_slot
     end
 
     if project.reputation == "limited"
@@ -484,12 +484,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
 
     hop_apply_custom_label_quota if github_runner.custom_label
-    hop_allocate_vm
+    hop_wait_allocation_slot
   end
 
   label def apply_custom_label_quota
     custom_label = github_runner.custom_label
-    hop_allocate_vm unless custom_label.concurrent_runner_count_limit
+    hop_wait_allocation_slot unless custom_label.concurrent_runner_count_limit
 
     new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
     updated_rows = GithubCustomLabel
@@ -501,7 +501,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
-    hop_allocate_vm
+    hop_wait_allocation_slot
+  end
+
+  label def wait_allocation_slot
+    waited = Time.now - github_runner.created_at
+    usable_slots = Config.github_runner_allocation_slots * (0.5 + 0.5 * [waited / 3600, 1].min)
+    hop_allocate_vm if Vm.where(location_id: Location::GITHUB_RUNNERS_ID, arch:, vm_host_id: nil).count < usable_slots
+
+    nap rand(10..20)
   end
 
   label def allocate_vm
