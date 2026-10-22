@@ -72,12 +72,16 @@ class DeletedRecord < Sequel::Model
     name = partition_name(day).to_sym
     next_day = day + 1
 
-    DB["CREATE TABLE ? (LIKE deleted_record INCLUDING ALL)", name].run
+    DB.create_table(name) do
+      like :deleted_record, including: :all
+    end
 
-    DB[<<~SQL, name, Time.utc(day.year, day.month, day.day), Time.utc(next_day.year, next_day.month, next_day.day)].no_auto_parameterize.run
-      ALTER TABLE deleted_record ATTACH PARTITION ?
-        FOR VALUES FROM (?) TO (?)
-    SQL
+    DB.alter_table(:deleted_record) do
+      attach_partition name do
+        from Time.utc(day.year, day.month, day.day)
+        to Time.utc(next_day.year, next_day.month, next_day.day)
+      end
+    end
   end
 
   def self.drop_partition(day)
