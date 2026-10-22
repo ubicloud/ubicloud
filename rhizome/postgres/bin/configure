@@ -169,6 +169,7 @@ safe_write_to_file("/etc/systemd/system/io-throttle@.service", <<~SERVICE)
   [Service]
   Type=oneshot
   ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]}
+  TimeoutStartSec=30
   User=root
 SERVICE
 
