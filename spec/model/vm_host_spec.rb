@@ -685,6 +685,14 @@ RSpec.describe VmHost do
       expect(pulse).not_to have_key(:dns_egress6)
     end
 
+    it "skips the IPv6 probe when IPv6 is disabled on the host" do
+      vm_host.update(ipv6_disabled: true)
+      stub_health_checks_pass
+      pulse = vm_host.check_pulse(session:, previous_pulse: {})
+      expect(pulse[:dns_egress4]).to eq("up")
+      expect(pulse).not_to have_key(:dns_egress6)
+    end
+
     it "treats a dns probe exception as down" do
       stub_health_checks_pass
       expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd("8.8.8.8")).and_raise(Sshable::SshError.new("cmd", "", "", nil, nil))
