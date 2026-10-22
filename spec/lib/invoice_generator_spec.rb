@@ -309,6 +309,29 @@ RSpec.describe InvoiceGenerator do
       expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud B.V.")
       expect(invoice.content["bank_transfer_info"]["IBAN"]).to eq("NL30REVO6759811127")
       expect(invoice.content["bank_transfer_info"]).not_to have_key("Intermediary BIC")
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud B.V.")
+    end
+
+    it "uses Inc. as issuer and for bank info if billing info invoice_from is inc, even for EU customers" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", invoice_from: "inc").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud Inc.")
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud Inc.")
+    end
+
+    it "uses B.V. as issuer and for bank info if billing info invoice_from is bv, even for non-EU customers" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", invoice_from: "bv").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud B.V.")
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud B.V.")
+      expect(invoice.content["bank_transfer_info"]["Intermediary BIC"]).to eq("CHASGB2L")
+      expect(invoice.content["vat_info"]).to be_nil
     end
 
     it "uses USD if project uses EUR invoices but eur_rate is not provided" do
