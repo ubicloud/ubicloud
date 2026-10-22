@@ -38,19 +38,23 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     deadline = clock_time + 80
     client = github_repository.installation.client(auto_paginate: true)
     created_after = (Time.now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d")
-    queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued", created: ">=#{created_after}"})[:workflow_runs]
-    Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count, oldest_run_at: queued_runs.map { it[:created_at] }.min}})
+    queued_runs = []
+    ["queued", "in_progress"].each do |status|
+      queued_runs.concat(client.repository_workflow_runs(github_repository.name, {status:, created: ">=#{created_after}"})[:workflow_runs])
 
-    # We check the rate limit after the first API call to avoid unnecessary API
-    # calls to fetch only the rate limit. Every response includes the rate limit
-    # information in the headers.
-    rate_limit = client.rate_limit
-    remaining_quota = rate_limit.remaining / rate_limit.limit.to_f
-    if remaining_quota < 0.1
-      Clog.emit("low remaining quota", {low_remaining_quota: {repository_name: github_repository.name, limit: rate_limit.limit, remaining: rate_limit.remaining}})
-      @polling_interval = (rate_limit.resets_at - Time.now).to_i
-      return
+      # Every response includes rate limit information in its headers.
+      rate_limit = client.rate_limit
+      remaining_quota = rate_limit.remaining / rate_limit.limit.to_f
+      if remaining_quota < 0.1
+        Clog.emit("low remaining quota", {low_remaining_quota: {repository_name: github_repository.name, limit: rate_limit.limit, remaining: rate_limit.remaining}})
+        @polling_interval = (rate_limit.resets_at - Time.now).to_i
+        return nil
+      end
+
+      @polling_interval = (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
     end
+    queued_runs = queued_runs.group_by { it[:id] }.values.map { |runs| runs.max_by { it[:run_attempt] } }
+    Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count, oldest_run_at: queued_runs.map { it[:created_at] }.min}})
 
     queued_labels = Hash.new(0)
     queued_runs.first(200).each do |run|
@@ -99,8 +103,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         schedule += start_interval
       end
     end
-
-    @polling_interval = (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
   end
 
   def cleanup_cache

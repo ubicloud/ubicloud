@@ -40,11 +40,69 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe ".check_queued_jobs" do
+    let(:created_after) { (now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d") }
+
+    before do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_return({workflow_runs: []})
+    end
+
+    it "creates a runner for queued jobs in an in-progress workflow" do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: []})
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_return({workflow_runs: [
+        {id: 1, run_attempt: 2, status: "in_progress", created_at: now},
+      ]})
+      allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100))
+      allow(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).and_return({jobs: [
+        {status: "in_progress", labels: ["ubicloud"]},
+        {status: "completed", labels: ["ubicloud"]},
+        {status: "queued", labels: ["ubicloud"]},
+      ]})
+
+      expect { nx.check_queued_jobs }.to change { GithubRunner.where(label: "ubicloud").count }.by(1)
+    end
+
+    it "counts a workflow once when it starts between listing requests" do
+      allow(client).to receive_messages(
+        repository_workflow_runs: {workflow_runs: [{id: 1, run_attempt: 2, created_at: now}]},
+        rate_limit: instance_double(Octokit::RateLimit, remaining: 100, limit: 100),
+      )
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).once.and_return({jobs: [
+        {status: "queued", labels: ["ubicloud"]},
+      ]})
+
+      expect { nx.check_queued_jobs }.to change { GithubRunner.where(label: "ubicloud").count }.by(1)
+    end
+
+    it "uses the latest attempt when a workflow is rerun between listing requests" do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
+        {id: 1, run_attempt: 1, created_at: now},
+      ]})
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_return({workflow_runs: [
+        {id: 1, run_attempt: 2, created_at: now},
+      ]})
+      allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100))
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).once.and_return({jobs: [
+        {status: "queued", labels: ["ubicloud"]},
+      ]})
+
+      expect { nx.check_queued_jobs }.to change { GithubRunner.where(label: "ubicloud").count }.by(1)
+    end
+
+    it "backs off when the queued listing exhausts the API quota" do
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: []})
+      allow(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "in_progress", created: ">=#{created_after}"}).and_raise(Octokit::TooManyRequests)
+      allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 100, resets_at: now + 10 * 60))
+
+      nx.check_queued_jobs
+
+      expect(nx.polling_interval).to eq(10 * 60)
+    end
+
     it "creates extra runner if needed" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-2", alias_for: "ubicloud-standard-8")
 
-      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
+      expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued", created_at: now},
         {id: 2, run_attempt: 1, status: "queued", created_at: now},
       ]})
@@ -90,7 +148,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     it "raises if runtime is too long" do
       expect(nx).to receive(:clock_time).and_return(0, 81)
-      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
+      expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued", created_at: now},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
@@ -98,7 +156,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "asks GitHub only for runs created in the last 7 days" do
-      created_after = (now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d")
       expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
         {id: 1, run_attempt: 1, status: "queued", created_at: now - 6 * 24 * 60 * 60},
         {id: 2, run_attempt: 1, status: "queued", created_at: now},
@@ -115,14 +172,14 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "naps until the resets_at if remaining quota is low" do
-      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
+      expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: []})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(8 * 60)
     end
 
     it "increases polling interval if remaining quota is lower than 0.5" do
-      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
+      expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: []})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 40, limit: 100)).at_least(:once)
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(15 * 60)
