@@ -496,11 +496,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to hop("wait_concurrency_limit")
     end
 
-    it "hops to allocate_vm if there is capacity" do
+    it "hops to wait_allocation_slot if there is capacity" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect(project).to receive(:active?).and_return(true)
 
-      expect { nx.start }.to hop("allocate_vm")
+      expect { nx.start }.to hop("wait_allocation_slot")
     end
 
     it "hops to apply_custom_label_quota if there is capacity and the label is a custom label" do
@@ -545,9 +545,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.wait_concurrency_limit }.to nap
     end
 
-    it "hops to allocate_vm when customer concurrency limit frees up" do
+    it "hops to wait_allocation_slot when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
     end
 
     it "hops to apply_custom_label_quota when the label is a custom label" do
@@ -662,7 +662,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
       it "waits if hugepage utilization is high although core utilization is low" do
@@ -675,7 +675,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64", family: "standard").update(used_cores: 8)
         create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "x64", family: "standard", total_cores: 0, used_cores: 0, total_hugepages_1g: 0, used_hugepages_1g: 0)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
       it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
@@ -698,14 +698,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if standard utilization is high but premium utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
         expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is high but standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
         expect(runner.not_upgrade_premium_set?).to be(true)
       end
 
@@ -713,7 +713,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
         runner.update(label: "ubicloud-standard-4-arm")
         VmHost[arch: "arm64"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
       it "checks the arm alien quota when spilling over an arm64 runner" do
@@ -738,7 +738,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if premium utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
       it "waits if premium utilization is high but standard utilization is low" do
@@ -759,32 +759,32 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if premium utilization is low than 50" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64").update(used_cores: 4)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
         expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is higher than 50" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64").update(used_cores: 10)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
         expect(runner.not_upgrade_premium_set?).to be(true)
       end
     end
   end
 
   describe "#apply_custom_label_quota" do
-    it "hops to allocate_vm if custom label exists and has concurrency limit available" do
+    it "hops to wait_allocation_slot if custom label exists and has concurrency limit available" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
       expect(runner).to receive(:installation_id).and_return(installation.id).twice
-      expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+      expect { nx.apply_custom_label_quota }.to hop("wait_allocation_slot")
     end
 
-    it "hops to allocate_vm if custom label exists and concurrency limit is not set" do
+    it "hops to wait_allocation_slot if custom label exists and concurrency limit is not set" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       expect(runner).to receive(:actual_label).and_return("custom-label-1")
       expect(runner).to receive(:installation_id).and_return(installation.id)
-      expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+      expect { nx.apply_custom_label_quota }.to hop("wait_allocation_slot")
     end
 
     it "naps if custom label exists and concurrency limit is not available" do
@@ -793,6 +793,45 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
       expect(Clog).to receive(:emit).with("hit custom label concurrency limit", instance_of(Hash)).and_call_original
       expect { nx.apply_custom_label_quota }.to nap
+    end
+  end
+
+  describe "#wait_allocation_slot" do
+    before do
+      allow(Config).to receive(:github_runner_allocation_slots).and_return(4)
+    end
+
+    it "hops to allocate_vm without counting vms if the limit is disabled" do
+      allow(Config).to receive(:github_runner_allocation_slots).and_return(0)
+      expect(Vm).not_to receive(:where)
+      expect { nx.wait_allocation_slot }.to hop("allocate_vm")
+    end
+
+    it "hops to allocate_vm if a new runner fits into half of the slots" do
+      expect { nx.wait_allocation_slot }.to hop("allocate_vm")
+    end
+
+    it "only counts unallocated vms of the same arch in the runner location" do
+      create_vm(location_id: Location::GITHUB_RUNNERS_ID, arch: "arm64", name: "arm-vm")
+      create_vm(location_id: Location::HETZNER_FSN1_ID, name: "other-location-vm")
+      create_vm(location_id: Location::GITHUB_RUNNERS_ID, vm_host_id: create_vm_host.id, name: "allocated-vm")
+      expect { nx.wait_allocation_slot }.to hop("allocate_vm")
+    end
+
+    it "lets runners use more slots the longer they wait" do
+      2.times { create_vm(location_id: Location::GITHUB_RUNNERS_ID, name: "queued-vm-#{it}") }
+      expect { nx.wait_allocation_slot }.to nap
+      runner.update(created_at: now - 1800)
+      expect { nx.wait_allocation_slot }.to nap
+      runner.update(created_at: now - 3600)
+      expect { nx.wait_allocation_slot }.to hop("allocate_vm")
+    end
+
+    it "naps for a fixed interval regardless of waiting time" do
+      runner.update(created_at: now - 3600)
+      4.times { create_vm(location_id: Location::GITHUB_RUNNERS_ID, name: "queued-vm-#{it}") }
+      expect(nx).to receive(:rand).with(10..20).and_return(15)
+      expect { nx.wait_allocation_slot }.to nap(15)
     end
   end
 
