@@ -184,6 +184,7 @@ RSpec.describe VmHost do
         ip4, r_address = vm_host.ip4_random_vm_network
         expect(r_address).to be_a Address
         expect(r_address.id).to eq address_id
+        expect(r_address.keys).to match_array Address.columns
         expect(ips).to include ip4.to_s
 
         project_id = Project.create(name: "test").id
