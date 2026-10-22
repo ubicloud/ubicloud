@@ -7,8 +7,12 @@ rm -rf $new_ssl_folder
 rm -rf /ie/workdir/ssl_latest
 mkdir $new_ssl_folder
 
-curl -f -L3 [FD00:0B1C:100D:5afe:CE::]/load-balancer/cert.pem > $new_ssl_folder/ubi_cert.pem
-curl -f -L3 [FD00:0B1C:100D:5afe:CE::]/load-balancer/key.pem > $new_ssl_folder/ubi_key.pem
+# Spelled long because curl bundles short options: its own table reads
+# "-3, --sslv3", so "-L3" was --location --sslv3, not a redirect limit. --sslv3
+# asks for a protocol RFC 7568 withdrew and curl has ignored outright since
+# 7.77.0, so only --location is kept.
+curl --fail --location [FD00:0B1C:100D:5afe:CE::]/load-balancer/cert.pem > $new_ssl_folder/ubi_cert.pem
+curl --fail --location [FD00:0B1C:100D:5afe:CE::]/load-balancer/key.pem > $new_ssl_folder/ubi_key.pem
 
 chown -R ie:ie $new_ssl_folder
 chmod 640 $new_ssl_folder/ubi_key.pem
