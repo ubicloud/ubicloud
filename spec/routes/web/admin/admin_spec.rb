@@ -1055,15 +1055,16 @@ RSpec.describe CloverAdmin do
   end
 
   it "omits the backtrace from the details of active pages on index page" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil, extra_data: {"exception" => {"class" => "RuntimeError", "backtrace" => ["clover.rb:1"]}}).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil, extra_data: {"exception" => {"class" => "RuntimeError", "backtrace" => ["clover.rb:1"]}, "causes" => [{"class" => "KeyError", "backtrace" => ["clover.rb:2"]}]}).subject
     visit "/"
     expect(page_data).to eq [
-      ["", "some problem", "[]", "{\"exception\" => {\"class\" => \"RuntimeError\"}}"],
+      ["", "some problem", "[]", "{\"causes\" => [{\"class\" => \"KeyError\"}], \"exception\" => {\"class\" => \"RuntimeError\"}}"],
     ]
-    expect(page).to have_no_content "clover.rb:1"
+    expect(page).to have_no_content "clover.rb:"
 
     click_link page1.summary
     expect(page).to have_content "clover.rb:1"
+    expect(page).to have_content "clover.rb:2"
   end
 
   it "hides snoozed pages on index page and shows a note about them" do
