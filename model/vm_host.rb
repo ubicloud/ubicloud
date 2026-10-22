@@ -466,7 +466,7 @@ class VmHost < Sequel::Model
     end
 
     pulse.merge!(dns_egress_pulse(session, previous_pulse, "4"))
-    pulse.merge!(dns_egress_pulse(session, previous_pulse, "6")) if net6
+    pulse.merge!(dns_egress_pulse(session, previous_pulse, "6")) if net6 && !ipv6_disabled
 
     pulse
   end
