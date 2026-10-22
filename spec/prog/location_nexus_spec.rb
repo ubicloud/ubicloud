@@ -19,6 +19,15 @@ RSpec.describe Prog::LocationNexus do
     expect(nx.location).to receive(:scheduled_maintenance_events).and_return(events)
   end
 
+  def gcp_nx(project_id: nil)
+    loc = Location.create(name: "gcp-us-east4", provider: "gcp", project_id:, display_name: "gcp", ui_name: "gcp", visible: true)
+    LocationCredentialGcp.create_with_id(loc, project_id: "test-project", service_account_email: "test@test-project.iam.gserviceaccount.com", credentials_json: "{}")
+    compute_client = instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client)
+    expect(Google::Cloud::Compute::V1::Instances::Rest::Client).to receive(:new).and_return(compute_client)
+    expect(compute_client).to receive(:aggregated_list).and_raise(Google::Cloud::PermissionDeniedError.new("test"))
+    described_class.new(Strand.create_with_id(loc, prog: "LocationNexus", label: "wait"))
+  end
+
   describe "#wait" do
     it "recycles the server and bypasses the maintenance window when the event is within 24h" do
       stub_events({server.vm_id => Time.now + 10 * 3600})
@@ -71,6 +80,25 @@ RSpec.describe Prog::LocationNexus do
       expect(page.severity).to eq("warning")
       expect(page.details).to eq({"project" => location.project.ubid, "related_resources" => [location.ubid]})
       expect(page.resource_id).to eq(location.id)
+    end
+
+    it "pages and naps for 31d if GCP returns PermissionDenied" do
+      test_nx = gcp_nx(project_id: project.id)
+
+      expect { test_nx.wait }.to nap(3600 * 24 * 31)
+      page = Page.from_tag_parts("GcpPermissionDenied", test_nx.location.ubid)
+      expect(page.summary).to eq("gcp_permission_denied")
+      expect(page.severity).to eq("warning")
+      expect(page.details).to eq({"project" => project.ubid, "related_resources" => [test_nx.location.ubid]})
+      expect(page.resource_id).to eq(test_nx.location.id)
+    end
+
+    it "pages without a project when GCP returns PermissionDenied for a public location" do
+      test_nx = gcp_nx
+
+      expect { test_nx.wait }.to nap(3600 * 24 * 31)
+      page = Page.from_tag_parts("GcpPermissionDenied", test_nx.location.ubid)
+      expect(page.details).to eq({"project" => nil, "related_resources" => [test_nx.location.ubid]})
     end
 
     it "skips provider ip range refresh when metering is disabled" do
