@@ -99,7 +99,7 @@ class GithubRunner < Sequel::Model
   def provision_spare_runner(force: false)
     return if !force && spare_runner_provisioned_set?
     incr_spare_runner_provisioned
-    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
+    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:, actual_label:).subject
   end
 
   def init_health_monitor_session
