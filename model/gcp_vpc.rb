@@ -11,6 +11,10 @@ class GcpVpc < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :update_firewall_rules
+
+  def management?
+    dedicated_for_private_subnet&.gcp_management? || false
+  end
 end
 
 # Table: gcp_vpc

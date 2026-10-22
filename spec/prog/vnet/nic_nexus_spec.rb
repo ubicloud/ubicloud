@@ -109,6 +109,20 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.prog).to eq("Vnet::Gcp::NicNexus")
       expect(strand.label).to eq("start")
     end
+
+    it "gives a NIC in the GCP management subnet a single address" do
+      service_project = Project.create(name: "pg-service")
+      allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
+      gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: service_project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      mgmt_ps = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: gcp_location.id,
+        project_id: service_project.id, net6: "fd1b:9793:dcef:cd0d::/64", net4: "100.64.0.0/20", state: "waiting")
+
+      nic = described_class.assemble(mgmt_ps.id, name: "mgmt-nic", is_management: true).subject
+
+      expect(nic.private_ipv4.netmask.prefix_len).to eq(32)
+      expect(mgmt_ps.net4.contains(nic.private_ipv4.network)).to be true
+    end
   end
 
   describe ".select_aws_subnet" do

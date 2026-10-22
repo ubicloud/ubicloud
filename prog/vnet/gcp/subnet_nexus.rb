@@ -27,11 +27,36 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # See doc/gcp_firewall_architecture.md for the full design.
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
+  MANAGEMENT_NET4 = "100.64.0.0/20"
+
+  def self.assemble_management(location_id)
+    unless (location = Location[location_id])&.gcp?
+      fail "No existing GCP location"
+    end
+
+    unless (project = Project[Config.postgres_service_project_id])
+      fail "No existing Postgres service project"
+    end
+
+    key = {project_id: project.id, location_id: location.id, name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME}
+    DB.transaction do
+      PrivateSubnet.dataset.insert_conflict(target: key.keys).insert(
+        id: PrivateSubnet.generate_uuid,
+        net4: MANAGEMENT_NET4,
+        net6: Prog::Vnet::SubnetNexus.random_private_ipv6(location, project).to_s,
+        state: "waiting",
+        **key,
+      )
+      ps = PrivateSubnet.first(key)
+      ps.strand || Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label: "start")
+    end
+  end
+
   label def start
     register_deadline("wait", 5 * 60)
 
     gcp_vpc = private_subnet.gcp_vpc ||
-      (private_subnet.project.gcp_dedicated_subnet_vpcs ? ensure_dedicated_vpc : ensure_shared_vpc)
+      ((private_subnet.gcp_management? || private_subnet.project.gcp_dedicated_subnet_vpcs) ? ensure_dedicated_vpc : ensure_shared_vpc)
     unless private_subnet.gcp_vpc
       gcp_vpc.add_private_subnet(private_subnet)
       # Firewalls attached to this subnet (or to VMs whose NICs live in
@@ -65,7 +90,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         description: "Ubicloud subnet for #{private_subnet.ubid} [Ubicloud=#{Config.provider_resource_tag_value}]",
         ip_cidr_range: private_subnet.net4.to_s,
         network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
-        private_ip_google_access: true,
+        private_ip_google_access: !private_subnet.gcp_management?,
         stack_type: "IPV4_IPV6",
         ipv6_access_type: "EXTERNAL",
       ),
@@ -93,6 +118,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_tag_resources
+    hop_wait if private_subnet.gcp_management?
+
     self.tag_key_name ||= ensure_tag_key
     # Emit on every entry (including frame re-reads) so a strand that
     # crashed between creating the tag key and the next nap still surfaces
