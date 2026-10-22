@@ -146,6 +146,8 @@ module Config
   override :github_runner_aws_spill_threshold_seconds, 30, int
   override :github_runner_aws_spill_vcpu_capacity, 100, int
   override :github_runner_aws_spill_runner_capacity, 50, int
+  # 0 disables the limit on unallocated runner VMs
+  override :github_runner_allocation_slots, 1000, int
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string

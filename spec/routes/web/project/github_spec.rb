@@ -268,6 +268,7 @@ RSpec.describe Clover, "github" do
       )
       runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-2", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
       runner_custom_label_quota = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4", repository_name: "my-repo").update(label: "apply_custom_label_quota").subject.update(created_at: now - 120)
+      runner_allocation_slot = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-2", repository_name: "my-repo").update(label: "wait_allocation_slot").subject.update(created_at: now - 60)
 
       [
         [now, "standard-2", 15],
@@ -293,12 +294,13 @@ RSpec.describe Clover, "github" do
         ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
         ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
         ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
+        ["my-repo", "#{runner_allocation_slot.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Queued for provisioning\nWaiting for 1m", "", ""],
         ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
         ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
       ]
       expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
         ["Allocated vCPU", "4 vCPU"],
-        ["Requested vCPU", "14 vCPU"],
+        ["Requested vCPU", "16 vCPU"],
         ["Today", "$0.02"],
         ["Last 30 Days", "$1600.02"],
       ]
