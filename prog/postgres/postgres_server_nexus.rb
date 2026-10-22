@@ -356,6 +356,7 @@ After=postgresql.service
 Type=oneshot
 User=ubi
 ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
+TimeoutStartSec=30
 StandardOutput=journal
 StandardError=journal
 SERVICE
@@ -395,6 +396,7 @@ User=ubi_monitoring
 AmbientCapabilities=CAP_DAC_READ_SEARCH
 NoNewPrivileges=true
 ExecStart=/usr/bin/env ruby /home/ubi/postgres/bin/collect-pg-metrics #{postgres_server.version}
+TimeoutStartSec=30
 StandardOutput=journal
 StandardError=journal
 SERVICE

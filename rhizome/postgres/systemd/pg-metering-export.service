@@ -4,3 +4,4 @@ Description=Export pg network metering counters to node_exporter textfile
 [Service]
 Type=oneshot
 ExecStart=/home/ubi/postgres/bin/export-network-metrics
+TimeoutStartSec=30
