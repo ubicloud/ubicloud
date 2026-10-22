@@ -283,6 +283,12 @@ RSpec.describe Project do
     Strand.create(id: gr_alien_arm.id, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
 
     expect(project.current_resource_usage("GithubRunnerVCpuArmAws")).to eq 16
+
+    gr_unplaced = gi.add_runner(label: "ubicloud-standard-8", repository_name: "a/a")
+    Strand.create(id: gr_unplaced.id, label: "allocate_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 10
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 4
   end
 
   it "counts no alien vcpu usage when the aws alien location isn't configured" do
