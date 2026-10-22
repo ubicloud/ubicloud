@@ -1020,6 +1020,46 @@ RSpec.describe Clover, "auth" do
       end
     end
 
+    it "syncs account email on OAuth login only if OAuth is the only login method" do
+      provider = oidc_provider
+      omniauth_key = provider.ubid.to_sym
+
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "user@example.com"})
+      click_button "Login"
+
+      account = Account.first
+      expect(account.email).to eq "user@example.com"
+
+      # Case 1: Only login method (OAuth only, no password, 1 identity) -> email updates
+      click_button "Logout"
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "updated_user@example.com"})
+      click_button "Login"
+      expect(account.reload.email).to eq "updated_user@example.com"
+
+      # Case 2: Account has a password -> email is not updated
+      DB[:account_password_hashes].insert(id: account.id, password_hash: BCrypt::Password.create("password"))
+      click_button "Logout"
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "another_user@example.com"})
+      click_button "Login"
+      expect(account.reload.email).to eq "updated_user@example.com"
+
+      # Case 3: Account has multiple identities -> email is not updated
+      DB[:account_password_hashes].where(id: account.id).delete
+      AccountIdentity.create(account_id: account.id, provider: "github", uid: "gh_123")
+      click_button "Logout"
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "another_user@example.com"})
+      click_button "Login"
+      expect(account.reload.email).to eq "updated_user@example.com"
+    end
+
     it "cannot login to an account via password when domain is locked" do
       oidc_provider.add_locked_domain(domain: "Example.com")
       account = create_account
