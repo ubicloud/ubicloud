@@ -114,13 +114,16 @@ end
 
 # Table: billing_info
 # Columns:
-#  id         | uuid                     | PRIMARY KEY
-#  stripe_id  | text                     | NOT NULL
-#  created_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  valid_vat  | boolean                  |
+#  id           | uuid                     | PRIMARY KEY
+#  stripe_id    | text                     | NOT NULL
+#  created_at   | timestamp with time zone | NOT NULL DEFAULT now()
+#  valid_vat    | boolean                  |
+#  invoice_from | text                     |
 # Indexes:
 #  billing_info_pkey          | PRIMARY KEY btree (id)
 #  billing_info_stripe_id_key | UNIQUE btree (stripe_id)
+# Check constraints:
+#  valid_invoice_from | (invoice_from = ANY (ARRAY['inc'::text, 'bv'::text]))
 # Referenced By:
 #  payment_method | payment_method_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 #  project        | project_billing_info_id_fkey        | (billing_info_id) REFERENCES billing_info(id)
