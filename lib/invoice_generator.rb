@@ -60,9 +60,11 @@ class InvoiceGenerator
           project_content[:usd_to_eur_rate] = @eur_rate
         end
 
+        invoice_from = bi&.invoice_from || ((is_eu || convert_usd_to_eur) ? "bv" : "inc")
+
         if bi && bi.payment_methods.empty?
           project_content[:due_date] = (Date.today + 30).to_s
-          if is_eu || convert_usd_to_eur
+          if invoice_from == "bv"
             project_content[:bank_transfer_info] = {
               "Beneficiary" => "Ubicloud B.V.",
               "IBAN" => "NL30REVO6759811127",
@@ -90,7 +92,7 @@ class InvoiceGenerator
         #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
         #   - If the customer has provided a VAT number from another European country that we have validated, we include a reverse charge notice along with 0% VAT.
         #   - If the customer hasn't provided a VAT number, or the one they provided has not been validated, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
-        project_content[:issuer_info] = if is_eu
+        project_content[:issuer_info] = if invoice_from == "bv"
           {
             name: "Ubicloud B.V.",
             address: "Turfschip 267",
