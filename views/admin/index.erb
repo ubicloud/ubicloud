@@ -18,7 +18,8 @@
       <tbody>
         <% @grouped_pages.sort_by { |k,| k || "z" }.each do |root_resource_id, pages| %>
           <% pages.each_with_index do |page, index| %>
-            <% details = page.details.except("backtrace") %>
+            <% details = page.details.dup %>
+            <% details["exception"] = details["exception"].except("backtrace") if details["exception"] %>
             <% resources = details.delete("related_resources") %>
 
             <tr>

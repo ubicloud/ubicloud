@@ -1055,10 +1055,10 @@ RSpec.describe CloverAdmin do
   end
 
   it "omits the backtrace from the details of active pages on index page" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil, extra_data: {"exception_class" => "RuntimeError", "backtrace" => ["clover.rb:1"]}).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil, extra_data: {"exception" => {"class" => "RuntimeError", "backtrace" => ["clover.rb:1"]}}).subject
     visit "/"
     expect(page_data).to eq [
-      ["", "some problem", "[]", "{\"exception_class\" => \"RuntimeError\"}"],
+      ["", "some problem", "[]", "{\"exception\" => {\"class\" => \"RuntimeError\"}}"],
     ]
     expect(page).to have_no_content "clover.rb:1"
 
