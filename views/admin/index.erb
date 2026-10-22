@@ -20,6 +20,7 @@
           <% pages.each_with_index do |page, index| %>
             <% details = page.details.dup %>
             <% details["exception"] = details["exception"].except("backtrace") if details["exception"] %>
+            <% details["causes"] = details["causes"].map { it.except("backtrace") } if details["causes"] %>
             <% resources = details.delete("related_resources") %>
 
             <tr>
