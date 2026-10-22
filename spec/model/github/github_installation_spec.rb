@@ -30,6 +30,18 @@ RSpec.describe GithubInstallation do
     expect(installation.total_active_runner_vcpus).to eq(6)
   end
 
+  describe "#active_runners_dataset" do
+    it "excludes runners being destroyed and includes other runners" do
+      vms = [2, 4].map { create_vm(cores: it) }
+      active = GithubRunner.create(installation_id: installation.id, vm_id: vms[0].id, location_id: vms[0].location_id, repository_name: "test-repo", label: "ubicloud-standard-2")
+      Strand.create_with_id(active, prog: "Github::GithubRunnerNexus", label: "wait")
+      destroying = GithubRunner.create(installation_id: installation.id, vm_id: vms[1].id, location_id: vms[1].location_id, repository_name: "test-repo", label: "ubicloud-standard-4")
+      Strand.create_with_id(destroying, prog: "Github::GithubRunnerNexus", label: "destroy")
+
+      expect(installation.active_runners_dataset.all).to eq([active])
+    end
+  end
+
   describe "#cache_storage_gib" do
     it "returns effective quota if the premium is not enabled" do
       installation.update(allocator_preferences: {})

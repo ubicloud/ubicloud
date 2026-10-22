@@ -47,6 +47,14 @@ module Ubicloud
       @values[:repositories] = adapter.get(_path("/repository"))[:items].map { GithubRepository.new(adapter, it) }
     end
 
+    def runners(reload: false)
+      if (runners = @values[:runners]) && !reload
+        return runners
+      end
+
+      @values[:runners] = adapter.get(_path("/runner"))[:items].map { GithubRunner.new(adapter, it) }
+    end
+
     private
 
     def _path(rest = "")
