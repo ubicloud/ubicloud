@@ -652,7 +652,7 @@ DEPENDENCIES
   webmock
 
 RUBY VERSION
-  ruby 4.0.7
+  ruby 4.0.8
 
 BUNDLED WITH
   4.0.20
