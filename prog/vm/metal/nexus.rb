@@ -52,7 +52,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def queued_vms
-    Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
+    Vm.where(location_id: vm.location_id, arch: vm.arch, vm_host_id: nil)
   end
 
   def before_destroy
@@ -135,7 +135,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       page_tag_parts = ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family]
       if waiting_seconds >= page_after_minutes * 60 && !Page.from_tag_parts(*page_tag_parts)
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", page_tag_parts, queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", page_tag_parts, queued_vms.limit(25).select_map(:id).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
       nap capacity_wait_seconds
