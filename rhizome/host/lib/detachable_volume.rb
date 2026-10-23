@@ -3,8 +3,8 @@
 require_relative "../../common/lib/util"
 require_relative "vhost_block_backend"
 require_relative "kek_pipe"
-require_relative "remote_storage_server"
 require_relative "storage_key_encryption"
+require_relative "storage_path"
 require "fileutils"
 require "json"
 require "openssl"
@@ -49,7 +49,7 @@ class DetachableVolume
 
   def secrets_conf = File.join(@dir, "vhost-backend-secrets.conf")
 
-  def unit = "dv-#{@id}-storage.service"
+  def unit = StoragePath.detachable(@id).vhost_backend_service
 
   def exist? = File.exist?(main_conf)
 
@@ -260,16 +260,6 @@ class DetachableVolume
 
   def remote_source?
     File.exist?(source_conf) && PerfectTOML.load_file(source_conf).dig("stripe_source", "type") == "remote"
-  end
-
-  def serve(port:, psk:, psk_identity:, kek:, server_version:)
-    server = VhostBlockBackend.new(server_version)
-    fail "remote-stripe-server requires vhost block backend v0.5.0 or later" unless server.supports_remote_stripe_server?
-
-    stop
-    run_with_kek_pipe([server.remote_stripe_server_path, "-f", main_conf, "--listen-config", "/dev/stdin"],
-      kek_pipe: kek_pipe_path, kek_content: kek, env: {"RUST_LOG" => "info"},
-      stdin: RemoteStorageServer.listen_config(port, psk, psk_identity))
   end
 
   def drop_source

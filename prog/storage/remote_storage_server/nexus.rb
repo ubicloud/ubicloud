@@ -122,19 +122,12 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   # (never written to the host in the clear) so the host-side helper can serve
   # the (encrypted) source volume with TLS-PSK.
   def start_daemon
-    source = remote_storage_server.source_vm_storage_volume
-    unless source
-      volume = remote_storage_server.source_detachable_volume
-      sshable.d_run(daemon_name, "sudo", "host/bin/detachable-volume", "serve", volume.ubid, stdin: {
-        "kek" => volume.key_encryption_key_1.key,
-        "psk" => remote_storage_server.psk,
-        "psk_identity" => remote_storage_server.psk_identity,
-        "port" => remote_storage_server.port,
-        "server_version" => server_version,
-      }.to_json)
-      return
+    source = remote_storage_server.source_vm_storage_volume || remote_storage_server.source_detachable_volume
+    source_args = if source.is_a?(VmStorageVolume)
+      [source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s, source.vhost_block_backend_version]
+    else
+      [source.ubid]
     end
-
     secrets = {
       "kek" => source.key_encryption_key_1.secret_key_material_hash,
       "psk" => remote_storage_server.psk,
@@ -142,9 +135,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     sshable.d_run(
       daemon_name,
       "sudo", "host/bin/setup-remote-storage-server",
-      source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s,
-      source.vhost_block_backend_version, server_version, remote_storage_server.port.to_s,
-      remote_storage_server.psk_identity,
+      *source_args, server_version, remote_storage_server.port.to_s, remote_storage_server.psk_identity,
       stdin: secrets.to_json,
     )
   end

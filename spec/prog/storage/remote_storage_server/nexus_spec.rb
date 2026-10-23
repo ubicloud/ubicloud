@@ -158,15 +158,12 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
       expect { dnx.start }.to hop("run_server")
     end
 
-    it "runs host/bin/detachable-volume serve with the keys on stdin" do
+    it "runs host/bin/setup-remote-storage-server on the volume, with the keys on stdin" do
       expect(dnx.sshable).to receive(:d_check).with(dnx.daemon_name).and_return("NotStarted")
       expect(dnx.sshable).to receive(:d_run) do |name, *args, stdin:|
         expect(name).to eq(dnx.daemon_name)
-        expect(args).to eq(["sudo", "host/bin/detachable-volume", "serve", volume.ubid])
-        expect(JSON.parse(stdin)).to eq({
-          "kek" => volume.key_encryption_key_1.key, "psk" => server.psk, "psk_identity" => server.psk_identity,
-          "port" => server.port, "server_version" => "v0.5.1",
-        })
+        expect(args).to eq(["sudo", "host/bin/setup-remote-storage-server", volume.ubid, "v0.5.1", server.port.to_s, server.psk_identity])
+        expect(JSON.parse(stdin)).to eq({"kek" => volume.key_encryption_key_1.secret_key_material_hash, "psk" => server.psk})
       end
       expect { dnx.run_server }.to nap(5)
     end
