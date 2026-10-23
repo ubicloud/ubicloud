@@ -16,6 +16,8 @@ RSpec.describe Clover, "cli pg show" do
   end
 
   it "shows information for PostgreSQL database" do
+    expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
+    DnsZone.create(project_id: @project.id, name: "pg.example.com")
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
     @pg.add_log_destination(name: "ld-name", type: "syslog", url: "tcp://logs.example.com:6514")
     @pg.update(root_cert_1: "a", root_cert_2: "b")
@@ -35,6 +37,8 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
+      hostname: test-pg.#{@pg.ubid}.pg.example.com
+      private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -70,6 +74,8 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
+      hostname: test-pg.#{@pg.ubid}.pg.example.com
+      private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
