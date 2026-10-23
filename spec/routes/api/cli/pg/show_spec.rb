@@ -16,8 +16,6 @@ RSpec.describe Clover, "cli pg show" do
   end
 
   it "shows information for PostgreSQL database" do
-    expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
-    DnsZone.create(project_id: @project.id, name: "pg.example.com")
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
     @pg.add_log_destination(name: "ld-name", type: "syslog", url: "tcp://logs.example.com:6514")
     @pg.update(root_cert_1: "a", root_cert_2: "b")
@@ -37,8 +35,6 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
-      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
-      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -74,8 +70,6 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
-      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
-      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -112,6 +106,16 @@ RSpec.describe Clover, "cli pg show" do
     expect(cli(%W[pg #{@ref} show -f id,name])).to eq <<~END
       id: #{@pg.ubid}
       name: test-pg
+    END
+  end
+
+  it "shows connection strings when requested with -f" do
+    expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
+    DnsZone.create(project_id: @project.id, name: "pg.example.com")
+
+    expect(cli(%W[pg #{@ref} show -f connection-string,private-connection-string])).to eq <<~END
+      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
     END
   end
 end
