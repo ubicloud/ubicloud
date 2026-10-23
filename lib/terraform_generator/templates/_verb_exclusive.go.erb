@@ -1,0 +1,59 @@
+<%# One declarer (postgres upgrade). The arm encodes its protocol:
+single-step major advance, a status probe whose sole 400 means idle,
+a version-targeted wait. Only exclusivity itself is generic here;
+parameterize the rest when a second exclusive verb exists, not
+before. -%>
+		{name: "<%= v.name %>",
+			changed: func(plan, state *<%= model_type %>) bool {
+				return !plan.Version.Equal(state.Version)
+			},
+			run: func(plan, state *<%= model_type %>) diag.Diagnostics {
+				var diags diag.Diagnostics
+				fail := func(summary, detail string) { diags.AddError(summary, detail) }
+				// The upgrade is irreversible and the backend advances exactly
+				// one major, server-chosen; it never combines with any other
+				// change.
+				if <%= non_exclusive_attr_fields.map { "!plan.#{it}.Equal(state.#{it})" }.join(" || ") %> {
+					fail("Version upgrades cannot combine with other changes",
+						"apply the version change alone, then the remaining changes.")
+					return diags
+				}
+				stateV, errS := strconv.Atoi(state.Version.ValueString())
+				planV, errP := strconv.Atoi(plan.Version.ValueString())
+				if errS != nil || errP != nil || planV != stateV+1 {
+					fail("Unsupported version change",
+						fmt.Sprintf("a major version advances exactly one at a time (%s -> %d); got %s -> %s",
+							state.Version.ValueString(), stateV+1, state.Version.ValueString(), plan.Version.ValueString()))
+					return diags
+				}
+				statusResp, err := <%= verb_read_call(v, "PostgresUpgradeStatus") %>
+				if err != nil {
+					diags.Append(apiFailErr("reading", "<%= human %> upgrade status", <%= camel_lower %>ResourceLogIdentifier(state), err)...)
+					return diags
+				}
+				// The status endpoint's sole 400 is "Database is not
+				// upgrading": idle or already converged - proceed. A 200 means
+				// one is in flight or failed; never re-mask a failed upgrade.
+				if statusResp.StatusCode() == http.StatusOK && statusResp.JSON200 != nil {
+					fail(fmt.Sprintf("An upgrade is already %s", string(statusResp.JSON200.UpgradeStatus)),
+						fmt.Sprintf("current %s, target %s; resolve it before planning another.",
+							statusResp.JSON200.CurrentVersion, statusResp.JSON200.TargetVersion))
+					return diags
+				}
+				apiResp, err := <%= verb_call(v, body: "nil") %>
+				if err != nil {
+					diags.Append(apiFailErr("starting", "<%= human %> upgrade", <%= camel_lower %>ResourceLogIdentifier(state), err)...)
+					return diags
+				}
+				if apiResp.StatusCode() != http.StatusOK {
+					diags.Append(apiFailStatus("starting", "<%= human %> upgrade", <%= camel_lower %>ResourceLogIdentifier(state), apiResp.Status(), apiResp.Body)...)
+					return diags
+				}
+				if _, waitDiags := waitFor<%= camel %>Version(ctx, r, state, plan.Version.ValueString(),
+					envDuration("<%= env_prefix %>_UPGRADE_TIMEOUT", 3600*time.Second),
+					envDuration("<%= env_prefix %>_POLL_INTERVAL", 10*time.Second)); waitDiags.HasError() {
+					diags.Append(waitDiags...)
+					return diags
+				}
+				return diags
+			}},

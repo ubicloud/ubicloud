@@ -1,0 +1,32 @@
+terraform {
+  required_providers {
+    ubicloud = { source = "ubicloud/ubicloud" }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_postgres" "db" {
+  project_id   = "<%= project_ubid %>"
+  location     = "<%= location %>"
+  name         = "<%= name %>"
+  size         = "standard-2"
+  storage_size = <%= storage %>
+<% if defined?(pg_version) && pg_version -%>
+  version      = "<%= pg_version %>"
+<% end -%>
+<% if defined?(mw_start) && mw_start -%>
+  maintenance_window_start_at = <%= mw_start %>
+  maintenance_window_days     = [<%= mw_days.map { "\"#{it}\"" }.join(", ") %>]
+<% end -%>
+<% if defined?(pg_config) && pg_config -%>
+  pg_config = {
+<% pg_config.each do |k, v| -%>
+    <%= k %> = "<%= v %>"
+<% end -%>
+  }
+<% end -%>
+}

@@ -1,0 +1,10 @@
+inherit_from: ../../.rubocop.yml
+
+# The terraform harness is an acceptance suite, not unit specs: files
+# are *_harness.rb so the default *_spec.rb pattern never loads them
+# (they need go, terraform, and a provider checkout), and describes
+# name terraform resources rather than Ruby classes.
+RSpec/SpecFilePathSuffix:
+  Enabled: false
+RSpec/DescribeClass:
+  Enabled: false
