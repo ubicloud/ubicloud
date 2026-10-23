@@ -63,15 +63,6 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   label def start
     register_deadline("wait", 5 * 60)
-    # The source volume's vhost backend keeps running when its VM is stopped, so
-    # it still holds the disk and the kek pipe. Stop it so the remote server can
-    # open the volume exclusively. The source VM cannot run again until its
-    # storage is restarted, which is the intended migration semantics.
-    if (source = remote_storage_server.source_vm_storage_volume)
-      sshable.cmd("sudo systemctl stop :unit", unit: source.vhost_backend_systemd_unit_name)
-    else
-      sshable.cmd_json("sudo host/bin/detachable-volume stop :volume_id", volume_id: remote_storage_server.source_detachable_volume.ubid)
-    end
     hop_run_server
   end
 
@@ -120,21 +111,15 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   # Start the daemon, delivering the source volume's KEK and the PSK over stdin
   # (never written to the host in the clear) so the host-side helper can serve
-  # the (encrypted) source volume with TLS-PSK.
+  # the (encrypted) source volume with TLS-PSK. The helper stops the volume's
+  # vhost backend first.
   def start_daemon
-    source = remote_storage_server.source_vm_storage_volume
-    unless source
-      volume = remote_storage_server.source_detachable_volume
-      sshable.d_run(daemon_name, "sudo", "host/bin/detachable-volume", "serve", volume.ubid, stdin: {
-        "kek" => volume.key_encryption_key_1.key,
-        "psk" => remote_storage_server.psk,
-        "psk_identity" => remote_storage_server.psk_identity,
-        "port" => remote_storage_server.port,
-        "server_version" => server_version,
-      }.to_json)
-      return
+    source = remote_storage_server.source_vm_storage_volume || remote_storage_server.source_detachable_volume
+    source_args = if source.is_a?(VmStorageVolume)
+      [source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s, source.vhost_block_backend_version]
+    else
+      [source.ubid]
     end
-
     secrets = {
       "kek" => source.key_encryption_key_1.secret_key_material_hash,
       "psk" => remote_storage_server.psk,
@@ -142,9 +127,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     sshable.d_run(
       daemon_name,
       "sudo", "host/bin/setup-remote-storage-server",
-      source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s,
-      source.vhost_block_backend_version, server_version, remote_storage_server.port.to_s,
-      remote_storage_server.psk_identity,
+      *source_args, server_version, remote_storage_server.port.to_s, remote_storage_server.psk_identity,
       stdin: secrets.to_json,
     )
   end

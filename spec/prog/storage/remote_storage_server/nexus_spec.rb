@@ -59,8 +59,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
   end
 
   describe "#start" do
-    it "stops the source volume's vhost backend and hops to run_server" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{source_volume.vhost_backend_systemd_unit_name}")
+    it "hops to run_server, leaving stopping the source's backend to the host" do
       expect { nx.start }.to hop("run_server")
       expect(nx.frame["deadline_target"]).to eq("wait")
     end
@@ -153,20 +152,12 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
       expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error(/\AHost doesn't have ubiblk /)
     end
 
-    it "stops the volume's backend so the server can open it" do
-      expect(dnx.sshable).to receive(:_cmd).with("sudo host/bin/detachable-volume stop #{volume.ubid}").and_return(JSON.generate({"caught_up" => true}))
-      expect { dnx.start }.to hop("run_server")
-    end
-
-    it "runs host/bin/detachable-volume serve with the keys on stdin" do
+    it "runs host/bin/setup-remote-storage-server on the volume, with the keys on stdin" do
       expect(dnx.sshable).to receive(:d_check).with(dnx.daemon_name).and_return("NotStarted")
       expect(dnx.sshable).to receive(:d_run) do |name, *args, stdin:|
         expect(name).to eq(dnx.daemon_name)
-        expect(args).to eq(["sudo", "host/bin/detachable-volume", "serve", volume.ubid])
-        expect(JSON.parse(stdin)).to eq({
-          "kek" => volume.key_encryption_key_1.key, "psk" => server.psk, "psk_identity" => server.psk_identity,
-          "port" => server.port, "server_version" => "v0.5.1",
-        })
+        expect(args).to eq(["sudo", "host/bin/setup-remote-storage-server", volume.ubid, "v0.5.1", server.port.to_s, server.psk_identity])
+        expect(JSON.parse(stdin)).to eq({"kek" => volume.key_encryption_key_1.secret_key_material_hash, "psk" => server.psk})
       end
       expect { dnx.run_server }.to nap(5)
     end

@@ -3,13 +3,13 @@
 require_relative "../lib/remote_storage_server"
 
 RSpec.describe RemoteStorageServer do
-  subject(:server) { described_class.new("vmxyz", "default", 0, "v0.5.0", "v0.5.0") }
+  subject(:server) { described_class.for_vm_volume("vmxyz", "default", 0, "v0.5.0", "v0.5.0") }
 
   let(:kek_material) { {"key" => "a2V5", "init_vector" => "aXY=", "auth_data" => "vmxyz_0"} }
 
-  describe ".listen_config" do
+  describe "#listen_config" do
     it "builds a listen config with the address and PSK" do
-      config = PerfectTOML.parse(described_class.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss"))
+      config = PerfectTOML.parse(server.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss"))
       expect(config["server"]).to eq({"address" => "0.0.0.0:4600", "psk" => {"identity" => "ubiblk-rss", "secret" => {"ref" => "psk"}}})
       expect(config["secrets"]["psk"]).to eq({"source" => {"inline" => "cHNrYnl0ZXM="}, "encoding" => "base64"})
     end
@@ -21,7 +21,7 @@ RSpec.describe RemoteStorageServer do
     end
 
     it "builds a legacy KEK YAML for a v0.2.x source" do
-      legacy = described_class.new("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
+      legacy = described_class.for_vm_volume("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
       yaml = YAML.safe_load(legacy.kek_payload(kek_material))
       expect(yaml["method"]).to eq("aes256-gcm")
       expect(yaml["key"]).to eq("a2V5")
@@ -31,11 +31,18 @@ RSpec.describe RemoteStorageServer do
 
   describe "#run" do
     it "refuses server binaries older than v0.5.0" do
-      old = described_class.new("vmxyz", "default", 0, "v0.5.0", "v0.4.2")
+      old = described_class.for_vm_volume("vmxyz", "default", 0, "v0.5.0", "v0.4.2")
       expect { old.run(4600, "p", "id", kek_material) }.to raise_error(/v0.5.0 or later/)
     end
 
+    it "stops the volume's vhost backend before serving it, since the backend holds the disk" do
+      expect(server).to receive(:_run_command).with("systemctl", "stop", "vmxyz-0-storage.service").ordered
+      expect(server).to receive(:run_with_kek_pipe).ordered
+      server.run(4600, "p", "id", kek_material)
+    end
+
     it "execs the v0.5.0 server, no --legacy for a current-format source" do
+      allow(server).to receive(:_run_command)
       expect(server).to receive(:run_with_kek_pipe).with(
         [
           "/opt/vhost-block-backend/v0.5.0/remote-stripe-server",
@@ -61,7 +68,8 @@ RSpec.describe RemoteStorageServer do
     end
 
     it "adds --legacy for a v0.2.x source, still using the v0.5.0 binary" do
-      legacy = described_class.new("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
+      legacy = described_class.for_vm_volume("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
+      allow(legacy).to receive(:_run_command)
       expect(legacy).to receive(:run_with_kek_pipe).with(
         [
           "/opt/vhost-block-backend/v0.5.0/remote-stripe-server",
@@ -93,6 +101,18 @@ RSpec.describe RemoteStorageServer do
         },
       )
       legacy.run(4600, "p", "id", kek_material)
+    end
+
+    it "serves a detachable volume from its own config, stopping its backend first" do
+      volume_id = "dv#{"0" * 24}"
+      dir = "/var/storage/detachable/#{volume_id}"
+      dv_server = described_class.for_detachable_volume(volume_id, "v0.5.1")
+      expect(dv_server).to receive(:_run_command).with("systemctl", "stop", "#{volume_id}-storage.service").ordered
+      expect(dv_server).to receive(:run_with_kek_pipe).with(
+        ["/opt/vhost-block-backend/v0.5.1/remote-stripe-server", "-f", "#{dir}/vhost-backend.conf", "--listen-config", "/dev/stdin"],
+        hash_including(kek_pipe: "#{dir}/kek.pipe", kek_content: "a2V5"),
+      ).ordered
+      dv_server.run(4600, "p", "id", kek_material)
     end
   end
 end

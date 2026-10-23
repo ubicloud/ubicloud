@@ -5,8 +5,8 @@ require_relative "../lib/detachable_volume"
 require "json"
 
 command, id = ARGV
-unless %w[start stop status delete serve drop-source].include?(command) && id
-  warn "usage: detachable-volume start|stop|status|delete|serve|drop-source <volume-id>"
+unless %w[start stop status delete drop-source].include?(command) && id
+  warn "usage: detachable-volume start|stop|status|delete|drop-source <volume-id>"
   exit 1
 end
 
@@ -27,10 +27,6 @@ when "status"
 when "delete"
   DetachableVolume.new(id).destroy
   puts JSON.generate({"deleted" => true})
-when "serve"
-  params = JSON.parse($stdin.read)
-  DetachableVolume.new(id).serve(port: params.fetch("port"), psk: params.fetch("psk"), psk_identity: params.fetch("psk_identity"),
-    kek: params.fetch("kek"), server_version: params.fetch("server_version"))
 when "drop-source"
   DetachableVolume.new(id).drop_source
   puts JSON.generate({"dropped" => true})
