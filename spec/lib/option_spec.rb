@@ -193,6 +193,22 @@ RSpec.describe Option do
     end
   end
 
+  describe "AWS_INSTANCE_TYPES" do
+    it "gives each instance type the storage its local disks add up to" do
+      described_class::AWS_INSTANCE_TYPES.each do |name, facts|
+        disks = facts["local_disks"]
+        expect(facts["storage_size_options"]).to eq(disks ? [disks.inject(:*)] : []), name
+      end
+    end
+
+    it "sizes local-disk families from their disks and the others from the EBS ladder" do
+      expect(described_class::AWS_INSTANCE_TYPES["m8gd.12xlarge"]["local_disks"]).to eq([3, 950])
+      expect(described_class::AWS_STORAGE_SIZE_OPTIONS["m8gd"][48]).to eq([2850])
+      expect(described_class::AWS_STORAGE_SIZE_OPTIONS["m8g"][48]).to eq([2850])
+      expect(described_class::AWS_INSTANCE_TYPES["m8g.12xlarge"]).not_to have_key("local_disks")
+    end
+  end
+
   describe "POSTGRES_FAMILY_FALLBACK_CHAINS" do
     it "matches the derivation from POSTGRES_SIZE_OPTIONS" do
       derived = (Option::POSTGRES_SIZE_OPTIONS.values.map(&:family).uniq & Option::AWS_FAMILY_OPTIONS)
