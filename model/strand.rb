@@ -190,11 +190,17 @@ SQL
 
   # Dispatch the strand as soon as possible, for use by a strand that
   # finished work another strand waits for. A strand that is already
-  # overdue keeps its schedule, so waking it cannot demote it.
-  def wakeup_waiting_strand(key = "waiting_strand_id")
+  # overdue keeps its schedule, so waking it cannot demote it. If a
+  # semaphore argument is given, incr the semaphore (which includes
+  # the schedule change)
+  def wakeup_waiting_strand(key = "waiting_strand_id", semaphore: nil)
     if (id = stack[0].delete(key))
       modified!(:stack)
-      Strand.where(id:).update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+      if semaphore
+        Semaphore.incr(id, semaphore)
+      else
+        Strand.where(id:).update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+      end
     end
   end
 
