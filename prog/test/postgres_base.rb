@@ -30,14 +30,18 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     )
   end
 
+  def self.aws_postgres_test_size
+    family = "m8gd"
+    vcpus = 2
+    [Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+  end
+
   def self.postgres_test_location_options(provider, family: nil, aws_location_name: "us-west-2", gcp_location_name: "gcp-us-central1")
     case provider
     when "aws"
       location = Location[provider: "aws", project_id: Config.local_e2e_postgres_test_project_id, name: aws_location_name]
       Prog::Test::Base.ensure_aws_e2e_credential(location)
-      family = "m8gd"
-      vcpus = 2
-      [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+      [location.id, *aws_postgres_test_size]
     when "gcp"
       location = Location[provider: "gcp", project_id: nil, name: gcp_location_name]
       Prog::Test::Base.ensure_gcp_e2e_credential(location)
