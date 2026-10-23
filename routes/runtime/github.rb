@@ -131,7 +131,7 @@ class Clover
           retries = 0
           begin
             upload_id = blob_storage_client.create_multipart_upload(bucket:, key: blob_key).upload_id
-          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket, Seahorse::Client::NetworkingError => ex
+          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket, Seahorse::Client::NetworkingError, Aws::S3::Errors::Http409Error => ex
             retries += 1
             if retries < 3
               # simplecov:disable
