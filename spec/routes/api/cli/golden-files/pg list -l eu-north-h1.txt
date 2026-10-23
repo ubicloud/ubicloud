@@ -1,1 +1,1 @@
-location  name  id  version  flavor
+location  name  id  version

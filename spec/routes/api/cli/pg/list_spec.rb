@@ -17,7 +17,7 @@ RSpec.describe Clover, "cli pg list" do
   end
 
   it "shows list of PostgreSQL databases" do
-    expect(cli(%w[pg list -N])).to eq "eu-central-h1  test-pg  #{@pg.ubid}  18  standard\n"
+    expect(cli(%w[pg list -N])).to eq "eu-central-h1  test-pg  #{@pg.ubid}  18\n"
   end
 
   it "-f option specifies fields" do
@@ -25,22 +25,22 @@ RSpec.describe Clover, "cli pg list" do
   end
 
   it "-l option filters to specific location" do
-    expect(cli(%w[pg list -Nleu-central-h1])).to eq "eu-central-h1  test-pg  #{@pg.ubid}  18  standard\n"
+    expect(cli(%w[pg list -Nleu-central-h1])).to eq "eu-central-h1  test-pg  #{@pg.ubid}  18\n"
     expect(cli(%w[pg list -Nleu-north-h1])).to eq "\n"
   end
 
   it "headers are shown by default" do
     expect(cli(%w[pg list])).to eq <<~END
-      location       name     #{id_headr}  version  flavor  
-      eu-central-h1  test-pg  #{@pg.ubid}  18       standard
+      location       name     #{id_headr}  version
+      eu-central-h1  test-pg  #{@pg.ubid}  18     
     END
   end
 
   it "handles case where header size is larger than largest column size" do
     @pg.update(name: "Abc")
     expect(cli(%w[pg list])).to eq <<~END
-      location       name  #{id_headr}  version  flavor  
-      eu-central-h1  Abc   #{@pg.ubid}  18       standard
+      location       name  #{id_headr}  version
+      eu-central-h1  Abc   #{@pg.ubid}  18     
     END
   end
 

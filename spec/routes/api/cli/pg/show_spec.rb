@@ -36,7 +36,6 @@ RSpec.describe Clover, "cli pg show" do
       version: 18
       target-version: 18
       ha-type: none
-      flavor: standard
       hostname: test-pg.#{@pg.ubid}.pg.example.com
       private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true
@@ -73,7 +72,6 @@ RSpec.describe Clover, "cli pg show" do
       version: 18
       target-version: 18
       ha-type: none
-      flavor: standard
       hostname: test-pg.#{@pg.ubid}.pg.example.com
       private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true

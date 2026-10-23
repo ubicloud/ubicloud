@@ -1,2 +1,0 @@
-name     id                          version  flavor  
-test-pg  pgvm1qb9gwct1mqmay7m54yma5  16       standard
