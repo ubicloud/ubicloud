@@ -37,8 +37,8 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
-      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
-      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      hostname: test-pg.#{@pg.ubid}.pg.example.com
+      private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -74,8 +74,8 @@ RSpec.describe Clover, "cli pg show" do
       target-version: 18
       ha-type: none
       flavor: standard
-      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
-      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      hostname: test-pg.#{@pg.ubid}.pg.example.com
+      private-hostname: test-pg.#{@pg.ubid}.private.pg.example.com
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -112,6 +112,16 @@ RSpec.describe Clover, "cli pg show" do
     expect(cli(%W[pg #{@ref} show -f id,name])).to eq <<~END
       id: #{@pg.ubid}
       name: test-pg
+    END
+  end
+
+  it "shows connection strings when requested with -f" do
+    expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
+    DnsZone.create(project_id: @project.id, name: "pg.example.com")
+
+    expect(cli(%W[pg #{@ref} show -f connection-string,private-connection-string])).to eq <<~END
+      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      private-connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
     END
   end
 end

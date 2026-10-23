@@ -4,7 +4,8 @@ class UbiCli
   on("pg").run_on("show") do
     desc "Show details for a PostgreSQL database"
 
-    fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor connection-string private-connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations log-destinations read-replicas ca-certificates].freeze.each(&:freeze)
+    fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor hostname private-hostname connection-string private-connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations log-destinations read-replicas ca-certificates].freeze.each(&:freeze)
+    default_fields = (fields - %w[connection-string private-connection-string]).freeze
 
     options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
       on("-f", "--fields=fields", "show specific fields (comma separated)")
@@ -14,7 +15,8 @@ class UbiCli
     run do |opts, cmd|
       data = sdk_object.info
       opts = opts[:pg_show]
-      keys = check_fields(opts[:fields], fields, "pg show -f option", cmd)
+      given = opts[:fields]
+      keys = given ? check_fields(given, fields, "pg show -f option", cmd) : default_fields
 
       body = []
 
@@ -53,6 +55,8 @@ class UbiCli
           sdk_object.read_replicas.each do |rr|
             body << "  " << rr[:location] << "/" << rr[:name] << "\n"
           end
+        when :private_hostname
+          body << display_key << ": " << URI(data[:private_connection_string]).hostname << "\n"
         when :ca_certificates
           body << "ca-certificates:\n" << data[key].to_s << "\n"
         else
