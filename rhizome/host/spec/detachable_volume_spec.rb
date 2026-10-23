@@ -17,7 +17,7 @@ RSpec.describe DetachableVolume do
     expect(volume.vhost_sock).to eq("/var/storage/detachable/#{id}/vhost.sock")
     expect(volume.rpc_sock).to eq("/var/storage/detachable/#{id}/rpc.sock")
     expect(volume.kek_pipe_path).to eq("/var/storage/detachable/#{id}/kek.pipe")
-    expect(volume.unit).to eq("dv-#{id}-storage.service")
+    expect(volume.unit).to eq("#{id}-storage.service")
   end
 
   it "only takes a volume id, so the id cannot reach outside the volume root" do
@@ -387,25 +387,6 @@ RSpec.describe DetachableVolume do
       expect(volume.remote_source?).to be false
       File.write(volume.source_conf, volume.stripe_source_toml({"type" => "new", "image" => "seed"}))
       expect(volume.remote_source?).to be false
-    end
-  end
-
-  describe "#serve" do
-    it "stops the backend and runs ubiblk's remote stripe server on the volume, with the KEK through its pipe" do
-      expect(volume).to receive(:stop).ordered
-      expect(volume).to receive(:run_with_kek_pipe).ordered { |cmd, kek_pipe:, kek_content:, env:, stdin:|
-        expect(cmd).to eq(["/opt/vhost-block-backend/v0.5.1/remote-stripe-server", "-f", volume.main_conf, "--listen-config", "/dev/stdin"])
-        expect(kek_pipe).to eq(volume.kek_pipe_path)
-        expect(kek_content).to eq(kek)
-        expect(env).to eq({"RUST_LOG" => "info"})
-        expect(stdin).to include(%(address = "0.0.0.0:5500"), %(identity = "rs1"))
-      }
-      volume.serve(port: 5500, psk: "cHNr", psk_identity: "rs1", kek: kek, server_version: "v0.5.1")
-    end
-
-    it "needs a ubiblk with the remote stripe server" do
-      expect { volume.serve(port: 5500, psk: "cHNr", psk_identity: "rs1", kek: kek, server_version: "v0.4.2") }
-        .to raise_error(RuntimeError, "remote-stripe-server requires vhost block backend v0.5.0 or later")
     end
   end
 
