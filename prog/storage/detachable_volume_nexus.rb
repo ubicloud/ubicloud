@@ -8,7 +8,7 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
       ubid = DetachableVolume.generate_ubid
       kek = StorageKeyEncryptionKey.create_random(auth_data: ubid.to_s)
       volume = DetachableVolume.create_with_id(ubid.to_uuid, project_id:, location_id:, size_gib:, source_image:,
-        key_encryption_key_1_id: kek.id, wrapped_xts: DetachableVolume.wrap_xts(kek))
+        key_encryption_key_1_id: kek.id)
       Strand.create_with_id(volume, prog: "Storage::DetachableVolumeNexus", label: "wait")
       volume
     end

@@ -381,7 +381,7 @@ RSpec.configure do |config|
     def create_detachable_volume(**args)
       kek = StorageKeyEncryptionKey.create_random(auth_data: "detachable-volume")
       defaults = {location_id: Location::HETZNER_FSN1_ID, source_image: "ubuntu-noble", size_gib: 2,
-                  key_encryption_key_1_id: kek.id, wrapped_xts: DetachableVolume.wrap_xts(kek)}
+                  key_encryption_key_1_id: kek.id}
       args = defaults.merge(args)
       args[:project_id] ||= Project.create(name: "detachable-volume-project").id
       volume = DetachableVolume.create(**args)

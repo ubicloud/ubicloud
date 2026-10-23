@@ -102,7 +102,7 @@ module AdminModelSpecHelper
       project = Project.create(name: "test-project")
       kek = create_storage_key_encryption_key
       DetachableVolume.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, size_gib: 2,
-        key_encryption_key_1_id: kek.id, wrapped_xts: "wrapped-xts", source_image: "ubuntu-noble")
+        key_encryption_key_1_id: kek.id, source_image: "ubuntu-noble")
     end
 
     def create_discount_code

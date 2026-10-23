@@ -39,10 +39,6 @@ class DetachableVolume < Sequel::Model
     stripes.fetch("fetched") == stripes.fetch("source")
   end
 
-  def self.wrap_xts(kek)
-    kek.encrypt(SecureRandom.bytes(64), "xts-key")
-  end
-
   # The input of host/bin/detachable-volume start, to start the volume on
   # target_host for a VM run by unix_user, with the storage volume in the
   # form StorageVolume takes it. nil if the volume can't start there now:
@@ -102,7 +98,6 @@ end
 #  vm_host_id              | uuid                     |
 #  key_encryption_key_1_id | uuid                     | NOT NULL
 #  key_encryption_key_2_id | uuid                     |
-#  wrapped_xts             | text                     | NOT NULL
 #  source_image            | text                     | NOT NULL
 # Indexes:
 #  detachable_volume_pkey           | PRIMARY KEY btree (id)
