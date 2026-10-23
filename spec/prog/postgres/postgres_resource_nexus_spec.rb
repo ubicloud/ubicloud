@@ -313,6 +313,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.pg.ubicloud.app"
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq pg.id
+      expect(cert.strand.stack[0]["remaining_auto_restarts"]).to eq 100
+      expect(cert.strand.stack[0]["wakeup_semaphore"]).to be_nil
     end
 
     it "does not use publicly signed certs for hostname version v3 if there is no DNS zone" do
@@ -824,7 +826,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       postgres_resource.update(server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem, client_cert: short_client_cert_pem, client_cert_key: short_client_key_pem, hostname_version: "v3")
 
       refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
-      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      expect { nx.refresh_certificates }.to hop("wait")
       expect(postgres_resource.server_cert).to eq short_server_cert_pem
       expect(postgres_resource.server_cert_key).to eq short_server_key_pem
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
@@ -834,6 +836,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.pg.ubicloud.app"
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq postgres_resource.id
+      expect(cert.strand.stack[0]["wakeup_semaphore"]).to eq "cert_renewed"
+      expect(cert.strand.stack[0]["remaining_auto_restarts"]).to eq 100
     end
   end
 
@@ -1023,6 +1027,41 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "hops to refresh_certificates when refresh_certificates is set" do
       nx.incr_refresh_certificates
       expect { nx.wait }.to hop("refresh_certificates")
+    end
+
+    context "when cert_renewed is set" do
+      let(:cert) do
+        Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).subject
+      end
+
+      before do
+        DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+        allow(Config).to receive(:postgres_service_hostname_v3).and_return("postgres.ubicloud.com")
+        refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "refresh_cert_id" => cert.id})
+        nx.incr_cert_renewed
+      end
+
+      it "updates the server cert, refreshes server certificates, and decrements the semaphore" do
+        server_cert, server_cert_key = Util.create_certificate(
+          subject: "/CN=Test Server",
+          extensions: ["keyUsage=digitalSignature"],
+          duration: 60 * 60 * 24 * 29,
+        )
+        cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
+        expect { nx.wait }.to nap(0)
+        expect(postgres_resource.reload.server_cert).to eq server_cert.to_pem
+        expect(postgres_resource.server_cert_key).to eq server_cert_key.to_pem
+        expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates")).not_to be_empty
+        expect(Semaphore.where(strand_id: st.id, name: "cert_renewed")).to be_empty
+        expect(st.stack[0]).not_to have_key("refresh_cert_id")
+      end
+
+      it "pages and decrements the semaphore if the cert is not available" do
+        expect { nx.wait }.to nap(0)
+        expect(Page.first.summary).to eq "Cert not available after cert_renewed semaphore set for #{postgres_resource.ubid}"
+        expect(Semaphore.where(strand_id: st.id, name: "cert_renewed")).to be_empty
+        expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates")).to be_empty
+      end
     end
 
     it "calls handle_storage_auto_scale when check_disk_usage is set and decrements the semaphore" do
