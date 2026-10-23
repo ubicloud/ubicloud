@@ -18,3 +18,28 @@
     </div>
   </div>
 </div>
+
+<% if vpc_peering_enabled?(@pg.location) %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          VPC Peering
+        </h3>
+
+        <p class="text-gray-500 mt-2">
+          Reach this database from your own AWS VPC over private addresses. Your connection string does not change.
+          <a class="text-orange-600" href="<%= path(@pg.private_subnet) %>/vpc-peering">Manage VPC peering</a>
+        </p>
+
+        <% if @pg.read_replica? %>
+          <p class="text-gray-500 mt-2">This read replica has its own private subnet and needs its own peering.</p>
+        <% elsif !@pg.read_replicas_dataset.empty? %>
+          <p class="text-gray-500 mt-2">
+            Each read replica has its own private subnet. Open a replica's Networking tab to peer it.
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

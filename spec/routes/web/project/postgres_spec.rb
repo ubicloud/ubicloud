@@ -981,6 +981,94 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "vpc peering" do
+      let(:aws_location) {
+        Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true).tap {
+          LocationAz.create(location_id: it.id, az: "a", zone_id: "usw2-az1")
+        }
+      }
+
+      let(:aws_pg) {
+        Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: aws_location.id,
+          name: "pg-aws",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 128,
+          target_version: "16",
+        ).subject
+      }
+
+      let(:intro) { "Reach this database from your own AWS VPC over private addresses. Your connection string does not change." }
+      let(:replica_note) { "This read replica has its own private subnet and needs its own peering." }
+      let(:primary_note) { "Each read replica has its own private subnet. Open a replica's Networking tab to peer it." }
+      let(:delete_note) { "The database will no longer be reachable over the VPC peerings of its private subnet." }
+
+      before do
+        allow(Config).to receive(:vpc_peering_enabled).and_return(true)
+        project.set_ff_vpc_peering_aws(true)
+      end
+
+      it "links the networking tab to the VPC peering tab of the database's private subnet only while VPC peering is enabled" do
+        project.set_ff_vpc_peering_aws(false)
+        visit "#{project.path}#{aws_pg.path}/networking"
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_no_content intro
+
+        project.set_ff_vpc_peering_aws(true)
+        page.refresh
+        expect(page).to have_content "VPC Peering"
+        expect(page).to have_content intro
+        expect(page).to have_no_content replica_note
+        expect(page).to have_no_content primary_note
+
+        click_link "Manage VPC peering"
+        expect(page.title).to eq "Ubicloud - #{aws_pg.ubid}-subnet"
+        expect(page).to have_current_path "#{project.path}#{aws_pg.private_subnet.path}/vpc-peering"
+        expect(page).to have_content "No VPC peerings yet."
+      end
+
+      it "tells a read replica and its primary that each one needs its own peering" do
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: aws_location.id,
+          name: "pg-aws-replica",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 128,
+          parent_id: aws_pg.id,
+        ).subject
+
+        visit "#{project.path}#{replica.path}/networking"
+        expect(page).to have_content replica_note
+        expect(page).to have_no_content primary_note
+        click_link "Manage VPC peering"
+        expect(page.title).to eq "Ubicloud - #{replica.ubid}-subnet"
+
+        visit "#{project.path}#{aws_pg.path}/networking"
+        expect(page).to have_content primary_note
+        expect(page).to have_no_content replica_note
+      end
+
+      it "warns in the delete card only when the database's private subnet has VPC peerings and VPC peering is enabled" do
+        visit "#{project.path}#{aws_pg.path}/settings"
+        expect(page).to have_content "This action will permanently delete this PostgreSQL database."
+        expect(page).to have_no_content delete_note
+
+        other_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "other-ps", location_id: aws_location.id).subject
+        Prog::Vnet::VpcPeeringNexus.assemble(other_ps, peer_account_id: "111122223333", peer_vpc_id: "vpc-0cccccccccccccccc", aws: {peer_region: "us-west-2"})
+        page.refresh
+        expect(page).to have_no_content delete_note
+
+        Prog::Vnet::VpcPeeringNexus.assemble(aws_pg.private_subnet, peer_account_id: "111122223333", peer_vpc_id: "vpc-0bbbbbbbbbbbbbbbb", aws: {peer_region: "us-west-2"})
+        page.refresh
+        expect(page).to have_content delete_note
+
+        project.set_ff_vpc_peering_aws(false)
+        page.refresh
+        expect(page).to have_no_content delete_note
+      end
+    end
+
     describe "metric-destination" do
       it "can create metric destination" do
         visit "#{project.path}#{pg.path}/charts"
