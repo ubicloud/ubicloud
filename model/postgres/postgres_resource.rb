@@ -919,7 +919,6 @@ end
 #  ha_type                         | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
 #  hostname_version                | text                     | NOT NULL DEFAULT 'v3'::text
 #  private_subnet_id               | uuid                     |
-#  flavor                          | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  location_id                     | uuid                     | NOT NULL
 #  maintenance_window_start_at     | integer                  |
 #  user_config                     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
