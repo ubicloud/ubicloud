@@ -11,30 +11,45 @@ require_relative "vhost_block_backend"
 require_relative "kek_pipe"
 require "perfect_toml"
 
-# Serves an existing (encrypted) storage volume over the ubiblk remote stripe
-# protocol with TLS-PSK. The server always runs the v0.5.0 remote-stripe-server
-# binary, which can serve volumes created by older backends: current-format
-# (v0.4.0+) volumes directly, and legacy v0.2.x volumes via --legacy. It reuses
-# the volume's own vhost-backend config (data/metadata/encryption and, if any,
-# its stripe source), adding only a listen config for the address + PSK. The
-# KEK is streamed to the volume's kek pipe, exactly as the vhost backend
-# receives it.
+# Serves an existing (encrypted) storage volume, either a VM's disk or a
+# detachable volume, over the ubiblk remote stripe protocol with TLS-PSK. The
+# server always runs the v0.5.0 remote-stripe-server binary, which can serve
+# volumes created by older backends: current-format (v0.4.0+) volumes
+# directly, and legacy v0.2.x volumes via --legacy. It reuses the volume's own
+# vhost-backend config (data/metadata/encryption and, if any, its stripe
+# source), adding only a listen config for the address + PSK. The KEK is
+# streamed to the volume's kek pipe, exactly as the vhost backend receives it.
 class RemoteStorageServer
   include KekPipe
 
-  def initialize(vm_name, storage_device, disk_index, source_version, server_version)
-    @vm_name = vm_name
-    @sp = StoragePath.new(vm_name, storage_device, disk_index)
-    @source_backend = VhostBlockBackend.new(source_version)
+  def self.for_vm_volume(vm_name, storage_device, disk_index, source_version, server_version)
+    sp = StoragePath.new(vm_name, storage_device, disk_index)
+    new(
+      config: sp.vhost_backend_config,
+      kek_pipe: sp.kek_pipe,
+      legacy: !VhostBlockBackend.new(source_version).config_v2?,
+      server_version: server_version,
+    )
+  end
+
+  def self.for_detachable_volume(volume_id, server_version)
+    sp = StoragePath.detachable(volume_id)
+    new(config: sp.vhost_backend_config, kek_pipe: sp.kek_pipe, legacy: false, server_version: server_version)
+  end
+
+  def initialize(config:, kek_pipe:, legacy:, server_version:)
+    @config = config
+    @kek_pipe = kek_pipe
+    @legacy = legacy
     @server_backend = VhostBlockBackend.new(server_version)
   end
 
   # A legacy (v0.2.x) source uses the old YAML config and needs --legacy.
   def legacy?
-    !@source_backend.config_v2?
+    @legacy
   end
 
-  def self.listen_config(port, psk, psk_identity)
+  def listen_config(port, psk, psk_identity)
     # The use of allow_inline_plaintext_secrets here is safe, because the listen config
     # is never stored in the file system, it is passed over stdin to the remote_stripe_server.
     PerfectTOML.generate({
@@ -71,14 +86,14 @@ class RemoteStorageServer
   def run(port, psk, psk_identity, kek_material)
     fail "remote-stripe-server requires vhost block backend v0.5.0 or later" unless @server_backend.supports_remote_stripe_server?
 
-    cmd = [@server_backend.remote_stripe_server_path, "-f", @sp.vhost_backend_config]
-    cmd.push("--legacy", "--legacy-kek", @sp.kek_pipe) if legacy?
+    cmd = [@server_backend.remote_stripe_server_path, "-f", @config]
+    cmd.push("--legacy", "--legacy-kek", @kek_pipe) if legacy?
     cmd.push("--listen-config", "/dev/stdin")
 
     run_with_kek_pipe(cmd,
-      kek_pipe: @sp.kek_pipe,
+      kek_pipe: @kek_pipe,
       kek_content: kek_payload(kek_material),
       env: {"RUST_LOG" => "info"},
-      stdin: self.class.listen_config(port, psk, psk_identity))
+      stdin: listen_config(port, psk, psk_identity))
   end
 end
