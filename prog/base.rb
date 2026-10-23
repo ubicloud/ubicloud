@@ -440,7 +440,9 @@ end
         allow_extension ||
         Time.new(deadline_at) > new_deadline
 
-      resolve_deadline_target(deadline_target) if deadline_target != new_deadline_target
+      target_changed = deadline_target != new_deadline_target
+      resolve_deadline_target(deadline_target) if target_changed
+      delete_from_stack("deadline_notified") if target_changed || deadline_at.nil?
 
       self.deadline_target = new_deadline_target
       self.deadline_page = page
@@ -457,7 +459,7 @@ end
 
   def unregister_deadline(deadline_target)
     resolve_deadline_target(deadline_target)
-    delete_from_stack("deadline_at", "deadline_target", "deadline_start", "deadline_page")
+    delete_from_stack("deadline_at", "deadline_target", "deadline_start", "deadline_page", "deadline_notified")
   end
 
   def resolve_deadline_target(deadline_target)

@@ -519,6 +519,62 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(1).to(0)
     end
 
+    it "pages a deadline registered for a new target after the previous deadline paged" do
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "start"}])
+      st.unsynchronized_run
+      old_page = Page.from_tag_parts("Deadline", st.id, "Test", "start")
+      expect(st.stack.first["deadline_notified"]).to be true
+
+      st.update(label: "nap_with_expired_deadline")
+      st.unsynchronized_run
+      expect(st.stack.first["deadline_target"]).to eq "pusher2"
+      expect(st.stack.first).not_to have_key("deadline_notified")
+      expect(st.this.get(:schedule)).to be_within(5).of(Time.now)
+
+      2.times { Strand[old_page.id].unsynchronized_run }
+      expect(old_page.reload.resolved_at).not_to be_nil
+
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.from_tag_parts("Deadline", st.id, "Test", "pusher2") }.from(nil)
+      expect(st.stack.first["deadline_notified"]).to be true
+    end
+
+    it "pages a deadline registered in a frame holding a stale paged flag" do
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_notified" => true}])
+      Prog::Test.new(st).register_deadline(nil, -1)
+      expect(st.stack.first).not_to have_key("deadline_notified")
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.from_tag_parts("Deadline", st.id, "Test", nil) }.from(nil)
+    end
+
+    it "does not page again when the target of a paged deadline is registered again" do
+      st = Strand.create(prog: "Test", label: :nap_with_expired_deadline)
+      st.unsynchronized_run
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+      expect(st.stack.first["deadline_notified"]).to be true
+
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      st.update(label: "extend_deadline")
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
+      expect(st.stack.first["deadline_notified"]).to be true
+
+      st.update(label: "set_expired_deadline")
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
+      expect(st.stack.first["deadline_notified"]).to be true
+
+      expect {
+        st.unsynchronized_run
+      }.not_to change { Page.active.count }.from(1)
+    end
+
     it "deletes the deadline information once the target is reached" do
       st = Strand.create(prog: "Test", label: :napper)
       st.stack.first["deadline_target"] = "napper"
@@ -673,6 +729,15 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).not_to have_key("deadline_at")
       expect(st.stack.first).not_to have_key("deadline_target")
       expect(st.stack.first).not_to have_key("deadline_start")
+    end
+
+    it "unregister_deadline clears the paged flag" do
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "start"}])
+      st.unsynchronized_run
+      expect(st.stack.first["deadline_notified"]).to be true
+
+      Prog::Test.new(st).unregister_deadline("start")
+      expect(st.stack.first).not_to have_key("deadline_notified")
     end
   end
 
