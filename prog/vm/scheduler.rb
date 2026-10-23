@@ -77,8 +77,11 @@ class Prog::Vm::Scheduler < Prog::Base
       timer.lap(:lock)
       if st
         tried += 1
-        result = bulk_commit ? try_plan(st, candidates) : try_allocate(st, candidates)
-        timer.lap(:plan)
+        result = if bulk_commit
+          try_plan(st, candidates, timer)
+        else
+          try_allocate(st, candidates).tap { timer.lap(:allocate) }
+        end
         case result
         when :allocated
           allocated_ids << st.id
@@ -134,10 +137,13 @@ class Prog::Vm::Scheduler < Prog::Base
   # As try_allocate, but plans the allocation for the bulk commit. Returns
   # :planned, :unplannable, the request of a VM that does not fit, or
   # :failed.
-  def try_plan(st, candidates)
+  def try_plan(st, candidates, timer)
     nx = st.load
+    vm = nx.vm
+    timer.lap(:load)
     request = nx.allocation_request
-    candidates.plan(nx.vm, request) ? :planned : :unplannable
+    timer.lap(:request)
+    candidates.plan(vm, request, timer) ? :planned : :unplannable
   rescue Scheduling::Allocator::NoSpaceLeft
     request
   rescue RuntimeError => ex
