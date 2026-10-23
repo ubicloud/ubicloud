@@ -543,6 +543,33 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect(vm.user_nic.reload.private_ipv4.to_s).to eq("10.0.0.23/32")
     end
 
+    describe "when AWS assigns a private IPv4 that another nic holds" do
+      let(:other_nic) { Prog::Vnet::NicNexus.assemble(vm.user_nic.private_subnet_id, name: "other-nic", ipv4_addr: "10.0.0.23/32").subject }
+
+      before do
+        client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created", private_ip_address: "10.0.0.23"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+        vm.update(unix_user: "runneradmin")
+        vm.user_nic.update(private_ipv4: nil)
+        vm.user_nic.nic_aws_resource.update(use_eip: false, create_network_interface: false)
+        other_nic
+      end
+
+      it "destroys the runner and provisions a spare runner" do
+        installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+        runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+        Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+        expect(Clog).to receive(:emit).with("private ipv4 is taken by another nic", {private_ipv4_taken: {vm:, private_ipv4: "10.0.0.23", nic: other_nic}}).and_call_original
+        expect { nx.create_instance }.to nap(60).and change(GithubRunner, :count).by(1)
+        expect(runner.reload.destroy_set?).to be true
+        expect(vm.user_nic.reload.private_ipv4).to be_nil
+        expect(vm.reload.aws_instance).to be_nil
+      end
+
+      it "raises when the vm is not a runner" do
+        expect { nx.create_instance }.to raise_error(Sequel::ValidationFailed, "private_subnet_id and private_ipv4 is already taken")
+      end
+    end
+
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
       expect { nx.create_instance }
