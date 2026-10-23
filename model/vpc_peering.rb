@@ -9,6 +9,12 @@ class VpcPeering < Sequel::Model
   plugin :association_dependencies, vpc_peering_aws_resource: :destroy
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
+
+  dataset_module do
+    def not_deleting
+      exclude(id: Semaphore.where(name: %w[destroy destroying]).select(:strand_id))
+    end
+  end
 end
 
 # Table: vpc_peering
