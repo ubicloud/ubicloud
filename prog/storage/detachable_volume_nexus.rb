@@ -29,14 +29,9 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
 
   label def wait_catch_up
     register_deadline("wait", 60 * 60)
-    host = detachable_volume.vm_host
-    status = host.sshable.cmd_json("sudo host/bin/detachable-volume status :volume_id", volume_id: detachable_volume.ubid)
-    nap 5 unless status["caught_up"]
+    nap 5 unless detachable_volume.caught_up?
 
-    if (server = detachable_volume.remote_storage_server)
-      host.sshable.cmd_json("sudo host/bin/detachable-volume drop-source :volume_id", volume_id: detachable_volume.ubid)
-      server.incr_destroy
-    end
+    detachable_volume.remote_storage_server&.incr_destroy
     hop_wait
   end
 

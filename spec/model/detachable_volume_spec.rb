@@ -17,18 +17,45 @@ RSpec.describe DetachableVolume do
     let(:host) { create_vm_host }
 
     it "records the host that holds its data" do
-      volume.record_host(host:, caught_up: true)
+      volume.record_host(host:)
       expect(volume.reload.vm_host_id).to eq(host.id)
+      expect(volume.catch_up_set?).to be false
     end
 
-    it "has its strand watch a catch-up that is still going" do
-      volume.record_host(host:, caught_up: false)
+    it "has its strand watch a volume just taken over from the host serving it" do
+      source = create_vm_host
+      volume.update(vm_host_id: source.id)
+      RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: source.id, psk: "cHNr", psk_identity: "rs1", port: 5500)
+      volume.record_host(host:)
       expect(volume.reload.catch_up_set?).to be true
     end
 
-    it "leaves its strand alone when there is nothing to catch up on" do
-      volume.record_host(host:, caught_up: true)
+    it "has nothing to catch up on when started again on the host that took it over" do
+      volume.update(vm_host_id: host.id)
+      RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id, psk: "cHNr", psk_identity: "rs1", port: 5500)
+      volume.record_host(host:)
       expect(volume.reload.catch_up_set?).to be false
+    end
+  end
+
+  describe "#caught_up?" do
+    let(:host) { create_vm_host }
+
+    before { volume.update(vm_host_id: host.id) }
+
+    def expect_status(stripes)
+      expect(volume.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/detachable/#{volume.ubid}/rpc.sock -q 2 -w 2 | head -n 1",
+        stdin: {command: "status"}.to_json).and_return({"status" => {"stripes" => stripes}}.to_json)
+    end
+
+    it "asks the volume's ubiblk for its stripe counts" do
+      expect_status({"fetched" => 8, "source" => 8})
+      expect(volume).to be_caught_up
+    end
+
+    it "is not caught up while stripes are left to fetch" do
+      expect_status({"fetched" => 3, "source" => 8})
+      expect(volume).not_to be_caught_up
     end
   end
 

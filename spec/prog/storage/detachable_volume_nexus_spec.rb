@@ -48,30 +48,29 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
   end
 
   describe "#wait_catch_up" do
+    def expect_status(stripes)
+      expect(nx.detachable_volume.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/detachable/#{volume.ubid}/rpc.sock -q 2 -w 2 | head -n 1",
+        stdin: {command: "status"}.to_json).and_return({"status" => {"stripes" => stripes}}.to_json)
+    end
+
     it "keeps waiting while stripes are outstanding" do
-      expect_host_command("status", {"stripes" => {"fetched" => 10, "source" => 1536}, "caught_up" => false})
+      expect_status({"fetched" => 10, "source" => 1536})
       expect { nx.wait_catch_up }.to nap(5)
     end
 
     it "goes back to waiting once the volume has caught up" do
-      expect_host_command("status", {"stripes" => {"fetched" => 1536, "source" => 1536}, "caught_up" => true})
+      expect_status({"fetched" => 1536, "source" => 1536})
       expect { nx.wait_catch_up }.to hop("wait")
     end
 
-    it "forgets the source and releases the server once everything is local" do
+    it "releases the server once everything is local" do
       server = RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id,
         psk: "psk", psk_identity: "id", port: 5500)
       Strand.create_with_id(server, prog: "Storage::RemoteStorageServer::Nexus", label: "wait")
 
-      expect_host_command("status", {"stripes" => {"fetched" => 5, "source" => 5}, "caught_up" => true}).ordered
-      expect_host_command("drop-source", {"dropped" => true}).ordered
+      expect_status({"fetched" => 5, "source" => 5})
       expect { nx.wait_catch_up }.to hop("wait")
       expect(server.reload.destroy_set?(cached: false)).to be true
-    end
-
-    it "keeps waiting when the host does not say it is caught up" do
-      expect_host_command("status")
-      expect { nx.wait_catch_up }.to nap(5)
     end
 
     it "leaves a host that cannot be reached to the strand's retries" do

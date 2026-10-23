@@ -15,9 +15,28 @@ class DetachableVolume < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :catch_up
 
-  def record_host(host:, caught_up:)
+  # Records that the volume now lives on host. A volume just taken over from
+  # the host serving it is still fetching its stripes from there.
+  def record_host(host:)
+    fetching = remote_storage_server && host.id != vm_host_id
     update(vm_host_id: host.id)
-    incr_catch_up unless caught_up
+    incr_catch_up if fetching
+  end
+
+  def path
+    File.join("/var/storage/detachable", ubid)
+  end
+
+  # Sends one command to the volume's ubiblk rpc socket. See
+  # VmStorageVolume#rpc for the nc options.
+  def rpc(payload)
+    rpc_socket = File.join(path, "rpc.sock")
+    vm_host.sshable.cmd_json("sudo nc -U :rpc_socket -q 2 -w 2 | head -n 1", stdin: payload.to_json, rpc_socket:)
+  end
+
+  def caught_up?
+    stripes = rpc(command: "status").dig("status", "stripes")
+    stripes.fetch("fetched") == stripes.fetch("source")
   end
 
   def self.wrap_xts(kek)

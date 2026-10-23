@@ -7,7 +7,6 @@ require_relative "storage_path"
 require "fileutils"
 require "json"
 require "perfect_toml"
-require "socket"
 
 class DetachableVolume
   include KekPipe
@@ -179,13 +178,6 @@ class DetachableVolume
     FileUtils.chown(unix_user, unix_user, path)
   end
 
-  def write_config_file(path, content)
-    safe_write_to_file(path, perm: 0o600) do |f|
-      f.write(content)
-      fsync_or_fail(f)
-    end
-  end
-
   def stripe_source_toml(source)
     stripe_source = case source["type"]
     when "new", "raw"
@@ -223,49 +215,5 @@ class DetachableVolume
     stop
     FileUtils.rm_f("/etc/systemd/system/#{unit}")
     FileUtils.rm_rf(@dir)
-  end
-
-  def status
-    return {"present" => false, "stripes" => {}, "caught_up" => true} unless exist?
-    counts = stripes
-    {"present" => true, "stripes" => counts, "caught_up" => caught_up?(counts)}
-  end
-
-  def stripes
-    rpc("status").dig("status", "stripes") || {}
-  end
-
-  def caught_up?(counts = nil)
-    return true unless remote_source?
-    counts ||= stripes
-    return false if counts.empty?
-    counts["fetched"].to_i >= counts["source"].to_i
-  end
-
-  def rpc(command)
-    line = UNIXSocket.open(rpc_sock) do |socket|
-      socket.write(JSON.generate({"command" => command}) + "\n")
-      socket.gets
-    end
-    JSON.parse(line.to_s)
-  rescue SystemCallError, JSON::ParserError
-    {}
-  end
-
-  def remote_source?
-    File.exist?(source_conf) && PerfectTOML.load_file(source_conf).dig("stripe_source", "type") == "remote"
-  end
-
-  def drop_source
-    return unless File.exist?(source_conf)
-
-    main = PerfectTOML.load_file(main_conf)
-    main["include"].delete(File.basename(source_conf))
-    write_config_file(main_conf, PerfectTOML.generate(main))
-    secrets = PerfectTOML.load_file(secrets_conf)
-    secrets.fetch("secrets").delete("remote-psk")
-    write_config_file(secrets_conf, PerfectTOML.generate(secrets))
-    rm_if_exists(source_conf)
-    sync_parent_dir(source_conf)
   end
 end
