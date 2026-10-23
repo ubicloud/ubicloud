@@ -10,6 +10,8 @@ version: 16
 target-version: 16
 ha-type: none
 flavor: standard
+hostname: test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com
+private-hostname: test-pg.pgvm1qb9gwct1mqmay7m54yma5.private.pg.example.com
 primary: true
 earliest-restore-time: 2025-11-21T10:27:32Z
 maintenance-window-start-at: 
