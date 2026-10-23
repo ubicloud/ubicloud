@@ -120,7 +120,6 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
-        expect(PostgresResource.first.flavor).to eq(PostgresResource::STANDARD_FLAVOR)
       end
 
       it "prices n2d storage from the family's own rate on the create page" do

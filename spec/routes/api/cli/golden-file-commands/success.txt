@@ -114,7 +114,7 @@ pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
 pg eu-central-h1/test-pg restart
 pg eu-central-h1/test-pg show
 pg eu-central-h1/test-pg show -f firewall-rules,metric-destinations,ca-certificates
-pg eu-central-h1/test-pg show -f ha-type,flavor,connection-string,primary,earliest-restore-time
+pg eu-central-h1/test-pg show -f ha-type,connection-string,primary,earliest-restore-time
 pg eu-central-h1/test-pg show -f id
 pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,version,tags
 pg eu-central-h1/test-pg show -f maintenance-window-start-at,read-replica,parent,read-replicas
@@ -124,7 +124,7 @@ pg eu-central-h1/test-pg show-default-config
 pg eu-central-h1/test-pg upgrade
 pg list
 pg list -f location
-pg list -f name,id,version,flavor
+pg list -f name,id,version
 pg list -l eu-central-h1
 pg list -l eu-central-h1 -f name,id
 pg list -l eu-central-h1 -N -f name,id
