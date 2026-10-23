@@ -749,7 +749,7 @@ Options:
     -N, --no-headers                 do not show headers
 
 Allowed Option Values:
-    Fields: location name id version flavor
+    Fields: location name id version
 
 
 Add a PostgreSQL metric destination using bearer token authentication
@@ -841,7 +841,7 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
-    -f, --flavor=type                flavor (deprecated, standard is the only flavor)
+    -f, --flavor=type                flavor (deprecated and ignored)
     -h, --ha-type=type               replication type
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
@@ -1188,7 +1188,7 @@ Options:
 
 Allowed Option Values:
     Fields: id name state location vm-size target-vm-size storage-size-gib
-            target-storage-size-gib version target-version ha-type flavor
+            target-storage-size-gib version target-version ha-type
             connection-string private-connection-string primary
             earliest-restore-time maintenance-window-start-at read-replica
             parent tags firewall-rules metric-destinations log-destinations
