@@ -580,6 +580,7 @@ DEPENDENCIES
   argon2-kdf
   autoforme (>= 1.15)
   awesome_print
+  aws-partitions
   aws-sdk-ec2 (~> 1.512)
   aws-sdk-iam
   aws-sdk-kms
