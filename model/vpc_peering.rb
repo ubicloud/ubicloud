@@ -15,6 +15,10 @@ class VpcPeering < Sequel::Model
       exclude(id: Semaphore.where(name: %w[destroy destroying]).select(:strand_id))
     end
   end
+
+  def display_state
+    (destroy_set? || destroying_set?) ? "deleting" : state
+  end
 end
 
 # Table: vpc_peering

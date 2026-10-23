@@ -1,0 +1,100 @@
+<%# locals: (vp:, ps:, can_edit:) %>
+<% aws = vp.vpc_peering_aws_resource
+state = vp.display_state
+pcx = aws.peering_connection_id
+local_cidr = ps.net4.to_s
+requester_vpc_id = ps.private_subnet_aws_resource.vpc_id %>
+
+<div
+  id="vpc-peering-<%= vp.ubid %>"
+  class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200"
+>
+  <div class="px-4 py-4 sm:px-6 flex flex-wrap items-center justify-between gap-4">
+    <div class="min-w-0">
+      <div class="flex items-center gap-3">
+        <span class="text-base font-semibold text-gray-900 break-all"><%= vp.peer_vpc_id %></span>
+        <%== part("components/vpc_peering_state_label", state:) %>
+      </div>
+
+      <p class="mt-1 text-sm text-gray-500">Account <%= vp.peer_account_id %>, region <%= aws.peer_region %></p>
+    </div>
+
+    <% if can_edit && state != "deleting" %>
+      <%== part(
+        "components/delete_button",
+        url: "#{path(ps)}/vpc-peering/#{vp.ubid}",
+        confirmation_message: "Are you sure you want to delete the VPC peering with #{vp.peer_vpc_id}? Traffic over it stops at once."
+      ) %>
+    <% end %>
+  </div>
+
+  <div class="px-4 py-5 sm:px-6 space-y-4 text-sm text-gray-700">
+    <% case state %>
+    <% when "creating" %>
+      <p><%= vp.state_message || "Sending the peering request..." %></p>
+    <% when "waiting_for_peer" %>
+      <p>
+        Ubicloud sent a peering request <strong><%= pcx %></strong> from VPC <strong><%= requester_vpc_id %></strong>
+        (account <strong><%= aws.requester_account_id %></strong>, <%= ps.location.name %>) to your VPC
+        <strong><%= vp.peer_vpc_id %></strong> in account <strong><%= vp.peer_account_id %></strong>
+        (<%= aws.peer_region %>).
+        <% if expires_at = aws.expires_at %>
+          It expires on <strong><%= expires_at.getutc.strftime("%F %H:%M UTC") %></strong>. After that, delete this
+          peering and create it again.
+        <% end %>
+      </p>
+
+      <p>
+        <strong>1. Accept the request.</strong> Sign in to AWS account <%= vp.peer_account_id %> and open the VPC
+        console in <strong><%= aws.peer_region %></strong>
+        (<a href="<%= aws.console_url %>" target="_blank" rel="noopener noreferrer" class="font-medium text-orange-600 hover:text-orange-700">Open in AWS console</a>).
+        Go to <strong>Peering connections</strong> and select <strong><%= pcx %></strong>. Check that the requester is
+        account <%= aws.requester_account_id %>, VPC <%= requester_vpc_id %>, CIDR <%= local_cidr %>. Then choose
+        <strong>Actions &gt; Accept request</strong>.
+        <% if ps.location.byoc %>
+          The request comes from the AWS account of this location (<%= aws.requester_account_id %>). Accept only the
+          connection with this exact ID, as shown in your own Ubicloud console.
+        <% else %>
+          Ubicloud's AWS account sends peering requests for all Ubicloud customers, so accept only the connection with
+          this exact ID, as shown in your own Ubicloud console.
+        <% end %>
+        Do not send a peering request to the Ubicloud VPC from your side; Ubicloud does not accept such requests and may
+        reject them.
+      </p>
+
+      <%== part("networking/vpc_peering/aws/setup_steps", vp:, pcx:, local_cidr:) %>
+
+      <p class="text-gray-500">
+        Ubicloud routes only the private (RFC 1918) CIDR blocks of your VPC. Clients that reach your VPC over VPN,
+        Direct Connect, Transit Gateway or another peering cannot use this peering, because AWS does not route
+        transitively. Ubicloud checks for your acceptance every 30 seconds (every 5 minutes after the first hour) and
+        then configures its side automatically.
+      </p>
+    <% when "configuring" %>
+      <p>Accepted. Ubicloud is adding routes for your VPC's CIDR blocks...</p>
+    <% when "active" %>
+      <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <dt class="font-medium text-gray-500">Peering connection</dt>
+        <dd class="sm:col-span-2"><%== part("components/copyable_content", content: pcx) %></dd>
+        <dt class="font-medium text-gray-500">Routed CIDR blocks</dt>
+        <dd class="sm:col-span-2"><%= vp.peer_cidrs.empty? ? "None" : vp.peer_cidrs.join(", ") %></dd>
+      </dl>
+
+      <% if vp.state_message %>
+        <div class="rounded-md bg-yellow-50 p-4 text-yellow-800"><%= vp.state_message %></div>
+      <% end %>
+
+      <details>
+        <summary class="cursor-pointer font-medium text-gray-900">Your side of the setup</summary>
+
+        <div class="mt-4 space-y-4">
+          <%== part("networking/vpc_peering/aws/setup_steps", vp:, pcx:, local_cidr:) %>
+        </div>
+      </details>
+    <% when "failed" %>
+      <div class="rounded-md bg-red-50 p-4 text-red-800"><%= vp.state_message %></div>
+    <% else %>
+      <p>Removing routes and the peering connection...</p>
+    <% end %>
+  </div>
+</div>
