@@ -9,6 +9,7 @@
 - { name: postgres_upgrade16,        images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
 - { name: postgres_firewall,         images: ["postgres-ubuntu-2204"] }
 - { name: postgres_unarchive,        images: ["postgres-ubuntu-2204"] }
+- { name: vpc_peering,               images: ["postgres-ubuntu-2204"] }
 - { name: kubernetes,                images: ["ubuntu-resolute"] }
 - { name: kubernetes_upgrade,        images: ["ubuntu-resolute"] }
 - { name: kubernetes_firewall,       images: ["ubuntu-resolute", "ubuntu-noble"] }
