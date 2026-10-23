@@ -562,10 +562,12 @@ module Scheduling::Allocator
 
     private
 
+    def equivalence_class(request)
+      @classes[request.to_h.except(:vm_id, :diagnostics)] ||= new_equivalence_class(request)
+    end
+
     def best_allocation(request)
-      key = request.to_h.except(:vm_id, :diagnostics)
-      equivalence_class = (@classes[key] ||= new_equivalence_class(request))
-      hosts = equivalence_class.hosts(@changed_host_ids).reject do
+      hosts = equivalence_class(request).hosts(@changed_host_ids).reject do
         ((holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id) ||
           (request.ip4_enabled && !it[:ipv4_available])
       end
@@ -632,8 +634,11 @@ module Scheduling::Allocator
 
     # Returns whether it planned the allocation. A VM it cannot plan, e.g.,
     # one with a GPU, needs a commit of its own.
-    def plan(vm, request)
+    def plan(vm, request, timer)
+      equivalence_class(request)
+      timer.lap(:candidates)
       allocation = best_allocation(request)
+      timer.lap(:score)
       fail NoSpaceLeft, "#{vm} no space left on any eligible host" unless allocation
       return false unless @bulk_commit.plannable?(request, allocation)
 
@@ -641,6 +646,7 @@ module Scheduling::Allocator
       capacity = add_usage(@capacity.fetch(host_id), @bulk_commit.plan(vm, request, allocation))
       @capacity[host_id] = capacity
       @classes.each_value { it.row(host_id)&.merge!(capacity) }
+      timer.lap(:bulk_plan)
       true
     end
 

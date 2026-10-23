@@ -112,7 +112,7 @@ RSpec.describe Prog::Vm::Scheduler do
       it "logs the counts and the time of each phase of a round" do
         create_host
         create_waiting_vm
-        round = {waiting: 1, tried: 1, allocated: 1, unplaced: 0, milliseconds: hash_including(:queue, :lock, :plan, :finish)}
+        round = {waiting: 1, tried: 1, allocated: 1, unplaced: 0, milliseconds: hash_including(:queue, :lock, :allocate, :finish)}
         expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(round)}).and_call_original
 
         expect { nx.wait }.to nap(5)
@@ -128,7 +128,7 @@ RSpec.describe Prog::Vm::Scheduler do
       it "logs the time of the bulk write, the metrics and the one by one commits of a round" do
         create_slice_host
         create_waiting_vm
-        milliseconds = hash_including(:queue, :lock, :plan, :bulk_write, :record_metrics, :one_by_one, :finish)
+        milliseconds = hash_including(:queue, :lock, :load, :request, :candidates, :score, :bulk_plan, :bulk_write, :record_metrics, :one_by_one, :finish)
         expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(allocated: 1, milliseconds:)}).and_call_original
 
         expect { nx.wait }.to nap(5)
