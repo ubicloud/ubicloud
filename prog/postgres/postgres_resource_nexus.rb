@@ -130,6 +130,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           postgres_resource.dns_zone.id,
           private_hostname: postgres_resource.cert_private_hostname,
           waiting_strand_id: postgres_resource_id,
+          num_auto_restarts: 100,
         ).id
       end
 
@@ -387,8 +388,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         postgres_resource.dns_zone.id,
         private_hostname: postgres_resource.cert_private_hostname,
         waiting_strand_id: postgres_resource.id,
+        wakeup_semaphore: "cert_renewed",
+        num_auto_restarts: 100,
       ).id
-      hop_wait_refresh_public_cert
     end
 
     decr_refresh_certificates
@@ -396,6 +398,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait_refresh_public_cert
+    # Can remove this label after no strands at label
     wait_for_public_cert("refresh_cert_id")
     postgres_resource.save_changes
     PostgresServer.incr_refresh_certificates(server_ids_dataset)
@@ -473,6 +476,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     when_check_disk_usage_set? do
       decr_check_disk_usage
       postgres_resource.handle_storage_auto_scale
+    end
+
+    when_cert_renewed_set? do
+      wait_for_public_cert("refresh_cert_id")
+      postgres_resource.save_changes
+      PostgresServer.incr_refresh_certificates(server_ids_dataset)
+      decr_cert_renewed
+      nap 0
     end
 
     refresh = false
@@ -560,7 +571,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def wait_for_public_cert(frame_key)
     cert_id = send(frame_key)
     cert = Cert.with_pk!(cert_id)
-    nap(10 * 60) unless cert.cert
+    unless cert.cert
+      when_cert_renewed_set? do
+        Prog::PageNexus.assemble("Cert not available after cert_renewed semaphore set for #{postgres_resource.ubid}",
+          ["CertRenewal", postgres_resource.id],
+          postgres_resource.ubid,
+          resource_id: postgres_resource.id)
+        # Something is majorly wrong at this point. However, there isn't a point of
+        # continuing to retry this code, so after sending the page, decrement the semaphore.
+        decr_cert_renewed
+        nap(0)
+      end
+
+      nap(10 * 60)
+    end
 
     postgres_resource.server_cert = cert.cert
     postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem

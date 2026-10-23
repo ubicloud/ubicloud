@@ -81,6 +81,30 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(st.stack[0]["wait_deadline"]).to eq 100
     end
 
+    it "supports wakeup_semaphore: argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, wakeup_semaphore: "cert_renewed")
+      expect(st.stack[0]["wakeup_semaphore"]).to eq "cert_renewed"
+    end
+
+    it "does not enable auto restarts by default" do
+      st = described_class.assemble("test-hostname", dns_zone.id)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 0
+      expect(st.stack[0]["wait_deadline"]).to be_nil
+      expect(st.stack[0]["last_restart_time"]).to be_within(10).of(Time.now.to_i)
+    end
+
+    it "supports num_auto_restarts: argument, defaulting wait_deadline" do
+      st = described_class.assemble("test-hostname", dns_zone.id, num_auto_restarts: 3)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 3
+      expect(st.stack[0]["wait_deadline"]).to eq described_class::AUTO_RESTART_WAIT_DEADLINE
+    end
+
+    it "does not override given wait_deadline when using num_auto_restarts:" do
+      st = described_class.assemble("test-hostname", dns_zone.id, num_auto_restarts: 3, wait_deadline: 100)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 3
+      expect(st.stack[0]["wait_deadline"]).to eq 100
+    end
+
     it "fails if dns_zone is not valid" do
       id = SecureRandom.uuid
       expect {
@@ -104,6 +128,48 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "does not hop to restart if restarted is not set" do
       st.update(label: "wait_dns_validation")
+      expect { nx.before_run }.not_to hop
+    end
+
+    it "automatically restarts if waiting on the ACME order for too long and auto restarts remain" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100, "last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1})
+      expect { nx.before_run }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 1
+      expect(st.stack[0]["deadline_target"]).to eq "wait"
+      expect(Time.new(st.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+    end
+
+    it "extends an existing deadline when automatically restarting" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 1, "wait_deadline" => 100, "last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1, "deadline_target" => "wait", "deadline_at" => (Time.now + 10).to_s})
+      expect { nx.before_run }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 0
+      expect(Time.new(st.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+    end
+
+    it "does not automatically restart if no auto restarts remain" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 0, "last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1})
+      expect { nx.before_run }.not_to hop
+    end
+
+    it "does not automatically restart if last restart was recent" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "last_restart_time" => Time.now.to_i - 60})
+      expect { nx.before_run }.not_to hop
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
+    end
+
+    it "does not automatically restart if last_restart_time is not set" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "last_restart_time" => nil})
+      expect { nx.before_run }.not_to hop
+    end
+
+    it "does not automatically restart outside the ACME order labels" do
+      st.update(label: "wait")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1})
       expect { nx.before_run }.not_to hop
     end
 
@@ -135,7 +201,9 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
+      refresh_frame(nx, new_values: {"last_restart_time" => 0})
       expect { nx.start }.to hop("wait_dns_update")
+      expect(nx.strand.stack[0]["last_restart_time"]).to be_within(10).of(Time.now.to_i)
       expect(cert.reload.kid).to eq("test-kid")
       expect(cert.order_url).to eq("test-order-url")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
@@ -326,6 +394,17 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
       expect(cert.reload.cert).to eq("test-certificate")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
+    end
+
+    it "increments wakeup_semaphore on waiting strand if waiting_strand_id and wakeup_semaphore are set" do
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
+      refresh_frame(nx, new_values: {"waiting_strand_id" => waiting_strand.id, "wakeup_semaphore" => "cert_renewed"})
+      expect(@acme_order).to receive(:status).and_return("valid")
+      expect(@acme_order).to receive(:certificate).and_return("test-certificate")
+      expect { nx.wait_cert_finalization }.to hop("wait")
+      expect(cert.reload.cert).to eq("test-certificate")
+      expect(Semaphore.where(strand_id: waiting_strand.id).select_map(:name)).to eq ["cert_renewed"]
       expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
     end
   end

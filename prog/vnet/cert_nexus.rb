@@ -5,8 +5,8 @@ require "openssl"
 
 class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert
-  frame_reader :add_private, :wait_deadline
-  frame_accessor :last_dns_validation_request, :restarted
+  frame_reader :add_private, :wait_deadline, :wakeup_semaphore
+  frame_accessor :last_dns_validation_request, :restarted, :remaining_auto_restarts, :last_restart_time
 
   REVOKE_REASON = "cessationOfOperation"
 
@@ -17,23 +17,46 @@ class Prog::Vnet::CertNexus < Prog::Base
     bad_nonce_retry: 3,
   }.freeze
 
-  def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil, wait_deadline: nil)
+  AUTO_RESTART_SECONDS = 15 * 60
+  AUTO_RESTART_WAIT_DEADLINE = AUTO_RESTART_SECONDS * 2
+
+  def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil, wait_deadline: nil, num_auto_restarts: 0, wakeup_semaphore: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
 
+    wait_deadline ||= AUTO_RESTART_WAIT_DEADLINE if num_auto_restarts > 0
+
     DB.transaction do
       cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
 
-      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "waiting_strand_id" => waiting_strand_id, "wait_deadline" => wait_deadline}])
+      Strand.create_with_id(cert,
+        prog: "Vnet::CertNexus",
+        label: "start",
+        stack: [{
+          "restarted" => 0,
+          "waiting_strand_id" => waiting_strand_id,
+          "wakeup_semaphore" => wakeup_semaphore,
+          "wait_deadline" => wait_deadline,
+          "remaining_auto_restarts" => num_auto_restarts,
+          "last_restart_time" => Time.now.to_i,
+        }])
     end
   end
 
   def before_run
     super
 
-    when_restarted_set? do
-      hop_restart if ACME_ORDER_LABELS.include?(strand.label)
+    if ACME_ORDER_LABELS.include?(strand.label)
+      when_restarted_set? do
+        hop_restart
+      end
+
+      if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && remaining_auto_restarts > 0
+        self.remaining_auto_restarts -= 1
+        register_deadline("wait", wait_deadline, allow_extension: true)
+        hop_restart
+      end
     end
   end
 
@@ -42,6 +65,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def start
+    self.last_restart_time = Time.now.to_i
     register_deadline("wait", wait_deadline || 10 * 60)
 
     if Config.development? && cert.dns_zone_id.nil?
@@ -137,7 +161,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     when "valid"
       cert.update(cert: acme_order.certificate, created_at: Time.now)
       cleanup_dns_challenge_records
-      hop_wait_and_wakeup_waiting_strand
+      hop_wait_and_wakeup_waiting_strand(semaphore: wakeup_semaphore)
     else
       Clog.emit("Certificate finalization failed", {order_status:})
       cleanup_dns_challenge_records
