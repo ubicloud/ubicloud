@@ -147,6 +147,16 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
       expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is not on a host")
     end
 
+    it "fails for a volume that is already being moved" do
+      server
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is already being moved")
+    end
+
+    it "checks the volume's current host, not the one it was loaded with" do
+      DetachableVolume.where(id: volume.id).update(vm_host_id: nil)
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is not on a host")
+    end
+
     it "fails if the host doesn't have the necessary vhost_block_backend" do
       volume.update(vm_host_id: create_vm_host.id)
       expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error(/\AHost doesn't have ubiblk /)

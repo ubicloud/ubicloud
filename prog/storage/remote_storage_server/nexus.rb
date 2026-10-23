@@ -28,9 +28,16 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   end
 
   def self.assemble_for_detachable_volume(volume)
-    fail "Detachable volume is not on a host" unless volume.vm_host
+    DB.transaction do
+      # Lock the volume so that two concurrent moves can't both find no
+      # server and assemble one each, and so the checks below see the
+      # volume's current host.
+      volume.lock!
+      fail "Detachable volume is not on a host" unless volume.vm_host
+      fail "Detachable volume is already being moved" unless volume.remote_storage_server_dataset.empty?
 
-    create_server(volume.vm_host, source_detachable_volume_id: volume.id)
+      create_server(volume.vm_host, source_detachable_volume_id: volume.id)
+    end
   end
 
   def self.create_server(vm_host, **source)

@@ -67,16 +67,6 @@ class DetachableVolume < Sequel::Model
       "autofetch" => true,
     }
   end
-
-  def start_move
-    DB.transaction do
-      lock!
-      fail "#{ubid} is not on a host" unless vm_host
-      fail "#{ubid} is already being moved" unless remote_storage_server_dataset.empty?
-
-      Prog::Storage::RemoteStorageServer::Nexus.assemble_for_detachable_volume(self)
-    end
-  end
 end
 
 # Table: detachable_volume
