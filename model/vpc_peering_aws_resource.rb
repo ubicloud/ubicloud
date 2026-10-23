@@ -5,6 +5,10 @@ require_relative "../model"
 class VpcPeeringAwsResource < Sequel::Model
   many_to_one :vpc_peering, key: :id, read_only: true, is_used: true
   plugin ResourceMethods, referencing: UBID::TYPE_VPC_PEERING
+
+  def console_url
+    "https://#{peer_region}.console.aws.amazon.com/vpcconsole/home?region=#{peer_region}#PeeringConnectionDetails:VpcPeeringConnectionId=#{peering_connection_id}"
+  end
 end
 
 # Table: vpc_peering_aws_resource
