@@ -70,7 +70,7 @@ class Prog::Storage::RotateKek < Prog::Base
         vm_name: vm.inhost_name, disk_index: volume.disk_index, action:, stdin: JSON.generate(stdin))
     elsif (host = volume.vm_host)
       # A volume that has never been laid out has nothing on a host to re-wrap.
-      host.sshable.cmd("sudo host/bin/detachable-volume-key-tool :volume_id :action",
+      host.sshable.cmd("sudo host/bin/storage-key-tool :volume_id :action",
         volume_id: volume.ubid, action:, stdin: JSON.generate(stdin))
     end
   end

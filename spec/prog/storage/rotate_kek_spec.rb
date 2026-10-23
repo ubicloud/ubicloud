@@ -115,12 +115,12 @@ RSpec.describe Prog::Storage::RotateKek do
     describe "laid out on a host" do
       before { dv.update(vm_host_id: host.id) }
 
-      it "backs up, re-wraps and retires the key on the host through host/bin/detachable-volume-key-tool" do
+      it "backs up, re-wraps and retires the key on the host through host/bin/storage-key-tool" do
         old_key = dv.key_encryption_key_1.secret_key_material_hash
         sshable = rotation.volume.vm_host.sshable
         new_key = dv.reload.key_encryption_key_2.secret_key_material_hash
         [["backup", {old_key:}], ["rotate", {old_key:, new_key:}], ["retire-backup", {old_key:}]].each do |action, stdin|
-          expect(sshable).to receive(:_cmd).with("sudo host/bin/detachable-volume-key-tool #{dv.ubid} #{action}",
+          expect(sshable).to receive(:_cmd).with("sudo host/bin/storage-key-tool #{dv.ubid} #{action}",
             stdin: JSON.generate(stdin)).ordered
         end
         expect { rotation.back_up_key }.to hop("rotate")
