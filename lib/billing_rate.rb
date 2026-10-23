@@ -20,6 +20,13 @@ class BillingRate
     }.max_by { it["active_from"] }
   end
 
+  # Storage priced per family, where the customer picks the local SSD count,
+  # wins over the flavor-wide row that bundled shapes bill at zero.
+  def self.postgres_storage_rate(resource_type, flavor, family, location)
+    from_resource_properties(resource_type, "#{flavor}-#{family}", location.name, location.byoc) ||
+      from_resource_properties(resource_type, flavor, location.name, location.byoc)
+  end
+
   def self.unit_price_from_resource_properties(resource_type, resource_family, location, byoc = false, active_at = Time.now)
     from_resource_properties(resource_type, resource_family, location, byoc, active_at)&.[]("unit_price")&.to_f
   end

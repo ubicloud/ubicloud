@@ -2079,6 +2079,16 @@ RSpec.describe PostgresResource do
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
 
+    it "offers the two storage rungs of an n2d size" do
+      project.set_ff_enable_n2d_highmem(true)
+      option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
+      allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+      n2d_8_options = allowed_storage.select { it["size"] == "n2d-highmem-8" }
+      expect(n2d_8_options.map { it["storage_size"] }).to eq([3000, 6000])
+      expect(allowed_storage.map { it["size"] }).not_to include("n2d-standard-8")
+    end
+
     describe "AWS 48xlarge sizes" do
       let(:aws_location) {
         Location.create(name: "us-east-2", provider: "aws", display_name: "aws-us-east-2", ui_name: "Ohio, US (AWS)", visible: true)

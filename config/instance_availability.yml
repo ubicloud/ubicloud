@@ -9608,6 +9608,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-east1:
         families:
           c3d-highmem:
@@ -9909,6 +10021,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-east2:
         families:
           c4-highmem:
@@ -10015,6 +10239,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-northeast1:
         families:
           c3-standard:
@@ -10311,6 +10647,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -10404,6 +10852,118 @@ providers:
               memory_gib: 704
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-northeast3:
         families:
           c4-highmem:
@@ -10510,6 +11070,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-south1:
         families:
           c3-standard:
@@ -10759,6 +11431,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -10924,6 +11708,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-southeast1:
         families:
           c3-standard:
@@ -11294,6 +12190,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -11533,6 +12541,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-asia-southeast3:
         families:
           c3d-highmem:
@@ -11888,6 +13008,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -12211,6 +13443,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-europe-central2:
         families:
           c4a-highmem:
@@ -12287,6 +13631,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-europe-north1:
         families:
           c3d-standard:
@@ -12504,6 +13960,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-europe-north2:
         families:
           c3d-highmem:
@@ -13044,6 +14612,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-europe-west1:
         families:
           c3-standard:
@@ -13377,6 +15057,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -13522,6 +15314,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -13877,6 +15781,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -14185,6 +16201,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -14577,6 +16705,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -14816,6 +17056,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -14981,6 +17333,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-europe-west9:
         families:
           c4-highmem:
@@ -15087,6 +17551,118 @@ providers:
               memory_gib: 1080
               storage_size_options:
               - 18000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-me-central1:
         families:
           c4a-highmem:
@@ -15163,6 +17739,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-me-central2:
         families:
           c3-standard:
@@ -15234,6 +17922,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-me-west1:
         families:
           c3-standard:
@@ -15426,6 +18226,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-northamerica-northeast1:
         families:
           c3-standard:
@@ -15638,6 +18550,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-northamerica-northeast2:
         families:
           c4-highmem:
@@ -15818,6 +18842,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-northamerica-south1:
         families:
           c3d-highmem:
@@ -16343,6 +19479,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-southamerica-west1:
         families:
           c4-highmem:
@@ -16523,6 +19771,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-us-central1:
         families:
           c3-standard:
@@ -16893,6 +20253,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -17322,6 +20794,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -17714,6 +21298,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -18069,6 +21765,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -18340,6 +22148,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -18611,6 +22531,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
           z3-highlssd:
             sizes:
             - name: z3-highlssd-8
@@ -18850,6 +22882,118 @@ providers:
               memory_gib: 288
               storage_size_options:
               - 6000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-us-west3:
         families:
           c4-highmem:
@@ -19040,6 +23184,118 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
       gcp-us-west4:
         families:
           c3-standard:
@@ -19373,3 +23629,115 @@ providers:
               memory_gib: 1488
               storage_size_options:
               - 12000
+          n2d-highmem:
+            sizes:
+            - name: n2d-highmem-2
+              vcpus: 2
+              memory_gib: 16
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-80
+              vcpus: 80
+              memory_gib: 640
+              storage_size_options:
+              - 9000
+            - name: n2d-highmem-96
+              vcpus: 96
+              memory_gib: 768
+              storage_size_options:
+              - 9000
+          n2d-standard:
+            sizes:
+            - name: n2d-standard-2
+              vcpus: 2
+              memory_gib: 8
+              storage_size_options:
+              - 750
+              - 1500
+            - name: n2d-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 1500
+              - 3000
+            - name: n2d-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 3000
+              - 6000
+            - name: n2d-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 6000
+              - 9000
+            - name: n2d-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-80
+              vcpus: 80
+              memory_gib: 320
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-96
+              vcpus: 96
+              memory_gib: 384
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-128
+              vcpus: 128
+              memory_gib: 512
+              storage_size_options:
+              - 9000
+            - name: n2d-standard-224
+              vcpus: 224
+              memory_gib: 896
+              storage_size_options:
+              - 9000
