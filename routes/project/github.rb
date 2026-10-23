@@ -224,6 +224,7 @@ class Clover
                 end
 
                 DB.transaction do
+                  entry.require_modification = false
                   entry.destroy
                   audit_log(entry, "destroy")
                 end
