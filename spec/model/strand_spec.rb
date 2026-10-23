@@ -208,6 +208,16 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(1).of(schedule)
   end
 
+  it "increments the given semaphore on the waiting strand, waking it up" do
+    st.update(schedule: Time.now + 10000, stack: [{"waiting_strand_id" => st.id}])
+
+    st.wakeup_waiting_strand(semaphore: "cert_renewed")
+
+    expect(st.stack[0]).to eq({})
+    expect(Semaphore.where(strand_id: st.id).select_map(:name)).to eq ["cert_renewed"]
+    expect(st.reload.schedule).to be_within(10).of(Time.now)
+  end
+
   it "does nothing when there is no strand waiting" do
     st.update(schedule: Time.now + 10000)
 
