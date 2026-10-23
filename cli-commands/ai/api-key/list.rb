@@ -13,7 +13,7 @@ class UbiCli
     run do |opts|
       opts = opts[key]
       items = sdk.inference_api_key.list
-      response(format_rows(%i[id key], items, headers: opts[:"no-headers"] != false))
+      response(format_rows(%i[id], items, headers: opts[:"no-headers"] != false))
     end
   end
 end
