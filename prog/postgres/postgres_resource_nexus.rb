@@ -117,11 +117,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
       postgres_resource_id ||= PostgresResource.generate_uuid
 
-      flavor = PostgresResource::STANDARD_FLAVOR
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:, target_vm_size:,
         target_storage_size_gib:, server_cert:, server_cert_key:, superuser_password:,
-        ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:,
+        ha_type:, target_version:, parent_id:, tags:, restore_target:,
         hostname_version:, user_config:, pgbouncer_user_config:, target_image_family:,
         preferred_availability_zone_id:, required_availability_zone_id:)
 

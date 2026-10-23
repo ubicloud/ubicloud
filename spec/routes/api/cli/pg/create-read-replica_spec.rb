@@ -24,7 +24,6 @@ RSpec.describe Clover, "cli pg create-read-replica" do
     expect(pg.target_storage_size_gib).to eq 64
     expect(pg.ha_type).to eq "none"
     expect(pg.version).to eq "18"
-    expect(pg.flavor).to eq "standard"
     expect(pg.user_config).to eq({"max_connections" => "500"})
     expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "99"})
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])

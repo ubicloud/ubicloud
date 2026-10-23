@@ -11,4 +11,4 @@ Options:
     -N, --no-headers                 do not show headers
 
 Allowed Option Values:
-    Fields: location name id version flavor
+    Fields: location name id version

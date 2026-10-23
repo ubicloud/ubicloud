@@ -19,7 +19,6 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.target_storage_size_gib).to eq 64
     expect(pg.ha_type).to eq "none"
     expect(pg.version).to eq "18"
-    expect(pg.flavor).to eq "standard"
     expect(pg.pg_firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
       "0.0.0.0/0:5432...5433",
       "0.0.0.0/0:6432...6433",
@@ -44,7 +43,6 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.version).to eq "17"
     expect(pg.user_config).to eq({"max_connections" => "100", "wal_level" => "logical"})
     expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "100"})
-    expect(pg.flavor).to eq "standard"
     expect(pg.pg_firewall_rules_dataset.count).to eq 0
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
