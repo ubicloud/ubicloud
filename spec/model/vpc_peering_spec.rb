@@ -69,6 +69,22 @@ RSpec.describe VpcPeering do
     expect(ps.vpc_peerings_dataset.not_deleting.select_map(:id)).to eq [vp.id]
   end
 
+  it "shows deleting while destroy or destroying is set, and the stored state otherwise" do
+    Strand.create_with_id(vp, prog: "Vnet::Aws::VpcPeeringNexus", label: "wait")
+    %w[creating waiting_for_peer configuring active].each do
+      vp.update(state: it)
+      expect(vp.display_state).to eq it
+    end
+    vp.update(state: "failed", state_message: "The peering request was rejected in AWS account 111122223333.")
+    expect(vp.display_state).to eq "failed"
+
+    vp.incr_destroy
+    expect(vp.reload.display_state).to eq "deleting"
+    vp.decr_destroy
+    vp.incr_destroying
+    expect(vp.reload.display_state).to eq "deleting"
+  end
+
   it "destroys its AWS resource and keeps a deleted record of both" do
     VpcPeeringAwsResource.create_with_id(vp, peer_region: "us-west-2")
     expect { vp.destroy }.to change { DeletedRecord.where(record_id: vp.id).select_order_map(:model_name) }.from([]).to(%w[VpcPeering VpcPeeringAwsResource])
