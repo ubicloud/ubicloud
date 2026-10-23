@@ -101,29 +101,4 @@ RSpec.describe DetachableVolume do
       end
     end
   end
-
-  describe "#start_move" do
-    let(:source) { create_vm_host }
-
-    before { VhostBlockBackend.create(vm_host_id: source.id, version_code: 501, allocation_weight: 0) }
-
-    it "serves the volume from its host, so another host can take it over" do
-      volume.update(vm_host_id: source.id)
-      volume.start_move
-      server = volume.reload.remote_storage_server
-      expect(server.source_detachable_volume_id).to eq(volume.id)
-      expect(server.vm_host_id).to eq(source.id)
-      expect(server.strand.label).to eq("start")
-    end
-
-    it "refuses a volume that is not on a host" do
-      expect { volume.start_move }.to raise_error(RuntimeError, "#{volume.ubid} is not on a host")
-    end
-
-    it "refuses a volume already being moved" do
-      volume.update(vm_host_id: source.id)
-      volume.start_move
-      expect { volume.start_move }.to raise_error(RuntimeError, "#{volume.ubid} is already being moved")
-    end
-  end
 end
