@@ -12,7 +12,7 @@ RSpec.describe StorageDevice do
 
     it "returns the nvme-eui id for NVMe disks" do
       sshable = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-      expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
+      expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
       expect(described_class.convert_device_name_to_device_id(sshable, "nvme0n1")).to eq("nvme-eui.random-id")
     end
 

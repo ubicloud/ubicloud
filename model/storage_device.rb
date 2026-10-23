@@ -12,13 +12,14 @@ class StorageDevice < Sequel::Model
   # to handle this, we would use /dev/disk/by-id instead.
   # For SSD disks, there is a unique identifier which starts with wwn (World Wide Name) which is claimed to be unique across the world
   # For NVMe disks, there is a unique identidier which starts with nvme-eui and it is also claimed to be unique
+  # When the kernel has no EUI for an NVMe disk, it starts with nvme-nvme instead, built from vendor, serial and model
   #
   # All of our disks are either SSD or NVMe, so the assumptions that we can rely on these two prefixes is reliable
   def self.convert_device_name_to_device_id(sshable, device_name)
     if device_name.start_with?("sd")
       sshable.cmd("ls -l /dev/disk/by-id/ | grep :device_name | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'", device_name: "#{device_name}$").strip
     elsif device_name.start_with?("nvme")
-      sshable.cmd("ls -l /dev/disk/by-id/ | grep :device_name | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'", device_name: "#{device_name}$").strip
+      sshable.cmd("ls -l /dev/disk/by-id/ | grep :device_name | grep -E 'nvme-(eui|nvme)\\.' | sed -E 's/.*(nvme-(eui|nvme)\\.[^ ]*).*/\\1/'", device_name: "#{device_name}$").strip
     else
       device_name
     end
