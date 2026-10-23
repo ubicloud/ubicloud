@@ -402,8 +402,8 @@ end
     @frame = nil
   end
 
-  def hop_wait_and_wakeup_waiting_strand
-    strand.wakeup_waiting_strand
+  def hop_wait_and_wakeup_waiting_strand(semaphore: nil)
+    strand.wakeup_waiting_strand(semaphore:)
     hop_wait
   end
 
