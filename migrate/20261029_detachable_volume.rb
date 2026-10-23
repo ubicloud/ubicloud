@@ -14,7 +14,6 @@ Sequel.migration do
 
       foreign_key :key_encryption_key_1_id, :storage_key_encryption_key, type: :uuid, null: false
       foreign_key :key_encryption_key_2_id, :storage_key_encryption_key, type: :uuid
-      column :wrapped_xts, :text, collate: '"C"', null: false
 
       column :source_image, :text, collate: '"C"', null: false
 

@@ -25,7 +25,6 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
       expect(v.size_gib).to eq(4)
       expect(v.vm_host_id).to be_nil
       expect(v.key_encryption_key_1.auth_data).to eq(v.ubid)
-      expect(v.wrapped_xts).not_to be_nil
       expect(v.strand.label).to eq("wait")
     end
   end

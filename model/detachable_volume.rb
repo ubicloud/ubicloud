@@ -20,10 +20,6 @@ class DetachableVolume < Sequel::Model
     incr_catch_up unless caught_up
   end
 
-  def self.wrap_xts(kek)
-    kek.encrypt(SecureRandom.bytes(64), "xts-key")
-  end
-
   def start_params(target_host, unix_user:, device_id:, vhost_block_backend_version:, slice_name: "system.slice")
     fail "#{ubid} is having its key rotated" if key_encryption_key_2_id
 
@@ -79,7 +75,6 @@ end
 #  vm_host_id              | uuid                     |
 #  key_encryption_key_1_id | uuid                     | NOT NULL
 #  key_encryption_key_2_id | uuid                     |
-#  wrapped_xts             | text                     | NOT NULL
 #  source_image            | text                     | NOT NULL
 # Indexes:
 #  detachable_volume_pkey           | PRIMARY KEY btree (id)

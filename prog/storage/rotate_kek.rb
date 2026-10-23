@@ -37,14 +37,10 @@ class Prog::Storage::RotateKek < Prog::Base
     # the old key so the host can name the backup file.
     host_tool("retire-backup", {old_key: old_key_hash})
     retired_key = volume.key_encryption_key_1
-    changes = {
+    volume.update({
       key_encryption_key_1_id: volume.key_encryption_key_2_id,
       key_encryption_key_2_id: nil,
-    }
-    if volume.is_a?(DetachableVolume)
-      changes[:wrapped_xts] = volume.key_encryption_key_2.encrypt(retired_key.decrypt(volume.wrapped_xts, "xts-key"), "xts-key")
-    end
-    volume.update(changes)
+    })
     retired_key.destroy
 
     pop "key rotated successfully"
