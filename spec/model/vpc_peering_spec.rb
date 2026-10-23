@@ -59,6 +59,16 @@ RSpec.describe VpcPeering do
     expect { ps.destroy }.to raise_error(Sequel::ForeignKeyConstraintViolation, /vpc_peering_private_subnet_id_fkey/)
   end
 
+  it "excludes peerings with destroy or destroying set from not_deleting" do
+    marked, destroying = %w[vpc-0b1b2c3d4e5f60718 vpc-0c1b2c3d4e5f60718].map {
+      described_class.create(private_subnet_id: ps.id, peer_account_id: "111122223333", peer_vpc_id: it)
+    }
+    [vp, marked, destroying].each { Strand.create_with_id(it, prog: "Vnet::Aws::VpcPeeringNexus", label: "wait") }
+    marked.incr_destroy
+    destroying.incr_destroying
+    expect(ps.vpc_peerings_dataset.not_deleting.select_map(:id)).to eq [vp.id]
+  end
+
   it "destroys its AWS resource and keeps a deleted record of both" do
     VpcPeeringAwsResource.create_with_id(vp, peer_region: "us-west-2")
     expect { vp.destroy }.to change { DeletedRecord.where(record_id: vp.id).select_order_map(:model_name) }.from([]).to(%w[VpcPeering VpcPeeringAwsResource])
