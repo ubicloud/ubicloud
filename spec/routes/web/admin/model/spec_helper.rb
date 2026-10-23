@@ -710,6 +710,16 @@ module AdminModelSpecHelper
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 10, disk_index: 1)
     end
 
+    def create_vpc_peering
+      ps = create_private_subnet
+      VpcPeering.create(private_subnet_id: ps.id, peer_account_id: "111122223333", peer_vpc_id: "vpc-0a1b2c3d4e5f60718", peer_cidrs: Sequel.pg_array(["10.200.0.0/16"], :cidr))
+    end
+
+    def create_vpc_peering_aws_resource
+      vp = create_vpc_peering
+      VpcPeeringAwsResource.create_with_id(vp, peer_region: "us-east-1", peering_connection_id: "pcx-0123456789abcdef0", requester_account_id: "999988887777", expires_at: Time.now + 7 * 24 * 60 * 60)
+    end
+
     def create_network_volume
       NetworkVolume.create(location_id: Location::HETZNER_FSN1_ID, size_gib: 64)
     end
