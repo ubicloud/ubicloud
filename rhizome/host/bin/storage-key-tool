@@ -4,19 +4,30 @@
 require "json"
 require_relative "../lib/vm_path"
 require_relative "../lib/key_rotation"
+require_relative "../lib/storage_path"
 
-unless ARGV.length == 3
-  warn "usage: storage-key-tool vm-name disk-index action"
-  exit 1
+if ARGV.first&.start_with?("dv")
+  unless ARGV.length == 2
+    warn "usage: storage-key-tool detachable-volume-id action"
+    exit 1
+  end
+
+  volume_id, action = ARGV
+  rotation = KeyRotation.new(StoragePath.detachable(volume_id).vhost_backend_secrets_config, :config_v2)
+else
+  unless ARGV.length == 3
+    warn "usage: storage-key-tool vm-name disk-index action"
+    exit 1
+  end
+
+  vm_name, disk_index, action = ARGV
+  volume_params = JSON.parse(File.read(VmPath.new(vm_name).prep_json)).fetch("storage_volumes")
+    .find { |v| v["disk_index"].to_s == disk_index } ||
+    raise("no storage volume with disk_index #{disk_index} in prep.json")
+  rotation = KeyRotation.build_from_vm(vm_name, volume_params)
 end
 
-vm_name, disk_index, action = ARGV
 keys = JSON.parse($stdin.read)
-
-volume_params = JSON.parse(File.read(VmPath.new(vm_name).prep_json)).fetch("storage_volumes")
-  .find { |v| v["disk_index"].to_s == disk_index } ||
-  raise("no storage volume with disk_index #{disk_index} in prep.json")
-rotation = KeyRotation.build_from_vm(vm_name, volume_params)
 old_key = keys.fetch("old_key")
 
 case action
