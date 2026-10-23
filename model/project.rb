@@ -259,10 +259,55 @@ class Project < Sequel::Model
   end
 
   def default_private_subnet(location)
-    name = "default-#{location.display_name[0, 55]}"
-    location_id = location.id
-    ps = private_subnets_dataset.first(location_id:, name:)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
+    DB.transaction do
+      ps = available_default_private_subnet(location)
+      next ps if ps
+
+      this.for_no_key_update.get(:id)
+      available_default_private_subnet(location) || create_default_private_subnet(location)
+    end
+  end
+
+  private def available_default_private_subnet(location)
+    subnets = default_private_subnets(location)
+    return subnets[1] unless location.metal?
+
+    subnets.each_value do |ps|
+      next if ps[:destroying] || ps.ipv4_full?
+      ps = private_subnets_dataset.for_update.with_pk(ps.id)
+      return ps if ps && !ps.ipv4_full?
+    end
+    nil
+  end
+
+  private def create_default_private_subnet(location)
+    subnets = default_private_subnets(location)
+    first = subnets.each_value.find { !it[:destroying] }
+    firewall_ids = first.firewalls_dataset.select_map(Sequel[:firewall][:id]) if first
+    name = default_private_subnet_name(location, (subnets.keys.max || 0) + 1)
+    Prog::Vnet::SubnetNexus.assemble(id, name:, location_id: location.id, ipv4_range_size: (24 if location.metal?), firewall_ids:).subject
+  end
+
+  private def default_private_subnets(location)
+    private_subnets_dataset
+      .where(location_id: location.id)
+      .where(Sequel.like(:name, "default-%"))
+      .select_append(Semaphore.where(strand_id: Sequel[:private_subnet][:id], name: %w[destroy destroying]).exists.as(:destroying))
+      .eager(:location, nics: proc { it.select(:id, :private_subnet_id, :private_ipv4) })
+      .all
+      .filter_map { |ps| (n = default_private_subnet_number(location, ps.name)) && [n, ps] }
+      .sort_by(&:first).to_h
+  end
+
+  private def default_private_subnet_number(location, name)
+    return 1 if name == default_private_subnet_name(location, 1)
+    n = name[/-(\d+)\z/, 1].to_i
+    n if location.metal? && n > 1 && name == default_private_subnet_name(location, n)
+  end
+
+  private def default_private_subnet_name(location, n)
+    suffix = (n == 1) ? "" : "-#{n}"
+    "default-#{location.display_name[0, 55 - suffix.length]}#{suffix}"
   end
 
   def visible_location_names

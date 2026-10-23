@@ -85,6 +85,17 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.firewalls.first).to eq(fw)
     end
 
+    it "uses every firewall in firewall_ids" do
+      fws = Array.new(2) { Firewall.create(name: "fw-#{it}", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id) }
+      ps = described_class.assemble(prj.id, firewall_ids: fws.map(&:id))
+      expect(ps.subject.firewalls.map(&:id).sort).to eq(fws.map(&:id).sort)
+    end
+
+    it "attaches no firewall for an empty firewall_ids" do
+      ps = described_class.assemble(prj.id, firewall_ids: [])
+      expect(ps.subject.firewalls).to be_empty
+    end
+
     it "fails if provided firewall does not exist" do
       expect {
         described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")
@@ -117,6 +128,22 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.0.0.128/26")
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 2)
       expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.192/26")
+    end
+
+    it "finds a new subnet if the one it found overlaps an existing one" do
+      expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
+      project = Project.create(name: "test-project")
+      described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.0.1.128/26")
+      allow(SecureRandom).to receive(:random_number).with(2**(24 - 8) - 1).and_return(0, 1)
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 24).to_s).to eq("10.0.2.0/24")
+    end
+
+    it "finds a new subnet if the one it found lies inside an existing one" do
+      expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
+      project = Project.create(name: "test-project")
+      described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.0.0.0/24")
+      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 4)
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.1.64/26")
     end
 
     it "finds a new subnet if the one it found is banned" do
