@@ -1,0 +1,30 @@
+<%# locals: (vp:, pcx:, local_cidr:) %>
+
+<p>
+  <strong>2. Route traffic to Ubicloud.</strong> In every route table used by subnets that must reach Ubicloud, add a
+  route with destination <strong><%= local_cidr %></strong> and target <strong>peering connection <%= pcx %></strong>.
+  Subnets without an explicit association use the VPC's main route table. The AWS console offers
+  <em>Modify my route tables now</em> right after you accept.
+</p>
+
+<p>
+  <strong>3. Allow the traffic.</strong> If your security groups restrict outbound traffic, allow TCP to
+  <%= local_cidr %> on the ports you use (5432 for PostgreSQL, 6432 for PgBouncer). If you use custom network ACLs,
+  allow outbound TCP to <%= local_cidr %> on those ports and inbound return traffic from <%= local_cidr %> on ports
+  1024-65535. A VPC in another region must use CIDRs, because security groups cannot be referenced across regions.
+</p>
+
+<p>
+  <strong>4. Turn on DNS for your VPC.</strong> Enable <strong>DNS resolution</strong> and
+  <strong>DNS hostnames</strong> on <%= vp.peer_vpc_id %>. Ubicloud turns on DNS resolution for the peering on its side,
+  so a PostgreSQL database's hostname resolves to its private address inside your VPC; keep your connection string as it
+  is. From an instance in your VPC, <code>dig +short &lt;hostname&gt;</code> should print an address inside
+  <%= local_cidr %>. This works with the Amazon-provided DNS server, or a resolver that forwards to it. Virtual machines
+  have no such hostname: connect to their private IPv4 address, shown on the Virtual Machines tab.
+</p>
+
+<p>
+  <strong>5. Firewall.</strong> This subnet's firewall rules also apply to peered traffic. If they restrict sources (for
+  example, a PostgreSQL database created with "restrict by default"), add your VPC CIDRs on the needed ports. To allow
+  only private access, replace <code>0.0.0.0/0</code> and <code>::/0</code> rules with your VPC CIDRs.
+</p>
