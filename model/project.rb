@@ -345,6 +345,7 @@ class Project < Sequel::Model
     :visible_locations,
     :visible_postgres_locations,
     :vm_public_ssh_keys,
+    :vpc_peering_aws,
     :postgres_aws_use_different_azs_for_standbys,
     :postgres_backup_download_minio,
     :postgres_instance_type_fallback,

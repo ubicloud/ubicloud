@@ -204,6 +204,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
+
+    peerings = private_subnet.vpc_peerings_dataset
+    unless peerings.empty?
+      VpcPeering.incr_destroy(peerings.not_deleting.select(:id))
+      Clog.emit("Cannot destroy subnet with VPC peerings, waiting for them to be destroyed", private_subnet)
+      nap 5
+    end
     register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
@@ -264,6 +271,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
     rescue Aws::EC2::Errors::DependencyViolation => e
       Clog.emit("VPC has dependencies, retrying subnet cleanup", {vpc_dependency: {vpc_id: private_subnet_aws_resource.vpc_id, error: e.message}})
+      nap 5 if reject_inbound_peering_requests
       raise e
     rescue Aws::EC2::Errors::InvalidVpcIDNotFound
       # VPC already deleted
@@ -329,5 +337,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
       {name: "service-name", values: [guardduty_service_name]},
     ]}).vpc_endpoints.first
+  end
+
+  def reject_inbound_peering_requests
+    pending = client.describe_vpc_peering_connections({filters: [
+      {name: "accepter-vpc-info.vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+      {name: "status-code", values: ["pending-acceptance"]},
+    ]}).flat_map(&:vpc_peering_connections)
+    pending.each do
+      client.reject_vpc_peering_connection({vpc_peering_connection_id: it.vpc_peering_connection_id})
+    rescue Aws::EC2::Errors::InvalidStateTransition
+      nil
+    end
+    !pending.empty?
   end
 end

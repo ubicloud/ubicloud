@@ -116,6 +116,7 @@ module ResourceMethods
     INSPECT_CONVERTERS = {
       "uuid" => lambda { |v| UBID.to_ubid(v) },
       "cidr" => :to_s.to_proc,
+      "cidr[]" => lambda { |v| v.map(&:to_s) },
       "inet" => :to_s.to_proc,
       "numeric" => :to_f.to_proc,
       "timestamp with time zone" => lambda { |v| v.strftime("%F %T") },

@@ -47,6 +47,10 @@ class Clover
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
+        if vpc_peering_enabled?(@location) && !ps.vpc_peerings_dataset.not_deleting.empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has VPC peerings, first, delete them.")
+        end
+
         DB.transaction do
           ps.incr_destroy
           audit_log(ps, "destroy")
@@ -62,7 +66,64 @@ class Clover
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet, template_prefix: "networking/private_subnet"
 
-      r.show_object(ps, actions: %w[overview vms networking settings].freeze, perm: "PrivateSubnet:view", template: "networking/private_subnet/show")
+      actions = vpc_peering_enabled?(@location) ? %w[overview vms networking vpc-peering settings].freeze : %w[overview vms networking settings].freeze
+      r.show_object(ps, actions:, perm: "PrivateSubnet:view", template: "networking/private_subnet/show")
+
+      r.on vpc_peering_enabled?(@location), "vpc-peering" do
+        r.is do
+          r.get api? do
+            authorize("PrivateSubnet:view", ps)
+            peerings = vpc_peerings_for(ps)
+            {items: Serializers::VpcPeering.serialize(peerings), count: peerings.count}
+          end
+
+          r.post do
+            authorize("PrivateSubnet:edit", ps)
+            handle_validation_failure("networking/private_subnet/show") { @page = "vpc-peering" }
+            peer_account_id = typecast_params.nonempty_str!("peer_account_id").delete("- ")
+            peer_vpc_id = typecast_params.nonempty_str!("peer_vpc_id").strip.downcase
+            peer_region = typecast_params.dig(:nonempty_str, "aws", "peer_region") || @location.name
+            Validation.validate_aws_vpc_peering(peer_account_id:, peer_vpc_id:, peer_region:)
+            vp = DB.transaction do
+              peering = Prog::Vnet::VpcPeeringNexus.assemble(ps, peer_account_id:, peer_vpc_id:, aws: {peer_region:}).subject
+              audit_log(peering, "create", ps)
+              peering
+            end
+
+            if api?
+              Serializers::VpcPeering.serialize(vp)
+            else
+              flash["notice"] = "Ubicloud is requesting the peering. Accept it in AWS account #{vp.peer_account_id} when it appears below."
+              r.redirect ps, "/vpc-peering"
+            end
+          end
+        end
+
+        r.on :ubid_uuid do |id|
+          vp = ps.vpc_peerings_dataset[id:]
+          check_found_object(vp)
+
+          r.get api?, true do
+            authorize("PrivateSubnet:view", ps)
+            Serializers::VpcPeering.serialize(vp)
+          end
+
+          r.delete true do
+            authorize("PrivateSubnet:edit", ps)
+            DB.transaction do
+              vp.incr_destroy
+              audit_log(vp, "destroy", ps)
+            end
+
+            if api?
+              204
+            else
+              flash["notice"] = "VPC peering with #{vp.peer_vpc_id} is being deleted"
+              r.redirect ps, "/vpc-peering"
+            end
+          end
+        end
+      end
     end
   end
 end

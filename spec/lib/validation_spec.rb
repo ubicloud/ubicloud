@@ -366,6 +366,45 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_aws_vpc_peering" do
+    def validate(peer_account_id: "111122223333", peer_vpc_id: "vpc-0a1b2c3d4e5f60718", peer_region: "us-east-1")
+      described_class.validate_aws_vpc_peering(peer_account_id:, peer_vpc_id:, peer_region:)
+    end
+
+    it "accepts a 12 digit account, an 8 or 17 hex digit VPC ID and a commercial AWS region" do
+      expect(validate).to be_nil
+      expect(validate(peer_vpc_id: "vpc-0a1b2c3d", peer_region: "eu-central-1")).to be_nil
+    end
+
+    it "rejects an account ID that is not 12 digits" do
+      ["11112222333", "1111222233334", "11112222333a"].each do |peer_account_id|
+        expect { validate(peer_account_id:) }.to raise_error(described_class::ValidationFailed) { |e|
+          expect(e.details).to eq("peer_account_id" => "AWS account ID must be 12 digits, such as 123456789012. It is in the account menu at the top right of the AWS console.")
+        }
+      end
+    end
+
+    it "rejects a VPC ID of another shape" do
+      ["subnet-0a1b2c3d4e5f60718", "xvpc-0a1b2c3d", "vpc-0a1b2c3d4", "vpc-0A1B2C3D"].each do |peer_vpc_id|
+        expect { validate(peer_vpc_id:) }.to raise_error(described_class::ValidationFailed) { |e|
+          expect(e.details).to eq("peer_vpc_id" => "VPC ID must look like vpc-0123456789abcdef0. It is under Your VPCs in the AWS VPC console.")
+        }
+      end
+    end
+
+    it "rejects regions outside the commercial AWS partition" do
+      %w[aws-global cn-north-1 us-gov-west-1 mars-north-1].each do |peer_region|
+        expect { validate(peer_region:) }.to raise_error(described_class::ValidationFailed) { |e|
+          expect(e.details).to eq("aws.peer_region" => "\"#{peer_region}\" is not an AWS region. Use a region code such as us-east-1.")
+        }
+      end
+    end
+
+    it "reports every invalid field at once" do
+      expect { validate(peer_account_id: "1", peer_vpc_id: "vpc-1", peer_region: "cn-north-1") }.to raise_error(described_class::ValidationFailed, "Validation failed for following fields: peer_account_id, peer_vpc_id, aws.peer_region")
+    end
+  end
+
   describe "#validate_syslog_url" do
     it "valid urls" do
       [

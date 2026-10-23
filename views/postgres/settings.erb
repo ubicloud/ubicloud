@@ -332,6 +332,10 @@ pre_selected_values = {
 
               <div class="mt-2 text-sm text-gray-500">
                 <p>This action will permanently delete this PostgreSQL database.</p>
+
+                <% if vpc_peering_enabled?(@pg.location) && !@pg.private_subnet.vpc_peerings_dataset.empty? %>
+                  <p>The database will no longer be reachable over the VPC peerings of its private subnet.</p>
+                <% end %>
               </div>
             </div>
 
