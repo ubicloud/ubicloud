@@ -699,7 +699,7 @@ class StorageVolume
   end
 
   def vhost_user_block_service
-    @vhost_user_block_service ||= "#{@vm_name}-#{@disk_index}-storage.service" if @vhost_backend_version
+    @vhost_user_block_service ||= sp.vhost_backend_service if @vhost_backend_version
   end
 
   def sp
