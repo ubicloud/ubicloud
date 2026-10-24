@@ -2,6 +2,7 @@
 
 require "rodish"
 require "csv"
+require "shellwords"
 require_relative "../sdk/ruby/lib/ubicloud"
 
 class UbiCli
@@ -392,7 +393,7 @@ class UbiCli
     if page.next_page_args
       body << "Continue search: #{continuation_cmd} "
       page.next_page_args.each do |key, value|
-        body << "--" << key.to_s.tr("_", "-") << "=" << value.to_s << " " if value
+        body << "--" << key.to_s.tr("_", "-") << "=" << value.to_s.shellescape << " " if value
       end
       body << "\n"
     end
