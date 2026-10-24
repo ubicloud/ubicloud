@@ -38,6 +38,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     strand.save_changes
   end
 
+  def moving?
+    !vm.vm_storage_volumes_dataset.where(boot: true).exclude(remote_storage_server_id: nil).empty?
+  end
+
   def boots_from_customer_machine_image?
     project_id = vm.vm_storage_volumes_dataset
       .where(boot: true)
@@ -226,7 +230,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       nap 3
     end
 
-    if (addr = vm.ip4_string)
+    # A moved VM runs whatever the customer had on it, which may block ssh, so
+    # don't wait for ssh to come up.
+    if (addr = vm.ip4_string) && !moving?
       begin
         Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
       rescue SystemCallError
