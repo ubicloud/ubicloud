@@ -170,7 +170,7 @@ class StorageVolume
       "--kek #{sp.kek_pipe}"
     end
 
-    if @archive_source || @remote_source
+    if needs_network?
       # An archive (S3) or remote stripe source needs outbound network access.
       restrict_address_families = "AF_UNIX AF_INET AF_INET6"
       private_network = "no"
@@ -187,7 +187,7 @@ class StorageVolume
     service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
     File.write(service_file_path, <<~SERVICE)
         [Unit]
-        Description=Vhost Block Backend Service for #{@vm_name}
+        Description=#{service_description}
         After=network.target
 
         [Service]
@@ -243,6 +243,14 @@ class StorageVolume
         [Install]
         WantedBy=multi-user.target
     SERVICE
+  end
+
+  def needs_network?
+    !!(@archive_source || @remote_source)
+  end
+
+  def service_description
+    "Vhost Block Backend Service for #{@vm_name}"
   end
 
   def systemd_io_rate_limits
@@ -476,12 +484,15 @@ class StorageVolume
     raise unless e.stderr.include?("not loaded")
   end
 
+  def purge_vhost_backend
+    stop_service_if_loaded(sp.vhost_backend_service)
+    rm_if_exists("/etc/systemd/system/#{sp.vhost_backend_service}")
+    rm_if_exists(vhost_sock)
+  end
+
   def purge_spdk_artifacts
     if @vhost_backend_version
-      service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
-      stop_service_if_loaded(vhost_user_block_service)
-      rm_if_exists(service_file_path)
-      rm_if_exists(vhost_sock)
+      purge_vhost_backend
       return
     end
 

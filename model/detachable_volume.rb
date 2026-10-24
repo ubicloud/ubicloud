@@ -43,27 +43,50 @@ class DetachableVolume < Sequel::Model
     kek.encrypt(SecureRandom.bytes(64), "xts-key")
   end
 
-  def key_material
+  # The input of host/bin/detachable-volume start, to start the volume on
+  # target_host for a VM run by unix_user, with the storage volume in the
+  # form StorageVolume takes it. nil if the volume can't start there now:
+  # its data is on another host, or it is being served from this one.
+  def start_params(target_host, unix_user:, device_id:, vhost_block_backend_version:, slice_name: "system.slice")
     fail "#{ubid} is having its key rotated" if key_encryption_key_2_id
-    {"kek" => key_encryption_key_1.key, "wrapped_xts" => wrapped_xts}
-  end
 
-  def stripe_source_for(target_host)
-    return {"type" => "new", "image" => source_image} unless vm_host_id
+    storage_volume = {
+      "vhost_block_backend_version" => vhost_block_backend_version,
+      "encrypted" => true,
+      "device_id" => device_id,
+      "size_gib" => size_gib,
+      "slice_name" => slice_name,
+      "queue_size" => 64,
+      "track_written" => true,
+      "copy_on_read" => true,
+    }
     server = remote_storage_server
-    if server && vm_host_id == server.vm_host_id
-      taking_over = target_host.id != vm_host_id && server.strand.label == "wait"
-      return taking_over ? remote_source(server) : nil
+    prep = if vm_host_id.nil?
+      storage_volume["image"] = source_image
+      true
+    elsif server && vm_host_id == server.vm_host_id
+      return unless target_host.id != vm_host_id && server.strand.label == "wait"
+      storage_volume["remote_source"] = remote_source(server)
+      true
+    elsif vm_host_id == target_host.id
+      false
+    else
+      return
     end
-    {"type" => "local"} if vm_host_id == target_host.id
+
+    {
+      "unix_user" => unix_user,
+      "kek" => key_encryption_key_1.secret_key_material_hash,
+      "prep" => prep,
+      "storage_volume" => storage_volume,
+    }
   end
 
   def remote_source(server)
     {
-      "type" => "remote",
       "address" => server.address,
       "psk_identity" => server.psk_identity,
-      "wrapped_psk" => key_encryption_key_1.encrypt(Base64.decode64(server.psk), "remote-psk"),
+      "encrypted_psk" => key_encryption_key_1.encrypt(Base64.decode64(server.psk), "remote-psk"),
       "autofetch" => true,
     }
   end
