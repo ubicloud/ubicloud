@@ -79,4 +79,17 @@ RSpec.describe Clover, "cli al search" do
       vm/destroy,#{@subject_ubid},""
     END
   end
+
+  it "shell escapes option values in the continuation command" do
+    @account.update(name: "Test User")
+    at = Time.now
+    insert_audit_log(action: "destroy", ubid_type: "ps", id: UBID.generate_from_time("a1", at - 10).to_uuid, at:)
+    id = insert_audit_log(action: "destroy", ubid_type: "vm", id: UBID.generate_from_time("a1", at).to_uuid, at:)
+
+    continuation = search_result(["al", "search", "-N", "-a", "destroy", "-s", "Test User", "--limit=1"]).lines.last
+    expect(continuation).to eq "Continue search: ubi al search --action=destroy --subject=Test\\ User --limit=1 --pagination-key=#{at.strftime("%s.%6N")}/#{UBID.to_ubid(id)} \n"
+
+    args = continuation.delete_prefix("Continue search: ubi ").shellsplit
+    expect(search_result([*args, "-N"])).to eq "vm/destroy,Test User,\"\"\n"
+  end
 end
