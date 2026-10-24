@@ -3,6 +3,12 @@
 DEFAULT_STORAGE_DEVICE = "DEFAULT"
 
 class StoragePath
+  # A detachable volume isn't tied to a VM, so it has a directory of its own.
+  def self.detachable(volume_id)
+    raise ArgumentError, "invalid detachable volume id: #{volume_id.inspect}" unless /\Adv[0-9a-z]{24}\z/.match?(volume_id)
+    DetachableStoragePath.new(volume_id)
+  end
+
   def initialize(vm_name, device, disk_index)
     @vm_name = vm_name
     @device = device
@@ -58,5 +64,28 @@ class StoragePath
 
   def rpc_socket_path
     @rpc_socket_path ||= File.join(storage_dir, "rpc.sock")
+  end
+
+  def vhost_backend_service
+    "#{@vm_name}-#{@disk_index}-storage.service"
+  end
+end
+
+class DetachableStoragePath < StoragePath
+  def initialize(volume_id)
+    super(nil, DEFAULT_STORAGE_DEVICE, nil)
+    @volume_id = volume_id
+  end
+
+  def storage_root
+    @storage_root ||= File.join(device_path, "detachable", @volume_id)
+  end
+
+  def storage_dir
+    storage_root
+  end
+
+  def vhost_backend_service
+    "#{@volume_id}-storage.service"
   end
 end

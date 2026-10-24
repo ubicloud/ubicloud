@@ -59,8 +59,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
   end
 
   describe "#start" do
-    it "stops the source volume's vhost backend and hops to run_server" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{source_volume.vhost_backend_systemd_unit_name}")
+    it "hops to run_server, leaving stopping the source's backend to the host" do
       expect { nx.start }.to hop("run_server")
       expect(nx.frame["deadline_target"]).to eq("wait")
     end
@@ -122,6 +121,70 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
       expect(sshable).to receive(:d_clean).with(nx.daemon_name)
       expect { nx.destroy }.to exit({"msg" => "remote storage server destroyed"})
       expect(rss).not_to exist
+    end
+  end
+
+  describe "serving a detachable volume" do
+    subject(:dnx) { described_class.new(described_class.assemble_for_detachable_volume(volume)) }
+
+    let(:source_host) {
+      host = create_vm_host
+      VhostBlockBackend.create(version: "v0.5.1", allocation_weight: 0, vm_host_id: host.id)
+      host
+    }
+    let(:volume) { create_detachable_volume(vm_host_id: source_host.id) }
+    let(:server) { dnx.remote_storage_server }
+
+    it "serves from the volume's host" do
+      expect(server.source_detachable_volume_id).to eq(volume.id)
+      expect(server.source_vm_storage_volume_id).to be_nil
+      expect(server.vm_host.id).to eq(source_host.id)
+      expect(server.strand.label).to eq("start")
+    end
+
+    it "fails for a volume that is on no host" do
+      volume.update(vm_host_id: nil)
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is not on a host")
+    end
+
+    it "fails for a volume that is already being moved" do
+      server
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is already being moved")
+    end
+
+    it "checks the volume's current host, not the one it was loaded with" do
+      DetachableVolume.where(id: volume.id).update(vm_host_id: nil)
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error("Detachable volume is not on a host")
+    end
+
+    it "fails if the host doesn't have the necessary vhost_block_backend" do
+      volume.update(vm_host_id: create_vm_host.id)
+      expect { described_class.assemble_for_detachable_volume(volume) }.to raise_error(/\AHost doesn't have ubiblk /)
+    end
+
+    it "runs host/bin/setup-remote-storage-server on the volume, with the keys on stdin" do
+      expect(dnx.sshable).to receive(:d_check).with(dnx.daemon_name).and_return("NotStarted")
+      expect(dnx.sshable).to receive(:d_run) do |name, *args, stdin:|
+        expect(name).to eq(dnx.daemon_name)
+        expect(args).to eq(["sudo", "host/bin/setup-remote-storage-server", volume.ubid, "v0.5.1", server.port.to_s, server.psk_identity])
+        expect(JSON.parse(stdin)).to eq({"kek" => volume.key_encryption_key_1.secret_key_material_hash, "psk" => server.psk})
+      end
+      expect { dnx.run_server }.to nap(5)
+    end
+
+    it "deletes the copy it served once the volume lives on another host" do
+      server.source_detachable_volume.update(vm_host_id: create_vm_host.id)
+      expect(dnx.sshable).to receive(:d_check).and_return("NotStarted")
+      expect(dnx.sshable).to receive(:d_clean)
+      expect(dnx.sshable).to receive(:_cmd).with("sudo host/bin/detachable-volume delete #{volume.ubid}").and_return(JSON.generate({"deleted" => true}))
+      expect { dnx.destroy }.to exit({"msg" => "remote storage server destroyed"})
+    end
+
+    it "keeps the copy when the volume never left" do
+      expect(dnx.sshable).to receive(:d_check).and_return("NotStarted")
+      expect(dnx.sshable).to receive(:d_clean)
+      expect(dnx.sshable).not_to receive(:_cmd)
+      expect { dnx.destroy }.to exit({"msg" => "remote storage server destroyed"})
     end
   end
 end

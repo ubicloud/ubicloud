@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/detachable_volume"
+require "json"
+
+command, id = ARGV
+unless %w[start delete].include?(command) && id
+  warn "usage: detachable-volume start|delete <volume-id>"
+  exit 1
+end
+
+case command
+when "start"
+  # See DetachableVolume#start_params in the control plane.
+  params = JSON.parse($stdin.read)
+  volume = DetachableVolume.new(id, params.fetch("unix_user"), params.fetch("storage_volume"))
+  volume.ensure_started(params.fetch("kek"), lay_out: params.fetch("prep"))
+  puts JSON.generate({"vhost_sock" => volume.vhost_sock})
+when "delete"
+  DetachableVolume.new(id).delete
+  puts JSON.generate({"deleted" => true})
+end

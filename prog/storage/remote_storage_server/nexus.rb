@@ -4,7 +4,7 @@ require "securerandom"
 
 # Runs an ubiblk remote-stripe-server daemon on the host of a source volume,
 # serving that volume over the remote stripe protocol (TLS-PSK) so another host
-# can boot a VM from it.
+# can boot a VM from it, or take a detachable volume over.
 class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   subject_is :remote_storage_server
 
@@ -23,6 +23,24 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     vm = source_volume.vm
     vm_host = vm.vm_host
     fail "VM isn't in stopped_by_admin state" unless vm.strand.label == "stopped_by_admin"
+
+    create_server(vm_host, source_vm_storage_volume_id: source_volume.id)
+  end
+
+  def self.assemble_for_detachable_volume(volume)
+    DB.transaction do
+      # Lock the volume so that two concurrent moves can't both find no
+      # server and assemble one each, and so the checks below see the
+      # volume's current host.
+      volume.lock!
+      fail "Detachable volume is not on a host" unless volume.vm_host
+      fail "Detachable volume is already being moved" unless volume.remote_storage_server_dataset.empty?
+
+      create_server(volume.vm_host, source_detachable_volume_id: volume.id)
+    end
+  end
+
+  def self.create_server(vm_host, **source)
     fail "Host doesn't have ubiblk v0.5.1+" if vm_host.vhost_block_backends_dataset.where { version_code >= SERVER_VERSION_CODE }.empty?
 
     DB.transaction do
@@ -31,7 +49,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       id = ubid.to_uuid
       remote_storage_server = RemoteStorageServer.create_with_id(
         id,
-        source_vm_storage_volume_id: source_volume.id,
+        **source,
         vm_host_id: vm_host.id,
         psk: Base64.strict_encode64(SecureRandom.bytes(32)),
         psk_identity: ubid.to_s,
@@ -52,12 +70,6 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   label def start
     register_deadline("wait", 5 * 60)
-    # The source volume's vhost backend keeps running when its VM is stopped, so
-    # it still holds the disk and the kek pipe. Stop it so the remote server can
-    # open the volume exclusively. The source VM cannot run again until its
-    # storage is restarted, which is the intended migration semantics.
-    source = remote_storage_server.source_vm_storage_volume
-    sshable.cmd("sudo systemctl stop :unit", unit: source.vhost_backend_systemd_unit_name)
     hop_run_server
   end
 
@@ -88,6 +100,10 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       sshable.d_stop(daemon_name)
     end
     sshable.d_clean(daemon_name)
+    volume = remote_storage_server.source_detachable_volume
+    if volume && volume.vm_host_id != remote_storage_server.vm_host_id
+      sshable.cmd_json("sudo host/bin/detachable-volume delete :volume_id", volume_id: volume.ubid)
+    end
     remote_storage_server.destroy
     pop "remote storage server destroyed"
   end
@@ -102,26 +118,33 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   # Start the daemon, delivering the source volume's KEK and the PSK over stdin
   # (never written to the host in the clear) so the host-side helper can serve
-  # the (encrypted) source volume with TLS-PSK.
+  # the (encrypted) source volume with TLS-PSK. The helper stops the volume's
+  # vhost backend first.
   def start_daemon
-    source = remote_storage_server.source_vm_storage_volume
+    source = remote_storage_server.source_vm_storage_volume || remote_storage_server.source_detachable_volume
+    source_args = if source.is_a?(VmStorageVolume)
+      [source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s, source.vhost_block_backend_version]
+    else
+      [source.ubid]
+    end
     secrets = {
       "kek" => source.key_encryption_key_1.secret_key_material_hash,
       "psk" => remote_storage_server.psk,
     }
-    target_vbb_version = remote_storage_server
+    sshable.d_run(
+      daemon_name,
+      "sudo", "host/bin/setup-remote-storage-server",
+      *source_args, server_version, remote_storage_server.port.to_s, remote_storage_server.psk_identity,
+      stdin: secrets.to_json,
+    )
+  end
+
+  def server_version
+    remote_storage_server
       .vm_host
       .vhost_block_backends_dataset
       .reverse(:version_code)
       .first { version_code >= SERVER_VERSION_CODE }
       .version
-    sshable.d_run(
-      daemon_name,
-      "sudo", "host/bin/setup-remote-storage-server",
-      source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s,
-      source.vhost_block_backend_version, target_vbb_version, remote_storage_server.port.to_s,
-      remote_storage_server.psk_identity,
-      stdin: secrets.to_json,
-    )
   end
 end
