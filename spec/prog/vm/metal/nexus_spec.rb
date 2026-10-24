@@ -73,6 +73,18 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     strand
   end
 
+  def add_moving_boot_volume
+    source_host = create_vm_host
+    source_vm = create_vm(vm_host_id: source_host.id, name: "rss-source-vm")
+    sd = StorageDevice.create(vm_host_id: source_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
+    Strand.create_with_id(source_vm, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+    VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: source_host.id)
+    source_volume = VmStorageVolume.create(vm_id: source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
+      key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
+    rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(source_volume.id).subject
+    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, remote_storage_server_id: rss.id)
+  end
+
   describe ".assemble" do
     it "fails if there is no project" do
       expect {
@@ -1136,6 +1148,19 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.provisioned_at).to be_within(10).of(Time.now)
     end
 
+    it "skips the check for a VM being moved, whose customer may block ssh" do
+      vm.update(allocated_at: Time.now - 100)
+      vm.incr_update_firewall_rules
+      adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
+      add_moving_boot_volume
+      expect(Socket).not_to receive(:tcp)
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
+      expect { nx.wait_sshable }.to hop("wait")
+      expect(vm.reload.display_state).to eq("running")
+      expect(vm.provisioned_at).to be_within(10).of(Time.now)
+    end
+
     it "schedules the waiting strand if the frame has one" do
       vm.update(allocated_at: Time.now - 100)
       vm.incr_update_firewall_rules
@@ -1307,15 +1332,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "hops to wait_storage_catchup when storage volume has remote_storage_server_id" do
-      target_host = create_vm_host
-      rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
-      sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
-      Strand.create_with_id(rss_source_vm, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
-      VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: target_host.id)
-      rss_source_volume = VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
-        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
-      rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rss_source_volume.id).subject
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, remote_storage_server_id: rss.id)
+      add_moving_boot_volume
       expect { nx.wait }.to hop("wait_storage_catchup")
     end
 
