@@ -10,8 +10,11 @@ class Prog::PageNexus < Prog::Base
       details = extra_data.merge({"related_resources" => related_resources})
       tag = Page.generate_tag(tag_parts)
 
-      if (existing_page = Page.active.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
-        existing_page.incr_retrigger
+      if (existing_page = Page.active.first(tag:))
+        # The problem has recurred, so cancel any pending resolve, else a
+        # resolve held by a snooze would close the page when the snooze ends.
+        existing_page.decr_resolve
+        existing_page.incr_retrigger if Page.severity_order(severity) > Page.severity_order(existing_page.severity)
       end
 
       new_page_id = Page.generate_uuid
@@ -72,6 +75,13 @@ class Prog::PageNexus < Prog::Base
     end
 
     when_resolve_set? do
+      # Keep a snoozed page open, so that a flapping problem reassembles into
+      # it rather than paging again on each recurrence. (This also holds open
+      # a page that has really recovered, until the snooze ends.)
+      if (snooze_until = PageSnooze.active.where(page_id: page.id).max(:snooze_until))
+        nap (snooze_until - Time.now).ceil.clamp(1..)
+      end
+
       page.resolve(notify: !suppress_triggers)
       hop_wait_retention
     end

@@ -159,10 +159,12 @@ class Page < Sequel::Model
     client.trigger(tag, summary:, severity:, details:, links:)
   end
 
-  # Ends the snoozes that hide the page. Keeps the rows as a record of the
-  # operator and the note.
+  # Ends the snoozes that hide the page and hold it open. Keeps the rows as a
+  # record of the operator and the note. Wakes the strand, so that a resolve
+  # held by the snoozes takes effect now.
   def unsnooze
     PageSnooze.active.where(page_id: id).update(snooze_until: Sequel::CURRENT_TIMESTAMP)
+    Strand.where(id:).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
   end
 
   def resolve(notify: true)

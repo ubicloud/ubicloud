@@ -2126,11 +2126,14 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
 
     expect(p.semaphores_dataset.select_map(:name)).to eq []
+    PageSnooze.create(page_id: p.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "flapping")
     click_link "Resolve"
     click_button "Resolve"
     expect(page).to have_flash_notice("Resolve scheduled for Page")
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
     expect(p.semaphores_dataset.select_map(:name)).to eq ["resolve"]
+    # A resolve by an operator ends the snooze, else the snooze would hold the page open.
+    expect(Page.active.snoozed.all).to be_empty
   end
 
   it "supports retriggering Pages" do

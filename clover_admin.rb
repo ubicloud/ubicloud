@@ -668,7 +668,10 @@ class CloverAdmin < Roda
     model Page do
       action "resolve", "Resolve" do
         flash "Resolve scheduled for Page"
-        run(&:incr_resolve)
+        run do
+          it.unsnooze
+          it.incr_resolve
+        end
       end
 
       action "retrigger", "Retrigger" do
