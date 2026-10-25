@@ -42,6 +42,38 @@ RSpec.describe Prog::PageNexus do
       expect(pg.reload.resolved_at).not_to be_nil
     end
 
+    it "holds a snoozed page open, and resolves it when the snooze ends" do
+      PageSnooze.create(page_id: pg.id, snooze_until: Time.now + 600, snoozed_by: "admin", note: "short")
+      PageSnooze.create(page_id: pg.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "flapping")
+      PageSnooze.create(page_id: pg.id, snooze_until: Time.now - 60, snoozed_by: "admin", note: "expired")
+      pn.incr_resolve
+      expect { pn.wait }.to nap(3600)
+      expect(pg.semaphores_dataset.select_map(:name)).to eq ["resolve"]
+      expect(pg.reload.resolved_at).to be_nil
+
+      # Waking early does not resolve the page, since the snooze is checked
+      # on each run, not implied by the schedule.
+      pn.strand.update(schedule: Time.now)
+      expect { described_class.new(pn.strand).wait }.to nap(3600)
+      expect(pg.reload.resolved_at).to be_nil
+
+      pg.unsnooze
+      expect(pn.strand.reload.schedule).to be_within(5).of(Time.now)
+      expect { described_class.new(pn.strand).wait }.to hop("wait_retention")
+      expect(pg.reload.resolved_at).to be_within(5).of(Time.now)
+    end
+
+    it "keeps a snoozed page open when the problem recurs before the snooze ends" do
+      snooze = PageSnooze.create(page_id: pg.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "flapping")
+      pn.incr_resolve
+      expect { pn.wait }.to nap(3600)
+
+      described_class.assemble("Test summary", ["test-page-tag"], [], resource_id: nil)
+      snooze.update(snooze_until: Time.now - 60)
+      expect { described_class.new(pn.strand).wait }.to nap(6 * 60 * 60)
+      expect(pg.reload.resolved_at).to be_nil
+    end
+
     it "triggers page when retrigger semaphore is set" do
       expect(pg).to receive(:trigger)
       pn.incr_retrigger
@@ -244,11 +276,14 @@ RSpec.describe Prog::PageNexus do
       expect(existing_page.details["old_data"]).to eq("old_value")
       expect(existing_page.details["foo"]).to be_nil
 
+      # The problem recurs after a resolve was requested, which cancels the resolve.
+      existing_page.incr_resolve
       expect {
         described_class.assemble(summary, tag_parts, related_resources, resource_id:, severity:, extra_data:)
       }.to not_change(Page, :count).and not_change(Strand, :count)
 
       existing_page.reload
+      expect(existing_page.semaphores_dataset.select_map(:name)).to eq []
       expect(existing_page.resource_id).to eq(resource_id)
       expect(existing_page.summary).to eq(summary)
       expect(existing_page.severity).to eq(severity)
