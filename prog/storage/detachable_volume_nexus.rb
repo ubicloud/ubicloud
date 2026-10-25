@@ -33,10 +33,7 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
     status = host.sshable.cmd_json("sudo host/bin/detachable-volume status :volume_id", volume_id: detachable_volume.ubid)
     nap 5 unless status["caught_up"]
 
-    if (server = detachable_volume.remote_storage_server)
-      host.sshable.cmd_json("sudo host/bin/detachable-volume drop-source :volume_id", volume_id: detachable_volume.ubid)
-      server.incr_destroy
-    end
+    detachable_volume.remote_storage_server&.incr_destroy
     hop_wait
   end
 
