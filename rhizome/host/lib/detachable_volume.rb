@@ -89,8 +89,8 @@ class DetachableVolume < StorageVolume
   def caught_up?(counts = nil)
     return true unless remote_source?
     counts ||= stripes
-    return false if counts.empty?
-    counts["fetched"].to_i >= counts["source"].to_i
+    return false unless counts.key?("fetched") && counts.key?("source")
+    counts["fetched"] >= counts["source"]
   end
 
   def rpc(command)
