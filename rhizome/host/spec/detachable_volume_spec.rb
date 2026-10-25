@@ -5,314 +5,89 @@ require "base64"
 require "tmpdir"
 
 RSpec.describe DetachableVolume do
-  subject(:volume) { described_class.new(id, ubiblk_version: "v0.5.1") }
+  subject(:volume) { described_class.new(id, "user0", params) }
 
   let(:id) { "dv#{"0" * 24}" }
-  let(:kek) { Base64.strict_encode64("k" * 32) }
+  let(:dir) { "/var/storage/detachable/#{id}" }
+  let(:service) { "#{id}-storage.service" }
+  let(:params) { {"device_id" => "dvdev", "size_gib" => 2, "vhost_block_backend_version" => "v0.5.1"} }
+  let(:kek) { {"key" => "a2V5"} }
 
-  it "derives every path from the volume id" do
-    expect(volume.dir).to eq("/var/storage/detachable/#{id}")
-    expect(volume.disk_file).to eq("/var/storage/detachable/#{id}/disk.raw")
-    expect(volume.metadata_file).to eq("/var/storage/detachable/#{id}/metadata")
-    expect(volume.vhost_sock).to eq("/var/storage/detachable/#{id}/vhost.sock")
-    expect(volume.rpc_sock).to eq("/var/storage/detachable/#{id}/rpc.sock")
-    expect(volume.kek_pipe_path).to eq("/var/storage/detachable/#{id}/kek.pipe")
-    expect(volume.unit).to eq("#{id}-storage.service")
+  it "lives in a directory of its own, whatever its owner" do
+    expect(volume.storage_dir).to eq(dir)
+    expect(volume.storage_root).to eq(dir)
+    expect(volume.disk_file).to eq("#{dir}/disk.raw")
+    expect(volume.vhost_sock).to eq("#{dir}/vhost.sock")
+    expect(volume.sp.kek_pipe).to eq("#{dir}/kek.pipe")
   end
 
-  it "only takes a volume id, so the id cannot reach outside the volume root" do
-    expect { described_class.new("../../..") }.to raise_error(ArgumentError, 'invalid volume id: "../../.."')
+  it "has a backend service named after the volume, not its owner" do
+    expect(volume.vhost_user_block_service).to eq(service)
   end
 
-  it "needs a ubiblk version only to run the backend" do
-    expect { described_class.new(id).write_unit("user0") }
-      .to raise_error(RuntimeError, "running the backend needs a ubiblk version")
+  it "refuses an id that could reach outside the volume root" do
+    expect { described_class.new("../../..").storage_dir }.to raise_error(ArgumentError, 'invalid detachable volume id: "../../.."')
   end
 
-  it "is present once its config is" do
-    expect(File).to receive(:exist?).with(volume.main_conf).and_return(true)
-    expect(volume).to exist
-  end
-
-  describe "#create" do
-    around { |example|
-      Dir.mktmpdir { |dir|
-        @dir = dir
-        example.run
-      }
-    }
-
-    before do
-      volume.instance_variable_set(:@dir, @dir)
-      allow(FileUtils).to receive(:chown)
-      allow(File).to receive(:chmod)
-      allow(volume).to receive(:init_metadata)
-    end
-
-    it "makes the disk sparse at the requested size and writes the configs" do
-      volume.create(device_id: "cldata", size_gib: 2, kek: kek, source: {"type" => "new", "image" => "seed"},
-        unix_user: "user0")
-      expect(File.size(File.join(@dir, "disk.raw"))).to eq(2 * 1024 * 1024 * 1024)
-      expect(PerfectTOML.load_file(File.join(@dir, "vhost-backend.conf"))).to eq({
-        "include" => ["vhost-backend-stripe-source.conf", "vhost-backend-secrets.conf"],
-        "device" => {
-          "data_path" => "#{@dir}/disk.raw",
-          "vhost_socket" => "#{@dir}/vhost.sock",
-          "rpc_socket" => "#{@dir}/rpc.sock",
-          "device_id" => "cldata",
-          "track_written" => true,
-          "metadata_path" => "#{@dir}/metadata",
-        },
-        "tuning" => {"num_queues" => 1, "queue_size" => 64, "seg_size_max" => 65536, "seg_count_max" => 4, "poll_timeout_us" => 1000, "write_through" => false},
-        "encryption" => {"xts_key" => {"ref" => "xts-key"}},
-      })
-      expect(PerfectTOML.load_file(File.join(@dir, "vhost-backend-stripe-source.conf"))).to eq({
-        "stripe_source" => {"type" => "raw", "image_path" => "/var/storage/images/seed.raw", "copy_on_read" => true},
-      })
-      secrets = PerfectTOML.load_file(File.join(@dir, "vhost-backend-secrets.conf"))["secrets"]
-      expect(secrets["kek"]).to eq({"encoding" => "base64", "source" => {"file" => "#{@dir}/kek.pipe"}})
-      xts_key = secrets["xts-key"]
-      expect(xts_key.except("source")).to eq({"encoding" => "base64", "encrypted_by" => {"ref" => "kek"}})
-      wrapped = Base64.decode64(xts_key.dig("source", "inline"))
-      expect(StorageKeyEncryption.aes256gcm_decrypt(Base64.decode64(kek), "xts-key", wrapped).bytesize).to eq(64)
-    end
-
-    it "generates a new XTS key for every volume it lays out" do
-      keys = Array.new(2) do
-        volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: nil, unix_user: "user0")
-        PerfectTOML.load_file(volume.secrets_conf).dig("secrets", "xts-key", "source", "inline")
-      end
-      expect(keys.uniq.size).to eq(2)
-    end
-
-    it "puts the main config in place only once the metadata is initialised, so a killed layout is not taken for a volume" do
-      expect(volume).to receive(:init_metadata) { expect(volume).not_to exist }
-      volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: nil, unix_user: "user0")
-      expect(volume).to exist
-      expect(File).not_to exist(volume.staged_main_conf)
-    end
-
-    it "lays a volume out afresh over whatever a killed layout left" do
-      File.write(File.join(@dir, "leftover"), "x")
-      File.write(volume.staged_main_conf, "half")
-      volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: nil, unix_user: "user0")
-      expect(File).not_to exist(File.join(@dir, "leftover"))
-      expect(PerfectTOML.load_file(volume.main_conf).dig("device", "device_id")).to eq("cldata")
-    end
-
-    it "initialises the metadata, which tracks what is written and fetched" do
-      expect(volume).to receive(:init_metadata).with(kek, "user0")
-      volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: {"type" => "new", "image" => "seed"},
-        unix_user: "user0")
-      expect(File.size(File.join(@dir, "metadata"))).to eq(8 * 1024 * 1024)
-    end
-
-    it "writes no stripe source for a volume with nothing to read from" do
-      volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: nil, unix_user: "user0")
-      expect(File).not_to exist(File.join(@dir, "vhost-backend-stripe-source.conf"))
-      expect(PerfectTOML.load_file(File.join(@dir, "vhost-backend.conf"))["include"]).to eq(["vhost-backend-secrets.conf"])
-    end
-
-    it "removes a half-laid-out volume when laying it out fails, so a retry starts over" do
-      volume.instance_variable_set(:@dir, File.join(@dir, id))
-      expect(volume).to receive(:init_metadata).and_raise(RuntimeError, "init-metadata failed")
-      expect {
-        volume.create(device_id: "cldata", size_gib: 1, kek: kek, source: {"type" => "new", "image" => "seed"}, unix_user: "user0")
-      }.to raise_error(RuntimeError, "init-metadata failed")
-      expect(File).not_to exist(File.join(@dir, id))
-    end
-  end
-
-  describe "#stripe_source_toml" do
-    it "reads a new or raw volume through to the seed image" do
-      %w[new raw].each do |type|
-        expect(PerfectTOML.parse(volume.stripe_source_toml({"type" => type, "image" => "seed-image"}))).to eq({
-          "stripe_source" => {"type" => "raw", "image_path" => "/var/storage/images/seed-image.raw", "copy_on_read" => true},
-        })
-      end
-    end
-
-    it "pulls from another host, fetching in the background only when asked to" do
-      toml = volume.stripe_source_toml({"type" => "remote", "address" => "[fd00::2]:9000", "psk_identity" => "rs1", "autofetch" => false})
-      expect(PerfectTOML.parse(toml)).to eq({"stripe_source" => {
-        "type" => "remote",
-        "address" => "[fd00::2]:9000",
-        "autofetch" => false,
-        "connections" => 16,
-        "psk" => {"identity" => "rs1", "secret" => {"ref" => "remote-psk"}},
-      }})
-    end
-
-    it "refuses a source it does not know" do
-      expect { volume.stripe_source_toml({"type" => "magic"}) }
-        .to raise_error(RuntimeError, "unsupported stripe source magic")
-    end
-  end
-
-  describe "#write_configs" do
-    around { |example|
-      Dir.mktmpdir { |dir|
-        @dir = dir
-        example.run
-      }
-    }
-
-    before do
-      volume.instance_variable_set(:@dir, @dir)
-      allow(FileUtils).to receive(:chown)
-    end
-
-    it "carries the pre-shared key for a remote source" do
-      volume.write_configs(source: {"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "wrapped_psk" => "psk", "autofetch" => true},
-        kek: kek, device_id: "cldata", unix_user: "user0")
-      expect(PerfectTOML.load_file(volume.secrets_conf).dig("secrets", "remote-psk"))
-        .to eq({"encoding" => "base64", "source" => {"inline" => "psk"}, "encrypted_by" => {"ref" => "kek"}})
-    end
-
-    it "carries nothing extra for a local source" do
-      volume.write_configs(source: {"type" => "new", "image" => "seed"}, kek: kek, device_id: "cldata", unix_user: "user0")
-      expect(PerfectTOML.load_file(volume.secrets_conf)["secrets"].keys).to eq(["xts-key", "kek"])
-    end
+  it "runs its backend as its owner, without network access when it has nothing to fetch" do
+    expect(File).to receive(:write).with("/etc/systemd/system/#{service}", satisfy { |content|
+      content.include?("Description=Vhost Block Backend Service for detachable volume #{id}") &&
+        content.include?("User=user0") &&
+        content.include?("ReadWritePaths=#{dir}") &&
+        content.include?("PrivateNetwork=yes")
+    })
+    volume.vhost_backend_create_service_file
   end
 
   describe "#ensure_started" do
-    it "lays a new volume out before starting it" do
-      expect(volume).to receive(:exist?).and_return(false)
-      expect(volume).to receive(:create).with(device_id: "cldata", size_gib: 2, kek: kek, source: {"type" => "new", "image" => "seed-image"},
-        unix_user: "user0").ordered
-      expect(volume).to receive(:start).with(kek, "user0", slice: nil).ordered
-      volume.ensure_started(kek: kek, unix_user: "user0", device_id: "cldata", slice: nil, size_gib: 2,
-        source: {"type" => "new", "image" => "seed-image"})
+    it "removes what a failed layout or start left on the host, since nothing else would" do
+      [:prep, :start].each do |failing|
+        v = described_class.new(id, "user0", params)
+        allow(v).to receive_messages(stop_service_if_loaded: nil, rm_if_exists: nil, prep: nil, start: nil)
+        expect(v).to receive(failing).and_raise(RuntimeError, "#{failing} failed")
+        expect(v).to receive(:delete)
+        expect { v.ensure_started(kek, lay_out: true) }.to raise_error(RuntimeError, "#{failing} failed")
+      end
     end
 
-    it "only starts a volume that is already here" do
-      expect(volume).to receive(:exist?).and_return(true)
-      expect(volume).not_to receive(:create)
-      expect(volume).to receive(:start).with(kek, "user0", slice: "example.slice")
-      volume.ensure_started(kek: kek, unix_user: "user0", device_id: "cldata", slice: "example.slice", size_gib: 2, source: nil)
-    end
-  end
-
-  describe "#start" do
-    before do
-      allow(volume).to receive_messages(stop: nil, write_unit: nil, r: nil, take_ownership: nil)
-      allow(FileUtils).to receive(:rm_f)
-      allow(volume).to receive(:with_kek_pipe).and_yield("/pipe")
-      allow(volume).to receive(:write_kek_to_pipe)
+    it "only starts a volume whose data is already here" do
+      expect(volume).not_to receive(:prep)
+      expect(volume).to receive(:start).with(kek)
+      volume.ensure_started(kek, lay_out: false)
     end
 
-    it "takes ownership first, because a volume can come back under another user" do
-      expect(volume).to receive(:take_ownership).with("user3").ordered
-      expect(volume).to receive(:write_unit).with("user3", nil).ordered
-      expect(File).to receive(:socket?).and_return(true)
-      volume.start(kek, "user3")
-    end
-
-    it "runs the backend in the slice it is given" do
-      expect(volume).to receive(:write_unit).with("user3", "example.slice")
-      expect(File).to receive(:socket?).and_return(true)
-      volume.start(kek, "user3", slice: "example.slice")
-    end
-
-    it "streams the KEK through a fifo rather than putting it on a command line" do
-      expect(volume).to receive(:with_kek_pipe).with(volume.kek_pipe_path, owner: "user0").and_yield("/pipe")
-      expect(volume).to receive(:write_kek_to_pipe).with("/pipe", kek)
-      expect(File).to receive(:socket?).and_return(true)
-      volume.start(kek, "user0")
-    end
-
-    it "keeps waiting until the backend opens its socket" do
-      expect(File).to receive(:socket?).with(volume.vhost_sock).twice.and_return(false, true)
-      volume.start(kek, "user0")
-    end
-
-    it "gives up when the backend never opens its socket" do
-      stub_const("DetachableVolume::START_TIMEOUT", 0)
-      expect(File).to receive(:socket?).at_least(:once).and_return(false)
-      expect { volume.start(kek, "user0") }
-        .to raise_error(RuntimeError, "ubiblk never opened #{volume.vhost_sock}")
+    it "refuses a backend without config v2" do
+      [nil, "v0.2.2"].each do |version|
+        v = described_class.new(id, "user0", params.merge("vhost_block_backend_version" => version))
+        expect { v.ensure_started(kek, lay_out: true) }.to raise_error(RuntimeError, "detachable volumes need a vhost block backend with config v2")
+      end
     end
   end
 
-  describe "#take_ownership" do
-    it "hands the whole volume to the user it is starting under" do
-      expect(FileUtils).to receive(:chown_R).with("user3", "user3", volume.dir)
-      volume.take_ownership("user3")
-    end
+  it "hands itself and its service to its current owner when started" do
+    expect(volume).to receive(:_run_command).with("systemctl", "stop", service).ordered
+    expect(FileUtils).to receive(:chown_R).with("user0", "user0", dir).ordered
+    expect(volume).to receive(:vhost_backend_create_service_file).ordered
+    expect(volume).to receive(:_run_command).with("systemctl", "daemon-reload").ordered
+    expect(volume).to receive(:_run_command).with("systemctl", "stop", service).ordered
+    expect(volume).to receive(:with_kek_pipe).with("#{dir}/kek.pipe", owner: "user0").and_yield("pipe")
+    expect(volume).to receive(:_run_command).with("systemctl", "start", service)
+    expect(volume).to receive(:write_kek_to_pipe).with("pipe", "a2V5")
+    volume.vhost_backend_start(kek)
   end
 
-  describe "#write_unit" do
-    let(:unit) {
-      <<~UNIT
-        [Unit]
-        Description=Detachable volume #{id}
-        After=network.target
-
-        [Service]
-        SLICE
-        Environment=RUST_LOG=info
-        ExecStart=/opt/vhost-block-backend/v0.5.1/vhost-backend --config /var/storage/detachable/#{id}/vhost-backend.conf
-        Restart=no
-        User=user0
-        Group=user0
-        NoNewPrivileges=true
-        ProtectSystem=full
-        ReadWritePaths=/var/storage/detachable/#{id}
-        PrivateTmp=true
-        ProtectKernelModules=true
-        ProtectKernelTunables=true
-        ProtectControlGroups=true
-        RestrictNamespaces=true
-        RestrictSUIDSGID=yes
-        MemoryDenyWriteExecute=yes
-
-        [Install]
-        WantedBy=multi-user.target
-      UNIT
-    }
-
-    it "runs the backend as its user, with the volume its only writable path" do
-      expect(volume).to receive(:safe_write_to_file).with("/etc/systemd/system/#{volume.unit}", unit.sub("SLICE", ""))
-      volume.write_unit("user0")
-    end
-
-    it "puts the backend in a slice when given one" do
-      expect(volume).to receive(:safe_write_to_file).with("/etc/systemd/system/#{volume.unit}", unit.sub("SLICE", "Slice=example.slice"))
-      volume.write_unit("user0", "example.slice")
-    end
-  end
-
-  describe "#stop and #destroy" do
-    it "stops the unit" do
-      expect(volume).to receive(:_run_command).with("systemctl", "stop", volume.unit)
-      volume.stop
-    end
-
-    it "does not mind a unit that is not running" do
-      expect(volume).to receive(:_run_command).with("systemctl", "stop", volume.unit).and_raise(CommandFail.new("no", "", ""))
-      expect(volume.stop).to be_nil
-    end
-
-    it "takes the unit and the bytes with it" do
-      expect(volume).to receive(:stop)
-      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/#{volume.unit}")
-      expect(FileUtils).to receive(:rm_rf).with(volume.dir)
-      volume.destroy
-    end
-  end
-
-  describe "the ubiblk control socket" do
+  context "with its files in a directory" do
     around { |example|
-      Dir.mktmpdir { |dir|
-        @dir = dir
+      Dir.mktmpdir { |tmp|
+        @dir = tmp
         example.run
       }
     }
 
+    before { allow(volume.sp).to receive(:storage_dir).and_return(@dir) }
+
     def serve(reply)
-      volume.instance_variable_set(:@dir, @dir)
-      path = volume.rpc_sock
-      server = UNIXServer.new(path)
+      server = UNIXServer.new(volume.sp.rpc_socket_path)
       request = nil
       thread = Thread.new do
         conn = server.accept
@@ -326,7 +101,44 @@ RSpec.describe DetachableVolume do
       [result, request]
     end
 
-    it "asks for the stripe counts" do
+    def lay_out_configs(volume_params)
+      v = described_class.new(id, "user0", params.merge(volume_params))
+      allow(v.sp).to receive(:storage_dir).and_return(@dir)
+      allow(v).to receive(:write_through_device?).and_return(false)
+      allow(FileUtils).to receive(:chown)
+      v.vhost_backend_create_config({key: "ab" * 32, key2: "cd" * 32}, {"key" => Base64.strict_encode64("k" * 32)})
+    end
+
+    let(:remote) { {"remote_source" => {"address" => "[::1]:5500", "psk_identity" => "rs1", "encrypted_psk" => "cHNr", "autofetch" => true}} }
+
+    it "stops a backend left running and lays the volume out afresh before starting it when asked to" do
+      vol_dir = File.join(@dir, "vol")
+      allow(volume.sp).to receive(:storage_dir).and_return(vol_dir)
+      FileUtils.mkdir_p(vol_dir)
+      File.write(File.join(vol_dir, "disk.raw"), "old")
+      expect(volume).to receive(:_run_command).with("systemctl", "stop", service).ordered
+      expect(volume).to receive(:prep).with(kek).ordered { expect(File).not_to exist(vol_dir) }
+      expect(volume).to receive(:start).with(kek).ordered
+      volume.ensure_started(kek, lay_out: true)
+    end
+
+    it "stops and removes its backend service and its files when deleted, without knowing its owner" do
+      volume = described_class.new(id)
+      vol_dir = File.join(@dir, "vol")
+      allow(volume.sp).to receive(:storage_dir).and_return(vol_dir)
+      FileUtils.mkdir_p(vol_dir)
+      File.write(File.join(vol_dir, "disk.raw"), "data")
+      expect(volume).to receive(:_run_command).with("systemctl", "stop", service)
+      volume.delete
+      expect(File).not_to exist(vol_dir)
+    end
+
+    it "stops its backend" do
+      expect(volume).to receive(:_run_command).with("systemctl", "stop", service)
+      volume.stop
+    end
+
+    it "asks its backend for the stripe counts" do
       result, request = serve(JSON.generate({"status" => {"stripes" => {"fetched" => 4, "source" => 8}}}) + "\n") {
         volume.stripes
       }
@@ -335,7 +147,7 @@ RSpec.describe DetachableVolume do
     end
 
     it "reports whether the volume is here, how far it has fetched, and whether that is done" do
-      expect(volume).to receive_messages(exist?: true, remote_source?: true)
+      lay_out_configs(remote)
       serve(%({"status":{"stripes":{"fetched":3,"source":8}}}\n)) {
         expect(volume.status).to eq({"present" => true, "stripes" => {"fetched" => 3, "source" => 8}, "caught_up" => false})
       }
@@ -346,101 +158,37 @@ RSpec.describe DetachableVolume do
       expect(volume.status).to eq({"present" => false, "stripes" => {}, "caught_up" => true})
     end
 
+    it "lets its backend reach the network while its config reads from a remote source" do
+      lay_out_configs(remote)
+      expect(File).to receive(:write).with("/etc/systemd/system/#{service}", /PrivateNetwork=no/)
+      volume.vhost_backend_create_service_file
+    end
+
     it "is caught up once everything has been fetched from another host" do
-      expect(volume).to receive_messages(remote_source?: true, stripes: {"fetched" => 8, "source" => 8})
+      lay_out_configs(remote)
+      expect(volume).to receive(:stripes).and_return({"fetched" => 8, "source" => 8})
       expect(volume).to be_caught_up
     end
 
-    it "is not caught up while stripes from another host are outstanding" do
-      expect(volume).to receive_messages(remote_source?: true, stripes: {"fetched" => 1, "source" => 8})
-      expect(volume).not_to be_caught_up
-    end
-
-    it "is not caught up when the backend cannot say, as when it is stopped" do
-      expect(volume).to receive_messages(remote_source?: true, stripes: {})
-      expect(volume).not_to be_caught_up
+    it "is not caught up while stripes from another host are outstanding, or when the backend cannot say" do
+      lay_out_configs(remote)
+      expect(volume.caught_up?({"fetched" => 1, "source" => 8})).to be false
+      expect(volume.caught_up?({})).to be false
     end
 
     it "is caught up when seeded from an image, however little of it has been read" do
-      expect(volume).to receive(:remote_source?).and_return(false)
+      lay_out_configs({"image" => "seed"})
       expect(volume).not_to receive(:stripes)
       expect(volume).to be_caught_up
     end
 
     it "says nothing when the socket is not there" do
-      volume.instance_variable_set(:@dir, @dir)
       expect(volume.stripes).to eq({})
     end
 
     it "says nothing when the backend answers with something that is not JSON" do
       result, = serve("not json\n") { volume.rpc("status") }
       expect(result).to eq({})
-    end
-  end
-
-  describe "#remote_source?" do
-    around do |example|
-      Dir.mktmpdir do |dir|
-        @dir = dir
-        example.run
-      end
-    end
-
-    before { allow(volume).to receive(:source_conf).and_return(File.join(@dir, "source.conf")) }
-
-    it "is true for a volume that reads through to another host" do
-      File.write(volume.source_conf, volume.stripe_source_toml({"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "autofetch" => true}))
-      expect(volume.remote_source?).to be true
-    end
-
-    it "is false for one seeded from an image, and for one with no source at all" do
-      expect(volume.remote_source?).to be false
-      File.write(volume.source_conf, volume.stripe_source_toml({"type" => "new", "image" => "seed"}))
-      expect(volume.remote_source?).to be false
-    end
-  end
-
-  describe "#drop_source" do
-    around do |example|
-      Dir.mktmpdir do |dir|
-        @dir = dir
-        example.run
-      end
-    end
-
-    before do
-      volume.instance_variable_set(:@dir, @dir)
-      allow(FileUtils).to receive(:chown)
-      allow(volume).to receive(:init_metadata)
-    end
-
-    it "forgets the host it caught up from, keeping everything else" do
-      volume.create(source: {"type" => "remote", "address" => "[::1]:5500", "psk_identity" => "rs1", "wrapped_psk" => "cHNr", "autofetch" => true},
-        size_gib: 1, kek: kek, device_id: "cldata", unix_user: "user0")
-      xts_key = PerfectTOML.load_file(volume.secrets_conf).dig("secrets", "xts-key")
-      volume.drop_source
-      main = PerfectTOML.load_file(volume.main_conf)
-      expect(main["include"]).to eq(["vhost-backend-secrets.conf"])
-      expect(main.dig("device", "metadata_path")).to eq(volume.metadata_file)
-      expect(File).not_to exist(volume.source_conf)
-      secrets = PerfectTOML.load_file(volume.secrets_conf)["secrets"]
-      expect(secrets.keys).to contain_exactly("xts-key", "kek")
-      expect(secrets["xts-key"]).to eq(xts_key)
-    end
-
-    it "leaves a volume with no source alone" do
-      volume.create(source: nil, size_gib: 1, kek: kek, device_id: "cldata", unix_user: "user0")
-      expect { volume.drop_source }.not_to change { File.read(volume.main_conf) }
-    end
-  end
-
-  describe "#init_metadata" do
-    it "runs ubiblk's initialiser as the volume's user, with the KEK on a pipe" do
-      expect(volume).to receive(:run_with_kek_pipe).with(
-        ["sudo", "-u", "user0", "/opt/vhost-block-backend/v0.5.1/init-metadata", "-s", "11", "--config", "#{volume.main_conf}.new"],
-        kek_pipe: volume.kek_pipe_path, kek_content: kek, owner: "user0",
-      )
-      volume.init_metadata(kek, "user0")
     end
   end
 end

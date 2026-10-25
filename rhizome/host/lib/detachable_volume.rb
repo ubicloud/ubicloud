@@ -1,234 +1,77 @@
 # frozen_string_literal: true
 
-require_relative "../../common/lib/util"
-require_relative "vhost_block_backend"
-require_relative "kek_pipe"
-require_relative "storage_key_encryption"
-require_relative "storage_path"
-require "fileutils"
-require "json"
-require "openssl"
-require "perfect_toml"
+require_relative "storage_volume"
 require "socket"
 
-class DetachableVolume
-  include KekPipe
+# A ubiblk volume that isn't tied to a VM. It is laid out and run like a VM
+# disk, but lives in a directory of its own, has a backend service named after
+# it, and is owned by the user of whichever VM it is attached to, which can
+# change between starts.
+class DetachableVolume < StorageVolume
+  attr_reader :id
 
-  ROOT = "/var/storage/detachable"
-
-  IMAGE_ROOT = "/var/storage/images"
-
-  STRIPE_SHIFT = 11
-
-  START_TIMEOUT = 30
-
-  attr_reader :id, :dir
-
-  def initialize(id, ubiblk_version: nil)
-    raise ArgumentError, "invalid volume id: #{id.inspect}" unless /\Adv[0-9a-z]{24}\z/.match?(id)
+  # owner is the unix user of the VM the volume is attached to, and params
+  # are the volume's StorageVolume parameters. Neither is needed to delete
+  # the volume.
+  def initialize(id, owner = nil, params = {})
     @id = id
-    @dir = File.join(ROOT, id)
-    @ubiblk_version = ubiblk_version
+    super(owner, {"encrypted" => true}.merge(params))
   end
 
-  def disk_file = File.join(@dir, "disk.raw")
-
-  def metadata_file = File.join(@dir, "metadata")
-
-  def vhost_sock = File.join(@dir, "vhost.sock")
-
-  def rpc_sock = File.join(@dir, "rpc.sock")
-
-  def kek_pipe_path = File.join(@dir, "kek.pipe")
-
-  def main_conf = File.join(@dir, "vhost-backend.conf")
-
-  def staged_main_conf = "#{main_conf}.new"
-
-  def source_conf = File.join(@dir, "vhost-backend-stripe-source.conf")
-
-  def secrets_conf = File.join(@dir, "vhost-backend-secrets.conf")
-
-  def unit = StoragePath.detachable(@id).vhost_backend_service
-
-  def exist? = File.exist?(main_conf)
-
-  def ensure_started(kek:, unix_user:, device_id:, slice:, size_gib:, source:)
-    create(size_gib: size_gib, kek: kek, source: source, unix_user: unix_user, device_id: device_id) unless exist?
-    start(kek, unix_user, slice: slice)
+  def sp
+    @sp ||= StoragePath.detachable(@id)
   end
 
-  def create(size_gib:, kek:, source:, unix_user:, device_id:)
-    FileUtils.rm_rf(@dir)
-    FileUtils.mkdir_p(@dir)
-    FileUtils.chown(unix_user, unix_user, @dir)
+  # Lays the volume out afresh if asked to, over whatever an interrupted
+  # layout left, and starts it.
+  def ensure_started(key_wrapping_secrets, lay_out:)
+    fail "detachable volumes need a vhost block backend with config v2" unless use_config_v2?
+    return start(key_wrapping_secrets) unless lay_out
 
-    File.open(disk_file, File::CREAT | File::WRONLY) { |f| f.truncate(size_gib * 1024 * 1024 * 1024) }
-    FileUtils.chown(unix_user, unix_user, disk_file)
-    File.chmod(0o600, disk_file)
-
-    write_configs(source: source, kek: kek, device_id: device_id, unix_user: unix_user)
-
-    File.open(metadata_file, File::CREAT | File::WRONLY) { |f| f.truncate(8 * 1024 * 1024) }
-    FileUtils.chown(unix_user, unix_user, metadata_file)
-    init_metadata(kek, unix_user)
-    File.rename(staged_main_conf, main_conf)
-    sync_parent_dir(main_conf)
-  rescue
-    FileUtils.rm_rf(@dir)
-    raise
-  end
-
-  def start(kek, unix_user, slice: nil)
-    stop
-    FileUtils.rm_f(vhost_sock)
-    FileUtils.rm_f(rpc_sock)
-    take_ownership(unix_user)
-    write_unit(unix_user, slice)
-    r("systemctl", "daemon-reload")
-
-    with_kek_pipe(kek_pipe_path, owner: unix_user) do |pipe|
-      r("systemctl", "start", unit)
-      write_kek_to_pipe(pipe, kek)
-    end
-
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + START_TIMEOUT
-    until File.socket?(vhost_sock)
-      fail "ubiblk never opened #{vhost_sock}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-      sleep 0.001
+    # A retried start may find the backend of an earlier attempt still
+    # running, so stop it before removing the files from under it.
+    stop_service_if_loaded(vhost_user_block_service)
+    rm_if_exists(storage_dir)
+    begin
+      prep(key_wrapping_secrets)
+      start(key_wrapping_secrets)
+    rescue
+      # The control plane records the volume's host only once a start
+      # succeeds, so destroying the volume wouldn't remove what this left.
+      delete
+      raise
     end
   end
 
-  def write_configs(source:, kek:, device_id:, unix_user:)
-    includes = []
-    includes << File.basename(source_conf) if source
-    includes << File.basename(secrets_conf)
-
-    write_file(staged_main_conf, unix_user, PerfectTOML.generate({
-      "include" => includes,
-      "device" => {
-        "data_path" => disk_file,
-        "vhost_socket" => vhost_sock,
-        "rpc_socket" => rpc_sock,
-        "device_id" => device_id,
-        "track_written" => true,
-        "metadata_path" => metadata_file,
-      },
-      "tuning" => {
-        "num_queues" => 1,
-        "queue_size" => 64,
-        "seg_size_max" => 65536,
-        "seg_count_max" => 4,
-        "poll_timeout_us" => 1000,
-        "write_through" => false,
-      },
-      "encryption" => {"xts_key" => {"ref" => "xts-key"}},
-    }))
-
-    secrets = {
-      "xts-key" => wrapped_secret(wrapped_xts_key(kek)),
-      "kek" => {"encoding" => "base64", "source" => {"file" => kek_pipe_path}},
-    }
-    secrets["remote-psk"] = wrapped_secret(source["wrapped_psk"]) if source && source["type"] == "remote"
-    write_file(secrets_conf, unix_user, PerfectTOML.generate({"secrets" => secrets}))
-    write_file(source_conf, unix_user, stripe_source_toml(source)) if source
+  # The volume may be started for a different VM than it was last used by, so
+  # hand it and its service to that VM's user first.
+  def vhost_backend_start(key_wrapping_secrets)
+    stop_service_if_loaded(vhost_user_block_service)
+    FileUtils.chown_R(@vm_name, @vm_name, storage_dir)
+    vhost_backend_create_service_file
+    r "systemctl", "daemon-reload"
+    super
   end
 
-  def init_metadata(kek, unix_user)
-    cmd = ["sudo", "-u", unix_user, backend.init_metadata_path,
-      "-s", STRIPE_SHIFT.to_s, "--config", staged_main_conf]
-    run_with_kek_pipe(cmd, kek_pipe: kek_pipe_path, kek_content: kek, owner: unix_user)
+  # A volume restarted on the same host is started without its remote source
+  # in its parameters, but its config on disk may still read from one.
+  def needs_network?
+    super || remote_source?
   end
 
-  def take_ownership(unix_user)
-    FileUtils.chown_R(unix_user, unix_user, @dir)
+  def service_description
+    "Vhost Block Backend Service for detachable volume #{@id}"
   end
 
-  def write_unit(unix_user, slice = nil)
-    safe_write_to_file("/etc/systemd/system/#{unit}", <<~UNIT)
-      [Unit]
-      Description=Detachable volume #{@id}
-      After=network.target
-
-      [Service]
-      #{"Slice=#{slice}" if slice}
-      Environment=RUST_LOG=info
-      ExecStart=#{backend.bin_path} --config #{main_conf}
-      Restart=no
-      User=#{unix_user}
-      Group=#{unix_user}
-      NoNewPrivileges=true
-      ProtectSystem=full
-      ReadWritePaths=#{@dir}
-      PrivateTmp=true
-      ProtectKernelModules=true
-      ProtectKernelTunables=true
-      ProtectControlGroups=true
-      RestrictNamespaces=true
-      RestrictSUIDSGID=yes
-      MemoryDenyWriteExecute=yes
-
-      [Install]
-      WantedBy=multi-user.target
-    UNIT
-  end
-
-  def write_file(path, unix_user, content)
-    safe_write_to_file(path, content, perm: 0o600)
-    FileUtils.chown(unix_user, unix_user, path)
-  end
-
-  def write_config_file(path, content)
-    safe_write_to_file(path, perm: 0o600) do |f|
-      f.write(content)
-      fsync_or_fail(f)
-    end
-  end
-
-  def stripe_source_toml(source)
-    stripe_source = case source["type"]
-    when "new", "raw"
-      {"type" => "raw", "image_path" => File.join(IMAGE_ROOT, "#{source["image"]}.raw"), "copy_on_read" => true}
-    when "remote"
-      {
-        "type" => "remote",
-        "address" => source["address"],
-        "autofetch" => source.fetch("autofetch"),
-        "connections" => 16,
-        "psk" => {"identity" => source["psk_identity"], "secret" => {"ref" => "remote-psk"}},
-      }
-    else
-      fail "unsupported stripe source #{source["type"]}"
-    end
-    PerfectTOML.generate({"stripe_source" => stripe_source})
-  end
-
-  def backend
-    fail "running the backend needs a ubiblk version" unless @ubiblk_version
-    @backend ||= VhostBlockBackend.new(@ubiblk_version)
-  end
-
-  # The XTS key never leaves the host. A volume moved to another host gets a
-  # new one there, since the remote stripe server serves decrypted stripes.
-  def wrapped_xts_key(kek)
-    xts_key = OpenSSL::Cipher.new("aes-256-xts").random_key
-    Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek), "xts-key", xts_key))
-  end
-
-  def wrapped_secret(inline)
-    {"encoding" => "base64", "source" => {"inline" => inline}, "encrypted_by" => {"ref" => "kek"}}
-  end
+  def exist? = File.exist?(sp.vhost_backend_config)
 
   def stop
-    r("systemctl", "stop", unit)
-  rescue CommandFail
-    nil
+    stop_service_if_loaded(sp.vhost_backend_service)
   end
 
-  def destroy
-    stop
-    FileUtils.rm_f("/etc/systemd/system/#{unit}")
-    FileUtils.rm_rf(@dir)
+  def delete
+    purge_vhost_backend
+    rm_if_exists(storage_dir)
   end
 
   def status
@@ -241,6 +84,8 @@ class DetachableVolume
     rpc("status").dig("status", "stripes") || {}
   end
 
+  # Caught up once every stripe has been fetched from the remote source, and
+  # not while the backend can't say, as when it is stopped.
   def caught_up?(counts = nil)
     return true unless remote_source?
     counts ||= stripes
@@ -249,7 +94,7 @@ class DetachableVolume
   end
 
   def rpc(command)
-    line = UNIXSocket.open(rpc_sock) do |socket|
+    line = UNIXSocket.open(sp.rpc_socket_path) do |socket|
       socket.write(JSON.generate({"command" => command}) + "\n")
       socket.gets
     end
@@ -259,19 +104,7 @@ class DetachableVolume
   end
 
   def remote_source?
-    File.exist?(source_conf) && PerfectTOML.load_file(source_conf).dig("stripe_source", "type") == "remote"
-  end
-
-  def drop_source
-    return unless File.exist?(source_conf)
-
-    main = PerfectTOML.load_file(main_conf)
-    main["include"].delete(File.basename(source_conf))
-    write_config_file(main_conf, PerfectTOML.generate(main))
-    secrets = PerfectTOML.load_file(secrets_conf)
-    secrets.fetch("secrets").delete("remote-psk")
-    write_config_file(secrets_conf, PerfectTOML.generate(secrets))
-    rm_if_exists(source_conf)
-    sync_parent_dir(source_conf)
+    File.exist?(sp.vhost_backend_stripe_source_config) &&
+      PerfectTOML.load_file(sp.vhost_backend_stripe_source_config).dig("stripe_source", "type") == "remote"
   end
 end
