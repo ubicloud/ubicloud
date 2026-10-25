@@ -176,6 +176,11 @@ RSpec.describe DetachableVolume do
       expect(volume.caught_up?({})).to be false
     end
 
+    it "is not caught up on stripe counts it can't compare" do
+      lay_out_configs(remote)
+      expect(volume.caught_up?({"fetched" => 8})).to be false
+    end
+
     it "is caught up when seeded from an image, however little of it has been read" do
       lay_out_configs({"image" => "seed"})
       expect(volume).not_to receive(:stripes)
