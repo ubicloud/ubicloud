@@ -1,21 +1,21 @@
-#!/bin/env ruby
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 require_relative "../lib/detachable_volume"
 require "json"
 
 command, id = ARGV
-unless %w[start stop status delete drop-source].include?(command) && id
-  warn "usage: detachable-volume start|stop|status|delete|drop-source <volume-id>"
+unless %w[start stop status delete].include?(command) && id
+  warn "usage: detachable-volume start|stop|status|delete <volume-id>"
   exit 1
 end
 
 case command
 when "start"
+  # See DetachableVolume#start_params in the control plane.
   params = JSON.parse($stdin.read)
-  volume = DetachableVolume.new(id, ubiblk_version: params.fetch("ubiblk_version"))
-  volume.ensure_started(kek: params.fetch("kek"), unix_user: params.fetch("unix_user"), device_id: params.fetch("device_id"), slice: params["slice"],
-    size_gib: params.fetch("size_gib"), source: params.fetch("source"))
+  volume = DetachableVolume.new(id, params.fetch("unix_user"), params.fetch("storage_volume"))
+  volume.ensure_started(params.fetch("kek"), lay_out: params.fetch("prep"))
   puts JSON.generate({"vhost_sock" => volume.vhost_sock, "caught_up" => volume.caught_up?})
 when "stop"
   volume = DetachableVolume.new(id)
@@ -25,9 +25,6 @@ when "stop"
 when "status"
   puts JSON.generate(DetachableVolume.new(id).status)
 when "delete"
-  DetachableVolume.new(id).destroy
+  DetachableVolume.new(id).delete
   puts JSON.generate({"deleted" => true})
-when "drop-source"
-  DetachableVolume.new(id).drop_source
-  puts JSON.generate({"dropped" => true})
 end

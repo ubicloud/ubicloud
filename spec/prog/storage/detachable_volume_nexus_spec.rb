@@ -57,13 +57,12 @@ RSpec.describe Prog::Storage::DetachableVolumeNexus do
       expect { nx.wait_catch_up }.to hop("wait")
     end
 
-    it "forgets the source and releases the server once everything is local" do
+    it "releases the server once everything is local" do
       server = RemoteStorageServer.create(source_detachable_volume_id: volume.id, vm_host_id: create_vm_host.id,
         psk: "psk", psk_identity: "id", port: 5500)
       Strand.create_with_id(server, prog: "Storage::RemoteStorageServer::Nexus", label: "wait")
 
-      expect_host_command("status", {"stripes" => {"fetched" => 5, "source" => 5}, "caught_up" => true}).ordered
-      expect_host_command("drop-source", {"dropped" => true}).ordered
+      expect_host_command("status", {"stripes" => {"fetched" => 5, "source" => 5}, "caught_up" => true})
       expect { nx.wait_catch_up }.to hop("wait")
       expect(server.reload.destroy_set?(cached: false)).to be true
     end
