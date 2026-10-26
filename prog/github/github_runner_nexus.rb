@@ -351,7 +351,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def alien_allowed?
-    !project.get_ff_no_alien_runners
+    !project.get_ff_no_alien_runners && !project.get_ff_no_alien_runner_repositories&.any? { it.casecmp?(github_runner.repository_name) }
   end
 
   def before_destroy

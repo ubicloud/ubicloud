@@ -335,6 +335,7 @@ class Project < Sequel::Model
     :hard_runner_concurrency_limit,
     :invoice_in_eur,
     :ipv6_disabled,
+    :no_alien_runner_repositories,
     :no_alien_runners,
     :postgres_enable_maintenance_window_days,
     :postgres_hostname_override,
