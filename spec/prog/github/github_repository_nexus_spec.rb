@@ -248,14 +248,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
   end
 
-  describe "#transaction_around_run?" do
-    it "is false only for the wait label" do
-      expect(nx.transaction_around_run?).to be false
-      nx.strand.label = "destroy"
-      expect(nx.transaction_around_run?).to be true
-    end
-  end
-
   describe "#wait" do
     it "runs through the strand, using a transaction only around the start_transaction block" do
       repository.update(access_key: "key")
@@ -357,15 +349,63 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.destroy }.to nap(2 * 60)
     end
 
-    it "destroys blob storage if has one" do
+    it "destroys cache entries one at a time, then blob storage if has one" do
       repository.update(access_key: "access_key")
-      GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      entries = Array.new(2) do
+        GithubCacheEntry.create(repository_id: repository.id, key: "k#{it}", version: "v#{it}", scope: "main", upload_id: "upload-#{it}", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      end
       blob_storage_client = instance_double(Aws::S3::Client)
-      expect(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
-      expect(blob_storage_client).to receive(:delete_object)
+      allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+      entries.each do |entry|
+        expect(blob_storage_client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
+      end
       expect(nx.github_repository).to receive(:destroy_blob_storage)
 
+      expect { nx.destroy }.to nap(0)
+      expect(repository.cache_entries_dataset.count).to eq 1
+      expect { nx.destroy }.to nap(0)
+      expect(repository.cache_entries_dataset.count).to eq 0
       expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect(repository).not_to exist
+    end
+
+    it "deletes blob storage outside of the transaction and destroys records inside the transaction" do
+      entry = GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      st = nx.strand
+      st.update(label: "destroy")
+      repository.incr_destroying
+      in_transaction = false
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        if kwargs == {savepoint: true}
+          begin
+            in_transaction = true
+            m.call(*args, **kwargs, &block)
+          ensure
+            in_transaction = false
+          end
+        else
+          m.call(*args, **kwargs, &block)
+        end
+      end
+      blob_storage_client = instance_double(Aws::S3::Client)
+      allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+      expect(blob_storage_client).to receive(:delete_object) do
+        expect(in_transaction).to be false
+      end
+      destroyed = []
+      expect(DeletedRecord).to receive(:create).twice.and_wrap_original do |m, **kwargs|
+        expect(in_transaction).to be true
+        destroyed << kwargs[:model_name]
+        m.call(**kwargs)
+      end
+
+      expect(st.unsynchronized_run).to be_a Prog::Base::Nap
+      expect(entry).not_to exist
+      expect(repository).to exist
+
+      st.unsynchronized_run
+      expect(repository).not_to exist
+      expect(destroyed).to eq ["GithubCacheEntry", "GithubRepository"]
     end
 
     it "deletes resource and pops" do
