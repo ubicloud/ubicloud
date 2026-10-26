@@ -7,6 +7,7 @@ class UsageAlert < Sequel::Model
   many_to_one :user, class: :Account, read_only: true
 
   plugin ResourceMethods
+  plugin :update_or_create
 
   def trigger(current_cost)
     send_email(current_cost)

@@ -904,7 +904,7 @@ RSpec.describe Clover, "billing" do
       it "can create usage alert" do
         visit "#{project.path}/billing"
         fill_in "alert_name", with: "alert-3"
-        fill_in "limit", with: 200
+        fill_in "limit", with: 200, id: "limit"
         click_button "Add"
 
         expect(page).to have_content "alert-3"
@@ -916,7 +916,7 @@ RSpec.describe Clover, "billing" do
         click_button "Add"
         expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
 
-        fill_in "limit", with: 0
+        fill_in "limit", with: 0, id: "limit"
         click_button "Add"
         expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
       end
@@ -944,6 +944,41 @@ RSpec.describe Clover, "billing" do
         end
 
         expect(page.status_code).to eq(404)
+      end
+
+      it "can create, update, and remove spending cutoff" do
+        visit "#{project.path}/billing"
+        expect(page).to have_no_button "Remove Cutoff"
+        fill_in "Cutoff Limit", with: 300
+        click_button "Add Cutoff"
+        expect(page).to have_flash_notice "Created spending cutoff"
+        cutoff_alert = project.usage_alerts_dataset.first(cutoff: true)
+        expect(cutoff_alert.limit).to eq 300
+        expect(page).to have_no_css "#alert-#{cutoff_alert.ubid}"
+        expect(page).to have_css "#alert-#{@alert1.ubid}"
+        expect(find_by_id("cutoff_limit").value).to eq "300"
+
+        fill_in "Cutoff Limit", with: 400
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 400
+        expect(project.usage_alerts_dataset.where(cutoff: true).count).to eq 1
+        expect(find_by_id("cutoff_limit").value).to eq "400"
+
+        click_button "Remove Cutoff"
+        expect(page).to have_flash_notice "Removed spending cutoff"
+        expect(cutoff_alert.exists?).to be false
+        expect(@alert1.exists?).to be true
+        expect(page).to have_button "Add Cutoff"
+      end
+
+      it "does nothing when submitting spending cutoff without limit if there is no current cutoff" do
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: ""
+        click_button "Add Cutoff"
+        expect(page).to have_current_path "#{project.path}/billing"
+        expect(page).to have_no_css "#flash-notice"
+        expect(project.usage_alerts_dataset.where(cutoff: true).count).to eq 0
       end
     end
   end

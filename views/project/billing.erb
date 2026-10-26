@@ -4,7 +4,9 @@ if @project.billing_info
   @invoices = @project.invoices.prepend(@project.current_invoice)
 end
 
-@usage_alerts = @project.usage_alerts_dataset.eager(:user).all %>
+@usage_alerts = @project.usage_alerts_dataset.eager(:user).all
+@cutoff_alert = @usage_alerts.find(&:cutoff)
+@usage_alerts.delete(@cutoff_alert) %>
 
 <% if billing_info = @project.billing_info %>
   <%== part(
@@ -448,6 +450,69 @@ end
           No usage alerts...
         </div>
       <% end %>
+    </div>
+  </div>
+</div>
+
+<br>
+
+<!-- Spending cutoff -->
+<div id="cutoff-alert">
+  <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Spending Cutoff
+      </h3>
+    </div>
+  </div>
+
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="space-y-4">
+        <div>
+          <h2 class="text-lg font-medium leading-6 text-gray-900">
+            <%= @cutoff_alert ? "Update spending cutoff" : "Add spending cutoff" %>
+          </h2>
+
+          <p class="mt-1 text-sm text-gray-500">
+            Once usage for the current month exceeds the cutoff limit, the project is cut off from additional spending
+            for the rest of the month. The cutoff limit is checked every 5-10 minutes.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-end gap-6">
+          <% form(action: "#{@project.path}/usage-alert/cutoff", method: :post, id: "cutoff-alert-form") do %>
+            <div class="flex items-end gap-6">
+              <%== part(
+                "components/form/text",
+                name: "limit",
+                id: "cutoff_limit",
+                label: "Cutoff Limit",
+                type: "number",
+                value: @cutoff_alert&.limit,
+                attributes: {
+                  required: true,
+                  placeholder: "100"
+                },
+                extra_class: "pr-3"
+              ) %>
+
+              <%== part("components/form/submit_button", text: @cutoff_alert ? "Update Cutoff" : "Add Cutoff") %>
+            </div>
+          <% end %>
+
+          <% if @cutoff_alert %>
+            <%== part(
+              "components/delete_button",
+              text: "Remove Cutoff",
+              url: "#{@project.path}/usage-alert/cutoff",
+              exact_url: true,
+              hidden_inputs: { limit: "" },
+              confirmation_message: "Are you sure you want to remove the spending cutoff?"
+            ) %>
+          <% end %>
+        </div>
+      </div>
     </div>
   </div>
 </div>

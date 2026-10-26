@@ -36,6 +36,7 @@ class Clover < Roda
         ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask],
         ::PostgresServer => [:victoria_metrics_client, :restart_sensitive_params],
         ::SubjectTag => [:admin_tag?, :options_for_project, :subject_id_map_for_project_and_accounts],
+        ::UsageAlert => [:create, :find_or_new],
         ::VictoriaMetricsResource => [:client_for_project],
         ::Vm => [:from_runtime_jwt_payload, :maintenance_hour_options],
         ::VmHost => [:available_to_project],
@@ -58,7 +59,6 @@ class Clover < Roda
         ::Project,
         ::SshPublicKey,
         ::Strand,
-        ::UsageAlert,
       ].freeze
       DEFAULT_ALLOW = [:===, :create, :create_with_id, :new, :new_with_id, :ubid_format, :ubid_type].freeze
 
