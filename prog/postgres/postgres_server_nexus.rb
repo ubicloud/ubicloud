@@ -1031,6 +1031,7 @@ SQL
     representative_server = resource&.representative_server
     postgres_server.destroy
     representative_server&.incr_configure
+    resource&.remove_unneeded_internal_ssh_rules
 
     pop "postgres server is deleted"
   end

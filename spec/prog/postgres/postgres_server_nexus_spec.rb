@@ -2116,6 +2116,30 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
 
+    it "removes port 22 from the internal firewall when the last single-NIC server is gone" do
+      gcp_location = Location[name: "gcp-us-central1"]
+      mgmt_subnet = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, project_id: service_project.id,
+        location_id: gcp_location.id, net4: "100.64.0.0/20", net6: "fd1b:9793:dcef:cd0e::/64")
+      Strand.create_with_id(mgmt_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      Prog::Vnet::NicNexus.assemble(mgmt_subnet.id, name: "#{standby.vm.name}-mgmt-nic", is_management: true).subject.update(vm_id: standby.vm.id)
+      gcp_subnet = PrivateSubnet.create(name: "pg-gcp-subnet", project:, location_id: gcp_location.id,
+        net4: "172.0.4.0/26", net6: "fdfa:b5aa:14a3:4a41::/64")
+      gcp_vpc = GcpVpc.create(project_id: project.id, location_id: gcp_location.id, name: "ubicloud-vpc")
+      Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: gcp_subnet.id, gcp_vpc_id: gcp_vpc.id)
+      firewall = Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+      firewall.replace_firewall_rules([
+        {cidr: "1.2.3.4/32", port_range: Sequel.pg_range(22..22)},
+        {cidr: "172.0.4.0/26", port_range: Sequel.pg_range(5432..5432)},
+      ])
+      postgres_resource.update(location_id: gcp_location.id, private_subnet_id: gcp_subnet.id)
+
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+      expect(firewall.reload.firewall_rules.map { it.port_range.begin }).to eq([5432])
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
+    end
+
     it "does not crash when the resource row is already deleted" do
       # PostgresResourceNexus#wait_children_destroyed deletes the resource row
       # before server strands finish; delete it for real (a stubbed nx.resource
