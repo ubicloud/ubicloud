@@ -277,8 +277,8 @@ RSpec.describe PostgresResource do
       ps
     end
 
-    def create_gcp_server(name)
-      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, name:, location_id: gcp_location.id,
+    def create_gcp_server(name, private_subnet_id: nil)
+      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, name:, location_id: gcp_location.id, private_subnet_id:,
         unix_user: "ubi", boot_image: "ubuntu-jammy", size: "c4a-standard-4", arch: "arm64").subject
       PostgresServer.create(timeline: create_postgres_timeline(location_id: gcp_location.id), resource_id: gcp_resource.id,
         vm_id: vm.id, synchronization_status: "ready", timeline_access: "push", version: "17")
@@ -353,6 +353,60 @@ RSpec.describe PostgresResource do
 
         create_gcp_server("pg-gcp-vm2")
         expect(gcp_resource.reload.mgmt_ssh_via_user_security_group?).to be true
+      end
+    end
+
+    describe "#remove_unneeded_internal_ssh_rules" do
+      let(:firewall) { Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project) }
+      let(:mgmt_subnet) { create_management_subnet }
+      let(:gcp_subnet) {
+        PrivateSubnet.create(name: "pg-gcp-subnet", project_id: project.id, location_id: gcp_location.id,
+          net4: "172.0.4.0/26", net6: "fdfa:b5aa:14a3:4a41::/64")
+      }
+      let(:gcp_vpc) {
+        vpc = GcpVpc.create(project_id: project.id, location_id: gcp_location.id, name: "ubicloud-vpc")
+        Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: gcp_subnet.id, gcp_vpc_id: vpc.id)
+        vpc
+      }
+      let(:ssh_cidrs) { firewall.reload.firewall_rules.select { it.port_range.to_range.cover?(22) }.map { it.cidr.to_s } }
+      let(:update_semaphores) { Semaphore.where(name: "update_firewall_rules") }
+
+      def create_attached_server(name, with_mgmt_nic:)
+        vm = create_gcp_server(name, private_subnet_id: gcp_subnet.id)
+        add_management_nic(vm, mgmt_subnet) if with_mgmt_nic
+        vm.add_vm_firewall(firewall)
+        vm
+      end
+
+      before do
+        allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"])
+        gcp_vpc
+        gcp_resource.update(private_subnet_id: gcp_subnet.id)
+        firewall.replace_firewall_rules(gcp_resource.internal_firewall_rules)
+      end
+
+      it "keeps port 22 while a server has no management NIC" do
+        create_attached_server("pg-gcp-vm1", with_mgmt_nic: true)
+        create_attached_server("pg-gcp-vm2", with_mgmt_nic: false)
+        update_semaphores.delete
+
+        gcp_resource.remove_unneeded_internal_ssh_rules
+        expect(ssh_cidrs).to eq(["1.2.3.4/32"])
+        expect(update_semaphores.count).to eq(0)
+      end
+
+      it "removes port 22 and updates the VPC and the VMs once every server has a management NIC" do
+        vm = create_attached_server("pg-gcp-vm1", with_mgmt_nic: true)
+        update_semaphores.delete
+
+        gcp_resource.remove_unneeded_internal_ssh_rules
+        expect(ssh_cidrs).to be_empty
+        expect(firewall.firewall_rules.map { it.port_range.begin }.uniq.sort).to eq([5432, 6432])
+        expect(update_semaphores.select_map(:strand_id)).to contain_exactly(vm.id, gcp_vpc.id)
+
+        gcp_resource.remove_unneeded_internal_ssh_rules
+        expect(update_semaphores.count).to eq(2)
       end
     end
 
