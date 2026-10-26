@@ -494,6 +494,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to hop("allocate_vm")
     end
 
+    it "hops to allocate_vm without checking the quota with the central scheduler" do
+      expect(Config).to receive(:central_vm_scheduler).and_return(true)
+      expect(project).not_to receive(:quota_available?)
+      expect(project).to receive(:active?).and_return(true)
+
+      expect { nx.start }.to hop("allocate_vm")
+    end
+
     it "hops to apply_custom_label_quota if there is capacity and the label is a custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)

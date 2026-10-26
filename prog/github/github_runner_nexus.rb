@@ -345,7 +345,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
-    hop_wait_concurrency_limit unless quota_available?
+    hop_wait_concurrency_limit unless Config.central_vm_scheduler || quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
   end
