@@ -6,7 +6,7 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
-    -f, --flavor=type                flavor (deprecated, standard is the only flavor)
+    -f, --flavor=type                flavor (deprecated and ignored)
     -h, --ha-type=type               replication type
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
