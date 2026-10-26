@@ -368,6 +368,7 @@ end
 #  billable                  | boolean                  | NOT NULL DEFAULT true
 #  reputation                | text                     | NOT NULL DEFAULT 'new'::text
 #  gcp_dedicated_subnet_vpcs | boolean                  | NOT NULL DEFAULT false
+#  cutoff_at                 | timestamp with time zone |
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
