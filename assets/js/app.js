@@ -1209,10 +1209,4 @@ function setupLogDestinationForm() {
       $("#log-destination-syslog-auth").removeClass("hidden");
     }
   });
-
-  $(document).on("submit", "form:has(#url-display)", function () {
-    const prefix = $("#url-prefix").text();
-    const suffix = $("#url-display").val();
-    $("#url-hidden").val(prefix + suffix);
-  });
 }

@@ -4,6 +4,10 @@ require_relative "../../model"
 
 class PostgresLogDestination < Sequel::Model
   plugin ResourceMethods, encrypted_columns: {options: {format: :json}}
+
+  def self.url_prefix(type)
+    (type == "syslog") ? "tcp://" : "https://"
+  end
 end
 
 # Table: postgres_log_destination
