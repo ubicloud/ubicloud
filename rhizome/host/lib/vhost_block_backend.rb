@@ -6,6 +6,8 @@ require_relative "../../common/lib/util"
 
 class VhostBlockBackend
   SHA256_BY_VERSION_AND_ARCH = {
+    ["v0.6.0", :x64] => "3004276a17c36d64d73436afd8b547d5fe4f7dc4f461383a503eef9ec0f0c7f9",
+    ["v0.6.0", :arm64] => "477e636719d77507135c6fdfa8ea89e8450a8da09f732d6893c6127650c88554",
     ["v0.5.1", :x64] => "7b82f4769a7ee52b1fa71d17f12dbe02a4795e4bdb5e8fe4cea98bb3a7913972",
     ["v0.5.1", :arm64] => "f538c4ee0618274a738d5cb3695c720004a46d3edef89bce6c17a0a0df12b719",
     ["v0.4.2", :x64] => "e7e430f2e722a2d5d7c18a4f609360e003798d481e26da6db380e698ccb079eb",
