@@ -81,7 +81,7 @@ RSpec.describe DeletedRecord do
         .join(Sequel[:pg_class].as(:c), oid: :indexrelid)
         .where(indrelid: Sequel.cast(name, :regclass), indisvalid: true)
         .select_map(Sequel[:c][:relname])
-      expect(indexes).to contain_exactly("#{name}_model_name_deleted_at_idx", "#{name}_record_id_idx", "#{name}_deleted_at_idx")
+      expect(indexes).to contain_exactly("#{name}_model_name_deleted_at_idx", "#{name}_record_id_idx", "#{name}_deleted_at_idx", "#{name}_expr_deleted_at_idx")
     end
 
     it "drops a partition" do

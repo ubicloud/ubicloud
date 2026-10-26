@@ -95,6 +95,7 @@ end
 #  record_id    | uuid                     |
 #  model_values | jsonb                    | NOT NULL
 # Indexes:
-#  deleted_record_deleted_at_index            | brin (deleted_at)
-#  deleted_record_model_name_deleted_at_index | btree (model_name, deleted_at)
-#  deleted_record_record_id_index             | btree (record_id) WHERE record_id IS NOT NULL
+#  deleted_record_deleted_at_index                    | brin (deleted_at)
+#  deleted_record_github_runner_installation_id_index | btree ((model_values ->> 'installation_id'::text), deleted_at) WHERE model_name = 'GithubRunner'::text
+#  deleted_record_model_name_deleted_at_index         | btree (model_name, deleted_at)
+#  deleted_record_record_id_index                     | btree (record_id) WHERE record_id IS NOT NULL
