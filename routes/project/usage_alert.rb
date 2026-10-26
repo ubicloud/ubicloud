@@ -19,6 +19,35 @@ class Clover
         r.redirect billing_path
       end
 
+      r.post "cutoff" do
+        handle_validation_failure("project/billing")
+        limit = typecast_params.pos_int("limit")
+
+        notice_action = action = nil
+        DB.transaction do
+          ua = UsageAlert.find_or_new({project_id: @project.id, user_id: current_account_id, name: "-", cutoff: true}, limit:)
+          is_new = ua.new?
+
+          if limit
+            ua.save_changes
+            action = is_new ? "create" : "update"
+            notice_action = "#{action.capitalize}d"
+            audit_log(ua, action)
+          elsif !is_new
+            ua.destroy
+            action = "destroy"
+            notice_action = "Removed"
+            audit_log(ua, action)
+          else
+            no_audit_log
+            r.redirect billing_path
+          end
+        end
+
+        flash["notice"] = "#{notice_action} spending cutoff"
+        r.redirect billing_path
+      end
+
       r.delete :ubid_uuid do |id|
         next unless (usage_alert = @project.usage_alerts_dataset[id:])
 
@@ -28,7 +57,7 @@ class Clover
         end
 
         flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
-        r.redirect @project, "/billing"
+        r.redirect billing_path
       end
     end
   end
