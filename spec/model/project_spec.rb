@@ -158,6 +158,23 @@ RSpec.describe Project do
     end
   end
 
+  describe "#cutoff?" do
+    it "returns false if cutoff_at is not set" do
+      expect(project.cutoff?).to be false
+    end
+
+    it "returns false if cutoff_at is before the start of the current month" do
+      now = Time.now.utc
+      project.update(cutoff_at: Time.utc(now.year, now.month) - 1)
+      expect(project.cutoff?).to be false
+    end
+
+    it "returns true if cutoff_at is in the current month" do
+      project.update(cutoff_at: Time.now)
+      expect(project.cutoff?).to be true
+    end
+  end
+
   describe "#current_invoice" do
     it "works even if most recent invoice end date is in the future" do
       project = described_class.create(name: "dummy-name")
