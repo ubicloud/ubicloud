@@ -225,6 +225,27 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
     end
 
+    it "uses metal vms if alien runners are disabled for the repository, ignoring the case of its name" do
+      project.set_ff_no_alien_runner_repositories([runner.repository_name.upcase])
+      project.set_ff_aws_alien_runners_ratio(1.0)
+      runner.incr_spill_over
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("standard")
+      expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
+    end
+
+    it "uses alien vms if alien runners are disabled only for other repositories" do
+      project.set_ff_no_alien_runner_repositories(["other-repo"])
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m8a")
+      expect(picked_vm.location_id).to eq(location.id)
+    end
+
     it "uses the pool vm if spilled over by hand and alien runners are disabled for the project" do
       installation.update(allocator_preferences: {})
       pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
