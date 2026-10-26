@@ -16,13 +16,22 @@ class Prog::Github::DeleteCacheEntries < Prog::Base
     )
   end
 
+  def transaction_around_run?
+    false
+  end
+
   label def delete_entries
     if (cache_entry = next_entry)
-      cache_entry.destroy
-      nap 0
+      cache_entry.delete_blob_storage
+      start_transaction do
+        cache_entry.destroy
+        nap 0
+      end
     end
 
-    pop "all cache entries deleted"
+    start_transaction do
+      pop "all cache entries deleted"
+    end
   end
 
   def next_entry
