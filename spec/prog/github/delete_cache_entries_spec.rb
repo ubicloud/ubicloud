@@ -40,13 +40,15 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
   end
 
   describe "#delete_entries" do
+    let(:client) { instance_double(Aws::S3::Client) }
+
+    before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
+
     it "deletes cache entry and naps until no cache entries are left" do
       entries = self.entries
-      next_entries = entries.dup
-      dce.define_singleton_method(:next_entry) { next_entries.shift }
       entries.each do |entry|
-        entry.define_singleton_method(:after_destroy) {}
-        expect(entry).to receive(:delete_blob_storage).with(no_args)
+        expect(client).to receive(:abort_multipart_upload).with(bucket: repository.bucket_name, key: entry.blob_key, upload_id: entry.upload_id)
+        expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
       end
 
       expect { dce.delete_entries }.to nap(0)
@@ -62,21 +64,29 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
 
     it "deletes blob storage outside of the transaction and destroys the cache entry inside the transaction" do
       entry = entries[0]
-      entry.define_singleton_method(:after_destroy) {}
-      transaction_started = false
+      st = described_class.assemble(repository.id)
+      in_transaction = false
       allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
-        transaction_started = true if kwargs == {savepoint: true}
-        m.call(*args, **kwargs, &block)
+        if kwargs == {savepoint: true}
+          begin
+            in_transaction = true
+            m.call(*args, **kwargs, &block)
+          ensure
+            in_transaction = false
+          end
+        else
+          m.call(*args, **kwargs, &block)
+        end
       end
-      st = dce.strand
-      expect(st).to receive(:prog_class).and_return(class_double(dce.class, new: dce))
-      expect(dce).to receive(:next_entry).and_return(entry)
-      expect(entry).to receive(:delete_blob_storage).with(no_args) do
-        expect(transaction_started).to be false
+      expect(client).to receive(:abort_multipart_upload) do
+        expect(in_transaction).to be false
       end
-      expect(entry).to receive(:destroy).and_wrap_original do |m|
-        expect(transaction_started).to be true
-        m.call
+      expect(client).to receive(:delete_object) do
+        expect(in_transaction).to be false
+      end
+      expect(DeletedRecord).to receive(:create).and_wrap_original do |m, **kwargs|
+        expect(in_transaction).to be true
+        m.call(**kwargs)
       end
       expect(st.unsynchronized_run).to be_a Prog::Base::Nap
       expect(entry).not_to exist
