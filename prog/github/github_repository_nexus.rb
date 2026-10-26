@@ -20,7 +20,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   def transaction_around_run?
-    strand.label != "wait"
+    false
   end
 
   # We dynamically adjust the polling interval based on the remaining rate
@@ -192,13 +192,22 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     register_deadline(nil, 400)
     unless github_repository.runners.empty?
       Clog.emit("Cannot destroy repository with active runners", {not_destroyed_repository: {repository_name: github_repository.name}})
-      nap 2 * 60
+      start_transaction { nap 2 * 60 }
     end
 
-    github_repository.cache_entries_dataset.destroy
-    github_repository.destroy_blob_storage if github_repository.access_key
-    github_repository.destroy
+    if (entry = github_repository.cache_entries_dataset.first)
+      entry.delete_blob_storage
+      start_transaction do
+        entry.destroy
+        nap 0
+      end
+    end
 
-    pop "github repository destroyed"
+    github_repository.destroy_blob_storage if github_repository.access_key
+
+    start_transaction do
+      github_repository.destroy
+      pop "github repository destroyed"
+    end
   end
 end
