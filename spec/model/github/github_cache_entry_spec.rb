@@ -50,6 +50,24 @@ RSpec.describe GithubCacheEntry do
     end
   end
 
+  describe "#delete_blob_storage" do
+    let(:client) { instance_double(Aws::S3::Client) }
+
+    before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
+
+    it "clears the upload_id and skips blob storage on later calls" do
+      other = described_class.create(repository_id: repository.id, key: "k2", version: "v1", scope: "main", upload_id: "upload-456", created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      expect(client).to receive(:abort_multipart_upload).twice
+      expect(client).to receive(:delete_object).twice
+      entry.delete_blob_storage
+      other.delete_blob_storage
+      expect(entry.reload.upload_id).to be_nil
+      expect(other.reload.upload_id).to be_nil
+
+      entry.destroy
+    end
+  end
+
   describe ".destroy_where" do
     let(:client) { instance_double(Aws::S3::Client) }
 
