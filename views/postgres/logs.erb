@@ -1,6 +1,6 @@
 <% form_type = typecast_body_params.str("type") || "otlp"
-   url_protocol = (form_type == "syslog") ? "tcp://" : "https://"
-   url_suffix = (typecast_body_params.str("url") || "").sub(%r{\Ahttps?://|\Atcp://}, "")
+   url_protocol = PostgresLogDestination.url_prefix(form_type)
+   url_suffix = typecast_body_params.str("url_suffix")
 
    log_limit_options = [50, 100, 250, 500].freeze
 
@@ -332,6 +332,7 @@
 
                   <input
                     id="url-display"
+                    name="url_suffix"
                     type="text"
                     value="<%= url_suffix %>"
                     placeholder="host:port or domain/path"
@@ -342,8 +343,6 @@
                       sm:text-sm sm:leading-6
                     "
                   >
-
-                  <input type="hidden" name="url" id="url-hidden">
                 </div>
               </div>
 

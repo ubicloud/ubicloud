@@ -1206,13 +1206,14 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "nr", type: "otlp", url: "not-a-url",
+          name: "nr", type: "otlp", url_suffix: "bad host",
           header_keys: ["api-key", ""],
           header_values: ["secret", "ignored"],
           _csrf:,
         }
         expect(page.status_code).to eq(400)
         expect(page.body).to include("OTLP Endpoint URL")
+        expect(Capybara.string(page.body)).to have_field("url-display", with: "bad host")
         expect(page.body).to include('value="api-key"')
         expect(page.body).not_to include('value="ignored"')
         expect(page.body).not_to include("No logs found")
@@ -1223,7 +1224,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "mezmo", type: "syslog", url: "https://logs.example.com",
+          name: "mezmo", type: "syslog", url_suffix: "logs.example.com",
           structured_data_ids: ["honeybadger@61642", "", "honeybadger@61642"],
           structured_data_keys: ["api_key", "ignored", ""],
           structured_data_values: ["secret", "ignored", "ignored"],
@@ -1231,12 +1232,13 @@ RSpec.describe Clover, "postgres" do
         }
         expect(page.status_code).to eq(400)
         expect(page.body).to include("Syslog TCP Endpoint")
+        expect(Capybara.string(page.body)).to have_field("url-display", with: "logs.example.com")
         expect(page.body).to include('data-sd-id="honeybadger@61642"')
         expect(page.body).to include('value="secret"')
         expect(page.body).not_to include('value="ignored"')
 
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "mezmo", type: "syslog", url: "https://logs.example.com",
+          name: "mezmo", type: "syslog", url_suffix: "logs.example.com",
           structured_data_ids: [""],
           structured_data_keys: [""],
           structured_data_values: [""],
@@ -1250,12 +1252,10 @@ RSpec.describe Clover, "postgres" do
 
       it "can create an otlp log destination" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
-        page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "nr", type: "otlp", url: "https://otlp.nr-data.net",
-          _csrf:,
-        }
-        expect(page.status_code).to eq(302)
+        fill_in "Name", with: "nr"
+        fill_in "url-display", with: "otlp.nr-data.net"
+        click_button "Add"
+        expect(page).to have_flash_notice("Log destination is created")
         ld = pg.reload.log_destinations.first
         expect(ld.name).to eq "nr"
         expect(ld.type).to eq "otlp"
@@ -1267,7 +1267,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "nr", type: "otlp", url: "https://otlp.nr-data.net",
+          name: "nr", type: "otlp", url_suffix: "otlp.nr-data.net",
           header_keys: ["api-key", ""],
           header_values: ["secret", "ignored"],
           _csrf:,
@@ -1278,15 +1278,11 @@ RSpec.describe Clover, "postgres" do
 
       it "can create a syslog log destination without structured_data" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
-        page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "mezmo", type: "syslog", url: "tcp://syslog-a.logdna.com:6514",
-          structured_data_ids: [""],
-          structured_data_keys: [""],
-          structured_data_values: [""],
-          _csrf:,
-        }
-        expect(page.status_code).to eq(302)
+        fill_in "Name", with: "mezmo"
+        find_by_id("log-destination-type", visible: false).set("syslog")
+        fill_in "url-display", with: "syslog-a.logdna.com:6514"
+        click_button "Add"
+        expect(page).to have_flash_notice("Log destination is created")
         ld = pg.reload.log_destinations.first
         expect(ld.name).to eq "mezmo"
         expect(ld.type).to eq "syslog"
@@ -1298,7 +1294,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
-          name: "mezmo", type: "syslog", url: "tcp://logs.example.com:6514",
+          name: "mezmo", type: "syslog", url_suffix: "logs.example.com:6514",
           structured_data_ids: ["honeybadger@61642", "honeybadger@61642", "", "honeybadger@61642"],
           structured_data_keys: ["api_key", "env", "ignored", ""],
           structured_data_values: ["secret", "prod", "ignored", "ignored"],

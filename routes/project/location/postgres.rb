@@ -319,7 +319,11 @@ class Clover
           handle_validation_failure("postgres/show") { @page = "logs" }
 
           name, type = typecast_params.nonempty_str!(["name", "type"])
-          url = typecast_params.nonempty_str!("url")
+          url = if web?
+            PostgresLogDestination.url_prefix(type) + typecast_params.nonempty_str!("url_suffix")
+          else
+            typecast_params.nonempty_str!("url")
+          end
           (type == "otlp") ? Validation.validate_url(url) : Validation.validate_syslog_url(url)
 
           options = if web?
