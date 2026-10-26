@@ -18,7 +18,7 @@ source "https://rubygems.org"
 # Then update BUNDLED WITH version in Gemfile.lock to match bundler version that
 # ships with the new Ruby version.
 #
-# Then run `mise install`, `mise lock`, and `bundle install`.
+# Then run, `mise self-update`, `mise install`, `mise lock --upgrade`, and `bundle install`.
 ruby "4.0.9"
 
 gem "acme-client"
