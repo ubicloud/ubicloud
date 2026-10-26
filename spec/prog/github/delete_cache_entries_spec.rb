@@ -44,7 +44,10 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
       entries = self.entries
       next_entries = entries.dup
       dce.define_singleton_method(:next_entry) { next_entries.shift }
-      entries.each { it.define_singleton_method(:after_destroy) {} }
+      entries.each do |entry|
+        entry.define_singleton_method(:after_destroy) {}
+        expect(entry).to receive(:delete_blob_storage).with(no_args)
+      end
 
       expect { dce.delete_entries }.to nap(0)
       expect(entries[0]).not_to exist
@@ -55,6 +58,28 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
       expect(entries[1]).not_to exist
 
       expect { dce.delete_entries }.to exit({"msg" => "all cache entries deleted"})
+    end
+
+    it "deletes blob storage outside of the transaction and destroys the cache entry inside the transaction" do
+      entry = entries[0]
+      entry.define_singleton_method(:after_destroy) {}
+      transaction_started = false
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        transaction_started = true if kwargs == {savepoint: true}
+        m.call(*args, **kwargs, &block)
+      end
+      st = dce.strand
+      expect(st).to receive(:prog_class).and_return(class_double(dce.class, new: dce))
+      expect(dce).to receive(:next_entry).and_return(entry)
+      expect(entry).to receive(:delete_blob_storage).with(no_args) do
+        expect(transaction_started).to be false
+      end
+      expect(entry).to receive(:destroy).and_wrap_original do |m|
+        expect(transaction_started).to be true
+        m.call
+      end
+      expect(st.unsynchronized_run).to be_a Prog::Base::Nap
+      expect(entry).not_to exist
     end
   end
 
