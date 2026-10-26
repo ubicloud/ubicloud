@@ -372,6 +372,16 @@ class PostgresResource < Sequel::Model
     rules
   end
 
+  def remove_unneeded_internal_ssh_rules
+    return if mgmt_ssh_via_user_security_group?
+
+    ssh_rules = internal_firewall.firewall_rules_dataset.where(port_range: Sequel.pg_range(22..22))
+    return if ssh_rules.empty?
+
+    ssh_rules.destroy
+    private_subnet.apply_firewalls
+  end
+
   def pg_firewall_rules(firewall: customer_firewall)
     return [] unless firewall
 
