@@ -17,6 +17,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     bad_nonce_retry: 3,
   }.freeze
 
+  AUTO_RESTART_LABELS = ["start", *ACME_ORDER_LABELS].freeze
   AUTO_RESTART_SECONDS = 15 * 60
   AUTO_RESTART_WAIT_DEADLINE = AUTO_RESTART_SECONDS * 2
 
@@ -51,8 +52,10 @@ class Prog::Vnet::CertNexus < Prog::Base
       when_restarted_set? do
         hop_restart
       end
+    end
 
-      if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && remaining_auto_restarts > 0
+    if AUTO_RESTART_LABELS.include?(strand.label)
+      if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && remaining_auto_restarts&.>(0)
         self.remaining_auto_restarts -= 1
         register_deadline("wait", wait_deadline, allow_extension: true)
         hop_restart

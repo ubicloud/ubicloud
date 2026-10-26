@@ -161,6 +161,22 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
     end
 
+    it "automatically restarts if at the start label for too long and auto restarts remain" do
+      st.update(label: "start")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100, "last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1})
+      expect { nx.before_run }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 1
+      expect(st.stack[0]["deadline_target"]).to eq "wait"
+      expect(Time.new(st.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+    end
+
+    it "does not automatically restart if remaining_auto_restarts is not in the frame" do
+      st.update(label: "wait_dns_validation")
+      refresh_frame(nx, new_frame: st.stack[0].except("remaining_auto_restarts").merge("last_restart_time" => Time.now.to_i - described_class::AUTO_RESTART_SECONDS - 1))
+      expect { nx.before_run }.not_to hop
+      expect(st.stack[0]).not_to have_key("remaining_auto_restarts")
+    end
+
     it "does not automatically restart if last_restart_time is not set" do
       st.update(label: "wait_dns_validation")
       refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "last_restart_time" => nil})
