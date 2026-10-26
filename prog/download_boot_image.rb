@@ -167,32 +167,32 @@ class Prog::DownloadBootImage < Prog::Base
     },
     "github-ubuntu-2604" => {
       "x64" => {
-        "20260901.1.0" => "e3ea65f2d998e7a9bf7b3278bb927c3b1f5ab140f1b9055c189e5092ad1ed27b",
         "20261021.1.0" => "6fffd2f7c365f4bcd788860670ce2d0ba50e7bcf76d6303da3375c2486d659a3",
+        "20261026.1.0" => "dc3178ed0c4ec2014af987b5159010acbf539a7797627fed3a67dccd6c86b645",
       },
       "arm64" => {
-        "20260901.1.0" => "0c28ab59c6e395448b384a052af1e52e99c026d9505090b7131dba40bb0eb659",
         "20261021.1.0" => "91815f08bb49a98f8981cec03ff5581337e58f32a6b269397693455f8bf4aa73",
+        "20261026.1.0" => "54ebc12be7ff8fbba345e76e61606f60a005ee3749c0fae284429d10deb5d22e",
       },
     },
     "github-ubuntu-2404" => {
       "x64" => {
-        "20260901.1.0" => "44ac3a4d0b80a79a7c6b4ea790bd7715101cc7fe1272ecaf6ab78e9d18a3f8fc",
         "20261021.1.0" => "9c0c39e384b4b54cc377920be2c4b291204aae1599f8c756ae33f6124da29689",
+        "20261026.1.0" => "f1b73f1866a0edef7aa215eed5212ecbbb1963c7d17d894f8b4771491f88bba8",
       },
       "arm64" => {
-        "20260901.1.0" => "74f6b0cf95aa8c219561c2266d234518167f5a2bb63359db679dcadb792995c1",
         "20261021.1.0" => "e3113fac8df5eb508c5af08380c51575404e9df75820d304cf0c9171d8e5364d",
+        "20261026.1.0" => "d4be8ebad7527b5ae21d419b40d338c9007beea4798b0b4b1f823d3ea64c9456",
       },
     },
     "github-ubuntu-2204" => {
       "x64" => {
-        "20260901.1.0" => "db5f9699f6e5bb7fb8421d950416f85c00f6fb10f563e8390c4ecd43c571e6ec",
         "20261021.1.0" => "3463b55b3766f81466f36fc947662ec3cf6cfb8be6c34b41ffe3af881994c0f2",
+        "20261026.1.0" => "7cbc42d8640b0fcd2aa3fb927e1f8c42c50b8cee463d344320b4fcb1bfb0a9c8",
       },
       "arm64" => {
-        "20260901.1.0" => "3fd96907abcc8ca840da49c657ef72243b9b36b0e8567d3514369deb45b9de42",
         "20261021.1.0" => "66b9b343f2258f1619c2409b8fc3d3836add8b8e75b91d3a6b4e649a5efbc675",
+        "20261026.1.0" => "80bd12f6839c95002713e28b0dd83307b395a7ddfd38243956286ede2c9ff5e2",
       },
     },
     "postgres-ubuntu-2204" => {
