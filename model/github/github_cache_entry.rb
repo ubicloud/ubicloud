@@ -42,10 +42,9 @@ class GithubCacheEntry < Sequel::Model
     delete_blob_storage(destroyed: true)
   end
 
-  BLOB_STORAGE_DELETED_UPLOAD_ID = "_deleted"
-
   def delete_blob_storage(destroyed: false)
-    return if upload_id == BLOB_STORAGE_DELETED_UPLOAD_ID
+    # A nil upload_id means the blob storage was already deleted.
+    return unless upload_id
 
     bucket = repository.bucket_name
     key = blob_key
@@ -69,7 +68,7 @@ class GithubCacheEntry < Sequel::Model
       retry
     end
 
-    update(upload_id: BLOB_STORAGE_DELETED_UPLOAD_ID) unless destroyed
+    update(upload_id: nil) unless destroyed
   end
 end
 
