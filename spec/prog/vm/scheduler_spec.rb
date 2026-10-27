@@ -87,10 +87,32 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(vm.reload.vm_host_id).not_to be_nil
     end
 
+    context "with the round log" do
+      before { allow(Clog).to receive(:emit).and_call_original }
+
+      it "logs the counts and the time of each phase of a round" do
+        create_host
+        create_waiting_vm
+        round = {waiting: 1, tried: 1, allocated: 1, unplaced: 0, milliseconds: hash_including(:queue, :lock, :plan, :finish)}
+        expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(round)}).and_call_original
+
+        expect { nx.wait }.to nap(5)
+      end
+    end
+
     context "with the bulk commit" do
       before do
         allow(Config).to receive(:central_vm_scheduler_bulk_commit).and_return(true)
         allow(Clog).to receive(:emit).and_call_original
+      end
+
+      it "logs the time of the bulk write and the one by one commits of a round" do
+        create_slice_host
+        create_waiting_vm
+        milliseconds = hash_including(:queue, :lock, :plan, :bulk_write, :one_by_one, :finish)
+        expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(allocated: 1, milliseconds:)}).and_call_original
+
+        expect { nx.wait }.to nap(5)
       end
 
       def create_slice_host(cidr: "1.1.1.0/30", net6: "fd10:9b0b:6b4b:8fbb::/64", backend: true, **)
@@ -480,6 +502,7 @@ RSpec.describe Prog::Vm::Scheduler do
       vms = Array.new(2) { create_waiting_vm }
       expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vms.first.ubid})).and_call_original
       expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vms.last.ubid})).and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 2, allocated: 0)}).and_call_original
 
       expect { nx.wait }.to nap(5)
       expect(vms.map { it.reload.vm_host_id }).to eq([nil, nil])
