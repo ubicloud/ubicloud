@@ -170,13 +170,23 @@ JSON
   end
 
   describe "#start" do
+    def expect_cpu_commands(sshable)
+      expect(sshable).to receive(:_cmd).with("common/bin/arch").and_return("x64")
+      expect(sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(eight_thread_four_core_four_numa_two_socket)
+      expect(sshable).to receive(:_cmd).with("cat /sys/devices/system/cpu/cpu*/topology/die_id").and_return("0\n1\n0\n1\n")
+    end
+
     it "pops with cpu info" do
-      allow(lc).to receive_messages(
-        get_arch: "x64",
-        get_topology: {total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3]},
-        count_dies: 2,
-      )
-      expect { lc.start }.to exit(arch: "x64", total_cpus: 8, total_cores: 4, total_dies: 2, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3])
+      expect_cpu_commands(lc.sshable)
+      expect { lc.start }.to exit("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3])
+    end
+
+    it "returns string keys to a pushing prog, so it can read retval right away" do
+      pushed = described_class.new(Strand.create_with_id(sshable, prog: "LearnCpu", label: "start", stack: [{"subject_id" => sshable.id, "link" => ["LearnNumaNode", "start"]}, {}]))
+      expect_cpu_commands(pushed.sshable)
+      expect { pushed.start }.to hop("start", "LearnNumaNode") { |hop|
+        expect(hop.strand_update_args[:retval]).to eq("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3])
+      }
     end
   end
 end
