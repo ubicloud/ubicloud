@@ -783,6 +783,7 @@ RSpec.describe VmHost do
         max_file_retention: 120,
         interval: "15s",
         additional_labels: {ubicloud_resource_id: vm_host.ubid},
+        exclude_metrics: ["[{,]device=\"vetho"],
         metrics_dir: "/home/rhizome/host/metrics",
         project_id: "d272dc1f-52ba-4e52-9bcc-f90dce42a226",
       })
