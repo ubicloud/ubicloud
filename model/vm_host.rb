@@ -514,6 +514,7 @@ class VmHost < Sequel::Model
       max_file_retention: 120,
       interval: "15s",
       additional_labels: {ubicloud_resource_id: ubid},
+      exclude_metrics: ["[{,]device=\"vetho"],
       metrics_dir: "/home/rhizome/host/metrics",
       project_id: Config.monitoring_service_project_id,
     }
