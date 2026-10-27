@@ -2,6 +2,7 @@
 
 class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   include GcpLro
+  include GcpFirewallPolicy
 
   # Per-firewall INGRESS rules start at priority 10000 in the VPC's network
   # firewall policy. These rules target per-firewall secure tags
@@ -250,7 +251,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
 
     # Removes wait until every add lands so coverage never gaps.
     unless remaining_existing.empty?
-      mutations = remaining_existing.map { |stale| -> { delete_policy_rule(stale.priority) } }
+      mutations = remaining_existing.map { |stale| -> { remove_firewall_policy_rule(stale.priority) } }
       submit_policy_mutations(mutations, fw_ubid)
     end
   end
@@ -366,19 +367,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     self.policy_rule_ops_fw_ubid = nil
   end
 
-  def delete_policy_rule(priority)
-    credential.network_firewall_policies_client.remove_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      priority:,
-    )
-  rescue Google::Cloud::InvalidArgumentError => e
-    raise if e.message.include?("not ready")
-    nil
-  rescue Google::Cloud::NotFoundError
-    nil
-  end
-
   # When a firewall is detached from all subnets and VMs (or deleted), its
   # shared policy rules remain in the network firewall policy. This method
   # finds GCE_FIREWALL tag keys for this VPC whose firewalls no longer have
@@ -437,7 +425,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       if tag_value_name
         mutations = policy_rules.select { |rule|
           rule.action == "allow" && rule.target_secure_tags.any? { |t| t.name == tag_value_name }
-        }.map { |rule| -> { delete_policy_rule(rule.priority) } }
+        }.map { |rule| -> { remove_firewall_policy_rule(rule.priority) } }
 
         # Tracked like the sync path so pushback naps instead of raising,
         # and so the removes drain before the tag value delete below: a

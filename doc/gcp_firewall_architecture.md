@@ -453,9 +453,9 @@ retrying in-loop and the entry exits with a clean nap. Any other
 while nothing in the phase has been accepted yet, since there is nothing
 to lose by crashing; once one mutation is accepted the error defers
 instead so the accepted op names survive to be polled. This applies to
-the adds phase: removes call `delete_policy_rule`, which treats an
-already-gone priority as success and only propagates "not ready", so
-they reach the busy branch rather than the raise.
+the adds phase: removes call `remove_firewall_policy_rule`, which
+treats an already-gone priority as success and only propagates "not
+ready", so they reach the busy branch rather than the raise.
 
 An op that fails in its LRO pages and takes its firewall out of the rest
 of the convergence, so one firewall cannot starve the others; the entry

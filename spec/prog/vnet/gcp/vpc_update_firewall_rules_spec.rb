@@ -1181,25 +1181,25 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
   end
 
-  describe "delete_policy_rule" do
+  describe "remove_firewall_policy_rule" do
     it "removes the rule" do
       expect(nfp_client).to receive(:remove_rule).and_return(lro_op)
-      nx.send(:delete_policy_rule, 10000)
+      nx.send(:remove_firewall_policy_rule, 10000)
     end
 
     it "swallows NotFoundError" do
       expect(nfp_client).to receive(:remove_rule).and_raise(Google::Cloud::NotFoundError.new("not found"))
-      nx.send(:delete_policy_rule, 10000)
+      nx.send(:remove_firewall_policy_rule, 10000)
     end
 
     it "swallows InvalidArgumentError" do
       expect(nfp_client).to receive(:remove_rule).and_raise(Google::Cloud::InvalidArgumentError.new("invalid"))
-      nx.send(:delete_policy_rule, 10000)
+      nx.send(:remove_firewall_policy_rule, 10000)
     end
 
     it "re-raises a not-ready InvalidArgumentError so the caller can classify it as pushback" do
       expect(nfp_client).to receive(:remove_rule).and_raise(Google::Cloud::InvalidArgumentError.new("resource is not ready"))
-      expect { nx.send(:delete_policy_rule, 10000) }.to raise_error(Google::Cloud::InvalidArgumentError)
+      expect { nx.send(:remove_firewall_policy_rule, 10000) }.to raise_error(Google::Cloud::InvalidArgumentError)
     end
   end
 
