@@ -16,9 +16,15 @@ class Prog::LearnCpu < Prog::Base
     total_cpus = parsed.count
     sockets = parsed.map { |socket, _| socket }.uniq.count
     cores = parsed.uniq.count
-    cpu_numa_nodes = cpus.sort_by! { |cpu| cpu.fetch("cpu").to_i }.map! { |cpu| cpu["node"]&.to_i }
+    cpus.sort_by! { |cpu| cpu.fetch("cpu").to_i }
+    cpu_numa_nodes = cpus.map { |cpu| cpu["node"]&.to_i }
 
-    {total_cpus:, total_cores: cores, total_sockets: sockets, cpu_numa_nodes:}
+    # Like total_cores, identify a core by its socket and core, and number
+    # the cores in the order of their first cpu.
+    core_numbers = {}
+    cpu_cores = cpus.map { |cpu| core_numbers[cpu.fetch_values("socket", "core")] ||= core_numbers.size }
+
+    {total_cpus:, total_cores: cores, total_sockets: sockets, cpu_numa_nodes:, cpu_cores:}
   end
 
   def count_dies(arch:, total_sockets:)
