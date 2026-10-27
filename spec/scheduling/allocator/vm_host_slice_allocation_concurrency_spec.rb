@@ -49,19 +49,25 @@ RSpec.describe Scheduling::Allocator::VmHostSliceAllocation, :no_db_transaction 
 
   it "skips cpus locked by a concurrent allocation" do
     with_locked_cpus(2..5) do
-      expect(allocation.select_cpuset(vm_host.id, 4)).to eq([6, 7, 8, 9])
+      expect(allocation.select_cpuset(vm_host.id, 4, threads_per_core: 2)).to eq([6, 7, 8, 9])
     end
   end
 
   it "moves to the next numa node when the preferred one is partly locked" do
     with_locked_cpus(2..3) do
-      expect(allocation.select_cpuset(vm_host.id, 4)).to eq([6, 7, 8, 9])
+      expect(allocation.select_cpuset(vm_host.id, 4, threads_per_core: 2)).to eq([6, 7, 8, 9])
     end
   end
 
   it "spans numa nodes using only unlocked cpus" do
     with_locked_cpus([6, 7]) do
-      expect(allocation.select_cpuset(vm_host.id, 6)).to eq([2, 3, 4, 5, 8, 9])
+      expect(allocation.select_cpuset(vm_host.id, 6, threads_per_core: 2)).to eq([2, 3, 4, 5, 8, 9])
+    end
+  end
+
+  it "fails when concurrent allocations leave too few unlocked cpus" do
+    with_locked_cpus(2..9) do
+      expect { allocation.select_cpuset(vm_host.id, 4, threads_per_core: 2) }.to raise_error RuntimeError, "failed to allocate cpus"
     end
   end
 end

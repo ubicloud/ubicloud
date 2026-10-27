@@ -608,7 +608,7 @@ module Scheduling::Allocator
           threads_per_core = vm_host.total_cpus / vm_host.total_cores
           request_cores = @request.cores_for_vcpus(threads_per_core)
           slice_cpus = request_cores * threads_per_core
-          cpus = select_cpuset(vm_host.id, slice_cpus, @gpu_allocation&.numa_node)
+          cpus = select_cpuset(vm_host.id, slice_cpus, numa_node: @gpu_allocation&.numa_node, threads_per_core:)
 
           st = Prog::Vm::VmHostSliceNexus.assemble_with_host(
             "#{vm.family}_#{vm.inhost_name}",
@@ -642,31 +642,45 @@ module Scheduling::Allocator
       end
     end
 
-    def select_cpuset(vm_host_id, n, numa_node = nil)
+    def select_cpuset(vm_host_id, n, threads_per_core:, numa_node: nil)
       free_cpus = VmHostCpu.where(vm_host_id:, io: false, vm_host_slice_id: nil)
+      cpus = free_cpus.order_by(:cpu_number).select_map([:numa_node, :cpu_number, :core_number])
 
+      # Prefer cpus of cores with all their cpus free, so the slice shares no
+      # core with another slice or the io cpus.
+      free_threads = cpus.map { |_, _, core_number| core_number }.tally
+      whole_core_cpus = cpus.select { |_, _, core_number| core_number && free_threads[core_number] == threads_per_core }
+
+      selected = pick_cpuset(free_cpus, whole_core_cpus, n, numa_node) || pick_cpuset(free_cpus, cpus, n, numa_node)
+      fail "failed to allocate cpus" unless selected
+
+      selected
+    end
+
+    def pick_cpuset(free_cpus, cpus, n, numa_node)
       # Concurrent allocations on the same host see the same free cpus. Lock
       # the chosen cpus and skip the ones locked by other transactions, so
       # concurrent allocations get disjoint cpusets instead of queueing on
       # the same rows. Prefer the numa node of the VM's GPUs, then the
       # smallest numa node with enough free cpus.
-      free_cpus.order_by(:cpu_number)
-        .select_hash_groups(:numa_node, :cpu_number)
+      cpus.group_by { |node, _, _| node }
+        .transform_values { |numa_cpus| numa_cpus.map { |_, cpu_number, _| cpu_number } }
         .select { |_, numa_cpus| numa_cpus.size >= n }
         .sort_by { |node, numa_cpus| [(node == numa_node) ? 0 : 1, numa_cpus.size, numa_cpus.first] }
         .each do |_, numa_cpus|
-          cpus = lock_cpuset(free_cpus.where(cpu_number: numa_cpus), n)
-          return cpus if cpus.size == n
+          locked = lock_cpuset(free_cpus.where(cpu_number: numa_cpus), n)
+          return locked if locked.size == n
         end
 
-      cpus = lock_cpuset(free_cpus, n)
-      fail "failed to allocate cpus" if cpus.size < n
+      return if cpus.size < n
 
-      cpus
+      locked = lock_cpuset(free_cpus.where(cpu_number: cpus.map { |_, cpu_number, _| cpu_number }), n)
+      locked if locked.size == n
     end
 
     def lock_cpuset(ds, n)
-      ds.order_by(:numa_node, :cpu_number).limit(n).for_update.skip_locked.select_map(:cpu_number)
+      # Ordering by core takes the cpus of a core together.
+      ds.order_by(:numa_node, :core_number, :cpu_number).limit(n).for_update.skip_locked.select_map(:cpu_number)
     end
 
     def select_existing_slice

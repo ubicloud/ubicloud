@@ -1879,7 +1879,7 @@ RSpec.describe Scheduling::Allocator do
       al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
 
       vh = VmHost.first
-      expect { al.select_cpuset(vh.id, 24) }.to raise_error "failed to allocate cpus"
+      expect { al.select_cpuset(vh.id, 24, threads_per_core: 2) }.to raise_error "failed to allocate cpus"
     end
 
     it "select_cpuset picks the lowest free cpu numbers when the host has no numa data" do
@@ -1888,7 +1888,7 @@ RSpec.describe Scheduling::Allocator do
       al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
 
       vh = VmHost.first
-      expect(al.select_cpuset(vh.id, 4)).to eq([2, 3, 4, 5])
+      expect(al.select_cpuset(vh.id, 4, threads_per_core: 2)).to eq([2, 3, 4, 5])
     end
 
     it "select_cpuset chooses the best fitting numa node" do
@@ -1901,7 +1901,7 @@ RSpec.describe Scheduling::Allocator do
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 7..10).update(numa_node: 1) # 4 free cpus
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..16).update(numa_node: 2) # 6 free cpus
 
-      expect(al.select_cpuset(vh.id, 4)).to eq([7, 8, 9, 10])
+      expect(al.select_cpuset(vh.id, 4, threads_per_core: 2)).to eq([7, 8, 9, 10])
     end
 
     it "select_cpuset spans numa nodes when no single node has enough free cpus" do
@@ -1916,7 +1916,7 @@ RSpec.describe Scheduling::Allocator do
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..13).update(numa_node: 3)
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 14..16).update(numa_node: 4)
 
-      expect(al.select_cpuset(vh.id, 6)).to eq([2, 3, 4, 5, 6, 7])
+      expect(al.select_cpuset(vh.id, 6, threads_per_core: 2)).to eq([2, 3, 4, 5, 6, 7])
     end
 
     it "select_cpuset prefers the given numa node if it has enough free cpus" do
@@ -1929,8 +1929,40 @@ RSpec.describe Scheduling::Allocator do
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 7..10).update(numa_node: 1) # 4 free cpus
       VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..16).update(numa_node: 2) # 6 free cpus
 
-      expect(al.select_cpuset(vh.id, 4, 2)).to eq([11, 12, 13, 14])
-      expect(al.select_cpuset(vh.id, 6, 0)).to eq([11, 12, 13, 14, 15, 16])
+      expect(al.select_cpuset(vh.id, 4, threads_per_core: 2, numa_node: 2)).to eq([11, 12, 13, 14])
+      expect(al.select_cpuset(vh.id, 6, threads_per_core: 2, numa_node: 0)).to eq([11, 12, 13, 14, 15, 16])
+    end
+
+    describe "on a host numbering the hyperthreads of core N as cpus N and N + 8" do
+      let(:vh) { VmHost.first }
+      let(:al) { Scheduling::Allocator::VmHostSliceAllocation.new(nil, create_req(create_vm, vol), nil) }
+
+      before do
+        VmHostCpu.where(vm_host_id: vh.id).update(core_number: Sequel.function(:mod, :cpu_number, 8))
+        # The host's 17th cpu is a core of its own.
+        VmHostCpu.where(vm_host_id: vh.id, cpu_number: 16).update(core_number: 8)
+      end
+
+      it "select_cpuset picks whole cores, skipping the cores of the io cpus" do
+        expect(al.select_cpuset(vh.id, 4, threads_per_core: 2)).to eq([2, 10, 3, 11])
+      end
+
+      it "select_cpuset skips cores that a slice already uses" do
+        Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: [2], memory_gib: 4)
+        expect(al.select_cpuset(vh.id, 2, threads_per_core: 2)).to eq([3, 11])
+      end
+
+      it "select_cpuset falls back to free cpus of partly used cores when no whole core is free" do
+        Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: [2, 3, 4, 5, 6, 7, 16], memory_gib: 4)
+        expect(al.select_cpuset(vh.id, 2, threads_per_core: 2)).to eq([8, 9])
+      end
+
+      it "allocates a slice on a whole core" do
+        vm = create_vm(vcpus: 2, memory_gib: 8)
+        create_storage_volumes(vm, vol)
+        Al::Allocation.ranked_allocations(create_req(vm, vol, use_slices: true)).first.update(vm)
+        expect(vm.vm_host_slice.allowed_cpus_cgroup).to eq("2,10")
+      end
     end
 
     it "allocates a slice with the memory of the vm and cpus on the numa node of its gpus" do
