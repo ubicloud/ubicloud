@@ -33,6 +33,6 @@ class Prog::LearnCpu < Prog::Base
     arch = get_arch
     topo = get_topology
     total_dies = count_dies(total_sockets: topo[:total_sockets], arch:)
-    pop(arch:, **topo, total_dies:)
+    pop({arch:, **topo, total_dies:}.transform_keys(&:to_s))
   end
 end
