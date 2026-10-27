@@ -11,7 +11,6 @@ class GithubRunner < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :encoded_jit_config, redacted_columns: :workflow_job
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
-  include HealthMonitorMethods
 
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
 
@@ -100,26 +99,6 @@ class GithubRunner < Sequel::Model
     return if !force && spare_runner_provisioned_set?
     incr_spare_runner_provisioned
     Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
-  end
-
-  def init_health_monitor_session
-    {
-      ssh_session: vm.sshable.start_fresh_session,
-    }
-  end
-
-  def check_pulse(session:, previous_pulse:)
-    reading = begin
-      available_memory = session[:ssh_session].exec!("awk '/MemAvailable/ {print $2}' /proc/meminfo").chomp
-      "up"
-    rescue
-      "down"
-    end
-    aggregate_readings(previous_pulse:, reading:, data: {available_memory:})
-  end
-
-  def page_on_sshable_failure?
-    false
   end
 
   def custom_label

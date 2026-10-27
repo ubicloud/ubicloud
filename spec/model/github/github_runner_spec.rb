@@ -172,30 +172,4 @@ RSpec.describe GithubRunner do
       expect(github_runner.provision_spare_runner(force: true)).to be_a(described_class)
     }.to change(described_class, :count).from(1).to(2)
   end
-
-  it "initiates a new health monitor session" do
-    expect(github_runner.vm.sshable).to receive(:start_fresh_session)
-    github_runner.init_health_monitor_session
-  end
-
-  it "does not page on sshable failure" do
-    expect(github_runner.page_on_sshable_failure?).to be false
-  end
-
-  it "checks pulse" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-    }
-    pulse = {
-      reading: "up",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30,
-    }
-
-    expect(session[:ssh_session]).to receive(:_exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")
-    github_runner.check_pulse(session:, previous_pulse: pulse)
-
-    expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
-    github_runner.check_pulse(session:, previous_pulse: pulse)
-  end
 end
