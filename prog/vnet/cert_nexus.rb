@@ -13,8 +13,8 @@ class Prog::Vnet::CertNexus < Prog::Base
   ACME_ORDER_LABELS = %w[wait_dns_update wait_dns_validation cert_finalization wait_cert_finalization].freeze
 
   ACME_CLIENT_OPTIONS = {
-    connection_options: {request: {open_timeout: 5, timeout: 40}.freeze}.freeze,
-    bad_nonce_retry: 1,
+    connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
+    bad_nonce_retry: 3,
   }.freeze
 
   AUTO_RESTART_LABELS = ["start", *ACME_ORDER_LABELS].freeze
