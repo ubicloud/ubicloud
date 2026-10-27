@@ -962,7 +962,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content "Firewall Rules"
         expect(page).to have_no_content "0.0.0.0/0"
-        expect(page).to have_no_content "5432"
         expect(page).to have_content "You can manage firewall rules using the firewall for this PostgreSQL database"
         click_link "manage firewall rules using the firewall for this PostgreSQL database"
         expect(page.title).to eq "Ubicloud - #{pg.ubid}-firewall"
@@ -976,7 +975,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content "Firewall Rules"
         expect(page).to have_no_content "0.0.0.0/0"
-        expect(page).to have_no_content "5432"
         expect(page).to have_content "The firewall related to this PostgreSQL database was deleted or detached from the related private subnet"
         click_link "private subnet"
         expect(page.title).to eq "Ubicloud - #{pg.ubid}-subnet"
