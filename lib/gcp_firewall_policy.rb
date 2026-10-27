@@ -69,6 +69,19 @@ module GcpFirewallPolicy
     end
   end
 
+  def remove_firewall_policy_rule(priority)
+    credential.network_firewall_policies_client.remove_rule(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name,
+      priority:,
+    )
+  rescue Google::Cloud::InvalidArgumentError => e
+    raise if e.message.include?("not ready")
+    nil
+  rescue Google::Cloud::NotFoundError
+    nil
+  end
+
   def firewall_policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
     match = existing.match
     existing.direction == direction &&
