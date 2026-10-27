@@ -133,14 +133,26 @@ JSON
       expect(lc.sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(
         eight_thread_four_core_four_numa_two_socket,
       )
-      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3]})
+      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3], cpu_cores: [0, 0, 1, 1, 2, 2, 3, 3]})
+    end
+
+    it "maps each cpu to its core when the hyperthreads of a core are not numbered next to each other" do
+      expect(lc.sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(<<JSON)
+{"cpus": [
+  {"cpu": 0, "socket": 0, "core": 0},
+  {"cpu": 1, "socket": 0, "core": 1},
+  {"cpu": 2, "socket": 0, "core": 0},
+  {"cpu": 3, "socket": 0, "core": 1}
+]}
+JSON
+      expect(lc.get_topology).to eq({total_cpus: 4, total_cores: 2, total_sockets: 1, cpu_numa_nodes: [nil, nil, nil, nil], cpu_cores: [0, 1, 0, 1]})
     end
 
     it "ignores extra lscpu columns and a boolean online field (Ubuntu 24.04-style output)" do
       expect(lc.sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(
         eight_thread_four_core_two_numa_two_socket_numeric_fields,
       )
-      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 0, 0, 1, 1, 1, 1]})
+      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 0, 0, 1, 1, 1, 1], cpu_cores: [0, 0, 1, 1, 2, 2, 3, 3]})
     end
 
     it "coerces string cpu/node fields to integers and sorts numerically, not lexicographically (Ubuntu 22.04-style output)" do
@@ -148,13 +160,13 @@ JSON
         twelve_thread_six_core_two_numa_two_socket_string_fields,
       )
       expect(lc.get_topology).to eq(
-        {total_cpus: 12, total_cores: 6, total_sockets: 2, cpu_numa_nodes: [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1]},
+        {total_cpus: 12, total_cores: 6, total_sockets: 2, cpu_numa_nodes: [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1], cpu_cores: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]},
       )
     end
 
     it "reports nil numa nodes when the host has no NUMA data at all" do
       expect(lc.sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(four_thread_two_core_no_numa)
-      expect(lc.get_topology).to eq({total_cpus: 4, total_cores: 2, total_sockets: 1, cpu_numa_nodes: [nil, nil, nil, nil]})
+      expect(lc.get_topology).to eq({total_cpus: 4, total_cores: 2, total_sockets: 1, cpu_numa_nodes: [nil, nil, nil, nil], cpu_cores: [0, 0, 1, 1]})
     end
   end
 
@@ -178,14 +190,14 @@ JSON
 
     it "pops with cpu info" do
       expect_cpu_commands(lc.sshable)
-      expect { lc.start }.to exit("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3])
+      expect { lc.start }.to exit("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3], "cpu_cores" => [0, 0, 1, 1, 2, 2, 3, 3])
     end
 
     it "returns string keys to a pushing prog, so it can read retval right away" do
-      pushed = described_class.new(Strand.create_with_id(sshable, prog: "LearnCpu", label: "start", stack: [{"subject_id" => sshable.id, "link" => ["LearnNumaNode", "start"]}, {}]))
+      pushed = described_class.new(Strand.create_with_id(sshable, prog: "LearnCpu", label: "start", stack: [{"subject_id" => sshable.id, "link" => ["LearnCpuTopology", "start"]}, {}]))
       expect_cpu_commands(pushed.sshable)
-      expect { pushed.start }.to hop("start", "LearnNumaNode") { |hop|
-        expect(hop.strand_update_args[:retval]).to eq("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3])
+      expect { pushed.start }.to hop("start", "LearnCpuTopology") { |hop|
+        expect(hop.strand_update_args[:retval]).to eq("arch" => "x64", "total_cpus" => 8, "total_cores" => 4, "total_dies" => 2, "total_sockets" => 2, "cpu_numa_nodes" => [0, 0, 1, 1, 2, 2, 3, 3], "cpu_cores" => [0, 0, 1, 1, 2, 2, 3, 3])
       }
     end
   end
