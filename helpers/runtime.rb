@@ -20,7 +20,7 @@ class Clover < Roda
 
     Clog.emit("Get runner scope from GitHub API", {get_runner_scope: log_context})
     begin
-      jobs = runner.installation.client.workflow_run_jobs(runner.repository_name, run_id)[:jobs]
+      jobs = runner.installation.client(auto_paginate: true).workflow_run_jobs(runner.repository_name, run_id)[:jobs]
     rescue Octokit::ClientError, Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => ex
       Util.exception_to_hash(ex, into: log_context)
       Clog.emit("Could not list the jobs of the workflow run ", {runner_scope_failure: log_context})
