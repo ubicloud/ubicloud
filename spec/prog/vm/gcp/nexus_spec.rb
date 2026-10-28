@@ -451,6 +451,38 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         .to eq(vm.sshable.keys.map(&:public_key))
     end
 
+    it "asks cloud-init for a swap file when swap_size_bytes is set" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"swap_size_bytes" => 4294963200})
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-swap")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(YAML.safe_load(captured)["swap"]).to eq("filename" => "/swapfile", "size" => 4294963200)
+    end
+
+    it "leaves swap out of user-data when swap_size_bytes is nil" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      expect(st.stack.first.fetch("swap_size_bytes")).to be_nil
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-noswap")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(YAML.safe_load(captured).keys).to eq(["users"])
+    end
+
     it "creates a VmGcpResource row matching the chosen zone on first entry" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)

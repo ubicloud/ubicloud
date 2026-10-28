@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
+  frame_reader :unsupported_azs, :swap_size_bytes
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
 
   def before_destroy
@@ -33,7 +33,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
 
-    user_data = "#cloud-config\n" + {
+    cloud_config = {
       "users" => [
         "default",
         {
@@ -44,7 +44,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           "ssh_authorized_keys" => vm.sshable.keys.map(&:public_key),
         },
       ],
-    }.to_yaml.delete_prefix("---\n")
+    }
+
+    if swap_size_bytes
+      cloud_config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
+    user_data = "#cloud-config\n" + cloud_config.to_yaml.delete_prefix("---\n")
 
     # An -lssd machine type bundles its local SSDs, so only the boot disk is
     # declared for it; a family without one gets them attached here. GCE
