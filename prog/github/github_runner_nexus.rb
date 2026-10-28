@@ -936,11 +936,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
 
-    if github_runner[:job_id] && github_runner.runner_id && github_runner.completed_at && (workflow_run = github_runner.active_workflow_run)
+    if github_runner[:job_id] && github_runner.runner_id && github_runner.completed_at && (workflow_run_create_date = github_runner.workflow_run_create_date)
       begin
         DB.transaction(savepoint: true) do
           GithubCompletedWorkflowJob.insert(
-            workflow_run_create_date: workflow_run.create_date,
+            workflow_run_create_date:,
             label: github_runner.label,
             actual_label: github_runner.actual_label || github_runner.label,
             duration: (github_runner.completed_at - github_runner.ready_at).ceil,
