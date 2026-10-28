@@ -210,6 +210,45 @@ RSpec.describe GithubRunner do
     end
   end
 
+  describe "#workflow_run_create_date" do
+    let(:today) { Time.now.utc.to_date }
+    let(:repository) { GithubRepository.create(installation_id: github_runner.installation_id, name: "test-repo") }
+
+    before do
+      github_runner.update(repository_id: repository.id, run_id: 456, run_attempt: 2)
+    end
+
+    def create_active_run(create_date)
+      GithubActiveWorkflowRun.create(installation_id: github_runner.installation_id, repository_id: repository.id, create_date:, repository_name: "test-repo", run_id: 456, run_attempt: 2, head_branch: "main", head_repository_full_name: "test-repo", event: "push", status: "in_progress", display_title: "CI", commit_message: "cm", actor_login: "al", cache_scope: "main")
+    end
+
+    def create_completed_run(create_date, run_attempt: 2)
+      GithubCompletedWorkflowRun.create_partition(create_date) unless GithubCompletedWorkflowRun.partition_days.include?(create_date)
+      GithubCompletedWorkflowRun.insert(repository_id: repository.id, run_id: 456, run_attempt:, create_date:, installation_id: github_runner.installation_id, created_at: Time.now, run_started_at: Time.now, completed_at: Time.now, event: "push", status: "completed", conclusion: "success", display_title: "CI", actor_login: "al", duration: 90)
+    end
+
+    it "returns nil if there is no active or completed workflow run" do
+      create_completed_run(today, run_attempt: 1)
+      expect(github_runner.workflow_run_create_date).to be_nil
+    end
+
+    it "returns the create date of the active workflow run, preferring it to a completed workflow run" do
+      create_active_run(today - 30)
+      create_completed_run(today)
+      expect(github_runner.workflow_run_create_date).to eq(today - 30)
+    end
+
+    it "returns the create date of a completed workflow run created in the last 7 days" do
+      create_completed_run(today - 5)
+      expect(github_runner.workflow_run_create_date).to eq(today - 5)
+    end
+
+    it "returns nil if the completed workflow run was created more than 7 days ago" do
+      create_completed_run(today - 8)
+      expect(github_runner.workflow_run_create_date).to be_nil
+    end
+  end
+
   describe "workflow job info accessors" do
     let(:columns) { [:job_id, :run_id, :head_branch, :workflow_name, :job_name, :job_created_at, :job_started_at, :job_completed_at, :status, :conclusion] }
 

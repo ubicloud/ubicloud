@@ -2125,7 +2125,17 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(completed_jobs.count).to eq(0)
       end
 
-      it "does not insert a completed workflow job if there is no active workflow run" do
+      it "inserts a completed workflow job if the workflow run has already completed" do
+        workflow_run.destroy
+        GithubCompletedWorkflowRun.create_partition(workflow_run_create_date)
+        GithubCompletedWorkflowRun.insert(repository_id: workflow_run.repository_id, run_id: 456, run_attempt: 2, create_date: workflow_run_create_date, installation_id: installation.id, created_at: now, run_started_at: now, completed_at: now, event: "push", status: "completed", conclusion: "success", display_title: "CI", actor_login: "al", duration: 90)
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.select_map([:job_id, :workflow_run_create_date])).to eq([[789, workflow_run_create_date]])
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(0)
+      end
+
+      it "does not insert a completed workflow job if there is no active or recently completed workflow run" do
         runner.update(run_attempt: 1)
 
         expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})

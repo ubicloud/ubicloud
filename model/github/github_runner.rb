@@ -9,6 +9,7 @@ class GithubRunner < Sequel::Model
   many_to_one :vm, read_only: true
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
   many_to_one :active_workflow_run, class: :GithubActiveWorkflowRun, key: [:repository_id, :run_id, :run_attempt], primary_key: [:repository_id, :run_id, :run_attempt], read_only: true
+  many_to_one :completed_workflow_run, class: :GithubCompletedWorkflowRun, key: [:repository_id, :run_id, :run_attempt], primary_key: [:repository_id, :run_id, :run_attempt], read_only: true
 
   plugin ResourceMethods, encrypted_columns: :encoded_jit_config, redacted_columns: :workflow_job
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
@@ -108,6 +109,17 @@ class GithubRunner < Sequel::Model
     # Can be changed to only job_id after all GitHubRunner with
     # with workflow_job set also have these other columns set
     !!(job_id || workflow_job)
+  end
+
+  def workflow_run_create_date
+    unless (create_date = active_workflow_run_dataset.get(:create_date))
+      today = Time.now.utc.to_date
+      create_date = completed_workflow_run_dataset
+        .where(create_date: (today - 6)..today)
+        .get(:create_date)
+    end
+
+    create_date
   end
 
   # Methods below are temporary and can be removed after all GitHubRunner
