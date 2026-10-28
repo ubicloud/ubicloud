@@ -156,7 +156,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
-    elsif vm.location.aws?
+    elsif !vm.location.metal?
       # Alien runners are billed by the label's vCPU count, not the instance's;
       # 30 vCPU labels run on 32 vCPU instances but are still billed for 30.
       "standard-#{label_data["vcpus"]}"
@@ -609,7 +609,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
-    if vm.location.aws?
+    unless vm.location.metal?
       command << NetSsh.command(<<~COMMAND, private_ipv4:)
         echo :private_ipv4" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
       COMMAND

@@ -25,6 +25,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   let(:project) { installation.project }
   let(:client) { instance_double(Octokit::Client) }
   let(:now) { Time.utc(2026, 2, 5, 19, 0) }
+  let(:gcp_location) { Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: vm.project_id, display_name: "gcp-europe-west3", ui_name: "GCP Frankfurt", visible: false) }
   let(:boot_bug_grep) { "sudo grep -qszE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent\\|kernel\\ BUG\\ at\\ arch/x86/kernel/alternative.c:\\[0-9\\]+\\|GRUB_FORCE_PARTUUID\\ set,\\ attempting\\ initrdless\\ boot\\\\.\\\\s\\*\\$\\|EFI\\ stub:\\ WARNING:\\ Decompression\\ failed:\\ ZSTD-compressed\\ data\\ is\\ corrupt\\|EFI\\ stub:\\ ERROR:\\ Failed\\ to\\ decompress\\ kernel /vm/#{vm.inhost_name}/serial.log && echo match || true" }
 
   before do
@@ -459,6 +460,52 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-30")
       expect(runner.billed_vm_size).to eq("standard-30")
+    end
+
+    it "uses standard billing rate for runners on gcp" do
+      runner.update(label: "ubicloud-standard-4", ready_at: now - 5 * 60)
+      vm.update(location_id: gcp_location.id, family: "c4d-standard", vcpus: 4)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: installation.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-4")
+      expect(runner.billed_vm_size).to eq("standard-4")
+    end
+
+    it "uses separate billing rate for arm64 runners on gcp" do
+      runner.update(label: "ubicloud-standard-4-arm", ready_at: now - 5 * 60)
+      vm.update(location_id: gcp_location.id, family: "c4a-standard", vcpus: 4, arch: "arm64")
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: installation.id]
+      expect(br.amount).to eq(5)
+      expect(br.billing_rate["resource_family"]).to eq("standard-4-arm")
+      expect(runner.billed_vm_size).to eq("standard-4-arm")
+    end
+
+    it "uses the label's vm size for runners on gcp during a free upgrade" do
+      runner.update(label: "ubicloud-premium-4", ready_at: now - 5 * 60, created_at: now - 100)
+      project.set_ff_free_runner_upgrade_until(now - 50).reload
+      vm.update(location_id: gcp_location.id, family: "c4d-standard", vcpus: 4)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      expect(BillingRecord[resource_id: installation.id].billing_rate["resource_family"]).to eq("premium-4")
+      expect(runner.billed_vm_size).to eq("premium-4")
+    end
+
+    it "uses standard billing rate for premium labels on gcp" do
+      runner.update(label: "ubicloud-premium-4", ready_at: now - 5 * 60)
+      vm.update(location_id: gcp_location.id, family: "c4d-standard", vcpus: 4)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      expect(BillingRecord[resource_id: installation.id].billing_rate["resource_family"]).to eq("standard-4")
+      expect(runner.billed_vm_size).to eq("standard-4")
     end
 
     it "updates the amount of existing billing record" do
@@ -1185,6 +1232,22 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       ps = PrivateSubnet.create(name: "runner-subnet", location_id: location.id, net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64", state: "waiting", project_id: vm.project_id)
       Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
       vm.update(location_id: location.id, vm_host_id: nil)
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        set -ueo pipefail
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo 10.0.0.5" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "resolves the transparent cache domain to the vm on gcp" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      ps = PrivateSubnet.create(name: "runner-subnet", location_id: gcp_location.id, net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64", state: "waiting", project_id: vm.project_id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
+      vm.update(location_id: gcp_location.id, vm_host_id: nil)
       expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
         set -ueo pipefail
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
