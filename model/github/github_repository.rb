@@ -70,11 +70,11 @@ class GithubRepository < Sequel::Model
     this.update(bucket_name: nil, access_key: nil, secret_key: nil)
   end
 
-  def self.create_bucket(bucket_name, rescue_bucket_already_owned: true)
+  def self.create_bucket(bucket_name, rescue_bucket_already_owned: true, location: nil)
     begin
       admin_client.create_bucket({
         bucket: bucket_name,
-        create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
+        create_bucket_configuration: {location_constraint: location || Config.github_cache_blob_storage_region},
       })
     rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
       raise unless rescue_bucket_already_owned
@@ -96,24 +96,27 @@ class GithubRepository < Sequel::Model
       lock!(:no_key_update)
       return if access_key && secret_key
 
-      ds = DB[:github_repository_bucket_pool]
-      bucket = ds
-        .where(id: ds
-          .limit(1)
-          .for_update
-          .skip_locked
-          .select(:id))
-        .returning
-        .delete
-        .first
+      unless (location = installation.preferred_cache_location)
+        ds = DB[:github_repository_bucket_pool]
+        bucket = ds
+          .where(id: ds
+            .limit(1)
+            .for_update
+            .skip_locked
+            .select(:id))
+          .returning
+          .delete
+          .first
+      end
 
       if bucket
         bucket = GithubRepositoryBucketPool.call(bucket)
         update(bucket_name: bucket.ubid, access_key: bucket.access_key, secret_key: bucket.secret_key)
         Prog::Github::MaintainRepositoryBucketPool.schedule_strand
       else
-        token_id, token = self.class.create_bucket(bucket_name)
-        update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+        new_bucket_name = location ? "#{bucket_name}-#{location}" : bucket_name
+        token_id, token = self.class.create_bucket(new_bucket_name, location:)
+        update(bucket_name: new_bucket_name, access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
         Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
       end
     end

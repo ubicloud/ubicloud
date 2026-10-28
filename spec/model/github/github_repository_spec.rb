@@ -106,6 +106,28 @@ RSpec.describe GithubRepository do
       expect(st.reload.schedule).to be_within(5).of(Time.now)
     end
 
+    it "creates a bucket named after the installation's preferred cache location instead of using a precreated bucket" do
+      github_repository.installation.update(allocator_preferences: {"location_filter" => [Location::LEASEWEB_WDC02_ID]})
+      GithubRepositoryBucketPool.create(access_key: "precreated-key", secret_key: Digest::SHA256.hexdigest("precreated-secret"))
+      bucket_name = "#{github_repository.ubid}-enam"
+      expect(Config).to receive(:github_cache_blob_storage_account_id).and_return("123")
+      expect(blob_storage_client).to receive(:create_bucket).with({bucket: bucket_name, create_bucket_configuration: {location_constraint: "enam"}})
+      expected_policy = [
+        {
+          "effect" => "allow",
+          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
+          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"},
+        },
+      ]
+      expect(cloudflare_client).to receive(:create_token).with("#{bucket_name}-token", expected_policy).and_return(["test-key", "test-secret"])
+      github_repository.setup_blob_storage
+      github_repository.reload
+      expect(github_repository.bucket_name).to eq(bucket_name)
+      expect(github_repository.access_key).to eq("test-key")
+      expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))
+      expect(GithubRepositoryBucketPool.count).to eq(1)
+    end
+
     it "prefixes the bucket and token names with e2e in e2e runs" do
       allow(Config).to receive(:is_e2e).and_return(true)
       expect(blob_storage_client).to receive(:create_bucket).with(hash_including(bucket: "e2e-#{github_repository.ubid}"))

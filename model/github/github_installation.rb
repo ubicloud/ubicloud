@@ -56,6 +56,14 @@ class GithubInstallation < Sequel::Model
   def cache_storage_gib
     [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
   end
+
+  def us_only?
+    allocator_preferences["location_filter"] == [Location::LEASEWEB_WDC02_ID]
+  end
+
+  def preferred_cache_location
+    "enam" if us_only?
+  end
 end
 
 # Table: github_installation
