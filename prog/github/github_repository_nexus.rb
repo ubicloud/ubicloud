@@ -125,6 +125,12 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       .limit(200)
       .destroy_where(cond)
 
+    # Destroy uncommitted cache entries whose runner is gone, as nothing can finish their upload.
+    github_repository.cache_entries_dataset
+      .exclude(GithubRunner.where(id: Sequel[:github_cache_entry][:created_by]).exists)
+      .limit(200)
+      .destroy_where(cond)
+
     # Destroy oldest cache entries if the total usage exceeds the limit.
     dataset = github_repository.cache_entries_dataset.exclude(size: nil)
     total_usage = dataset.sum(:size).to_i

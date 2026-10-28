@@ -144,6 +144,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   describe ".cleanup_cache" do
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
     let(:bucket) { repository.bucket_name }
+    let(:runner) { GithubRunner.create(installation_id: installation.id, repository_id: repository.id, repository_name: repository.name, label: "ubicloud") }
 
     before do
       allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
@@ -164,13 +165,26 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "deletes cache entries created 90 minutes ago but not committed yet" do
-      cache_entry = create_cache_entry(created_at: now - 80 * 60, committed_at: nil)
-      hundred_minutes_old = create_cache_entry(created_at: now - 100 * 60, committed_at: nil)
+      cache_entry = create_cache_entry(created_at: now - 80 * 60, committed_at: nil, created_by: runner.id)
+      hundred_minutes_old = create_cache_entry(created_at: now - 100 * 60, committed_at: nil, created_by: runner.id)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: hundred_minutes_old.blob_key)
       expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket:, key: hundred_minutes_old.blob_key, upload_id: hundred_minutes_old.upload_id)
       expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(cache_entry).to exist
       expect(hundred_minutes_old).not_to exist
+    end
+
+    it "deletes uncommitted cache entries whose runner is gone" do
+      gone_runner_id = GithubRunner.generate_uuid
+      cache_entry = create_cache_entry(committed_at: nil, created_by: runner.id)
+      committed_entry = create_cache_entry(created_by: gone_runner_id)
+      runner_gone = create_cache_entry(committed_at: nil, created_by: gone_runner_id)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: runner_gone.blob_key)
+      expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket:, key: runner_gone.blob_key, upload_id: runner_gone.upload_id)
+      expect { nx.cleanup_cache }.to nap(5 * 60)
+      expect(cache_entry).to exist
+      expect(committed_entry).to exist
+      expect(runner_gone).not_to exist
     end
 
     it "deletes cache entries that older than 7 days not accessed yet" do
