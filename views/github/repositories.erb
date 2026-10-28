@@ -1,0 +1,30 @@
+<% @page_title = "Repositories" %>
+
+<%== render("github/tabbar") %>
+
+<% repository_path_prefix = "#{path(@installation)}/repository" %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    id: "repositories",
+    headers: ["Repository", "", ""],
+    rows:
+      @repositories.map do |repository|
+        repository_path = "#{repository_path_prefix}/#{repository.ubid}"
+        [
+          [
+            repository.name,
+            ["Workflow Runs", {link: "#{repository_path}/runs"}],
+            ["Job Metrics", {link: "#{repository_path}/job-metrics"}]
+          ],
+          {id: "repository-#{repository.ubid}"}
+        ]
+      end,
+    empty_state: {
+      icon: "github",
+      title: "No Repositories",
+      description: "Repositories are listed here after they use Ubicloud runners."
+    }
+  ) %>
+</div>

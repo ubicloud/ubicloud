@@ -21,6 +21,15 @@ RSpec.describe Clover, "github" do
     expect(JSON.parse(last_response.body)["name"]).to eq("test-user")
   end
 
+  it "can list repositories, excluding repositories that have not had runners" do
+    repository
+    GithubRepository.create(name: "test-user/no-runner-repo", installation_id: installation.id, last_job_at: GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF - 1)
+    get "/project/#{project.ubid}/github/test-user/repository"
+
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)["items"].map { it["name"] }).to eq ["test-repo"]
+  end
+
   it "can get repository information" do
     get "/project/#{project.ubid}/github/test-user/repository/#{repository.ubid}"
 
