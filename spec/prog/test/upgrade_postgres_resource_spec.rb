@@ -99,11 +99,11 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
       pr = PostgresResource[gcp_pgr_test.strand.stack.first["postgres_resource_id"]]
-      expect(pr.target_vm_size).to eq("c4a-standard-4")
+      expect(pr.target_vm_size).to eq("c4a-standard-lssd-4")
       expect(pr.target_storage_size_gib).to eq(375)
     end
 
-    it "creates a postgres resource on gcp with c4a-standard family and hops to wait_postgres_resource" do
+    it "creates a postgres resource on gcp with c4a-standard-lssd family and hops to wait_postgres_resource" do
       gcp_location = Location[provider: "gcp", project_id: nil, name: "gcp-us-central1"]
       LocationCredentialGcp.create_with_id(gcp_location,
         project_id: "test-gcp-project",
@@ -116,11 +116,11 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
         family: "ubuntu-2604",
         pg_versions: ["16", "17", "18"],
       )
-      gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard")
+      gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard-lssd")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
       pr = PostgresResource[gcp_pgr_test.strand.stack.first["postgres_resource_id"]]
-      expect(pr.target_vm_size).to eq("c4a-standard-4")
+      expect(pr.target_vm_size).to eq("c4a-standard-lssd-4")
       expect(pr.target_storage_size_gib).to eq(375)
     end
 

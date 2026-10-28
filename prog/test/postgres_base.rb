@@ -37,7 +37,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   end
 
   def self.gcp_postgres_test_size(family = nil)
-    family ||= "c4a-standard"
+    family ||= "c4a-standard-lssd"
     vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
     ["#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
   end

@@ -264,7 +264,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       customer_project.set_ff_postgres_gcp_dual_nic(true)
 
       pg = described_class.assemble(project_id: customer_project.id, location_id: gcp_location.id, name: "pg-name",
-        target_vm_size: "c4a-standard-4", target_storage_size_gib: 375).subject
+        target_vm_size: "c4a-standard-lssd-4", target_storage_size_gib: 375).subject
 
       expect(pg.representative_server.vm.management_nic.private_subnet_id).to eq(mgmt_subnet.id)
       expect(pg.internal_firewall.firewall_rules.map { it.port_range.to_range }).not_to include(22...23)
@@ -964,7 +964,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "bills storage on the flavor row for families with storage included" do
-      postgres_server.vm.update(family: "c4a-standard", vcpus: 8, arch: "arm64", cpu_percent_limit: nil)
+      postgres_server.vm.update(family: "c4a-standard-lssd", vcpus: 8, arch: "arm64", cpu_percent_limit: nil)
       postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
       project.update(billable: true)
 

@@ -130,7 +130,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
     let(:gcp_location) { Location[name: "gcp-us-central1"] }
     let(:gcp_resource) { create_postgres_resource(project:, location_id: gcp_location.id) }
     let(:gcp_server) {
-      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, location_id: gcp_location.id, size: "c4a-standard-4", arch: "arm64",
+      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, location_id: gcp_location.id, size: "c4a-standard-lssd-4", arch: "arm64",
         unix_user: "ubi", boot_image: "ubuntu-jammy").subject
       server = PostgresServer.create(timeline: create_postgres_timeline(location_id: gcp_location.id), resource: gcp_resource,
         vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
