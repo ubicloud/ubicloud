@@ -193,6 +193,23 @@ RSpec.describe GithubRunner do
     }.to change(described_class, :count).from(1).to(2)
   end
 
+  describe "#destroy" do
+    def deleted_records
+      DeletedRecord.where(model_name: "GithubRunner", record_id: github_runner.id)
+    end
+
+    it "does not create a DeletedRecord is skip_deleted_record is set" do
+      github_runner.skip_deleted_record!
+      github_runner.destroy
+      expect(deleted_records.count).to eq(0)
+    end
+
+    it "creates a DeletedRecord by default" do
+      github_runner.destroy
+      expect(deleted_records.count).to eq(1)
+    end
+  end
+
   describe "workflow job info accessors" do
     let(:columns) { [:job_id, :run_id, :head_branch, :workflow_name, :job_name, :job_created_at, :job_started_at, :job_completed_at, :status, :conclusion] }
 

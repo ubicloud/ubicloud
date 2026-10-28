@@ -970,6 +970,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         end
       rescue Sequel::DatabaseError => ex
         Clog.emit("failed to insert completed github workflow job", Util.exception_to_hash(ex, into: {github_completed_workflow_job_insert_failure: {github_runner:}}))
+      else
+        github_runner.skip_deleted_record!
       end
     end
 
