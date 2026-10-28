@@ -142,6 +142,7 @@ module Config
   optional :github_runner_service_project_id, uuid
   override :enable_github_workflow_poller, true, bool
   optional :github_runner_aws_location_id, uuid
+  optional :github_runner_gcp_location_id, uuid
   override :github_runner_aws_spot_instance_enabled, false, bool
   optional :github_runner_aws_spot_instance_max_price_per_vcpu, float
   override :github_runner_aws_spill_threshold_seconds, 30, int
