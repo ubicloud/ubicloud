@@ -42,6 +42,10 @@ class GithubCacheEntry < Sequel::Model
     delete_blob_storage(destroyed: true)
   end
 
+  def self.presigned_url_expires_in
+    60 * 60
+  end
+
   def delete_blob_storage(destroyed: false)
     # A nil upload_id means the blob storage was already deleted.
     return unless upload_id
