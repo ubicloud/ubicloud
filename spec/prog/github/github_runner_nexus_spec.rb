@@ -2135,8 +2135,39 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(0)
       end
 
-      it "does not insert a completed workflow job if there is no active or recently completed workflow run" do
+      it "uses the workflow run attempt start date from GitHub if there is no active or recently completed workflow run" do
         runner.update(run_attempt: 1)
+        expect(client).to receive(:get).with("repos/test-repo/actions/runs/456/attempts/1").and_return({created_at: Time.utc(2026, 2, 3, 23, 30), run_started_at: Time.utc(2026, 2, 4, 0, 30)})
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.select_map([:job_id, :run_attempt, :workflow_run_create_date])).to eq([[789, 1, workflow_run_create_date]])
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(0)
+      end
+
+      it "logs and does not insert a completed workflow job if the workflow run attempt from GitHub has no run_started_at" do
+        runner.update(run_attempt: 1)
+        expect(client).to receive(:get).with("repos/test-repo/actions/runs/456/attempts/1").and_return({created_at: Time.utc(2026, 2, 3, 23, 30), run_started_at: nil})
+        expect(Clog).to receive(:emit).with("no run_started_at for github workflow job, skipping completed workflow job insertion", {github_completed_workflow_job_skipped: {github_runner: runner}}).and_call_original
+        allow(Clog).to receive(:emit).and_call_original
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
+      end
+
+      it "logs and does not insert a completed workflow job if fetching the workflow run attempt from GitHub fails" do
+        runner.update(run_attempt: 1)
+        expect(client).to receive(:get).with("repos/test-repo/actions/runs/456/attempts/1").and_raise(Octokit::NotFound)
+        expect(Clog).to receive(:emit).with("error contacting GitHub to get run_started_at for runner, skipping completed workflow job insertion", hash_including(github_completed_workflow_job_skipped: {github_runner: runner}, exception: hash_including(class: "Octokit::NotFound"))).and_call_original
+        allow(Clog).to receive(:emit).and_call_original
+
+        expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+        expect(completed_jobs.count).to eq(0)
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
+      end
+
+      it "does not insert a completed workflow job if the runner run_id column is not set" do
+        runner.update(run_id: nil)
 
         expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
         expect(completed_jobs.count).to eq(0)
