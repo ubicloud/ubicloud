@@ -118,14 +118,10 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       .limit(200)
       .destroy_where(cond)
 
-    # Destroy cache entries if it is created 30 minutes ago
-    # but couldn't committed yet. 30 minutes decided as during
-    # our performance tests uploading 10GB of data (which is
-    # the max size for a single cache entry) takes ~8 minutes at most.
-    # To be on the safe side, ~2x buffer is added.
+    # Destroy cache entries still uncommitted 30 minutes after their upload URLs expired.
     cond = Sequel.expr(committed_at: nil)
     github_repository.cache_entries_dataset
-      .where { created_at < Time.now - 30 * 60 }
+      .where { created_at < Time.now - GithubCacheEntry::PRESIGNED_URL_EXPIRES_IN - 30 * 60 }
       .limit(200)
       .destroy_where(cond)
 

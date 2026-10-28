@@ -163,14 +163,14 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(ten_days_old).not_to exist
     end
 
-    it "deletes cache entries created 30 minutes ago but not committed yet" do
-      cache_entry = create_cache_entry(created_at: now - 15 * 60, committed_at: nil)
-      thirty_five_minutes_old = create_cache_entry(created_at: now - 35 * 60, committed_at: nil)
-      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: thirty_five_minutes_old.blob_key)
-      expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket:, key: thirty_five_minutes_old.blob_key, upload_id: thirty_five_minutes_old.upload_id)
+    it "deletes cache entries created 90 minutes ago but not committed yet" do
+      cache_entry = create_cache_entry(created_at: now - 80 * 60, committed_at: nil)
+      hundred_minutes_old = create_cache_entry(created_at: now - 100 * 60, committed_at: nil)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: hundred_minutes_old.blob_key)
+      expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket:, key: hundred_minutes_old.blob_key, upload_id: hundred_minutes_old.upload_id)
       expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(cache_entry).to exist
-      expect(thirty_five_minutes_old).not_to exist
+      expect(hundred_minutes_old).not_to exist
     end
 
     it "deletes cache entries that older than 7 days not accessed yet" do

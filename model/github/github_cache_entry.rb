@@ -42,6 +42,8 @@ class GithubCacheEntry < Sequel::Model
     delete_blob_storage(destroyed: true)
   end
 
+  PRESIGNED_URL_EXPIRES_IN = 60 * 60
+
   BLOB_STORAGE_DELETED_UPLOAD_ID = "_deleted"
 
   def delete_blob_storage(destroyed: false)
