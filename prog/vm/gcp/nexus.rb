@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
+  frame_reader :unsupported_azs, :swap_size_bytes
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
 
   def before_destroy
@@ -47,6 +47,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       ],
     }
     cloud_config["runcmd"] = [dual_nic_netplan(mgmt_nic).script] if mgmt_nic
+
+    if swap_size_bytes
+      cloud_config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
     user_data = "#cloud-config\n" + cloud_config.to_yaml.delete_prefix("---\n")
 
     # An -lssd machine type bundles its local SSDs, so only the boot disk is
