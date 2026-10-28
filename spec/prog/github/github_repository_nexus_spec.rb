@@ -150,7 +150,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     def create_cache_entry(**args)
-      defaults = {key: "k#{Random.rand}", version: "v1", scope: "main", repository_id: repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now}
+      defaults = {key: "k#{Random.rand}", version: "v1", scope: "main", upload_id: "u#{Random.rand}", repository_id: repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now}
       GithubCacheEntry.create(defaults.merge!(args))
     end
 
