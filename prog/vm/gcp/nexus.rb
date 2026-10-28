@@ -5,7 +5,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   subject_is :vm
   frame_reader :unsupported_azs
-  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
+  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -221,12 +221,22 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       push vm.update_firewall_rules_prog, {}, "update_firewall_rules"
     end
 
-    addr = vm.ip4
-    hop_create_billing_record unless addr
+    unless ssh_port_open
+      addr = vm.ip4
+      hop_create_billing_record unless addr
 
+      begin
+        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
+    end
+
+    # An open port does not prove the key is installed.
     begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
+      vm.sshable.cmd("true", timeout: 5)
+    rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+      self.ssh_port_open = true
       nap 1
     end
 
