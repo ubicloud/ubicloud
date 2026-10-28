@@ -158,6 +158,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
+    when_reset_blob_storage_set? { hop_reset_blob_storage }
+
     if Time.now - github_repository.last_job_at > 6 * 60 * 60
       cleanup_cache(polling_interval: 15 * 60) if github_repository.access_key
       nap(15 * 60)
@@ -186,6 +188,23 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     nap polling_interval
   end
 
+  label def reset_blob_storage
+    register_deadline("wait", 60 * 60)
+
+    if github_repository.access_key
+      destroy_next_cache_entry_and_nap
+      begin
+        github_repository.destroy_blob_storage
+      rescue Aws::S3::Errors::BucketNotEmpty
+        nap 5
+      end
+      github_repository.setup_blob_storage
+    end
+
+    decr_reset_blob_storage
+    hop_wait
+  end
+
   label def destroy
     decr_destroy
 
@@ -195,19 +214,22 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       start_transaction { nap 2 * 60 }
     end
 
+    destroy_next_cache_entry_and_nap
+    github_repository.destroy_blob_storage if github_repository.access_key
+
+    start_transaction do
+      github_repository.destroy
+      pop "github repository destroyed"
+    end
+  end
+
+  def destroy_next_cache_entry_and_nap
     if (entry = github_repository.cache_entries_dataset.first)
       entry.delete_blob_storage
       start_transaction do
         entry.destroy
         nap 0
       end
-    end
-
-    github_repository.destroy_blob_storage if github_repository.access_key
-
-    start_transaction do
-      github_repository.destroy
-      pop "github repository destroyed"
     end
   end
 end

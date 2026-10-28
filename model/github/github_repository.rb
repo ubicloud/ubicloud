@@ -13,7 +13,7 @@ class GithubRepository < Sequel::Model
   plugin :association_dependencies, cache_entries: :destroy
 
   plugin ResourceMethods, encrypted_columns: :secret_key
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :reset_blob_storage
   dataset_module Pagination
 
   def self.cache_size_limit
