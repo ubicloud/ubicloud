@@ -659,6 +659,38 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
+    it "reallocates the NIC private IP and resubmits when the IP is in use by another resource" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
+      ensure_vm_gcp_resource(vm, "a")
+      old_ip = nic.private_ipv4.network.to_s
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "IP_IN_USE_BY_ANOTHER_RESOURCE", message: "IP '#{old_ip}' is already being used by another resource.")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        http_error_status_code: 409,
+        http_error_message: "CONFLICT",
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      logged = nil
+      expect(Clog).to receive(:emit).with("GCE VM private IP is in use by another resource, reallocating", instance_of(Hash)).and_wrap_original do |original, message, metadata|
+        logged = metadata.dup
+        original.call(message, metadata)
+      end
+
+      expect { nx.wait_create_op }.to hop("start")
+      new_ip = nic.reload.private_ipv4
+      expect(new_ip.network.to_s).not_to eq(old_ip)
+      expect(new_ip.netmask.prefix_len).to eq(32)
+      expect(nic.private_subnet.net4.contains(new_ip.network)).to be(true)
+      expect(logged).to eq({nic_ip_reallocated: {nic: nic.ubid, from: old_ip, to: new_ip.network.to_s, error: "CONFLICT (HTTP 409); IP '#{old_ip}' is already being used by another resource. (code: IP_IN_USE_BY_ANOTHER_RESOURCE)"}})
+      stack = st.stack.first
+      expect(stack["create_vm"]).to be_nil
+      # The zone is not at fault, so it is kept and not excluded.
+      expect(stack["gcp_zone_suffix"]).to eq("a")
+      expect(stack["exclude_zones"]).to be_nil
+    end
+
     %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.each do |code|
       it "retries in a different zone on #{code} operation error" do
         refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
