@@ -216,11 +216,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def wait_sshable
-    if retval&.dig("msg") == "firewall rule is added"
-      decr_update_firewall_rules
-    end
-
     when_update_firewall_rules_set? do
+      decr_update_firewall_rules
       push vm.update_firewall_rules_prog, {}, "update_firewall_rules"
     end
 

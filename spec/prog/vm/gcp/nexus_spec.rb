@@ -952,16 +952,16 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "pushes update_firewall_rules when semaphore is set" do
+    it "decrements the semaphore and pushes update_firewall_rules when it is set" do
       nx.incr_update_firewall_rules
       expect { nx.wait_sshable }.to hop("update_firewall_rules", "Vnet::Gcp::UpdateFirewallRules")
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
     end
 
-    it "decrements semaphore when firewall rules are added" do
-      nx.incr_update_firewall_rules
+    it "pushes update_firewall_rules again for a semaphore set while the rules were added" do
       st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
-      expect { nx.wait_sshable }.to hop("create_billing_record")
-        .and change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
+      nx.incr_update_firewall_rules
+      expect { nx.wait_sshable }.to hop("update_firewall_rules", "Vnet::Gcp::UpdateFirewallRules")
     end
 
     it "naps if not sshable" do
