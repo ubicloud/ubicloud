@@ -167,7 +167,12 @@ class Clover
 
       r.on "repository" do
         r.get api? do
-          paginated_result(installation.repositories_dataset.order(:name), Serializers::GithubRepository, installation:)
+          paginated_result(installation.repositories_dataset.with_runners.order(:name), Serializers::GithubRepository, installation:)
+        end
+
+        r.get web? do
+          @repositories = installation.repositories_dataset.with_runners.order(:name).all
+          view "github/repositories"
         end
 
         r.on GITHUB_REPOSITORY_NAME_OR_UBID do |repository_name, repository_id|

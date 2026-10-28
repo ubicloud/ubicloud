@@ -43,6 +43,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(repository.last_job_at).to eq(now - described_class::BACKDATE_LAST_JOB_AT)
       expect(repository.last_job_at).to be < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF
       expect(repository.default_branch).to be_nil
+      expect(GithubRepository.with_runners.all).to eq []
       expect(Strand[repository.id].label).to eq("wait")
     end
 
@@ -69,6 +70,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
       expect(described_class.assemble(installation, "ubicloud/ubicloud", "main").id).to eq(repository.id)
       expect(repository.reload.last_job_at).to eq(now + 60)
+      expect(GithubRepository.with_runners.all).to eq [repository]
       expect(strand.reload.schedule).to be_within(5).of(now)
       expect(Strand.where(prog: "Github::GithubRepositoryNexus").count).to eq(1)
 

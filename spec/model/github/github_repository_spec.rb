@@ -44,6 +44,16 @@ RSpec.describe GithubRepository do
     claims
   end
 
+  describe ".with_runners" do
+    it "excludes repositories that have not had runners" do
+      github_repository
+      no_runner_repository = described_class.create(name: "test-owner/no-runners", installation_id: github_repository.installation_id, last_job_at: described_class::NO_RUNNER_LAST_JOB_CUTOFF)
+      expect(described_class.with_runners.all).to eq [github_repository]
+      no_runner_repository.update(last_job_at: described_class::NO_RUNNER_LAST_JOB_CUTOFF + 1)
+      expect(described_class.with_runners.order(:name).all).to eq [no_runner_repository, github_repository]
+    end
+  end
+
   describe "#blob_storage_client" do
     it "builds the S3 client with bounded timeouts and retries" do
       expect(Aws::S3::Client).to receive(:new).with(hash_including(

@@ -509,6 +509,53 @@ RSpec.describe Clover, "github" do
     end
   end
 
+  describe "repositories" do
+    let(:repositories_path) { "#{project.path}/github/#{installation.ubid}/repository" }
+
+    def active_tab
+      page.all("nav[aria-label=Tabs] a.text-orange-600").map(&:text)
+    end
+
+    it "shows empty state if the installation has no repositories" do
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      click_link "Repositories"
+      expect(page).to have_current_path(repositories_path)
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq "Ubicloud - Repositories"
+      expect(active_tab).to eq ["Repositories"]
+      expect(page).to have_content "No Repositories"
+    end
+
+    it "lists repositories for the installation with links to their workflow runs and job metrics" do
+      other_repository = GithubRepository.create(name: "test-user/another-repo", installation_id: installation.id)
+      repository
+      other_installation = GithubInstallation.create(installation_id: 456, name: "other-user", type: "User", project_id: project.id)
+      GithubRepository.create(name: "other-user/other-repo", installation_id: other_installation.id)
+      GithubRepository.create(name: "test-user/no-runner-repo", installation_id: installation.id, last_job_at: GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF - 1)
+
+      visit repositories_path
+      expect(page.all("#repositories tbody tr").map { it[:id] }).to eq ["repository-#{other_repository.ubid}", "repository-#{repository.ubid}"]
+      expect(page.all("#repositories tbody td").map(&:text)).to eq [
+        "test-user/another-repo", "Workflow Runs", "Job Metrics",
+        "test-user/test-repo", "Workflow Runs", "Job Metrics",
+      ]
+
+      within("#repository-#{repository.ubid}") { click_link "Workflow Runs" }
+      expect(page).to have_current_path("#{repositories_path}/#{repository.ubid}/runs")
+      expect(page.title).to eq "Ubicloud - Workflow Runs"
+
+      click_link "Repositories"
+      within("#repository-#{repository.ubid}") { click_link "Job Metrics" }
+      expect(page).to have_current_path("#{repositories_path}/#{repository.ubid}/job-metrics")
+      expect(page.title).to eq "Ubicloud - Job Metrics"
+      expect(active_tab).to eq []
+
+      click_link "Caches"
+      expect(active_tab).to eq ["Caches"]
+    end
+  end
+
   describe "runs" do
     let(:runs_path) { "#{project.path}/github/#{installation.ubid}/repository/#{repository.ubid}/runs" }
 

@@ -23,6 +23,10 @@ class GithubRepository < Sequel::Model
   TEMPORARY_CREDENTIALS = "temp-creds"
   NO_RUNNER_LAST_JOB_CUTOFF = Time.utc(2000)
 
+  dataset_module do
+    where :with_runners, Sequel[:last_job_at] > NO_RUNNER_LAST_JOB_CUTOFF
+  end
+
   def self.cache_size_limit
     10_737_418_240 # 10GB
   end
