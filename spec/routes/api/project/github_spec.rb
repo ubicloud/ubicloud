@@ -28,6 +28,24 @@ RSpec.describe Clover, "github" do
     expect(JSON.parse(last_response.body)["name"]).to eq("test-repo")
   end
 
+  it "lists the committed cache entries of a repository" do
+    committed_entry = cache_entry
+    GithubCacheEntry.create(key: "k-uncommitted", version: "v1", scope: "main", repository_id: repository.id, created_by: GithubRunner.generate_uuid)
+    get "/project/#{project.ubid}/github/test-user/repository/test-repo/cache"
+
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)["items"]).to eq([{
+      "id" => committed_entry.ubid,
+      "installation_name" => "test-user",
+      "repository_name" => "test-user/test-repo",
+      "key" => committed_entry.key,
+      "scope" => "main",
+      "size" => 1,
+      "created_at" => committed_entry.created_at.utc.iso8601,
+      "last_accessed_at" => nil,
+    }])
+  end
+
   it "can get cache entry information" do
     get "/project/#{project.ubid}/github/test-user/repository/test-repo/cache/#{cache_entry.ubid}"
 
