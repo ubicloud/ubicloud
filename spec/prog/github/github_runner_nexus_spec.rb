@@ -578,6 +578,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
       expect(GithubRunner[runner.id]).to be_nil
+      expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
     end
   end
 
@@ -2052,6 +2053,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
         expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
         expect(runner).not_to exist
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(0)
         expect(completed_jobs.all.map(&:values)).to eq([{
           repository_id: workflow_run.repository_id,
           job_id: 789,
@@ -2128,6 +2130,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
         expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
         expect(completed_jobs.count).to eq(0)
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
       end
 
       it "logs and still destroys the runner if inserting the completed workflow job fails" do
@@ -2137,6 +2140,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
         expect(runner).not_to exist
         expect(completed_jobs.count).to eq(0)
+        expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
       end
     end
   end

@@ -167,6 +167,19 @@ class GithubRunner < Sequel::Model
   def conclusion
     super || (self.conclusion = workflow_job&.[]("conclusion"))
   end
+
+  # Allow disabling use of DeletedRecord when destroying GithubRunner.
+  # If we insert a GithubCompletedWorkflowJob, then there is no point
+  # creating a DeletedRecord.
+  def skip_deleted_record!
+    @skip_deleted_record = true
+  end
+
+  private
+
+  def create_deleted_record
+    super unless @skip_deleted_record
+  end
 end
 
 # Table: github_runner
