@@ -146,7 +146,7 @@ RSpec.describe Clover, "github" do
       it "gets branch from GitHub API if the runner doesn't have a branch info" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
+        expect(Github).to receive(:installation_client).with(installation.installation_id, auto_paginate: true).and_return(client)
         expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id"))
@@ -336,7 +336,7 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
+        expect(Github).to receive(:installation_client).with(installation.installation_id, auto_paginate: true).and_return(client)
         expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
         expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
