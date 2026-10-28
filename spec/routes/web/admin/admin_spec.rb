@@ -2012,6 +2012,20 @@ RSpec.describe CloverAdmin do
     expect(runner.reload.semaphores.map(&:name).sort).to eq ["destroy", "skip_deregistration"]
   end
 
+  it "supports moving GithubInstallation to US" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repository = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+    Strand.create(prog: "Github::GithubRepositoryNexus", label: "wait") { it.id = repository.id }
+
+    visit "/model/GithubInstallation/#{ins.ubid}"
+    click_link "Move to US"
+    click_button "Move to US"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
+    expect(page).to have_flash_notice "Moved GitHub installation to US and scheduled cache resets for its repositories"
+    expect(ins.reload.allocator_preferences).to eq({"family_filter" => ["premium", "standard"], "location_filter" => [Location::LEASEWEB_WDC02_ID]})
+    expect(repository.reload.semaphores.map(&:name)).to eq ["reset_blob_storage"]
+  end
+
   it "links to GitHub page for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)

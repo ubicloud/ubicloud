@@ -577,6 +577,16 @@ class CloverAdmin < Roda
           end
         end
       end
+
+      action "move_to_us", "Move to US" do
+        flash "Moved GitHub installation to US and scheduled cache resets for its repositories"
+        run do |obj|
+          DB.transaction do
+            obj.update(allocator_preferences: obj.allocator_preferences.merge("location_filter" => [Location::LEASEWEB_WDC02_ID]))
+            GithubRepository.incr_reset_blob_storage(obj.repositories_dataset.select(:id))
+          end
+        end
+      end
     end
 
     model GithubRepository do
