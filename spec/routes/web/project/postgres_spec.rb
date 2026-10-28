@@ -1193,7 +1193,7 @@ RSpec.describe Clover, "postgres" do
           project_id: project.id,
           location_id: gcp_location.id,
           name: "pg-gcp",
-          target_vm_size: "c4a-standard-4",
+          target_vm_size: "c4a-standard-lssd-4",
           target_storage_size_gib: 375,
           target_version: "16",
         ).subject.tap {

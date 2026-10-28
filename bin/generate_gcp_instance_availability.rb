@@ -23,7 +23,7 @@ class GcpInstanceAvailabilityGenerator
   end
 
   # GCE machine type name => [our family, vcpu count], e.g.
-  # "z3-highmem-44-standardlssd" => ["z3-standard", 44]
+  # "z3-highmem-44-standardlssd" => ["z3-highmem-standardlssd", 44]
   def machine_type_index
     @machine_type_index ||= Option::GCP_FAMILY_VM_CONFIG.each_with_object({}) do |(family, config), index|
       config[:shapes].each_key do |vcpu|

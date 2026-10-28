@@ -68,11 +68,11 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "derives the arch from the vm size for arm64-only GCP sizes" do
-      described_class.assemble(ds, vm_size: "c4a-standard-4", location_id: gcp_location.id)
+      described_class.assemble(ds, vm_size: "c4a-standard-lssd-4", location_id: gcp_location.id)
 
       vm = Vm.first
       expect(vm.arch).to eq "arm64"
-      expect(vm.family).to eq "c4a-standard"
+      expect(vm.family).to eq "c4a-standard-lssd"
       expect(vm.vcpus).to eq 4
     end
 
@@ -98,7 +98,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "creates a dedicated dns subnet with control-plane-only SSH when restrict_ssh_to_control_plane is set" do
-      described_class.assemble(ds, vm_size: "c4a-standard-4", location_id: gcp_location.id, restrict_ssh_to_control_plane: true)
+      described_class.assemble(ds, vm_size: "c4a-standard-lssd-4", location_id: gcp_location.id, restrict_ssh_to_control_plane: true)
 
       subnet = Vm.first.user_nic.private_subnet
       expect(subnet.name).to eq "dns-gcp-us-central1"
@@ -112,7 +112,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "reuses an existing dns subnet without touching its firewall rules" do
       subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dns-gcp-us-central1", location_id: gcp_location.id).subject
 
-      described_class.assemble(ds, vm_size: "c4a-standard-4", location_id: gcp_location.id, restrict_ssh_to_control_plane: true)
+      described_class.assemble(ds, vm_size: "c4a-standard-lssd-4", location_id: gcp_location.id, restrict_ssh_to_control_plane: true)
 
       expect(Vm.first.user_nic.private_subnet_id).to eq subnet.id
       rules = subnet.firewalls.flat_map(&:firewall_rules)

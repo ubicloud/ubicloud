@@ -142,7 +142,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       user_project.set_ff_postgres_gcp_dual_nic(true)
       assemble = lambda do
         gcp_resource = create_postgres_resource(project: user_project, location_id: gcp_location.id)
-        gcp_resource.update(target_vm_size: "c4a-standard-4")
+        gcp_resource.update(target_vm_size: "c4a-standard-lssd-4")
         Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
         described_class.assemble(resource_id: gcp_resource.id, timeline_id: create_postgres_timeline(location_id: gcp_location.id).id, timeline_access: "push", is_representative: true).subject.vm
       end
@@ -162,7 +162,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       gcp_location = Location[name: "gcp-us-central1"]
       user_project.set_ff_postgres_gcp_dual_nic(true)
       gcp_resource = create_postgres_resource(project: user_project, location_id: gcp_location.id)
-      gcp_resource.update(target_vm_size: "c4a-standard-4")
+      gcp_resource.update(target_vm_size: "c4a-standard-lssd-4")
       Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
 
       st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: create_postgres_timeline(location_id: gcp_location.id).id, timeline_access: "push", is_representative: true)

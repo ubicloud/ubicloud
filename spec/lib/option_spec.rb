@@ -27,27 +27,27 @@ RSpec.describe Option do
 
   describe ".gcp_instance_type_name" do
     it "appends -lssd for machine types with local SSDs" do
-      expect(described_class.gcp_instance_type_name("c4a-standard", 8, lssd: true)).to eq("c4a-standard-8-lssd")
+      expect(described_class.gcp_instance_type_name("c4a-standard-lssd", 8, lssd: true)).to eq("c4a-standard-8-lssd")
     end
 
     it "defaults to the -lssd variant" do
-      expect(described_class.gcp_instance_type_name("c4a-standard", 8)).to eq("c4a-standard-8-lssd")
+      expect(described_class.gcp_instance_type_name("c4a-standard-lssd", 8)).to eq("c4a-standard-8-lssd")
     end
 
     it "returns the plain machine type without local SSDs" do
-      expect(described_class.gcp_instance_type_name("c4a-standard", 4, lssd: false)).to eq("c4a-standard-4")
+      expect(described_class.gcp_instance_type_name("c4a-standard-lssd", 4, lssd: false)).to eq("c4a-standard-4")
     end
   end
 
   describe "GCP Postgres options" do
     it "defines all GCP family options" do
       expect(Option::GCP_FAMILY_OPTIONS).to eq([
-        "c4a-standard", "c4a-highmem",
-        "c4-standard", "c4-highmem",
-        "c4d-standard", "c4d-highmem",
-        "c3-standard",
-        "c3d-standard", "c3d-highmem",
-        "z3-standardlssd", "z3-highlssd",
+        "c4a-standard-lssd", "c4a-highmem-lssd",
+        "c4-standard-lssd", "c4-highmem-lssd",
+        "c4d-standard-lssd", "c4d-highmem-lssd",
+        "c3-standard-lssd",
+        "c3d-standard-lssd", "c3d-highmem-lssd",
+        "z3-highmem-standardlssd", "z3-highmem-highlssd",
         "n2d-standard", "n2d-highmem",
       ])
     end
@@ -84,7 +84,7 @@ RSpec.describe Option do
     it "counts the local SSDs the VM nexus attaches from the data volume size" do
       expect(described_class.gcp_local_ssd_count("n2d-highmem", 6000)).to eq(16)
       expect(described_class.gcp_local_ssd_count("n2d-highmem", 0)).to eq(0)
-      expect(described_class.gcp_local_ssd_count("c4a-standard", 750)).to eq(0)
+      expect(described_class.gcp_local_ssd_count("c4a-standard-lssd", 750)).to eq(0)
     end
 
     it "has matching size options for each GCP family and vcpu" do
@@ -108,38 +108,38 @@ RSpec.describe Option do
         expect(size.memory_gib).to be_an(Integer), "#{size.name} memory_gib is #{size.memory_gib.inspect}"
       end
 
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-4"].memory_gib).to eq(15)
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-8"].memory_gib).to eq(30)
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4-highmem-4"].memory_gib).to eq(31)
-      expect(Option::VmSizes.find { it.name == "c4-highmem-8" }.memory_gib).to eq(62)
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-standard-8"].memory_gib).to eq(31)
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-highmem-8"].memory_gib).to eq(63)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-lssd-4"].memory_gib).to eq(15)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-standard-lssd-8"].memory_gib).to eq(30)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4-highmem-lssd-4"].memory_gib).to eq(31)
+      expect(Option::VmSizes.find { it.name == "c4-highmem-lssd-8" }.memory_gib).to eq(62)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-standard-lssd-8"].memory_gib).to eq(31)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4d-highmem-lssd-8"].memory_gib).to eq(63)
     end
 
     it "uses the family's memory_gib_overrides for shapes that do not follow the ratio" do
-      expect(described_class.gcp_memory_gib("z3-standardlssd", 176)).to eq(1406)
-      expect(described_class.gcp_memory_gib("z3-standardlssd", 88)).to eq(704)
-      expect(described_class.gcp_memory_gib("c4-standard", 4)).to eq(15)
-      expect(Option::POSTGRES_SIZE_OPTIONS["z3-standardlssd-176"].memory_gib).to eq(1406)
-      expect(Option::VmSizes.find { it.name == "z3-standardlssd-176" }.memory_gib).to eq(1406)
+      expect(described_class.gcp_memory_gib("z3-highmem-standardlssd", 176)).to eq(1406)
+      expect(described_class.gcp_memory_gib("z3-highmem-standardlssd", 88)).to eq(704)
+      expect(described_class.gcp_memory_gib("c4-standard-lssd", 4)).to eq(15)
+      expect(Option::POSTGRES_SIZE_OPTIONS["z3-highmem-standardlssd-176"].memory_gib).to eq(1406)
+      expect(Option::VmSizes.find { it.name == "z3-highmem-standardlssd-176" }.memory_gib).to eq(1406)
     end
 
     it "builds the GCE machine type from the family's prefix, vcpu count and suffix" do
-      expect(described_class.gcp_instance_type_name("c4a-standard", 16)).to eq("c4a-standard-16-lssd")
-      expect(described_class.gcp_instance_type_name("c4d-highmem", 96)).to eq("c4d-highmem-96-lssd")
-      expect(described_class.gcp_instance_type_name("c3-standard", 88)).to eq("c3-standard-88-lssd")
-      expect(described_class.gcp_instance_type_name("c3d-highmem", 360)).to eq("c3d-highmem-360-lssd")
-      expect(described_class.gcp_instance_type_name("z3-standardlssd", 44)).to eq("z3-highmem-44-standardlssd")
-      expect(described_class.gcp_instance_type_name("z3-highlssd", 32)).to eq("z3-highmem-32-highlssd")
+      expect(described_class.gcp_instance_type_name("c4a-standard-lssd", 16)).to eq("c4a-standard-16-lssd")
+      expect(described_class.gcp_instance_type_name("c4d-highmem-lssd", 96)).to eq("c4d-highmem-96-lssd")
+      expect(described_class.gcp_instance_type_name("c3-standard-lssd", 88)).to eq("c3-standard-88-lssd")
+      expect(described_class.gcp_instance_type_name("c3d-highmem-lssd", 360)).to eq("c3d-highmem-360-lssd")
+      expect(described_class.gcp_instance_type_name("z3-highmem-standardlssd", 44)).to eq("z3-highmem-44-standardlssd")
+      expect(described_class.gcp_instance_type_name("z3-highmem-highlssd", 32)).to eq("z3-highmem-32-highlssd")
       expect(described_class.gcp_instance_type_name("n2d-highmem", 8)).to eq("n2d-highmem-8")
       expect(described_class.gcp_instance_type_name("n2d-standard", 224, lssd: false)).to eq("n2d-standard-224")
     end
 
     it "terminates rather than live migrates above the local SSD migration limit" do
-      expect(described_class.gcp_on_host_maintenance("z3-highlssd", 44)).to eq("MIGRATE")
-      expect(described_class.gcp_on_host_maintenance("z3-highlssd", 88)).to eq("TERMINATE")
-      expect(described_class.gcp_on_host_maintenance("z3-standardlssd", 176)).to eq("TERMINATE")
-      expect(described_class.gcp_on_host_maintenance("c4-standard", 288)).to eq("MIGRATE")
+      expect(described_class.gcp_on_host_maintenance("z3-highmem-highlssd", 44)).to eq("MIGRATE")
+      expect(described_class.gcp_on_host_maintenance("z3-highmem-highlssd", 88)).to eq("TERMINATE")
+      expect(described_class.gcp_on_host_maintenance("z3-highmem-standardlssd", 176)).to eq("TERMINATE")
+      expect(described_class.gcp_on_host_maintenance("c4-standard-lssd", 288)).to eq("MIGRATE")
       expect(described_class.gcp_on_host_maintenance("n2d-highmem", 96)).to eq("MIGRATE")
     end
 
@@ -149,17 +149,17 @@ RSpec.describe Option do
 
     it "pins the storage size in GiB for every GCP family and vcpu" do
       expect(Option::GCP_STORAGE_SIZE_OPTIONS).to eq({
-        "c4a-standard" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
-        "c4a-highmem" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
-        "c4-standard" => {4 => [375], 8 => [375], 16 => [750], 24 => [1500], 32 => [1875], 48 => [3000], 96 => [6000], 144 => [9000], 192 => [12000], 288 => [18000]},
-        "c4-highmem" => {4 => [375], 8 => [375], 16 => [750], 24 => [1500], 32 => [1875], 48 => [3000], 96 => [6000], 144 => [9000], 192 => [12000], 288 => [18000]},
-        "c4d-standard" => {8 => [375], 16 => [375], 32 => [750], 48 => [1500], 64 => [2250], 96 => [3000], 192 => [6000], 384 => [12000]},
-        "c4d-highmem" => {8 => [375], 16 => [375], 32 => [750], 48 => [1500], 64 => [2250], 96 => [3000], 192 => [6000], 384 => [12000]},
-        "c3-standard" => {4 => [375], 8 => [750], 22 => [1500], 44 => [3000], 88 => [6000], 176 => [12000]},
-        "c3d-standard" => {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]},
-        "c3d-highmem" => {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]},
-        "z3-standardlssd" => {14 => [3000], 22 => [6000], 44 => [9000], 88 => [18000], 176 => [36000]},
-        "z3-highlssd" => {8 => [3000], 16 => [6000], 22 => [9000], 32 => [12000], 44 => [18000], 88 => [36000]},
+        "c4a-standard-lssd" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
+        "c4a-highmem-lssd" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
+        "c4-standard-lssd" => {4 => [375], 8 => [375], 16 => [750], 24 => [1500], 32 => [1875], 48 => [3000], 96 => [6000], 144 => [9000], 192 => [12000], 288 => [18000]},
+        "c4-highmem-lssd" => {4 => [375], 8 => [375], 16 => [750], 24 => [1500], 32 => [1875], 48 => [3000], 96 => [6000], 144 => [9000], 192 => [12000], 288 => [18000]},
+        "c4d-standard-lssd" => {8 => [375], 16 => [375], 32 => [750], 48 => [1500], 64 => [2250], 96 => [3000], 192 => [6000], 384 => [12000]},
+        "c4d-highmem-lssd" => {8 => [375], 16 => [375], 32 => [750], 48 => [1500], 64 => [2250], 96 => [3000], 192 => [6000], 384 => [12000]},
+        "c3-standard-lssd" => {4 => [375], 8 => [750], 22 => [1500], 44 => [3000], 88 => [6000], 176 => [12000]},
+        "c3d-standard-lssd" => {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]},
+        "c3d-highmem-lssd" => {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]},
+        "z3-highmem-standardlssd" => {14 => [3000], 22 => [6000], 44 => [9000], 88 => [18000], 176 => [36000]},
+        "z3-highmem-highlssd" => {8 => [3000], 16 => [6000], 22 => [9000], 32 => [12000], 44 => [18000], 88 => [36000]},
         "n2d-standard" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000], 128 => [9000], 224 => [9000]},
         "n2d-highmem" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000]},
       })
@@ -167,9 +167,9 @@ RSpec.describe Option do
 
     it "uses correct memory coefficients for GCP families" do
       # standard: 4 GiB/vCPU
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4a-standard-8"].memory_gib).to eq(32)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4a-standard-lssd-8"].memory_gib).to eq(32)
       # highmem: 8 GiB/vCPU
-      expect(Option::POSTGRES_SIZE_OPTIONS["c4a-highmem-8"].memory_gib).to eq(64)
+      expect(Option::POSTGRES_SIZE_OPTIONS["c4a-highmem-lssd-8"].memory_gib).to eq(64)
     end
   end
 

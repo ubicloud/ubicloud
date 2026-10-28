@@ -105,7 +105,7 @@ RSpec.describe Prog::Test::GcpVpcPeering do
       expect(location).to have_attributes(name: "gcp-us-central1", provider: "gcp", project_id: vp_test.postgres_test_project_id, byoc: false, display_name: customer_name, ui_name: customer_name)
       expect(Strand[location.id]).to have_attributes(prog: "LocationNexus", label: "wait")
       expect(location.location_credential_gcp).to have_attributes(project_id: "e2e-project", service_account_email: "e2e@e2e-project.iam.gserviceaccount.com")
-      expect(vp_test.postgres_resource).to have_attributes(location_id: location.id, name: "postgres-test-vpc-peering", target_vm_size: "c4a-standard-4", target_storage_size_gib: 375)
+      expect(vp_test.postgres_resource).to have_attributes(location_id: location.id, name: "postgres-test-vpc-peering", target_vm_size: "c4a-standard-lssd-4", target_storage_size_gib: 375)
       expect(vp_test.private_subnet_id).to eq vp_test.postgres_resource.private_subnet_id
     end
 

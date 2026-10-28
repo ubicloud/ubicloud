@@ -39,7 +39,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
       location_id: location.id, unix_user: "test-user",
       boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-      name: "testvm", size: "c4a-standard-8", arch: "arm64").subject
+      name: "testvm", size: "c4a-standard-lssd-8", arch: "arm64").subject
     DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
     v
   }
