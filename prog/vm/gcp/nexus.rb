@@ -157,6 +157,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}")
         hop_start
       end
+      if error_code == "IP_IN_USE_BY_ANOTHER_RESOURCE"
+        clear_gcp_op("create_vm")
+        reallocate_private_ipv4(op_error_message(op))
+        hop_start
+      end
       if error_code == "EXTERNAL_RESOURCE_NOT_FOUND" && op_error_message(op).include?(vm_service_account_email)
         # LRO variant of the SA-propagation race handled at insert above.
         clear_gcp_op("create_vm")
@@ -431,6 +436,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     )
 
     email
+  end
+
+  def reallocate_private_ipv4(error_message)
+    from = user_nic.private_ipv4.network.to_s
+    new_ip = user_nic.private_subnet.random_private_ipv4
+    Clog.emit("GCE VM private IP is in use by another resource, reallocating",
+      {nic_ip_reallocated: {nic: user_nic.ubid, from:, to: new_ip.network.to_s, error: error_message}})
+    user_nic.update(private_ipv4: new_ip)
   end
 
   def retry_zone_capacity(error_message)
