@@ -38,7 +38,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     gcp_vpc
     v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
       location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-      name: "testvm", size: "c4a-standard-8", arch: "arm64").subject
+      name: "testvm", size: "c4a-standard-lssd-8", arch: "arm64").subject
     DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
     v
   }
@@ -91,7 +91,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
         location_id: location.id, unix_user: "test-user",
         boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-        name: "testvm-zero", size: "c4a-standard-8", arch: "arm64",
+        name: "testvm-zero", size: "c4a-standard-lssd-8", arch: "arm64",
         storage_volumes: [{size_gib: 375}, {size_gib: 0}]).subject
       expect(v.vm_storage_volumes.count).to eq(1)
       expect(v.vm_storage_volumes.first.boot).to be true
@@ -112,7 +112,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         Prog::Vm::Nexus.assemble_with_sshable(project.id,
           location_id: location.id, unix_user: "test-user",
           boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-          name: "testvm-overcap", size: "c4a-standard-8", arch: "arm64",
+          name: "testvm-overcap", size: "c4a-standard-lssd-8", arch: "arm64",
           private_subnet_id: subnet.id).subject
       }.to raise_error(Validation::ValidationFailed) { |e|
         expect(e.details[:firewall]).to include("more than 9 firewalls")
@@ -1214,13 +1214,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "helper methods" do
     it "picks an -lssd machine type when the VM has non-boot volumes" do
-      nx.vm.update(family: "c4a-standard", vcpus: 8)
+      nx.vm.update(family: "c4a-standard-lssd", vcpus: 8)
       VmStorageVolume.create(vm_id: vm.id, size_gib: 375, boot: false, use_bdev_ubi: false, disk_index: 1)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8-lssd")
     end
 
     it "picks a plain machine type when the VM only has a boot volume" do
-      nx.vm.update(family: "c4a-standard", vcpus: 8)
+      nx.vm.update(family: "c4a-standard-lssd", vcpus: 8)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8")
     end
 
