@@ -696,6 +696,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
+      it "allocates if standard utilization is low in the installation's locations" do
+        installation.update(allocator_preferences: {"location_filter" => [Location::LEASEWEB_WDC02_ID]})
+        create_vm_host(location_id: Location::LEASEWEB_WDC02_ID, arch: "x64", family: "standard", total_cores: 16, used_cores: 8)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+      end
+
       it "waits if hugepage utilization is high although core utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64", family: "standard").update(used_cores: 8, used_hugepages_1g: 350)
