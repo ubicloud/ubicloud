@@ -468,6 +468,17 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: true).count).to eq(1)
       expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: true).count).to eq(1)
     end
+
+    it "keeps the DNS records of other servers when the VM has no address" do
+      dns_zone
+      parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "A", ttl: 10, data: nx.vm.ip4_string)
+      parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "AAAA", ttl: 10, data: nx.vm.ip6_string)
+      unaddressed = described_class.new(described_class.assemble(parseable_resource))
+
+      expect { unaddressed.destroy }.to hop("stop_parseable")
+
+      expect(dns_zone.records_dataset.where(tombstoned: true).count).to eq(0)
+    end
   end
 
   describe "#stop_parseable" do

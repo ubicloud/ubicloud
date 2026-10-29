@@ -243,8 +243,10 @@ TIMER
     register_deadline(nil, 10 * 60)
     decr_destroy
 
-    resource.dns_zone&.delete_record(record_name: resource.hostname, type: "A", data: vm.ip4_string)
-    resource.dns_zone&.delete_record(record_name: resource.hostname, type: "AAAA", data: vm.ip6_string)
+    # delete_record with nil data deletes the records of every server.
+    [["A", vm.ip4_string], ["AAAA", vm.ip6_string]].each do |type, data|
+      resource.dns_zone&.delete_record(record_name: resource.hostname, type:, data:) if data
+    end
 
     Semaphore.incr(strand.children_dataset.select(:id), "destroy")
     hop_stop_parseable
