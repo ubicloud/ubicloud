@@ -35,7 +35,45 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(repository.last_job_at).to eq(now)
       expect(repository.default_branch).to eq("main")
       described_class.assemble(installation, "ubicloud/ubicloud", nil)
+      expect(repository.reload.default_branch).to eq("main")
+    end
+
+    it "backdates last_job_at for a new repository if update_last_job_at is false" do
+      repository = described_class.assemble(installation, "ubicloud/ubicloud", nil, update_last_job_at: false).subject
+      expect(repository.last_job_at).to eq(now - described_class::BACKDATE_LAST_JOB_AT)
+      expect(repository.last_job_at).to be < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF
+      expect(repository.default_branch).to be_nil
+      expect(Strand[repository.id].label).to eq("wait")
+    end
+
+    it "does not update last_job_at of an existing repository if update_last_job_at is false" do
+      repository = GithubRepository.create(installation_id: installation.id, name: "ubicloud/ubicloud", last_job_at: now - 60)
+      described_class.assemble(installation, "ubicloud/ubicloud", "main", update_last_job_at: false)
+      expect(GithubRepository.count).to eq(1)
+      expect(repository.reload.last_job_at).to eq(now - 60)
       expect(repository.default_branch).to eq("main")
+    end
+
+    it "does not reschedule the strand of an existing repository with runners" do
+      repository = GithubRepository.create(installation_id: installation.id, name: "ubicloud/ubicloud", last_job_at: now - 60)
+      strand = Strand.create_with_id(repository, prog: "Github::GithubRepositoryNexus", label: "wait", schedule: now + 5 * 60)
+      described_class.assemble(installation, "ubicloud/ubicloud", "main")
+      expect(repository.reload.last_job_at).to eq(now)
+      expect(strand.reload.schedule).to eq(now + 5 * 60)
+    end
+
+    it "sets last_job_at and wakes the strand of a repository that has not had runners" do
+      repository = described_class.assemble(installation, "ubicloud/ubicloud", "main", update_last_job_at: false).subject
+      strand = Strand[repository.id]
+      strand.update(schedule: now + 60 * 60 * 24 * 365 * 1000)
+
+      expect(described_class.assemble(installation, "ubicloud/ubicloud", "main").id).to eq(repository.id)
+      expect(repository.reload.last_job_at).to eq(now + 60)
+      expect(strand.reload.schedule).to be_within(5).of(now)
+      expect(Strand.where(prog: "Github::GithubRepositoryNexus").count).to eq(1)
+
+      described_class.assemble(installation, "ubicloud/ubicloud", "main")
+      expect(repository.reload.last_job_at).to eq(now)
     end
   end
 
@@ -293,6 +331,12 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#wait" do
+    it "hibernates if the repository has not had runners" do
+      repository.update(last_job_at: now - described_class::BACKDATE_LAST_JOB_AT)
+      expect(nx).not_to receive(:check_queued_jobs)
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365 * 1000)
+    end
+
     it "runs through the strand, using a transaction only around the start_transaction block" do
       repository.update(access_key: "key")
       expect(Config).to receive(:enable_github_workflow_poller).and_return(false)

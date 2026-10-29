@@ -18,6 +18,7 @@ class GithubRepository < Sequel::Model
   dataset_module Pagination
 
   TEMPORARY_CREDENTIALS = "temp-creds"
+  NO_RUNNER_LAST_JOB_CUTOFF = Time.utc(2000)
 
   def self.cache_size_limit
     10_737_418_240 # 10GB
