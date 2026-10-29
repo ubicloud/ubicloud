@@ -60,7 +60,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   def create_runner_for(vm)
     installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-    GithubRunner.create(label: "ubicloud-premium-8", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+    runner = GithubRunner.create(label: "ubicloud-premium-8", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+    runner
   end
 
   def ensure_vm_gcp_resource(vm, suffix)
@@ -359,6 +361,58 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to nap(5 * 60)
       stack = st.stack.first
       expect(stack["exclude_zones"]).to eq([])
+    end
+
+    describe "for a GitHub runner VM" do
+      let(:runner) { create_runner_for(vm) }
+
+      before do
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+        ensure_vm_gcp_resource(vm, "c")
+        runner
+      end
+
+      it "moves to the next alternative family with a fresh zone sweep when all zones are exhausted" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => ["c4a-highmem"]})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: "c4a-standard", next_family: "c4a-highmem", error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(vm.reload.family).to eq("c4a-highmem")
+        expect(st.stack.first["exclude_zones"]).to eq([])
+      end
+
+      it "provisions a spare runner and destroys this one when no family is left" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => ["c4a-standard"]})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+          .and change { GithubRunner.where(installation_id: runner.installation_id).count }.from(1).to(2)
+        expect(runner.reload.destroy_set?).to be true
+        expect(runner.spare_runner_provisioned_set?).to be true
+        spare = GithubRunner.where(installation_id: runner.installation_id).exclude(id: runner.id).first
+        expect(spare.spill_over_set?).to be true
+        expect(vm.reload.family).to eq("c4a-standard")
+      end
+
+      it "still destroys this runner when its spare was already provisioned" do
+        runner.incr_spare_runner_provisioned
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => []})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+          .and not_change { GithubRunner.where(installation_id: runner.installation_id).count }
+        expect(runner.reload.destroy_set?).to be true
+      end
+
+      it "replaces the runner when the frame has no alternative families" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => nil})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+        expect(runner.reload.destroy_set?).to be true
+      end
     end
 
     it "excludes failed zones on successive retries" do
@@ -796,6 +850,21 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
+    it "skips the remaining zones of a GitHub runner VM on QUOTA_EXCEEDED" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a", "alternative_families" => ["c4a-highmem"]})
+      ensure_vm_gcp_resource(vm, "a")
+      create_runner_for(vm)
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "Quota 'C4A_CPUS' exceeded.")
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE, error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]))
+      expect(zone_ops_client).to receive(:get).and_return(op)
+
+      expect { nx.wait_create_op }.to hop("start")
+      expect(vm.reload.family).to eq("c4a-highmem")
+      expect(st.stack.first["exclude_zones"]).to eq([])
+      expect(st.stack.first["retry_zone_delay"]).to eq(5)
+    end
+
     it "reallocates the NIC private IP and resubmits when the IP is in use by another resource" do
       refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
       ensure_vm_gcp_resource(vm, "a")
@@ -1034,6 +1103,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(page.resource_id).to eq(vm.id)
     end
 
+    it "replaces a GitHub runner without paging when its instance enters TERMINATED state" do
+      runner = create_runner_for(vm)
+      instance = Google::Cloud::Compute::V1::Instance.new(status: "TERMINATED", network_interfaces: [])
+      expect(compute_client).to receive(:get).and_return(instance)
+      expect(Clog).to receive(:emit).with("GCE runner VM entered terminal state during provisioning", {gcp_runner_terminal: {vm: vm.ubid, status: "TERMINATED"}}).and_call_original
+
+      expect { nx.wait_instance_created }.to hop("wait_runner_destroy")
+      expect(runner.reload.destroy_set?).to be true
+      expect(Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "TERMINATED")).to be_nil
+    end
+
     it "pages and naps if the instance enters SUSPENDED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "SUSPENDED",
@@ -1157,6 +1237,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.incr_update_firewall_rules
       expect { nx.update_firewall_rules }.to hop(:update_firewall_rules, "Vnet::Gcp::UpdateFirewallRules") { it.strand_update_args[:stack].first["link"] == [st.prog, "wait"] }
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").all).to be_empty
+    end
+  end
+
+  describe "#wait_runner_destroy" do
+    it "naps until the runner destroys the VM" do
+      expect { nx.wait_runner_destroy }.to nap(60 * 60)
     end
   end
 

@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs, :swap_size_bytes
+  frame_reader :unsupported_azs, :swap_size_bytes, :alternative_families
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
 
   def before_destroy
@@ -163,7 +163,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.include?(error_code)
         clear_gcp_op("create_vm")
         # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
-        self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}")
+        # CPU quota is regional and per machine series, so another zone cannot help a runner.
+        self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}", zones_exhausted: error_code == "QUOTA_EXCEEDED" && runner)
         hop_start
       end
       if error_code == "IP_IN_USE_BY_ANOTHER_RESOURCE"
@@ -196,6 +197,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       # delete`.
       Clog.emit("GCP instance created", {gcp_instance_created: "#{vm.name}@#{gcp_zone}"})
     when "TERMINATED", "SUSPENDED"
+      if runner
+        Clog.emit("GCE runner VM entered terminal state during provisioning", {gcp_runner_terminal: {vm: vm.ubid, status: instance.status}})
+        replace_runner
+      end
       Prog::PageNexus.assemble(
         "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",
         ["GceProvisionTerminal", vm.ubid, instance.status],
@@ -284,6 +289,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   label def update_firewall_rules
     decr_update_firewall_rules
     hop_push :wait, vm.update_firewall_rules_prog, label: :update_firewall_rules
+  end
+
+  label def wait_runner_destroy
+    nap 60 * 60
   end
 
   label def prevent_destroy
@@ -471,14 +480,21 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap bump_excluded_zone(error_message)
   end
 
-  def bump_excluded_zone(error_message)
+  def bump_excluded_zone(error_message, zones_exhausted: false)
     excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
-    available = gcp_az_suffixes - excluded
+    available = zones_exhausted ? [] : gcp_az_suffixes - excluded
+    delay = 5
 
     if available.empty?
-      Clog.emit("GCE zone retry exhausted, resetting exclusions",
-        {zone_retry: {failed_zone: gcp_zone, excluded:,
-                      error: error_message}})
+      if runner
+        switch_runner_family(error_message)
+      else
+        Clog.emit("GCE zone retry exhausted, resetting exclusions",
+          {zone_retry: {failed_zone: gcp_zone, excluded:,
+                        error: error_message}})
+        # Wait for capacity to free up.
+        delay = 5 * 60
+      end
       excluded = []
       available = gcp_az_suffixes
     else
@@ -493,9 +509,23 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     self.gcp_zone_suffix = new_suffix
     self.exclude_zones = excluded
     vm.reload.vm_gcp_resource.update(location_az_id: location_az_for(new_suffix).id)
-    # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
-    # 5 seconds: still have untried zones. Move on to the next one quickly.
-    (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
+    delay
+  end
+
+  def switch_runner_family(error_message)
+    families = alternative_families || []
+    next_family = families[(families.index(vm.family) || -1) + 1]
+    Clog.emit("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: vm.family, next_family:, error: error_message}})
+    replace_runner unless next_family
+    vm.update(family: next_family)
+  end
+
+  def replace_runner
+    # GCP just failed this runner, so its replacement goes straight to AWS.
+    runner.provision_spare_runner&.incr_spill_over
+    runner.incr_destroy
+    register_deadline(nil, 15 * 60)
+    hop_wait_runner_destroy
   end
 
   def gcp_az_suffixes
