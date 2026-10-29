@@ -46,10 +46,17 @@ class PostgresResource < Sequel::Model
 
     def gcp_use_separate_management_nic?
       return true if any_server_has_management_nic?
-      return false unless Config.gcp_postgres_dual_nic || project.get_ff_postgres_gcp_dual_nic || use_dual_nic_set?
+      return false unless _gcp_dual_nic_enabled?
 
       mgmt_subnet = PrivateSubnet.gcp_management_subnet(location)
       !mgmt_subnet.nil? && mgmt_subnet.strand.label == "wait"
+    end
+
+    def gcp_ensure_management_subnet
+      return unless _gcp_dual_nic_enabled?
+      return if PrivateSubnet.gcp_management_subnet(location)
+
+      Prog::Vnet::Gcp::SubnetNexus.assemble_management(location.id)
     end
 
     def gcp_mgmt_ssh_via_user_security_group?
@@ -58,6 +65,10 @@ class PostgresResource < Sequel::Model
 
     def gcp_management_nic_use_eip?
       !project.get_ff_postgres_gcp_ssh_ipv6
+    end
+
+    def _gcp_dual_nic_enabled?
+      Config.gcp_postgres_dual_nic || project.get_ff_postgres_gcp_dual_nic || use_dual_nic_set?
     end
 
     def gcp_new_server_exclusion_filters
