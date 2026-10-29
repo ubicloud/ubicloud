@@ -52,6 +52,13 @@ class PostgresResource < Sequel::Model
       !mgmt_subnet.nil? && mgmt_subnet.strand.label == "wait"
     end
 
+    def gcp_ensure_management_subnet
+      return unless Config.gcp_postgres_dual_nic || project.get_ff_postgres_gcp_dual_nic
+      return if PrivateSubnet.gcp_management_subnet(location)
+
+      Prog::Vnet::Gcp::SubnetNexus.assemble_management(location.id)
+    end
+
     def gcp_mgmt_ssh_via_user_security_group?
       !use_separate_management_nic? || servers.any? { it.vm.management_nic.nil? }
     end

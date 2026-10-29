@@ -31,6 +31,9 @@ class PostgresResource < Sequel::Model
       false
     end
 
+    def metal_ensure_management_subnet
+    end
+
     def metal_management_nic_use_eip?
       true
     end

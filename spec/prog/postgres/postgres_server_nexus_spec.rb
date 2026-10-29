@@ -158,6 +158,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(assemble.call.management_nic).to be_nil
     end
 
+    it "creates the missing GCP management subnet under the dual-NIC flag and gives the server one NIC until it is ready" do
+      gcp_location = Location[name: "gcp-us-central1"]
+      user_project.set_ff_postgres_gcp_dual_nic(true)
+      gcp_resource = create_postgres_resource(project: user_project, location_id: gcp_location.id)
+      gcp_resource.update(target_vm_size: "c4a-standard-4")
+      Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+
+      st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: create_postgres_timeline(location_id: gcp_location.id).id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.management_nic).to be_nil
+      mgmt_subnet = PrivateSubnet.gcp_management_subnet(gcp_location)
+      expect(mgmt_subnet.project_id).to eq(service_project.id)
+      expect(mgmt_subnet.strand.label).to eq("start")
+    end
+
     it "sets swap_size_bytes for hobby vm sizes" do
       hobby_resource = create_postgres_resource(project: user_project, location_id:)
       hobby_resource.update(target_vm_size: "hobby-1")

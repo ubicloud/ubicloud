@@ -254,6 +254,7 @@ RSpec.describe PostgresResource do
   end
 
   it "requests no management NIC on metal" do
+    expect(postgres_resource.ensure_management_subnet).to be_nil
     expect(postgres_resource.use_separate_management_nic?).to be false
     expect(postgres_resource.management_nic_use_eip?).to be true
   end
@@ -322,6 +323,22 @@ RSpec.describe PostgresResource do
         add_management_nic(vm, mgmt_subnet)
         mgmt_subnet.strand.update(label: "update_firewall_rules")
         expect(gcp_resource.use_separate_management_nic?).to be true
+      end
+    end
+
+    describe "#ensure_management_subnet" do
+      it "creates the management subnet of the location once, only under the flag" do
+        gcp_resource.ensure_management_subnet
+        expect(PrivateSubnet.gcp_management_subnet(gcp_location)).to be_nil
+
+        gcp_resource.project.set_ff_postgres_gcp_dual_nic(true)
+        gcp_resource.ensure_management_subnet
+        mgmt_subnet = PrivateSubnet.gcp_management_subnet(gcp_location)
+        expect(mgmt_subnet.strand.prog).to eq("Vnet::Gcp::SubnetNexus")
+        expect(mgmt_subnet.strand.label).to eq("start")
+
+        gcp_resource.ensure_management_subnet
+        expect(PrivateSubnet.where(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME).select_map(:id)).to eq([mgmt_subnet.id])
       end
     end
 

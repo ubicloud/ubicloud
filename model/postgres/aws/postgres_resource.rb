@@ -43,6 +43,9 @@ class PostgresResource < Sequel::Model
       true
     end
 
+    def aws_ensure_management_subnet
+    end
+
     def aws_management_nic_use_eip?
       !aws_ssh_ipv6?
     end
