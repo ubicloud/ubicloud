@@ -31,7 +31,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       self.gcp_zone_suffix = location_az.az
     end
 
-    service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
+    service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access && !runner
 
     mgmt_nic = vm.management_nic
     cloud_config = {
@@ -324,7 +324,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def finalize_destroy
-    if Config.gcp_postgres_iam_access || vm.vm_gcp_resource&.service_account_email
+    if (Config.gcp_postgres_iam_access && !runner) || vm.vm_gcp_resource&.service_account_email
       begin
         credential.iam_client.delete_project_service_account("projects/-/serviceAccounts/#{vm_service_account_email}")
       rescue Google::Apis::ClientError => e
@@ -393,6 +393,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     routes.size == 2 && routes.all? { it.include?(" dev user-nic ") }
   rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
     false
+  end
+
+  def runner
+    return @runner if defined?(@runner)
+    @runner = GithubRunner[vm_id: vm.id]
   end
 
   def credential
