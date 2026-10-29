@@ -13,6 +13,11 @@ RSpec.describe Parseable::Client do
       expect(client.instance_variable_get(:@password)).to eq("secret")
     end
 
+    it "verifies the peer against verify_host instead of the endpoint host" do
+      expect(Excon).to receive(:new).with("https://1.1.1.1:8000", hash_including(ssl_verify_peer_host: "parseable.example.com"))
+      described_class.new(endpoint: "https://1.1.1.1:8000", ssl_ca_data:, verify_host: "parseable.example.com")
+    end
+
     it "creates an Excon client when not supplied with ssl_ca_data" do
       client = described_class.new(endpoint: "https://example.com", username: "admin2", password: "foobar")
       expect(client.instance_variable_get(:@endpoint)).to eq("https://example.com")

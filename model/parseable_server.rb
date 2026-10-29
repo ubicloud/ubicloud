@@ -20,6 +20,10 @@ class ParseableServer < Sequel::Model
     "https://[#{public_ipv6_address}]:8000"
   end
 
+  def ip4_url
+    "https://#{vm.ip4_string}:8000"
+  end
+
   def endpoint
     (Config.development? || Config.is_e2e) ? ip6_url : "https://#{resource.hostname}:8000"
   end
@@ -64,8 +68,9 @@ class ParseableServer < Sequel::Model
 
   def client
     Parseable::Client.new(
-      endpoint:,
+      endpoint: (Config.development? || Config.is_e2e) ? ip6_url : ip4_url,
       ssl_ca_data: resource.root_certs,
+      verify_host: resource.hostname,
       username: resource.admin_user,
       password: resource.admin_password,
     )
