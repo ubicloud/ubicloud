@@ -5,17 +5,32 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   frame_accessor :skip_check_queued_jobs
 
   RUNNER_START_WINDOW = 60.0
+  BACKDATE_LAST_JOB_AT = (60 * 60 * 24 * 365.2425 * 1000 + 12 * 60 * 60)
+  UPDATE_SCHEDULE = Sequel::Qualifier.new(:strand).transform(Strand::SCHEDULE_NO_LATER_THAN_NOW)
 
-  def self.assemble(installation, name, default_branch)
+  def self.assemble(installation, name, default_branch, update_last_job_at: true)
+    last_job_at = Time.now.utc
+    last_job_at -= BACKDATE_LAST_JOB_AT unless update_last_job_at
+
     DB.transaction do
-      repository = GithubRepository.new(installation_id: installation.id, name:)
+      repository = GithubRepository.new(installation_id: installation.id, name:, default_branch:, last_job_at:)
       repository.skip_auto_validations(:unique) do
-        updates = {last_job_at: Time.now}
+        updates = {}
+        updates[:last_job_at] = if update_last_job_at
+          Sequel.case({(Sequel[:github_repository][:last_job_at] < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF) => last_job_at + 60}, last_job_at)
+        else
+          Sequel[:github_repository][:last_job_at]
+        end
         updates[:default_branch] = default_branch if default_branch
         repository.insert_conflict(target: [:installation_id, :name], update: updates).save_changes
       end
+
+      if update_last_job_at && repository.last_job_at > last_job_at + 30
+        update = {schedule: UPDATE_SCHEDULE}
+      end
+
       Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { it.id = repository.id }
-        .insert_conflict(target: :id).save_changes
+        .insert_conflict(target: :id, update:).save_changes
     end
   end
 
@@ -162,6 +177,10 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
+    if github_repository.last_job_at < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF
+      hibernate
+    end
+
     when_reset_blob_storage_set? { hop_reset_blob_storage }
 
     if Time.now - github_repository.last_job_at > 6 * 60 * 60
