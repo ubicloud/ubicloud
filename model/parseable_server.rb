@@ -66,6 +66,12 @@ class ParseableServer < Sequel::Model
     pulse
   end
 
+  def healthy?
+    client.healthy?
+  rescue Parseable::Client::Error
+    false
+  end
+
   def client
     Parseable::Client.new(
       endpoint: (Config.development? || Config.is_e2e) ? ip6_url : ip4_url,

@@ -68,14 +68,13 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect { nx.start }.to hop("bootstrap_rhizome")
     end
 
-    it "inserts A and AAAA DNS records when a dns_zone is present" do
+    it "does not insert DNS records before parseable is running" do
       nx.vm.strand.update(label: "wait")
 
       dns_zone
       expect { nx.start }.to hop("bootstrap_rhizome")
 
-      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
-      expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
+      expect(dns_zone.records_dataset.count).to eq(0)
     end
   end
 
@@ -220,16 +219,50 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
       expect { nx.configure_metrics }.to hop("wait")
     end
+
+    it "hops to add_dns_records during initial provisioning" do
+      nx.incr_initial_provisioning
+      allow(sshable).to receive(:_cmd)
+      allow(sshable).to receive(:write_file)
+
+      expect { nx.configure_metrics }.to hop("add_dns_records")
+    end
+  end
+
+  describe "#add_dns_records" do
+    before { nx.incr_initial_provisioning }
+
+    it "naps until parseable answers on its own address" do
+      dns_zone
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 503)
+
+      expect { nx.add_dns_records }.to nap(5)
+      expect(dns_zone.records_dataset.count).to eq(0)
+    end
+
+    it "inserts A and AAAA DNS records, ends initial provisioning and hops to wait" do
+      dns_zone
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 200)
+
+      expect { nx.add_dns_records }.to hop("wait")
+
+      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
+      expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
+    end
+
+    it "ends initial provisioning when there is no dns_zone" do
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 200)
+
+      expect { nx.add_dns_records }.to hop("wait")
+
+      expect(DnsRecord.count).to eq(0)
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
+    end
   end
 
   describe "#wait" do
     before { st.update(label: "wait") }
-
-    it "decrements initial provisioning semaphore" do
-      nx.incr_initial_provisioning
-      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
-      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
-    end
 
     it "naps for approximately one month" do
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)

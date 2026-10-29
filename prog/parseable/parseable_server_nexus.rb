@@ -41,8 +41,6 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
 
     register_deadline("wait", 10 * 60)
 
-    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "A", ttl: 10, data: vm.ip4_string)
-    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
     cert, cert_key = create_certificate
     parseable_server.update(cert:, cert_key:)
 
@@ -166,12 +164,24 @@ TIMER
     vm.sshable.cmd("sudo systemctl daemon-reload")
     vm.sshable.cmd("sudo systemctl enable --now parseable-metrics.timer")
 
+    when_initial_provisioning_set? do
+      hop_add_dns_records
+    end
+
+    hop_wait
+  end
+
+  label def add_dns_records
+    nap 5 unless parseable_server.healthy?
+
+    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "A", ttl: 10, data: vm.ip4_string)
+    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
+    decr_initial_provisioning
+
     hop_wait
   end
 
   label def wait
-    decr_initial_provisioning
-
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup

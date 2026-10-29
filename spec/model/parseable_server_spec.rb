@@ -89,6 +89,23 @@ RSpec.describe ParseableServer do
     end
   end
 
+  describe "#healthy?" do
+    before do
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.1.1.1/32")
+      allow(Config).to receive_messages(development?: false, is_e2e: false)
+    end
+
+    it "returns true when the liveness check passes" do
+      stub_request(:get, "https://1.1.1.1:8000/api/v1/liveness").to_return(status: 200)
+      expect(parseable_server.healthy?).to be true
+    end
+
+    it "returns false when the liveness check fails" do
+      stub_request(:get, "https://1.1.1.1:8000/api/v1/liveness").to_return(status: 503)
+      expect(parseable_server.healthy?).to be false
+    end
+  end
+
   describe "#init_health_monitor_session" do
     it "returns session hash with parseable_client" do
       client = instance_double(Parseable::Client)
