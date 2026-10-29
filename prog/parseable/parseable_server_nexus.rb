@@ -31,13 +31,14 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
 
       id = ubid.to_uuid
       parseable_server = ParseableServer.create_with_id(id, parseable_resource_id: parseable_resource.id, vm_id: vm_st.id)
-      Strand.create_with_id(parseable_server, prog: "Parseable::ParseableServerNexus", label: "start")
+      strand = Strand.create_with_id(parseable_server, prog: "Parseable::ParseableServerNexus", label: "start")
+      parseable_server.incr_initial_provisioning
+      strand
     end
   end
 
   label def start
     nap 5 unless vm.strand.label == "wait"
-    incr_initial_provisioning
 
     register_deadline("wait", 10 * 60)
 

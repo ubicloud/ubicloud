@@ -7,7 +7,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
   let(:parseable_project) { Project.create(name: "parseable-svc") }
   let(:sshable) { nx.vm.sshable }
-  let(:st) { described_class.assemble(parseable_resource) }
+  let(:st) { described_class.assemble(parseable_resource).reload }
 
   let(:parseable_resource) {
     ps_st = Prog::Vnet::SubnetNexus.assemble(parseable_project.id, name: "test-parseable-subnet", location_id: Location::HETZNER_FSN1_ID)
@@ -53,8 +53,16 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
   before do
     allow(Config).to receive_messages(parseable_service_project_id: parseable_project.id, parseable_host_name: "parseable.example.com", parseable_version: "v2.6.3", postgres_service_project_id: parseable_project.id)
+    Semaphore.where(strand_id: st.id, name: "initial_provisioning").destroy
     add_ipv4_to_vm(nx.vm, "1.2.3.4")
     nx.vm.update(ephemeral_net6: "2a01::/64")
+  end
+
+  describe ".assemble" do
+    it "starts the server in initial provisioning" do
+      server = ParseableServer[described_class.assemble(parseable_resource).id]
+      expect(server.initial_provisioning_set?).to be true
+    end
   end
 
   describe "#start" do
