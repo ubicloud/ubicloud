@@ -59,7 +59,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # PostgresServer::Gcp#gcp_storage_device_paths).
     boot_volume = vm.vm_storage_volumes_dataset.order(:disk_index).first(boot: true)
     boot_params = {source_image: gce_source_image, disk_size_gb: boot_volume.size_gib}
-    if (boot_disk_type = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:boot_disk_type])
+    if runner
+      # GCE provisions Hyperdisk Balanced above its free baseline by default.
+      boot_params.merge!(disk_type: "zones/#{gcp_zone}/diskTypes/hyperdisk-balanced", provisioned_iops: 3000, provisioned_throughput: 140)
+    elsif (boot_disk_type = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:boot_disk_type])
       boot_params[:disk_type] = "zones/#{gcp_zone}/diskTypes/#{boot_disk_type}"
     end
     disks = [

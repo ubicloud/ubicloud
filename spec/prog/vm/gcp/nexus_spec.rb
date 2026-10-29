@@ -254,6 +254,39 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
+    it "pins the Hyperdisk Balanced boot disk of a GitHub runner VM at the free baseline" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+      create_runner_for(vm)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner-disk")
+      expect(compute_client).to receive(:insert) do |args|
+        params = args[:instance_resource].disks.first.initialize_params
+        expect(params.disk_type).to eq("zones/us-central1-a/diskTypes/hyperdisk-balanced")
+        expect(params.provisioned_iops).to eq(3000)
+        expect(params.provisioned_throughput).to eq(140)
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "leaves the boot disk provisioning to GCE for a VM that is not a runner" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-plain-disk")
+      expect(compute_client).to receive(:insert) do |args|
+        params = args[:instance_resource].disks.first.initialize_params
+        expect(params.has_disk_type?).to be false
+        expect(params.has_provisioned_iops?).to be false
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
     it "leaves the AccessConfig NAT IP unset for an ephemeral address without a static IP" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
