@@ -185,7 +185,7 @@ class Clover
 
           r.on "cache" do
             r.get api? do
-              paginated_result(repository.cache_entries_dataset.order(:id), Serializers::GithubCacheEntry, installation:, repository:)
+              paginated_result(repository.cache_entries_dataset.exclude(committed_at: nil).order(:id), Serializers::GithubCacheEntry, installation:, repository:)
             end
 
             r.delete true do

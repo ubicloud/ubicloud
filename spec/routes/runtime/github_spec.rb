@@ -159,7 +159,7 @@ RSpec.describe Clover, "github" do
 
       it "returns presigned urls and upload id for the reserved cache" do
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")) do |_, params|
+        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id", expires_in: GithubCacheEntry::PRESIGNED_URL_EXPIRES_IN)) do |_, params|
           "url-#{params[:part_number]}"
         end.exactly(3).times
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}
@@ -349,7 +349,7 @@ RSpec.describe Clover, "github" do
       it "returns a cache from default branch when no branch info" do
         runner.update(workflow_job: nil)
         entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: GithubCacheEntry::PRESIGNED_URL_EXPIRES_IN).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k1", version: "v1"}
 
         expect(last_response.status).to eq(200)
