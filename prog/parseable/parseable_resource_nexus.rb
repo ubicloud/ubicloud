@@ -4,6 +4,7 @@ require_relative "../../lib/util"
 
 class Prog::Parseable::ParseableResourceNexus < Prog::Base
   subject_is :parseable_resource
+  frame_accessor :old_server_ids
 
   def self.assemble(project_id:, name:, location_id:, admin_user:, vm_size:, storage_size_gib:)
     Validation.validate_name(name)
@@ -81,6 +82,10 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
       hop_destroy
     end
 
+    when_recycle_set? do
+      hop_recycle
+    end
+
     if parseable_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
       hop_refresh_certificates
     end
@@ -98,6 +103,37 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
     parseable_resource.certificate_last_checked_at = Time.now
     parseable_resource.save_changes
 
+    hop_wait
+  end
+
+  label def recycle
+    register_deadline("wait", 60 * 60)
+    decr_recycle
+
+    self.old_server_ids = parseable_resource.servers_dataset.select_map(:id)
+    Prog::Parseable::ParseableServerNexus.assemble(parseable_resource)
+
+    hop_wait_new_server
+  end
+
+  label def wait_new_server
+    when_destroy_set? do
+      hop_destroy
+    end
+
+    # Destroying the new server cancels the recycle.
+    hop_wait unless new_server
+    nap 10 unless new_server.strand.label == "wait" && !new_server.initial_provisioning_set? && new_server.healthy?
+
+    ParseableServer.incr_destroy(old_server_ids)
+    hop_wait_old_servers_destroyed
+  end
+
+  label def wait_old_servers_destroyed
+    nap 10 unless ParseableServer.where(id: old_server_ids).empty?
+
+    # Reload users that were added on an old server during the overlap.
+    new_server.incr_restart
     hop_wait
   end
 
@@ -125,5 +161,9 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
     parseable_resource.destroy
 
     pop "destroyed"
+  end
+
+  def new_server
+    @new_server ||= parseable_resource.servers_dataset.exclude(id: old_server_ids).first
   end
 end

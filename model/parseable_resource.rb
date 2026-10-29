@@ -11,7 +11,7 @@ class ParseableResource < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2, :secret_key]
-  plugin SemaphoreMethods, :destroy, :reconfigure
+  plugin SemaphoreMethods, :destroy, :reconfigure, :recycle
 
   LOG_RETENTION_DAYS = 7
 
