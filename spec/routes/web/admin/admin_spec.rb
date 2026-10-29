@@ -3252,6 +3252,7 @@ RSpec.describe CloverAdmin do
       expect(frame["vhost_block_backend_version"]).to eq Config.vhost_block_backend_version
       expect(frame["default_boot_images"]).to contain_exactly("ubuntu-jammy", "github-ubuntu-2404")
       expect(frame["install_os"]).to be true
+      expect(frame["ipv4_subnet_prefix"]).to eq 27
 
       expect(page.all(".unprepared-vm-hosts-table td").map(&:text)).to eq [
         vmh.ubid, "1.2.3.4", "hetzner", "12345", "start", "", "", "0", "",
@@ -3276,6 +3277,21 @@ RSpec.describe CloverAdmin do
       expect(frame["vhost_block_backend_version"]).to eq "v0.2.2"
       expect(frame["default_boot_images"]).to eq []
       expect(frame["install_os"]).to be false
+      expect(frame["ipv4_subnet_prefix"]).to eq 28
+    end
+
+    it "allows opting out of ordering an IPv4 subnet" do
+      stub_hetzner_rename("12345")
+
+      fill_in "Hosts", with: "12345,1.2.3.4"
+      select "hetzner-fsn1", from: "Location"
+      select "hetzner", from: "Provider"
+      uncheck "Order IPv4 Subnet"
+      click_button "Setup VM Hosts"
+
+      st = Strand.first(prog: "Vm::HostNexus")
+      expect(page).to have_flash_notice("VM host setup started: #{st.ubid} (hetzner 12345)")
+      expect(st.stack.first["ipv4_subnet_prefix"]).to be_nil
     end
 
     it "allows setting up multiple vm hosts" do

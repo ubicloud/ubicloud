@@ -141,7 +141,8 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "leaseweb provider labels" do
     def run_provider_labels(st)
       nx = described_class.new(st)
-      expect { nx.start }.to hop("create_addresses")
+      expect { nx.start }.to hop("setup")
+      expect { nx.setup }.to hop("create_addresses")
       expect { nx.create_addresses }.to hop("pull_server_info")
       expect { nx.pull_server_info }.to hop("setup_ssh_keys")
       st.subject.reload
@@ -228,18 +229,84 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#start" do
+    it "sets a deadline for setup and hops to order_ipv4_subnet when assembled with an IPv4 subnet prefix" do
+      nx = described_class.new(assemble_hetzner_host(ipv4_subnet_prefix: 27))
+      expect { nx.start }.to hop("order_ipv4_subnet")
+      expect(nx.strand.stack.first["deadline_target"]).to eq("setup")
+      expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
+    end
+
+    it "hops to setup when assembled without an IPv4 subnet prefix" do
+      expect { nx.start }.to hop("setup")
+    end
+  end
+
+  describe "#setup" do
     it "hops to create_addresses for a host with a provider" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
-      expect { nx.start }.to hop("create_addresses")
+      expect { nx.setup }.to hop("create_addresses")
     end
 
     it "hops to install_host_os when assembled with install_os" do
       st = described_class.assemble("192.168.0.2", install_os: true)
-      expect { described_class.new(st).start }.to hop("install_host_os")
+      expect { described_class.new(st).setup }.to hop("install_host_os")
     end
 
     it "hops to setup_ssh_keys when not installing the OS" do
-      expect { nx.start }.to hop("setup_ssh_keys")
+      expect { nx.setup }.to hop("setup_ssh_keys")
+    end
+  end
+
+  describe "#order_ipv4_subnet" do
+    let(:st) { assemble_hetzner_host(ipv4_subnet_prefix: 27) }
+
+    it "orders a subnet when the server has no IPv4 subnet and no open order" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"})
+        .to_return(status: 200, body: JSON.generate([{subnet: {ip: "2a01:4f8:10a:128b::", mask: 64, server_ip: "127.0.0.1"}}]))
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 404, body: "")
+      order = stub_request(:post, "https://robot-ws.your-server.de/order/server_addon/transaction")
+        .with(body: {server_number: "1", product_id: "subnet_ipv4_27", reason: "We provision virtual machines on this server. We assign IPv4 addresses to them from the additional subnet."})
+        .to_return(status: 201, body: JSON.generate(transaction: {id: "B1", status: "in process"}))
+      expect(Clog).to receive(:emit).with("ordered ipv4 subnet", {ipv4_subnet_order: {vm_host: vm_host.ubid, prefix: 27, transaction_id: "B1"}}).and_call_original
+      expect { nx.order_ipv4_subnet }.to hop("wait_ipv4_subnet")
+      expect(order).to have_been_requested.once
+    end
+
+    it "logs and naps when Hetzner rejects the order" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"}).to_return(status: 404, body: "")
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 404, body: "")
+      stub_request(:post, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 409, body: "")
+      expect(Clog).to receive(:emit).with("ipv4 subnet order rejected", {ipv4_subnet_order_rejected: {vm_host: vm_host.ubid, prefix: 27, exception: hash_including(class: "Excon::Error::Conflict")}}).and_call_original
+      expect { nx.order_ipv4_subnet }.to nap(65536)
+    end
+
+    it "skips ordering when the server has an IPv4 subnet" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"})
+        .to_return(status: 200, body: JSON.generate([{subnet: {ip: "30.30.30.32", mask: 27, server_ip: "127.0.0.1"}}]))
+      expect { nx.order_ipv4_subnet }.to hop("wait_ipv4_subnet")
+    end
+
+    it "skips ordering when an order for a subnet is open" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"}).to_return(status: 404, body: "")
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction")
+        .to_return(status: 200, body: JSON.generate([{transaction: {id: "B1", status: "in process", server_number: 1, product: {id: "subnet_ipv4_27"}}}]))
+      expect { nx.order_ipv4_subnet }.to hop("wait_ipv4_subnet")
+    end
+  end
+
+  describe "#wait_ipv4_subnet" do
+    let(:st) { assemble_hetzner_host(ipv4_subnet_prefix: 27) }
+
+    it "hops to setup once the server has an IPv4 subnet" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"})
+        .to_return(status: 200, body: JSON.generate([{subnet: {ip: "30.30.30.32", mask: 27, server_ip: "127.0.0.1"}}]))
+      expect { nx.wait_ipv4_subnet }.to hop("setup")
+    end
+
+    it "naps until the server has an IPv4 subnet" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "127.0.0.1"})
+        .to_return(status: 200, body: JSON.generate([{subnet: {ip: "2a01:4f8:10a:128b::", mask: 64, server_ip: "127.0.0.1"}}]))
+      expect { nx.wait_ipv4_subnet }.to nap(60)
     end
   end
 
@@ -854,11 +921,11 @@ RSpec.describe Prog::Vm::HostNexus do
       vm_host.update(allocation_state: "unprepared")
       vm = create_vm(vm_host_id: vm_host.id)
       Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
-      expect(nx.strand.stack.first.keys).to include("install_os", "default_boot_images", "vhost_block_backend_version")
+      expect(nx.strand.stack.first.keys).to include("install_os", "default_boot_images", "vhost_block_backend_version", "ipv4_subnet_prefix")
       expect { nx.start_vms }.to hop("configure_metrics")
       expect(vm_host.reload.allocation_state).to eq("accepting")
       expect(vm.start_after_host_reboot_set?).to be true
-      expect(nx.strand.stack.first.keys).not_to include("install_os", "default_boot_images", "vhost_block_backend_version")
+      expect(nx.strand.stack.first.keys).not_to include("install_os", "default_boot_images", "vhost_block_backend_version", "ipv4_subnet_prefix")
     end
 
     it "start_vms starts vms & becomes accepting & hops to configure_metrics if was draining and in graceful reboot" do
