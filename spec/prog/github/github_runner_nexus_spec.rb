@@ -247,6 +247,15 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.location_id).to eq(location.id)
     end
 
+    it "uses metal vms if the installation is US only" do
+      installation.update(allocator_preferences: {"location_filter" => [Location::LEASEWEB_WDC02_ID]})
+      project.set_ff_aws_alien_runners_ratio(1.0)
+      runner.incr_spill_over
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("standard")
+      expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
+    end
+
     it "uses the pool vm if spilled over by hand and alien runners are disabled for the project" do
       installation.update(allocator_preferences: {})
       pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
@@ -684,6 +693,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+      end
+
+      it "allocates if standard utilization is low in the installation's locations" do
+        installation.update(allocator_preferences: {"location_filter" => [Location::LEASEWEB_WDC02_ID]})
+        create_vm_host(location_id: Location::LEASEWEB_WDC02_ID, arch: "x64", family: "standard", total_cores: 16, used_cores: 8)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
       end
 
