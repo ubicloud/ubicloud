@@ -58,6 +58,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     )
   end
 
+  def create_runner_for(vm)
+    installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+    GithubRunner.create(label: "ubicloud-premium-8", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+  end
+
   def ensure_vm_gcp_resource(vm, suffix)
     return if VmGcpResource[vm.id]
     VmGcpResource.create_with_id(vm,
@@ -579,6 +584,20 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ) do |_, req|
           yield req.policy
         end
+      end
+
+      it "creates no service account for a GitHub runner VM" do
+        create_runner_for(vm)
+        expect(iam_client).not_to receive(:get_project_service_account)
+
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner")
+        expect(compute_client).to receive(:insert) do |args|
+          expect(args[:instance_resource].service_accounts).to be_empty
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(VmGcpResource[vm.id].service_account_email).to be_nil
       end
 
       it "creates the service account when missing, grants actAs, and attaches it to the instance" do
@@ -1220,6 +1239,15 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
       expect(Vm[vm.id]).to be_nil
+    end
+
+    it "skips service account deletion for a GitHub runner VM" do
+      ensure_vm_gcp_resource(vm, "a")
+      create_runner_for(vm)
+      expect(Config).to receive(:gcp_postgres_iam_access).and_return(true)
+      expect(nx.send(:credential)).not_to receive(:iam_client)
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
     end
 
     it "skips service account deletion when the VM never had one" do
