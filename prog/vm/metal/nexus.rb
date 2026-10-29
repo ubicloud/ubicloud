@@ -199,7 +199,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # since nothing here depends on its outcome.
       Prog::LearnHypervisor.assemble(vm.id)
 
-      hop_wait_sshable
+      Semaphore.incr(vm.id, :update_firewall_rules, wake: false)
+      nap_hop(3, :wait_sshable)
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
         storage: vm.storage_secrets,
@@ -220,16 +221,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait_sshable
-    unless vm.update_firewall_rules_set?
-      # vm.incr rewrites schedule and strand rerun immediately instead of napping
-      Semaphore.incr(vm.id, :update_firewall_rules, wake: false)
-      # This is the first time we get into this state and we know that
-      # wait_sshable will take at least 3 seconds on the fastest boot images.
-      # So, we nap here to reduce the amount of load on the control plane
-      # unnecessarily.
-      nap 3
-    end
-
     # A moved VM runs whatever the customer had on it, which may block ssh, so
     # don't wait for ssh to come up.
     if (addr = vm.ip4_string) && !moving?
