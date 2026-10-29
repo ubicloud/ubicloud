@@ -444,9 +444,9 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
   end
 
   describe "#destroy" do
-    it "hops to_wait_children_destoyed" do
+    it "hops to stop_parseable" do
       st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
-      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect { nx.destroy }.to hop("stop_parseable")
       expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
     end
 
@@ -455,10 +455,38 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "A", ttl: 10, data: nx.vm.ip4_string)
       parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "AAAA", ttl: 10, data: nx.vm.ip6_string)
 
-      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect { nx.destroy }.to hop("stop_parseable")
 
       expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: true).count).to eq(1)
       expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: true).count).to eq(1)
+    end
+  end
+
+  describe "#stop_parseable" do
+    it "starts the stop and naps" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("stop_parseable", "sudo", "systemctl", "stop", "parseable")
+      expect { nx.stop_parseable }.to nap(5)
+    end
+
+    it "naps while the stop is in progress" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("InProgress")
+      expect { nx.stop_parseable }.to nap(5)
+    end
+
+    it "hops to wait_children_destroyed when parseable has stopped" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("Succeeded")
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
+    end
+
+    it "hops to wait_children_destroyed when the stop fails" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("Failed")
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
+    end
+
+    it "hops to wait_children_destroyed when the server cannot be reached" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_raise(Errno::ECONNREFUSED)
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
     end
   end
 

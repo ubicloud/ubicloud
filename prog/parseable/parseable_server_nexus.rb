@@ -244,7 +244,26 @@ TIMER
 
     resource.dns_zone&.delete_record(record_name: resource.hostname, type: "A", data: vm.ip4_string)
     resource.dns_zone&.delete_record(record_name: resource.hostname, type: "AAAA", data: vm.ip6_string)
+
     Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_stop_parseable
+  end
+
+  # A graceful stop uploads the staged logs before the data disk goes away.
+  label def stop_parseable
+    case vm.sshable.d_check("stop_parseable")
+    when "Succeeded"
+      hop_wait_children_destroyed
+    when "Failed"
+      Clog.emit("Failed to stop parseable before destroy", {parseable_stop_failed: {ubid: parseable_server.ubid}})
+      hop_wait_children_destroyed
+    when "NotStarted"
+      vm.sshable.d_run("stop_parseable", "sudo", "systemctl", "stop", "parseable")
+    end
+
+    nap 5
+  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError => ex
+    Clog.emit("Failed to stop parseable before destroy", Util.exception_to_hash(ex, into: {ubid: parseable_server.ubid}))
     hop_wait_children_destroyed
   end
 
