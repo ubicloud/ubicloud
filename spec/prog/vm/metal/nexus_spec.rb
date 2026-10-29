@@ -481,8 +481,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#prep" do
     it "hops to wait_sshable if prep command succeeds" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
-      expect { nx.prep }.to hop("wait_sshable")
+      expect { nx.prep }.to hop("wait_sshable", nap: 3)
         .and change { vm.clean_prep_set?(cached: false) }.from(false).to(true)
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
       expect(Strand.where(prog: "LearnHypervisor").count).to eq(1)
     end
 
@@ -1112,23 +1113,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "naps 3 seconds if it's the first time we execute wait_sshable" do
-      schedule = st.schedule
-      expect { nx.wait_sshable }.to nap(3)
-        .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
-      expect(st.reload.schedule).to eq(schedule)
-    end
-
     it "naps if not sshable" do
       expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
-      vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
       expect { nx.wait_sshable }.to nap(1)
     end
 
     it "hops to wait if sshable and billing record created" do
       vm.update(allocated_at: Time.now - 100)
-      vm.incr_update_firewall_rules
       adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
@@ -1140,7 +1132,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "skips a check if ipv4 is not enabled" do
       vm.update(allocated_at: Time.now - 100)
-      vm.incr_update_firewall_rules
       expect(vm.ip4).to be_nil
       expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
       expect { nx.wait_sshable }.to hop("wait")
@@ -1150,7 +1141,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "skips the check for a VM being moved, whose customer may block ssh" do
       vm.update(allocated_at: Time.now - 100)
-      vm.incr_update_firewall_rules
       adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
       add_moving_boot_volume
@@ -1163,7 +1153,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "schedules the waiting strand if the frame has one" do
       vm.update(allocated_at: Time.now - 100)
-      vm.incr_update_firewall_rules
       waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
       refresh_frame(nx, new_values: {"waiting_strand_id" => waiting_strand.id})
 
