@@ -81,6 +81,16 @@ RSpec.describe Option do
       expect(Option::GCP_STORAGE_SIZE_OPTIONS["n2d-standard"][224]).to eq([9000])
     end
 
+    it "keeps the runner only n4d family out of the Postgres options" do
+      expect(Option::GCP_FAMILY_VM_CONFIG).to have_key("n4d-standard")
+      expect(Option::POSTGRES_FAMILY_OPTIONS).not_to have_key("n4d-standard")
+      expect(Option::POSTGRES_SIZE_OPTIONS.keys.grep(/\An4d/)).to be_empty
+      expect(Option::VmSizes.select { it.family == "n4d-standard" }.map(&:name)).to eq(%w[n4d-standard-8 n4d-standard-16 n4d-standard-32])
+      expect(described_class.gcp_instance_type_name("n4d-standard", 16, lssd: false)).to eq("n4d-standard-16")
+      expect(described_class.gcp_local_ssd_count("n4d-standard", 0)).to eq(0)
+      expect(described_class.gcp_on_host_maintenance("n4d-standard", 32)).to eq("MIGRATE")
+    end
+
     it "counts the local SSDs the VM nexus attaches from the data volume size" do
       expect(described_class.gcp_local_ssd_count("n2d-highmem", 6000)).to eq(16)
       expect(described_class.gcp_local_ssd_count("n2d-highmem", 0)).to eq(0)
@@ -88,7 +98,7 @@ RSpec.describe Option do
     end
 
     it "has matching size options for each GCP family and vcpu" do
-      Option::GCP_STORAGE_SIZE_OPTIONS.each do |family, vcpu_map|
+      Option::GCP_STORAGE_SIZE_OPTIONS.slice(*Option::GCP_FAMILY_OPTIONS).each do |family, vcpu_map|
         vcpu_map.each_key do |vcpu|
           size_name = "#{family}-#{vcpu}"
           expect(Option::POSTGRES_SIZE_OPTIONS).to have_key(size_name), "Missing POSTGRES_SIZE_OPTIONS entry for #{size_name}"
@@ -162,6 +172,7 @@ RSpec.describe Option do
         "z3-highlssd" => {8 => [3000], 16 => [6000], 22 => [9000], 32 => [12000], 44 => [18000], 88 => [36000]},
         "n2d-standard" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000], 128 => [9000], 224 => [9000]},
         "n2d-highmem" => {2 => [750, 1500], 4 => [1500, 3000], 8 => [3000, 6000], 16 => [6000, 9000], 32 => [9000], 48 => [9000], 64 => [9000], 80 => [9000], 96 => [9000]},
+        "n4d-standard" => {8 => [0], 16 => [0], 32 => [0]},
       })
     end
 

@@ -24,8 +24,9 @@ class GcpInstanceAvailabilityGenerator
 
   # GCE machine type name => [our family, vcpu count], e.g.
   # "z3-highmem-44-standardlssd" => ["z3-standard", 44]
+  # Runner-only families stay out, since the file feeds the Postgres options.
   def machine_type_index
-    @machine_type_index ||= Option::GCP_FAMILY_VM_CONFIG.each_with_object({}) do |(family, config), index|
+    @machine_type_index ||= Option::GCP_FAMILY_VM_CONFIG.slice(*Option::GCP_FAMILY_OPTIONS).each_with_object({}) do |(family, config), index|
       config[:shapes].each_key do |vcpu|
         index[Option.gcp_instance_type_name(family, vcpu)] = [family, vcpu]
       end

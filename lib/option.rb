@@ -138,6 +138,9 @@ module Option
   # one or two per vcpu within the 24 GCE allows, and GCE would default the
   # boot disk to pd-standard.
   n2d_shapes = {2 => [2, 4], 4 => [4, 8], 8 => [8, 16], 16 => [16, 24], 32 => [24], 48 => [24], 64 => [24], 80 => [24], 96 => [24]}
+  # n4d takes no local SSD and boots only from Hyperdisk. GitHub runners use
+  # it, so it stays out of the Postgres options.
+  n4d_shapes = {8 => 0, 16 => 0, 32 => 0}
 
   # shapes maps a vcpu count to the number of bundled local SSDs, or to the
   # counts a customer can pick, not to a storage size: the size is a count
@@ -163,6 +166,7 @@ module Option
                       shapes: {8 => 1, 16 => 2, 22 => 3, 32 => 4, 44 => 6, 88 => 12}},
     "n2d-standard" => {gce_prefix: "n2d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n2d_shapes.merge(128 => [24], 224 => [24]), boot_disk_type: "pd-balanced"},
     "n2d-highmem" => {gce_prefix: "n2d-highmem", gce_suffix: nil, arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: n2d_shapes, boot_disk_type: "pd-balanced"},
+    "n4d-standard" => {gce_prefix: "n4d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n4d_shapes, boot_disk_type: "hyperdisk-balanced", runner_only: true},
   }.freeze
 
   # GCE can live migrate a VM with at most this much attached local SSD.
@@ -176,7 +180,7 @@ module Option
     (total_gib > GCP_LIVE_MIGRATION_MAX_LOCAL_SSD_GIB) ? "TERMINATE" : "MIGRATE"
   end
 
-  GCP_FAMILY_OPTIONS = GCP_FAMILY_VM_CONFIG.keys.freeze
+  GCP_FAMILY_OPTIONS = GCP_FAMILY_VM_CONFIG.reject { |_, config| config[:runner_only] }.keys.freeze
 
   # What AWS publishes per instance type: local disks as [count, size_gb]
   # and EBS limits. bin/generate_instance_availability.rb writes it.
@@ -450,7 +454,7 @@ module Option
     ["r8id", 32, 256],
     ["r8id", 48, 384],
     ["r8id", 64, 512],
-  ].concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
+  ].concat(GCP_FAMILY_VM_CONFIG.slice(*GCP_FAMILY_OPTIONS).flat_map { |family, config|
     config[:shapes].keys.map { |vcpu| [family, vcpu, gcp_memory_gib(family, vcpu)] }
   }).to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
