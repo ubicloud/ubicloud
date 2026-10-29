@@ -100,7 +100,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
               name: "External NAT",
               type: "ONE_TO_ONE_NAT",
               network_tier: "STANDARD",
-              nat_i_p: gcp_res.static_ip.to_s,
+              **({nat_i_p: gcp_res.static_ip.to_s} if gcp_res.static_ip),
             ),
           ],
           ipv6_access_configs: [

@@ -249,6 +249,21 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
+    it "leaves the AccessConfig NAT IP unset for an ephemeral address without a static IP" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-ephemeral")
+      expect(compute_client).to receive(:insert) do |args|
+        ac = args[:instance_resource].network_interfaces.first.access_configs.first
+        expect(ac.has_nat_i_p?).to be false
+        expect(Google::Cloud::Compute::V1::AccessConfig.encode_json(ac)).not_to include("natIP")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
     it "uses network config from NicGcpResource" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
