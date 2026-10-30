@@ -240,9 +240,10 @@ RSpec.describe StorageVolume do
     end
 
     it "can purge a vhost backend service" do
-      expect(encrypted_vhost_sv).to receive(:stop_service_if_loaded).with("test-2-storage.service").at_least(:once)
-      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/etc/systemd/system/test-2-storage.service")
-      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/var/storage/test/2/vhost.sock")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "stop", "test-2-storage.service")
+      expect(FileUtils).to receive(:rm_r).with("/etc/systemd/system/test-2-storage.service")
+      expect(FileUtils).to receive(:rm_r).with("/etc/systemd/system.control/test-2-storage.service.d").and_raise(Errno::ENOENT)
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/test/2/vhost.sock")
 
       encrypted_vhost_sv.purge_spdk_artifacts
     end

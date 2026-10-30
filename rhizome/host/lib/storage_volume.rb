@@ -500,6 +500,7 @@ class StorageVolume
   def purge_vhost_backend
     stop_service_if_loaded(sp.vhost_backend_service)
     rm_if_exists("/etc/systemd/system/#{sp.vhost_backend_service}")
+    rm_if_exists("/etc/systemd/system.control/#{sp.vhost_backend_service}.d")
     rm_if_exists(vhost_sock)
   end
 
