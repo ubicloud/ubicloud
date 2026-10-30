@@ -122,23 +122,12 @@ class PrivateSubnet < Sequel::Model
   #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
   #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
   def random_private_ipv4
-    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
-  end
+    cidr_size, offsets = ipv4_blocks
+    taken = ipv4_taken_blocks(cidr_size)
+    free = offsets.reject { taken.include?(it) }
+    fail "No free IPv4 address in #{net4}" if free.empty?
 
-  private def _random_private_ipv4
-    cidr_size = [32, (net4.netmask.prefix_len + 8)].min
-    total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
-
-    # Skip the sub-blocks overlapping the addresses the provider reserves at
-    # the edges of the subnet, e.g. the first /24 of a /16 parent contains
-    # the reserved gateway/DNS addresses and must not be leased to a VM.
-    leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1].freeze
-    random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
-
-    addr = net4.nth_subnet(cidr_size, random_offset)
-    return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
-
-    addr
+    net4.nth_subnet(cidr_size, free[SecureRandom.random_number(free.size)])
   end
 
   def random_host_ipv4
@@ -157,6 +146,32 @@ class PrivateSubnet < Sequel::Model
     return random_private_ipv6 if nics.any? { |nic| nic.private_ipv6.to_s == addr.to_s }
 
     addr
+  end
+
+  def ipv4_full?
+    cidr_size, offsets = ipv4_blocks
+    taken = ipv4_taken_blocks(cidr_size)
+    offsets.all? { taken.include?(it) }
+  end
+
+  private def ipv4_taken_blocks(cidr_size)
+    block_size = 2**(32 - cidr_size)
+    nics.each_with_object(Set.new) do |nic, taken|
+      next unless (ip = nic.private_ipv4)
+
+      first = (ip.network.addr - net4.network.addr) / block_size
+      taken.merge(first...(first + 2**[cidr_size - ip.netmask.prefix_len, 0].max))
+    end
+  end
+
+  private def ipv4_blocks
+    cidr_size = [32, (net4.netmask.prefix_len + 8)].min
+
+    # Skip the sub-blocks overlapping the addresses the provider reserves at
+    # the edges of the subnet, e.g. the first /24 of a /16 parent contains
+    # the reserved gateway/DNS addresses and must not be leased to a VM.
+    leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1]
+    [cidr_size, leading...(2**(cidr_size - net4.netmask.prefix_len) - trailing)]
   end
 
   def incr_destroy_if_only_used_internally(ubid:, vm_ids:)

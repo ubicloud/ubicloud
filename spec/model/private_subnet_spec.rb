@@ -110,7 +110,29 @@ RSpec.describe PrivateSubnet do
       end
       # Only the reserved first and last /24 remain free; the allocator
       # must exhaust its draws rather than ever select one of them.
-      expect { ps.random_private_ipv4 }.to raise_error(RuntimeError, "Could not find random IPv4 after 1000 iterations")
+      expect { ps.random_private_ipv4 }.to raise_error(RuntimeError, "No free IPv4 address in 10.9.0.0/16")
+    end
+
+    it "treats every block that a NIC with a bigger block covers as taken" do
+      ps = described_class.create(name: "wide-nic-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16",
+        state: "waiting", project_id: Project.create(name: "wide-nic-prj").id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.6.0/23", private_ipv6: "fd1b:9793:dcef:cd0a:c::/79",
+        mac: "00:00:00:00:00:01", name: "wide-nic", state: "active")
+      expect(SecureRandom).to receive(:random_number).with(252).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.8.0/24"
+    end
+
+    it "picks among the free addresses only" do
+      ps = described_class.create(name: "last-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/29",
+        state: "waiting", project_id: Project.create(name: "last-net-prj").id)
+      [4, 5].each do |i|
+        Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.39.#{i}/32", private_ipv6: "fd1b:9793:dcef:cd0a:#{i * 2}::/79",
+          mac: format("00:00:00:00:00:%02x", i), name: "nic-#{i}", state: "active")
+      end
+      expect(SecureRandom).to receive(:random_number).with(1).and_return(0)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.39.6/32"
     end
 
     it "returns random private ipv6" do
@@ -158,7 +180,7 @@ RSpec.describe PrivateSubnet do
       end
 
       it "returns random private ipv4" do
-        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 5)
+        expect(SecureRandom).to receive(:random_number).with(58).and_return(4)
         expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
       end
 
@@ -166,6 +188,62 @@ RSpec.describe PrivateSubnet do
         expect(SecureRandom).to receive(:random_number).with(32766).and_return(5, 6)
         expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:e::/79"
       end
+    end
+  end
+
+  describe "#ipv4_full?" do
+    def nic(ps, i)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.39.#{i}/32", private_ipv6: "fd1b:9793:dcef:cd0a:#{(i * 2).to_s(16)}::/79",
+        mac: format("00:00:00:00:00:%02x", i), name: "nic-#{i}", state: "active")
+    end
+
+    it "ignores NICs without an IPv4 address" do
+      ps = described_class.create(name: "noip-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/29",
+        state: "waiting", project_id: Project.create(name: "noip-net-prj").id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: nil, private_ipv6: "fd1b:9793:dcef:cd0a:a::/79",
+        mac: "00:00:00:00:00:aa", name: "noip-nic", state: "active")
+      expect(ps.ipv4_full?).to be false
+    end
+
+    it "counts the blocks NICs cover, not the NICs" do
+      ps = described_class.create(name: "cover-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/29",
+        state: "waiting", project_id: Project.create(name: "cover-net-prj").id)
+      nic(ps, 1)
+      expect(ps.ipv4_full?).to be false
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.39.4/30", private_ipv6: "fd1b:9793:dcef:cd0a:a::/79",
+        mac: "00:00:00:00:00:aa", name: "wide-nic", state: "active")
+      expect(described_class[ps.id].ipv4_full?).to be true
+    end
+
+    it "is true once the NICs hold every usable address" do
+      ps = described_class.create(name: "tiny-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/29",
+        state: "waiting", project_id: Project.create(name: "tiny-net-prj").id)
+      nic(ps, 4)
+      nic(ps, 5)
+      expect(ps.ipv4_full?).to be false
+      nic(ps, 6)
+      expect(described_class[ps.id].ipv4_full?).to be true
+    end
+
+    it "reserves one block at each edge of a bigger parent subnet" do
+      ps = described_class.create(name: "big-empty-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16",
+        state: "waiting", project_id: Project.create(name: "big-empty-prj").id)
+      expect(ps.ipv4_full?).to be false
+    end
+
+    it "applies the GCP reservation of 2 + 2 addresses" do
+      prj = Project.create(name: "gcp-full-prj")
+      loc = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: prj.id, display_name: "gcp", ui_name: "gcp", visible: true)
+      ps = described_class.create(name: "gcp-ps", location_id: loc.id,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/29", state: "waiting", project_id: prj.id)
+      (2..4).each { nic(ps, it) }
+      expect(ps.ipv4_full?).to be false
+      nic(ps, 5)
+      expect(described_class[ps.id].ipv4_full?).to be true
     end
   end
 
