@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
+require "openssl"
+
 class Prog::Vm::Scheduler < Prog::Base
   STRAND_ID = UBID.parse("st0vmschedv13rzzzzzzzzzzzz").to_uuid
 
   # The fields of a waiting VM's frame that its allocation request uses.
   ALLOCATION_FRAME_KEYS = %w[storage_volumes distinct_storage_devices exclude_host_ids exclude_data_centers gpu_count gpu_device force_host_id ch_version].freeze
 
-  frame_accessor :reservations
+  frame_accessor :reservations, :full_classes
 
   # Adds up the time of each phase of a round, for the round log.
   class RoundTimer
@@ -41,10 +43,15 @@ class Prog::Vm::Scheduler < Prog::Base
   # rest of its class: they keep their place in line, cost nothing, and
   # cannot block smaller VMs that fit in the gaps. A round ends after it
   # placed central_vm_scheduler_batch_size VMs, or when no class fits.
+  #
+  # A class that did not fit stays full until capacity frees up, so later
+  # rounds skip it too, without a try (remembered_full_classes). Holders
+  # are tried anyway, as their reserved host drains.
   label def wait
     timer = RoundTimer.new
     reservations = live_reservations
     holders, queue = waiting_queue.partition { reservations.value?(it[:id]) }
+    remembered = remembered_full_classes(reservations)
     timer.lap(:queue)
     bulk_commit = Scheduling::BulkCommit.new if Config.central_vm_scheduler_bulk_commit
     candidates = if bulk_commit
@@ -68,7 +75,7 @@ class Prog::Vm::Scheduler < Prog::Base
         break
       end
 
-      if full_classes.include?(vm[:class])
+      if full_classes.include?(vm[:class]) || (remembered.include?(vm[:class]) && !reservations.value?(vm[:id]))
         unplaced_ids << vm[:id]
         next
       end
@@ -108,11 +115,12 @@ class Prog::Vm::Scheduler < Prog::Base
     release_unfitting(reservations, no_capacity)
     reserve(no_capacity.except(*spilled_ids), reservations, candidates)
     self.reservations = reservations
+    remember_full_classes(full_classes | remembered, reservations, since: remembered.empty? ? Time.now : full_classes_since)
     timer.lap(:finish)
 
     Clog.emit("central vm scheduler round", {central_vm_scheduler_round: {
       waiting: holders.size + queue.size, tried:, allocated: allocated_ids.size, unplaced: unplaced_ids.size,
-      milliseconds: timer.milliseconds,
+      remembered: remembered.size, milliseconds: timer.milliseconds,
     }})
     nap(more_waiting ? 0 : 5)
   end
@@ -172,6 +180,36 @@ class Prog::Vm::Scheduler < Prog::Base
     allocated_ids += one_by_one.select { commit_one(it.load, candidates) == :allocated }.map(&:id)
     timer.lap(:one_by_one)
     allocated_ids
+  end
+
+  # The full classes of the previous rounds, while they are still full.
+  # The scheduler makes every allocation, so between rounds free capacity
+  # grows only when VMs leave, hosts change or reservations end, and each
+  # of these changes the capacity state. Other changes that let a class fit,
+  # e.g., a new boot image, wait until central_vm_scheduler_full_class_seconds
+  # have passed.
+  def remembered_full_classes(reservations)
+    remembered = full_classes
+    return Set.new unless remembered && remembered["capacity"] == capacity_state(reservations) &&
+      Time.now - full_classes_since < Config.central_vm_scheduler_full_class_seconds
+
+    Set.new(remembered["classes"])
+  end
+
+  def remember_full_classes(classes, reservations, since:)
+    self.full_classes = {"classes" => classes.to_a, "capacity" => capacity_state(reservations), "since" => since.to_f}
+  end
+
+  def full_classes_since
+    Time.at(full_classes["since"])
+  end
+
+  # Free capacity of the accepting hosts, and the reservations that keep
+  # other VMs off some of it.
+  def capacity_state(reservations)
+    VmHost.where(allocation_state: "accepting")
+      .get { [count.function.*.as(:hosts), sum(total_cores - used_cores).as(:cores), sum(total_hugepages_1g - used_hugepages_1g).as(:memory)] }
+      .map(&:to_i) + [reservations]
   end
 
   # An operator can override the configured value live in the frame.
@@ -239,6 +277,8 @@ class Prog::Vm::Scheduler < Prog::Base
   def waiting_queue
     not_upgrade_premium = Semaphore.where(strand_id: Sequel[:github_runner][:id], name: "not_upgrade_premium").exists
     host_owners = VmHost.exclude(project_id: nil).distinct.select_map(:project_id)
+    # A digest stands for the class, so the frame can remember it.
+    class_keys = Hash.new { |keys, request_class| keys[request_class] = OpenSSL::Digest::SHA256.hexdigest(JSON.generate(request_class))[0, 32] }
     waiting_dataset
       .join(:vm, id: Sequel[:strand][:id])
       .left_join(:github_runner, vm_id: Sequel[:vm][:id])
@@ -258,8 +298,8 @@ class Prog::Vm::Scheduler < Prog::Base
       .map do |row|
         stack = row.delete(:stack)
         project_id = row.delete(:project_id)
-        row[:class] = row.except(:id, :customer, :created_at)
-          .merge(owner: host_owners.include?(project_id) ? project_id : nil, frame: stack.first.slice(*ALLOCATION_FRAME_KEYS))
+        row[:class] = class_keys[row.except(:id, :customer, :created_at)
+          .merge(owner: host_owners.include?(project_id) ? project_id : nil, frame: stack.first.slice(*ALLOCATION_FRAME_KEYS))]
         row
       end
   end

@@ -327,6 +327,15 @@ RSpec.describe Prog::Vm::Scheduler do
         expect(st.stack.first["reservations"]).to eq({})
       end
 
+      it "tries a holder although its class is remembered full" do
+        holder = create_waiting_vm(vcpus: 16)
+        expect { nx.wait }.to nap(5)
+        expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
+        expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 1)}).and_call_original
+
+        expect { described_class.new(st).wait }.to nap(5)
+      end
+
       it "keeps the reservation while its host lacks memory for the holder" do
         holder = create_waiting_vm(vcpus: 16)
         st.update(stack: [{"reservations" => {vmh.id => holder.id}}])
@@ -494,6 +503,39 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { nx.wait }.to nap(5)
       expect(other.reload.vm_host_id).to be_nil
       expect(owned.reload.vm_host_id).not_to be_nil
+    end
+
+    it "skips a full class in later rounds without a try while capacity is unchanged" do
+      create_host(used_cores: 7)
+      vm = create_waiting_vm(vcpus: 4)
+      expect(Clog).to receive(:emit).with("Allocator query for vm", anything).once.and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 0)}).and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 0, unplaced: 1, remembered: 1)}).and_call_original
+
+      expect { nx.wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(5)
+      expect(vm.reload.vm_host_id).to be_nil
+    end
+
+    it "tries a full class again once capacity frees up" do
+      vmh = create_host(used_cores: 7)
+      vm = create_waiting_vm(vcpus: 4)
+
+      expect { nx.wait }.to nap(5)
+      vmh.update(used_cores: 1)
+      expect { described_class.new(st).wait }.to nap(5)
+      expect(vm.reload.vm_host_id).to eq(vmh.id)
+    end
+
+    it "tries a full class again after central_vm_scheduler_full_class_seconds" do
+      create_host(used_cores: 7)
+      create_waiting_vm(vcpus: 4)
+      expect(Config).to receive(:central_vm_scheduler_full_class_seconds).and_return(0)
+      expect(Clog).to receive(:emit).with("Allocator query for vm", anything).twice.and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 0)}).twice.and_call_original
+
+      expect { nx.wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(5)
     end
 
     it "places up to the batch size in a round and continues in the next one" do
