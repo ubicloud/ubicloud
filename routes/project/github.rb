@@ -23,6 +23,37 @@ class Clover
       end
     end
 
+    r.post api?, true do
+      unless (request = GithubConnectRequest.with_code(@project.id, typecast_params.nonempty_str!("code")))
+        fail Validation::ValidationFailed.new(code: "Code is invalid or expired")
+      end
+      installation_id = request.installation_id
+
+      unless @project.active?
+        fail Validation::ValidationFailed.new(project: "GitHub runner integration is not allowed for inactive projects")
+      end
+
+      if GithubInstallation.with_github_installation_id(installation_id)
+        fail Validation::ValidationFailed.new(code: "GitHub installation is already connected to a Ubicloud project")
+      end
+
+      account = Github.app_client.installation(installation_id)[:account]
+      installation = DB.transaction do
+        request.this.delete(force: true)
+        installation = GithubInstallation.create_for_account(installation_id:, account:, project_id: @project.id)
+        audit_log(installation, "create")
+        installation
+      end
+
+      Serializers::GithubInstallation.serialize(installation).merge(has_valid_payment_method: @project.has_valid_payment_method?)
+    end
+
+    r.post api?, "connect" do
+      no_audit_log
+      state = GithubConnectRequest.start(@project.id).state
+      {url: "https://github.com/apps/#{Config.github_app_name}/installations/new?state=#{state}"}
+    end
+
     r.get web?, "create" do
       session["github_installation_project_id"] = @project.id
 

@@ -25,6 +25,7 @@ ubi fw (location/fw-name | fw-id) show [options]
 ubi fw (location/fw-name | fw-id) update-description new-description
 ubi gh command [...]
 ubi gh (installation-name/repository-name) post-command [...]
+ubi gh connect [options]
 ubi gh installation command [...]
 ubi gh installation installation-name post-command [...]
 ubi gh installation list [options]

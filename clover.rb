@@ -1135,6 +1135,13 @@ class Clover < Roda
         r.hash_branches(:webhook_prefix)
       end
 
+      if typecast_params.str("state")
+        r.on "github" do
+          before_main_hash_branches
+          r.hash_branches(:github_connect_prefix)
+        end
+      end
+
       r.get "auth", :ubid_uuid do |id|
         next unless (@oidc_provider = OidcProvider[id])
 

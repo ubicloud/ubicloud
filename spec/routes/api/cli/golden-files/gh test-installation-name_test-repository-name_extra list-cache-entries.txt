@@ -7,6 +7,7 @@ Usage:
     ubi gh (installation-name/repository-name) post-command [...]
 
 Commands:
+    connect                     Connect a GitHub account to the project
     installation                Manage GitHub installations
 
 Post Commands:

@@ -1,0 +1,22 @@
+<div class="space-y-4 text-sm text-gray-700">
+  <% if @code %>
+    <p>
+      To connect the GitHub account <strong><%= @account_name %></strong> to the Ubicloud project
+      <strong><%= @project_name %></strong>, enter this code in the terminal where you ran
+      <code>ubi gh connect</code>:
+    </p>
+
+    <div class="flex justify-center rounded-md bg-gray-100 p-6 font-mono text-4xl font-semibold tracking-widest text-gray-900">
+      <%== part("components/copyable_content", content: @code, classes: "gap-3") %>
+    </div>
+
+    <p>The code expires 10 minutes after you ran <code>ubi gh connect</code>.</p>
+
+    <p class="font-semibold text-red-600">
+      Enter this code only if you ran <code>ubi gh connect</code> yourself. Never give it to another person. A person who
+      has this code can run GitHub Actions jobs of this account on their project and see its secrets.
+    </p>
+  <% else %>
+    <p><%= @connect_error %></p>
+  <% end %>
+</div>

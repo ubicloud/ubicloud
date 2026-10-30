@@ -112,6 +112,78 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
+    post:
+      operationId: createGithubInstallation
+      summary: Connect a GitHub installation using the code shown after installing the GitHub App
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  description: Code shown after installing the GitHub App from the URL returned by the connect endpoint
+                  type: string
+              additionalProperties: false
+              required:
+                - code
+      responses:
+        '200':
+          description: The connected GitHub installation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_valid_payment_method:
+                    description: Whether the project has a valid payment method. GitHub Actions jobs don't start without one.
+                    type: boolean
+                  id:
+                    $ref: '#/components/schemas/GithubInstallation/properties/id'
+                  name:
+                    $ref: '#/components/schemas/GithubInstallation/properties/name'
+                additionalProperties: false
+                required:
+                  - id
+                  - name
+                  - has_valid_payment_method
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  /project/{project_id}/github/connect:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: connectGithub
+      summary: Get the URL that installs the GitHub App to connect a GitHub installation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+              additionalProperties: false
+      responses:
+        '200':
+          description: The GitHub App installation URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    description: URL of the GitHub App installation page
+                    type: string
+                additionalProperties: false
+                required:
+                  - url
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
   /project/{project_id}/github/{github_installation_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'

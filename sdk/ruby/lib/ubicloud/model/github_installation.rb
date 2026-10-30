@@ -12,6 +12,18 @@ module Ubicloud
 
     set_columns :id, :name, :key, :size
 
+    # Return the URL that installs the GitHub App. After installing, GitHub
+    # shows a code to pass to create.
+    def self.connect_url(adapter)
+      adapter.post("#{fragment}/connect")[:url]
+    end
+
+    # Connect a GitHub installation to the project, using the code shown
+    # after installing the GitHub App from connect_url.
+    def self.create(adapter, code:)
+      new(adapter, adapter.post(fragment.to_s, code:))
+    end
+
     # Create a new GithubInstallation instance. +values+ can be:
     #
     # * a string (treated as an id if in valid GithubInstallation id format,

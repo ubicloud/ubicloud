@@ -259,12 +259,22 @@ Usage:
     ubi gh (installation-name/repository-name) post-command [...]
 
 Commands:
+    connect                     Connect a GitHub account to the project
     installation                Manage GitHub installations
 
 Post Commands:
     list-cache-entries          List cache entries for a GitHub repository
     remove-all-cache-entries    Remove all cache entries for a GitHub repository
     remove-cache-entry          Remove cache entry for a GitHub repository
+
+
+Connect a GitHub account to the project
+
+Usage:
+    ubi gh connect [options]
+
+Options:
+        --confirm=code               code shown after installing the GitHub App
 
 
 Manage GitHub installations
