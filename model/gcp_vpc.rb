@@ -22,10 +22,17 @@ end
 #  network_self_link       | text    |
 #  dedicated_for_subnet_id | uuid    |
 #  is_management           | boolean | NOT NULL DEFAULT false
+#  peer_network            | text    |
+#  peering_state           | text    |
+#  peering_state_message   | text    |
 # Indexes:
 #  gcp_vpc_pkey                               | PRIMARY KEY btree (id)
 #  gcp_vpc_dedicated_for_subnet_id_uidx       | UNIQUE btree (dedicated_for_subnet_id) WHERE dedicated_for_subnet_id IS NOT NULL
 #  gcp_vpc_project_id_location_id_shared_uidx | UNIQUE btree (project_id, location_id) WHERE dedicated_for_subnet_id IS NULL
+# Check constraints:
+#  gcp_vpc_peering_config_check    | ((peer_network IS NULL) = (peering_state IS NULL))
+#  gcp_vpc_peering_dedicated_check | (peer_network IS NULL OR dedicated_for_subnet_id IS NOT NULL AND NOT is_management)
+#  gcp_vpc_peering_state_check     | (peering_state = ANY (ARRAY['creating'::text, 'waiting_for_peer'::text, 'active'::text, 'failed'::text, 'deleting'::text]))
 # Foreign key constraints:
 #  gcp_vpc_dedicated_for_subnet_id_fkey | (dedicated_for_subnet_id) REFERENCES private_subnet(id)
 #  gcp_vpc_location_id_fkey             | (location_id) REFERENCES location(id)
