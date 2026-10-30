@@ -197,12 +197,12 @@ class Prog::DownloadBootImage < Prog::Base
     },
     "postgres-ubuntu-2204" => {
       "x64" => {
-        "20261009.1.0" => "4ec0d629d005e265598d833a98e6cacdda4aa8d6bfbadc2b2df1ca5e9e5db685",
+        "20261030.1.0" => "8c2aa4968ef51c4400807e49aa8e6954dfcd0b2c03cb6a2cc41cc25afb3547ad",
       },
     },
     "postgres-ubuntu-2604" => {
       "x64" => {
-        "20261009.1.0" => "2a47337f499363a2a6ec433524fb71c36b0c906418b2adca0cd2370d0688b9c3",
+        "20261030.1.0" => "abadc173b60d29d8cceabf0dab153bb83857dee60fdcad042d139ec288bba320",
       },
     },
     "ai-ubuntu-2404-nvidia" => {
