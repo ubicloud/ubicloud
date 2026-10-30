@@ -19,6 +19,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   KNOWN_KERNEL_BOOT_BUG_SIGNATURES = [
     "EXT4-fs error.*ext4_mb_generate_buddy.*block bitmap and bg descriptor inconsistent",
     "kernel BUG at arch/x86/kernel/alternative.c:[0-9]+",
+    "GRUB_FORCE_PARTUUID set, attempting initrdless boot\\.\\s*$",
   ].freeze
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil, schedule: nil)
@@ -628,7 +629,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def known_kernel_boot_bug?
     return false unless (host = vm.vm_host)
 
-    host.sshable.cmd("sudo grep -qsE :re /vm/:name/serial.log && echo match || true", re: KNOWN_KERNEL_BOOT_BUG_SIGNATURES.join("|"), name: vm.inhost_name).include?("match")
+    host.sshable.cmd("sudo grep -qszE :re /vm/:name/serial.log && echo match || true", re: KNOWN_KERNEL_BOOT_BUG_SIGNATURES.join("|"), name: vm.inhost_name).include?("match")
   end
 
   def replace_runner_on_known_kernel_boot_bug
