@@ -5,12 +5,13 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
 
   MAX_SECONDS = 60 * 60 * 24 * 35
 
-  def self.assemble(installation:, repository_name:, default_branch: nil, **)
+  def self.assemble(installation:, repository_name:, create_date:, run_id:, run_attempt:, default_branch: nil, **)
     DB.transaction do
       unless (repository_id = GithubRepository.where(installation_id: installation.id, name: repository_name).get(:id))
         repository_id = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch, update_last_job_at: false).id
       end
-      workflow_run = GithubActiveWorkflowRun.new(installation_id: installation.id, repository_id:, repository_name:, **)
+
+      workflow_run = GithubActiveWorkflowRun.new(installation_id: installation.id, repository_id:, repository_name:, create_date:, run_id:, run_attempt:, **)
       workflow_run.skip_auto_validations(:unique) do
         workflow_run.insert_conflict(target: [:repository_id, :run_id, :run_attempt], update: {repository_id:}).save_changes
       end
