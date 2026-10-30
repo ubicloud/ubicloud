@@ -145,10 +145,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start
-    if Config.central_vm_scheduler
-      Strand.where(id: Prog::Vm::Scheduler::STRAND_ID).update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
-      hop_wait_allocation
-    end
+    hop_wait_allocation if Config.central_vm_scheduler
 
     begin
       Scheduling::Allocator.allocate(vm, storage_volumes, **allocation_filters)

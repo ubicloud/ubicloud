@@ -588,10 +588,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "waits for the central scheduler if it is enabled" do
       expect(Config).to receive(:central_vm_scheduler).and_return(true)
-      scheduler = Strand.create_with_id(Prog::Vm::Scheduler::STRAND_ID, prog: "Vm::Scheduler", label: "wait", schedule: Time.now + 60)
       expect(Scheduling::Allocator).not_to receive(:allocate)
       expect { nx.start }.to hop("wait_allocation")
-      expect(scheduler.reload.schedule).to be < Time.now
     end
 
     it "creates a page if no capacity left and naps" do

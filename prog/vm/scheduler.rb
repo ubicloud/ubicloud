@@ -129,7 +129,7 @@ class Prog::Vm::Scheduler < Prog::Base
       waiting: holders.size + queue.size, tried:, allocated: allocated_ids.size, unplaced: unplaced_ids.size,
       remembered: remembered.size, milliseconds: timer.milliseconds,
     }})
-    nap(more_waiting ? 0 : 5)
+    nap(more_waiting ? 0 : 0.2)
   end
 
   # Returns :allocated, the request of a VM that does not fit, or :failed.

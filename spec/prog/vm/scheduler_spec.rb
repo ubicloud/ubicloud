@@ -52,7 +52,7 @@ RSpec.describe Prog::Vm::Scheduler do
       vmh = create_host
       vms = Array.new(2) { create_waiting_vm }
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
       expect(vms.map { it.strand.schedule }).to all(be < Time.now)
     end
@@ -60,8 +60,8 @@ RSpec.describe Prog::Vm::Scheduler do
     it "marks the vms without capacity as waiting for capacity once" do
       vm = create_waiting_vm
 
-      expect { nx.wait }.to nap(5)
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
+      expect { nx.wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to be_nil
       expect(Semaphore.where(strand_id: vm.id, name: "waiting_for_capacity").count).to eq(1)
     end
@@ -71,7 +71,7 @@ RSpec.describe Prog::Vm::Scheduler do
       vm.update(created_at: Time.now - 60)
       runner = create_runner(vm)
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(runner.spill_over_set?).to be(true)
     end
 
@@ -82,7 +82,7 @@ RSpec.describe Prog::Vm::Scheduler do
       create_runner(spilled).incr_spill_over
       vm = create_waiting_vm
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(spilled.reload.vm_host_id).to be_nil
       expect(vm.reload.vm_host_id).not_to be_nil
     end
@@ -96,7 +96,7 @@ RSpec.describe Prog::Vm::Scheduler do
         round = {waiting: 1, tried: 1, allocated: 1, unplaced: 0, milliseconds: hash_including(:queue, :lock, :allocate, :finish)}
         expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(round)}).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
       end
     end
 
@@ -112,7 +112,7 @@ RSpec.describe Prog::Vm::Scheduler do
         milliseconds = hash_including(:queue, :lock, :load, :request, :candidates, :score, :bulk_plan, :bulk_write, :one_by_one, :finish)
         expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(allocated: 1, milliseconds:)}).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
       end
 
       def create_slice_host(cidr: "1.1.1.0/30", net6: "fd10:9b0b:6b4b:8fbb::/64", backend: true, **)
@@ -160,11 +160,11 @@ RSpec.describe Prog::Vm::Scheduler do
         one_by_one = nil
         DB.transaction(savepoint: true, rollback: :always) do
           expect(Config).to receive(:central_vm_scheduler_bulk_commit).and_return(false)
-          expect { nx.wait }.to nap(5)
+          expect { nx.wait }.to nap(0.2)
           one_by_one = allocation_rows(vms, hosts)
         end
 
-        expect { described_class.new(st).wait }.to nap(5)
+        expect { described_class.new(st).wait }.to nap(0.2)
         expect(allocation_rows(vms, hosts)).to eq(one_by_one)
         expect(vms.map { it.vm_host_slice.vm_host_id }).to all(be_truthy)
       end
@@ -173,7 +173,7 @@ RSpec.describe Prog::Vm::Scheduler do
         vmh = create_slice_host(backend: false)
         vm = create_waiting_vm
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.vm_host_id).to eq(vmh.id)
         expect(vm.vm_storage_volumes.first.spdk_installation_id).not_to be_nil
       end
@@ -185,7 +185,7 @@ RSpec.describe Prog::Vm::Scheduler do
         after_plan { VmHostCpu.where(vm_host_id: vmh.id, cpu_number: [2, 3]).update(vm_host_slice_id: taken.id) }
         expect(Clog).to receive(:emit).with("central vm scheduler bulk commit failed", hash_including(central_vm_scheduler_bulk_failure: {vms: 1})).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.vm_host_id).to eq(vmh.id)
         expect(vm.vm_host_slice.cpus.map(&:cpu_number)).to eq([4, 5])
       end
@@ -197,7 +197,7 @@ RSpec.describe Prog::Vm::Scheduler do
         after_plan { VmHost.where(id: vmh.id).update(used_cores: 0) }
         expect(Clog).not_to receive(:emit).with("central vm scheduler failed to allocate vm", anything)
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect([first, large, last].map { it.reload.vm_host_id }).to eq([vmh.id, nil, vmh.id])
       end
 
@@ -207,7 +207,7 @@ RSpec.describe Prog::Vm::Scheduler do
         vms = Array.new(2) { create_waiting_vm }
         vms.each { it.update(ip4_enabled: true) }
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vms.map { it.reload.vm_host_id }).to contain_exactly(fuller.id, other.id)
       end
 
@@ -223,14 +223,14 @@ RSpec.describe Prog::Vm::Scheduler do
         vm.create_storage_volumes(volumes.map { it.except("machine_image_version_id").transform_keys(&:to_sym) })
         vm.strand.update(stack: [{"storage_volumes" => volumes}])
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.vm_storage_volumes.sort_by(&:disk_index).map(&:boot_image_id)).to eq([nil, vmh.boot_images.first.id, nil])
       end
 
       it "marks the vms without capacity" do
         vm = create_waiting_vm
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.waiting_for_capacity_set?).to be(true)
       end
 
@@ -240,7 +240,7 @@ RSpec.describe Prog::Vm::Scheduler do
         large, small = Array.new(2) { create_waiting_vm }
         large.update(vcpus: 8, memory_gib: 32)
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(large.reload.vm_host_id).to eq(other.id)
         expect(small.reload.vm_host_id).not_to eq(other.id)
       end
@@ -256,7 +256,7 @@ RSpec.describe Prog::Vm::Scheduler do
           create_vm(vm_host_id: vmh.id, project_id: project.id, name: "existing-vm", ephemeral_net6: used_net6, local_vetho_ip: VmHost::APIPA_RANGE.nth(10).to_s + "/32")
           vm = create_waiting_vm
 
-          expect { nx.wait }.to nap(5)
+          expect { nx.wait }.to nap(0.2)
           expect(vm.reload.ephemeral_net6.to_s).not_to eq(used_net6)
           expect(vm.local_vetho_ip.network.to_s).to eq(VmHost::APIPA_RANGE.nth(12).to_s)
         end
@@ -276,7 +276,7 @@ RSpec.describe Prog::Vm::Scheduler do
         end
         expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vm.ubid})).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.vm_host_id).to be_nil
       end
 
@@ -286,7 +286,7 @@ RSpec.describe Prog::Vm::Scheduler do
         vm = create_waiting_vm
         expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vm.ubid})).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(vm.reload.vm_host_id).to be_nil
       end
     end
@@ -303,15 +303,15 @@ RSpec.describe Prog::Vm::Scheduler do
         large = create_waiting_vm(vcpus: 16)
         expect(Clog).to receive(:emit).with("central vm scheduler reserved host", {central_vm_scheduler_reservation: {vm: large.ubid, vm_host: vmh.ubid}}).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(st.stack.first["reservations"]).to eq({vmh.id => large.id})
 
         small = create_waiting_vm
-        expect { described_class.new(st).wait }.to nap(5)
+        expect { described_class.new(st).wait }.to nap(0.2)
         expect(small.reload.vm_host_id).to be_nil
 
         vmh.update(used_cores: 0)
-        expect { described_class.new(st).wait }.to nap(5)
+        expect { described_class.new(st).wait }.to nap(0.2)
         expect(large.reload.vm_host_id).to eq(vmh.id)
         expect(st.stack.first["reservations"]).to eq({})
       end
@@ -322,18 +322,18 @@ RSpec.describe Prog::Vm::Scheduler do
         st.update(stack: [{"reservations" => {vmh.id => holder.id}}])
         vmh.update(used_cores: 0)
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(holder.reload.vm_host_id).to eq(vmh.id)
         expect(st.stack.first["reservations"]).to eq({})
       end
 
       it "tries a holder although its class is remembered full" do
         holder = create_waiting_vm(vcpus: 16)
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
         expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 1)}).and_call_original
 
-        expect { described_class.new(st).wait }.to nap(5)
+        expect { described_class.new(st).wait }.to nap(0.2)
       end
 
       it "keeps the reservation while its host lacks memory for the holder" do
@@ -341,7 +341,7 @@ RSpec.describe Prog::Vm::Scheduler do
         st.update(stack: [{"reservations" => {vmh.id => holder.id}}])
         vmh.update(used_cores: 0, used_hugepages_1g: 150)
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
       end
 
@@ -352,7 +352,7 @@ RSpec.describe Prog::Vm::Scheduler do
         vmh.update(used_cores: 0)
         expect(Clog).to receive(:emit).with("central vm scheduler released reservation", {central_vm_scheduler_release: {vm: holder.ubid, vm_host: vmh.ubid, reason: "unfitting"}}).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(holder.reload.vm_host_id).to be_nil
       end
 
@@ -362,7 +362,7 @@ RSpec.describe Prog::Vm::Scheduler do
         st.update(stack: [{"reservations" => {gone_host_id => holder.id}}])
         expect(Clog).to receive(:emit).with("central vm scheduler released reservation", {central_vm_scheduler_release: {vm: holder.ubid, vm_host: UBID.to_ubid(gone_host_id), reason: "host gone"}}).and_call_original
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(st.stack.first["reservations"]).to eq({vmh.id => holder.id})
       end
 
@@ -374,7 +374,7 @@ RSpec.describe Prog::Vm::Scheduler do
         large = create_waiting_vm(vcpus: 16)
         st.update(stack: [{"reservations" => {vmh.id => spilled.id}}])
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(runner.spill_over_set?).to be(true)
         expect(st.stack.first["reservations"]).to eq({vmh.id => large.id})
       end
@@ -385,7 +385,7 @@ RSpec.describe Prog::Vm::Scheduler do
         st.update(stack: [{"reservations" => {vmh.id => gone.id}}])
         small = create_waiting_vm
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(small.reload.vm_host_id).to eq(vmh.id)
         expect(st.stack.first["reservations"]).to eq({})
       end
@@ -396,7 +396,7 @@ RSpec.describe Prog::Vm::Scheduler do
         create_waiting_vm(vcpus: 30)
         expect(Config).to receive(:central_vm_scheduler_max_reservations).and_return(1).twice
 
-        expect { nx.wait }.to nap(5)
+        expect { nx.wait }.to nap(0.2)
         expect(st.stack.first["reservations"].size).to eq(1)
       end
     end
@@ -404,7 +404,7 @@ RSpec.describe Prog::Vm::Scheduler do
     it "reserves no host for a large vm that no host may take" do
       create_waiting_vm(vcpus: 16)
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(st.stack.first["reservations"]).to eq({})
     end
 
@@ -412,9 +412,9 @@ RSpec.describe Prog::Vm::Scheduler do
       vmh = create_host
       vm = create_waiting_vm
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(0.2)
       expect(vmh.reload.used_cores).to eq(1 + vm.reload.cores)
     end
 
@@ -427,7 +427,7 @@ RSpec.describe Prog::Vm::Scheduler do
         queue
       end
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to be_nil
     end
 
@@ -435,7 +435,7 @@ RSpec.describe Prog::Vm::Scheduler do
       create_host
       vm = create_waiting_vm(lease: Time.now + 60)
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to be_nil
     end
 
@@ -465,7 +465,7 @@ RSpec.describe Prog::Vm::Scheduler do
       older, newer = Array.new(2) { create_waiting_vm }
       older.incr_waiting_for_capacity
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(older.reload.vm_host_id).not_to be_nil
       expect(newer.reload.vm_host_id).to be_nil
     end
@@ -478,7 +478,7 @@ RSpec.describe Prog::Vm::Scheduler do
       installation = create_installation
       [*large, small].each { create_runner(it, installation:) }
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(small.reload.vm_host_id).not_to be_nil
       expect(large.map { it.reload.waiting_for_capacity_set? }).to eq([true, true])
     end
@@ -491,7 +491,7 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(Clog).to receive(:emit).with("Allocator query for vm", anything).once.and_call_original
       expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, unplaced: 3)}).and_call_original
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
     end
 
     it "tries the vms of a project that owns hosts apart from the others" do
@@ -500,7 +500,7 @@ RSpec.describe Prog::Vm::Scheduler do
       other, owned = Array.new(2) { create_waiting_vm }
       owned.update(project_id: owner.id)
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(other.reload.vm_host_id).to be_nil
       expect(owned.reload.vm_host_id).not_to be_nil
     end
@@ -512,8 +512,8 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 0)}).and_call_original
       expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 0, unplaced: 1, remembered: 1)}).and_call_original
 
-      expect { nx.wait }.to nap(5)
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
+      expect { described_class.new(st).wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to be_nil
     end
 
@@ -521,9 +521,9 @@ RSpec.describe Prog::Vm::Scheduler do
       vmh = create_host(used_cores: 7)
       vm = create_waiting_vm(vcpus: 4)
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       vmh.update(used_cores: 1)
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(0.2)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
     end
 
@@ -534,8 +534,8 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(Clog).to receive(:emit).with("Allocator query for vm", anything).twice.and_call_original
       expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, remembered: 0)}).twice.and_call_original
 
-      expect { nx.wait }.to nap(5)
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
+      expect { described_class.new(st).wait }.to nap(0.2)
     end
 
     it "stops a round after central_vm_scheduler_max_tries tries and continues in the next one" do
@@ -545,7 +545,7 @@ RSpec.describe Prog::Vm::Scheduler do
 
       expect { nx.wait }.to nap(0)
       expect([small, large].map { !it.reload.vm_host_id.nil? }).to eq([true, false])
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(0.2)
       expect(large.reload.vm_host_id).not_to be_nil
     end
 
@@ -556,7 +556,7 @@ RSpec.describe Prog::Vm::Scheduler do
 
       expect { nx.wait }.to nap(0)
       expect([first, second].map { !it.reload.vm_host_id.nil? }).to eq([true, false])
-      expect { described_class.new(st).wait }.to nap(5)
+      expect { described_class.new(st).wait }.to nap(0.2)
       expect(second.reload.vm_host_id).not_to be_nil
     end
 
@@ -579,7 +579,7 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(Clog).to receive(:emit).with("central vm scheduler failed to allocate vm", hash_including(central_vm_scheduler_failure: {vm: vms.last.ubid})).and_call_original
       expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 2, allocated: 0)}).and_call_original
 
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to nap(0.2)
       expect(vms.map { it.reload.vm_host_id }).to eq([nil, nil])
     end
   end
