@@ -27,7 +27,7 @@ class VmHost < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics, :patch,
-    :enable_csum_guard, :disable_csum_guard
+    :enable_csum_guard, :disable_csum_guard, :upgrade_ubiblk
   include HealthMonitorMethods
   include MetricsTargetMethods
 
