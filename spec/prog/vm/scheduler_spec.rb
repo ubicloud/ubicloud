@@ -538,6 +538,17 @@ RSpec.describe Prog::Vm::Scheduler do
       expect { described_class.new(st).wait }.to nap(5)
     end
 
+    it "stops a round after central_vm_scheduler_max_tries tries and continues in the next one" do
+      create_host
+      small, large = [create_waiting_vm, create_waiting_vm(vcpus: 4)]
+      expect(Config).to receive(:central_vm_scheduler_max_tries).and_return(1).twice
+
+      expect { nx.wait }.to nap(0)
+      expect([small, large].map { !it.reload.vm_host_id.nil? }).to eq([true, false])
+      expect { described_class.new(st).wait }.to nap(5)
+      expect(large.reload.vm_host_id).not_to be_nil
+    end
+
     it "places up to the batch size in a round and continues in the next one" do
       create_host
       first, second = Array.new(2) { create_waiting_vm }

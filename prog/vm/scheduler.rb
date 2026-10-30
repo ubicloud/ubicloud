@@ -42,7 +42,8 @@ class Prog::Vm::Scheduler < Prog::Base
   # same allocation, so once one of them does not fit, the round skips the
   # rest of its class: they keep their place in line, cost nothing, and
   # cannot block smaller VMs that fit in the gaps. A round ends after it
-  # placed central_vm_scheduler_batch_size VMs, or when no class fits.
+  # placed central_vm_scheduler_batch_size VMs, after
+  # central_vm_scheduler_max_tries tries, or when no class fits.
   #
   # A class that did not fit stays full until capacity frees up, so later
   # rounds skip it too, without a try (remembered_full_classes). Holders
@@ -66,6 +67,7 @@ class Prog::Vm::Scheduler < Prog::Base
     full_classes = Set.new
     unplaced_ids = []
     batch_size = Config.central_vm_scheduler_batch_size
+    max_tries = Config.central_vm_scheduler_max_tries
     more_waiting = false
     tried = 0
 
@@ -78,6 +80,11 @@ class Prog::Vm::Scheduler < Prog::Base
       if full_classes.include?(vm[:class]) || (remembered.include?(vm[:class]) && !reservations.value?(vm[:id]))
         unplaced_ids << vm[:id]
         next
+      end
+
+      if tried >= max_tries
+        more_waiting = true
+        break
       end
 
       st = lock_strands([vm[:id]]).first
