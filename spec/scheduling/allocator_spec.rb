@@ -185,6 +185,26 @@ RSpec.describe Scheduling::Allocator do
       vms.each { allocate(it) }
     end
 
+    it "scores central_vm_scheduler_scored_hosts valid hosts, not all of them" do
+      Array.new(3) { create_host }
+      vm = create_waiting_vm
+      expect(Config).to receive(:central_vm_scheduler_scored_hosts).and_return(2)
+      expect(Al::BestFitAllocation).to receive(:new).twice.and_call_original
+
+      allocate(vm)
+      expect(vm.reload.vm_host_id).not_to be_nil
+    end
+
+    it "skips the hosts a vm may not use until it found enough valid ones" do
+      reserved = create_host
+      free = create_host
+      vm = create_waiting_vm
+      expect(Config).to receive(:central_vm_scheduler_scored_hosts).and_return(1)
+
+      Al::CandidateCache.new(reservations: {reserved.id => "other"}, free_provisionings: 0).allocate(vm, described_class.request(vm, storage_volumes))
+      expect(vm.reload.vm_host_id).to eq(free.id)
+    end
+
     it "prefers the host with the least space left" do
       create_host
       fuller = create_host(used_cores: 5, used_hugepages_1g: 30)

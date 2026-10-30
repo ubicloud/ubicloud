@@ -266,6 +266,7 @@ module Config
   override :central_vm_scheduler_batch_size, 50, int
   override :central_vm_scheduler_full_class_seconds, 60, int
   override :central_vm_scheduler_max_tries, 100, int
+  override :central_vm_scheduler_scored_hosts, 50, int
   override :central_vm_scheduler_spill_installation_share, 0.5, float
   override :central_vm_scheduler_reservation_min_vcpus, 16, int
   override :central_vm_scheduler_max_reservations, 10, int

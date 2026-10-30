@@ -579,12 +579,24 @@ module Scheduling::Allocator
       @host_owners ||= VmHost.exclude(project_id: nil).distinct.select_map(:project_id)
     end
 
+    # Scores the hosts it meets in a random order until it found
+    # central_vm_scheduler_scored_hosts valid ones, not every host of the
+    # class (Borg's relaxed randomization). A host the request may not use
+    # is skipped when it is met.
     def best_allocation(request)
-      hosts = equivalence_class(request).hosts(@changed_host_ids).reject do
-        ((holder = @reservations[it[:vm_host_id]]) && holder != request.vm_id) ||
-          (request.ip4_enabled && !it[:ipv4_available])
+      scored_hosts = Config.central_vm_scheduler_scored_hosts
+      allocations = []
+      equivalence_class(request).hosts(@changed_host_ids).shuffle.each do |host|
+        next if (holder = @reservations[host[:vm_host_id]]) && holder != request.vm_id
+        next if request.ip4_enabled && !host[:ipv4_available]
+
+        allocation = BestFitAllocation.new(host, request, free_provisionings: @free_provisionings)
+        next unless allocation.is_valid
+
+        allocations << allocation
+        break if allocations.size >= scored_hosts
       end
-      BestFitAllocation.best_of(hosts, request, free_provisionings: @free_provisionings)
+      allocations.min_by { it.score + Allocation.random_score }
     end
 
     def new_equivalence_class(request)
