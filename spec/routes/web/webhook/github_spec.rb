@@ -190,7 +190,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "fails if not queued and runner_id is empty" do
-      send_webhook("workflow_job", workflow_job_payload(action: "waiting", workflow_job: workflow_job_object(runner_id: nil)))
+      send_webhook("workflow_job", workflow_job_payload(action: "in_progress", workflow_job: workflow_job_object(runner_id: nil)))
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "A workflow_job without runner_id"}}.to_json)
@@ -231,12 +231,13 @@ RSpec.describe Clover, "github" do
       expect(runner.reload.conclusion).to eq("success")
     end
 
-    it "fails if unexpected action" do
-      runner
-      send_webhook("workflow_job", workflow_job_payload(action: "approved"))
+    it "fails if unexpected action, before checking the installation or payload" do
+      ["approved", "waiting", nil].each do |action|
+        send_webhook("workflow_job", workflow_job_payload(action:, installation_id: 789, workflow_job: nil))
 
-      expect(page.status_code).to eq(200)
-      expect(page.body).to eq({error: {message: "Unhandled workflow_job action"}}.to_json)
+        expect(page.status_code).to eq(200)
+        expect(page.body).to eq({error: {message: "Unhandled workflow_job action"}}.to_json)
+      end
     end
   end
 
@@ -362,16 +363,17 @@ RSpec.describe Clover, "github" do
     end
 
     it "returns error if workflow run does not exist for known actions" do
-      send_webhook("workflow_run", workflow_run_payload(action: "queued", workflow_run: workflow_run_object(run_id: 999)))
+      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(run_id: 999)))
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered workflow_run"}}.to_json)
     end
 
-    it "returns error for unknown action" do
-      workflow_run
-      send_webhook("workflow_run", workflow_run_payload(action: "rerequested"))
-      expect(page.status_code).to eq(200)
-      expect(page.body).to eq({error: {message: "Unhandled workflow_run action"}}.to_json)
+    it "returns error for unknown action, before checking the installation or payload" do
+      ["rerequested", "queued", nil].each do |action|
+        send_webhook("workflow_run", workflow_run_payload(action:, installation_id: 789, workflow_run: nil))
+        expect(page.status_code).to eq(200)
+        expect(page.body).to eq({error: {message: "Unhandled workflow_run action"}}.to_json)
+      end
     end
   end
 

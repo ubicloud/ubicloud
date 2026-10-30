@@ -25,12 +25,17 @@ class Clover
   end
 
   def handle_webhook_github_workflow_run(data)
+    case (action = data["action"])
+    when "requested", "completed", "in_progress"
+      nil
+    else
+      return {error: {message: "Unhandled workflow_run action"}}
+    end
+
     unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
       return {error: {message: "Unregistered installation"}}
     end
-
-    action = data["action"]
 
     if (run = data["workflow_run"])
       repository_name = run.dig("repository", "full_name")
@@ -91,8 +96,7 @@ class Clover
       return {error: {message: "Unregistered workflow_run"}}
     end
 
-    case action
-    when "completed"
+    if action == "completed"
       workflow_run.this.update(
         status:,
         completed_at: run["updated_at"],
@@ -100,11 +104,9 @@ class Clover
       )
       workflow_run.incr_destroy
       {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}
-    when "in_progress"
+    else # "in_progress"
       workflow_run.this.where(conclusion: nil).update(status:)
       {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}
-    else
-      {error: {message: "Unhandled workflow_run action"}}
     end
   end
 
@@ -126,12 +128,17 @@ class Clover
   end
 
   def handle_webhook_github_workflow_job(data)
+    case (action = data["action"])
+    when "queued", "completed", "in_progress"
+      nil
+    else
+      return {error: {message: "Unhandled workflow_job action"}}
+    end
+
     unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
       return {error: {message: "Unregistered installation"}}
     end
-
-    action = data["action"]
 
     unless (job = data["workflow_job"])
       Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action:}})
@@ -194,16 +201,13 @@ class Clover
 
     update_github_runner_from_workflow_job(runner, job)
 
-    case action
-    when "in_progress"
+    if action == "in_progress"
       runner.log_duration("runner_started", Time.new(job["started_at"]) - Time.new(job["created_at"]))
       {message: "GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}"}
-    when "completed"
+    else # "completed"
       runner.incr_destroy
 
       {message: "GithubRunner[#{runner.ubid}] deleted"}
-    else
-      {error: {message: "Unhandled workflow_job action"}}
     end
   end
 end
