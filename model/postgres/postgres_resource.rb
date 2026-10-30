@@ -341,11 +341,9 @@ class PostgresResource < Sequel::Model
         unless dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
           dns.check(:AAAA, record_name, vm.ip6_string)
         end
-
-        record_name = private_hostname
-        dns.check(:A, record_name, vm.private_ipv4_string)
-        dns.check(:AAAA, record_name, vm.private_ipv6_string)
       end
+
+      private_dns_records.each { |type, data| dns.check(type, private_hostname, data) }
     end
   end
 

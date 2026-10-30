@@ -1,0 +1,48 @@
+<%# locals: (ps:, vpc:) %>
+
+<div class="p-6 space-y-4">
+  <h3 class="text-2xl font-bold text-gray-900">VPC Peering</h3>
+
+  <p class="text-sm text-gray-500">
+    Connect this cluster's dedicated VPC to one VPC in your GCP project over private IPv4 addresses. Custom routes and
+    IPv6 routes are not exchanged. Subnet address ranges must not overlap.
+  </p>
+
+  <% if vpc.peer_network %>
+    <dl class="text-sm space-y-2">
+      <dt class="font-medium">Customer network</dt>
+      <dd><%= vpc.peer_network %></dd>
+      <dt class="font-medium">Status</dt>
+      <dd><%= vpc.peering_state.tr("_", " ") %></dd>
+    </dl>
+    <% if vpc.peering_state_message %>
+      <p class="text-sm text-gray-600"><%= vpc.peering_state_message %></p>
+    <% end %>
+
+    <% unless vpc.peering_state == "deleting" %>
+      <% peer_project_id, peer_network_name = vpc.peer_network.split("/").values_at(1, 4)
+        local_project_id = vpc.location.location_credential_gcp.project_id
+        command = "gcloud compute networks peerings create #{vpc.peering_name} --project=#{peer_project_id} --network=#{peer_network_name} --peer-project=#{local_project_id} --peer-network=#{vpc.name} --stack-type=IPV4_ONLY --no-import-custom-routes --no-export-custom-routes --no-import-subnet-routes-with-public-ip --no-export-subnet-routes-with-public-ip" %>
+      <p class="text-sm text-gray-500">Create the matching peering in your project:</p>
+      <%== part("components/copyable_content", content: command) %>
+      <p class="text-sm text-gray-500">
+        Allow your client subnet CIDRs in the database firewall on ports 5432 and 6432, and allow outbound connections
+        in your own VPC. Use the private connection string on the database's Connection tab. Status is checked every
+        minute. Peering does not provide transit through other peered networks.
+      </p>
+    <% end %>
+
+    <% if has_permission?("PrivateSubnet:edit", ps) && vpc.peering_state != "deleting" %>
+      <%== part("components/delete_button", url: "#{path(ps)}/vpc-peering", text: "Disconnect VPC", confirmation_message: "Disconnect this VPC? Private connections through this peering will stop.") %>
+      <p class="text-sm text-gray-500">
+        After disconnecting, remove the matching peering configuration in your GCP project.
+      </p>
+    <% end %>
+  <% elsif has_permission?("PrivateSubnet:edit", ps) %>
+    <% form(action: "#{path(ps)}/vpc-peering", method: :post, class: "space-y-4") do %>
+      <%== part("components/form/text", name: "peer_project_id", label: "GCP project ID", attributes: {required: true, placeholder: "my-project"}) %>
+      <%== part("components/form/text", name: "peer_network_name", label: "VPC network name", attributes: {required: true, placeholder: "my-network"}) %>
+      <%== part("components/form/submit_button", text: "Connect VPC") %>
+    <% end %>
+  <% end %>
+</div>

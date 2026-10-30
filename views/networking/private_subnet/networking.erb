@@ -125,3 +125,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
     </table>
   </div>
 </div>
+
+<% if @ps.location.gcp? && (vpc = @ps.gcp_vpc) && (gcp_vpc_peering_enabled?(@ps) || vpc.peer_network) %>
+  <%== part("networking/private_subnet/gcp_vpc_peering", ps: @ps, vpc:) %>
+<% end %>

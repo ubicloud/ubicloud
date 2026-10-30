@@ -724,6 +724,53 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
   end
 
+  describe "peering lifecycle" do
+    before do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, location_id: location.id).subject
+      gcp_vpc.update(dedicated_for_subnet_id: ps.id, peer_network: "projects/customer-project/global/networks/customer-vpc", peering_state: "waiting_for_peer")
+    end
+
+    it "checks peering on the existing strand" do
+      expect { nx.wait }.to hop("sync", "Vnet::Gcp::VpcPeering")
+      expect(st.stack.first["peering_checked_at"]).to be_within(2).of(Time.now.to_i)
+    end
+
+    it "naps between checks instead of spinning through wait and sync" do
+      refresh_frame(nx, new_values: {"peering_checked_at" => Time.now.to_i})
+      expect { nx.wait }.to nap(60)
+    end
+
+    it "wakes immediately for an explicit peering change" do
+      st
+      gcp_vpc.incr_update_peering
+      refresh_frame(nx, new_values: {"peering_checked_at" => Time.now.to_i})
+      expect { nx.wait }.to hop("sync", "Vnet::Gcp::VpcPeering")
+    end
+
+    it "keeps firewall reconciliation ahead of status polling" do
+      st
+      gcp_vpc.incr_update_firewall_rules
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+
+    it "does not retry a terminal input error until the customer disconnects" do
+      gcp_vpc.update(peering_state: "failed", peering_state_message: "Overlapping subnets")
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+    end
+
+    it "clears a delete notification already handled by an in-flight peering operation" do
+      gcp_vpc.update(peer_network: nil, peering_state: nil)
+      st
+      gcp_vpc.incr_update_peering
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+      expect(gcp_vpc.update_peering_set?(cached: false)).to be(false)
+    end
+
+    it "removes the peer before destroying the VPC" do
+      expect { nx.destroy }.to hop("sync", "Vnet::Gcp::VpcPeering") { it.strand_update_args[:stack].first["link"] == [st.prog, "enumerate_destroy_state"] }
+    end
+  end
+
   describe "#destroy" do
     it "registers deadline and hops to enumerate_destroy_state when no subnets remain" do
       expect { nx.destroy }.to hop("enumerate_destroy_state")
