@@ -13,7 +13,7 @@ class Prog::RolloutSemaphore < Prog::Base
     PostgresResource => [:refresh_dns_record, :refresh_certificates],
     PostgresServer => [:install_rhizome, :configure, :configure_logs, :configure_metrics, :refresh_walg_credentials],
     Vm => [:update_firewall_rules, :restart],
-    VmHost => [:patch, :enable_csum_guard, :disable_csum_guard],
+    VmHost => [:patch, :enable_csum_guard, :disable_csum_guard, :upgrade_ubiblk],
   }.freeze.each_value(&:freeze)
 
   ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.each do |klass, semaphores|
