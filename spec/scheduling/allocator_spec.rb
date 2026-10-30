@@ -158,6 +158,25 @@ RSpec.describe Scheduling::Allocator do
       expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
     end
 
+    it "shares the equivalence classes of projects that own no hosts" do
+      vmh = create_host
+      vms = [create_waiting_vm, create_waiting_vm.tap { it.update(project_id: Project.create(name: "other").id) }]
+      expect(Al::Allocation::CandidateHosts).to receive(:new).once.and_call_original
+
+      vms.each { allocate(it) }
+      expect(vms.map { it.reload.vm_host_id }).to eq([vmh.id, vmh.id])
+    end
+
+    it "keeps the equivalence classes of a project that owns hosts apart" do
+      owner = Project.create(name: "owner")
+      create_host(project_id: owner.id)
+      vms = [create_waiting_vm, create_waiting_vm.tap { it.update(project_id: owner.id) }]
+      expect(Al::Allocation::CandidateHosts).to receive(:new).twice.and_call_original
+
+      expect { allocate(vms.first) }.to raise_error(Al::NoSpaceLeft)
+      allocate(vms.last)
+    end
+
     it "queries the candidate hosts of each equivalence class" do
       create_host
       vms = [create_waiting_vm, create_waiting_vm(vcpus: 4, memory_gib: 16)]

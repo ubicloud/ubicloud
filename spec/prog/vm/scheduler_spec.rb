@@ -474,6 +474,28 @@ RSpec.describe Prog::Vm::Scheduler do
       expect(large.map { it.reload.waiting_for_capacity_set? }).to eq([true, true])
     end
 
+    it "tries one vm of a class for the runners of different customers" do
+      create_host(used_cores: 7)
+      vms = Array.new(3) { create_waiting_vm(vcpus: 4) }
+      vms.each { it.update(location_id: Location::GITHUB_RUNNERS_ID) }
+      vms.each { create_runner(it) }
+      expect(Clog).to receive(:emit).with("Allocator query for vm", anything).once.and_call_original
+      expect(Clog).to receive(:emit).with("central vm scheduler round", {central_vm_scheduler_round: hash_including(tried: 1, unplaced: 3)}).and_call_original
+
+      expect { nx.wait }.to nap(5)
+    end
+
+    it "tries the vms of a project that owns hosts apart from the others" do
+      owner = Project.create(name: "owner")
+      create_host(project_id: owner.id)
+      other, owned = Array.new(2) { create_waiting_vm }
+      owned.update(project_id: owner.id)
+
+      expect { nx.wait }.to nap(5)
+      expect(other.reload.vm_host_id).to be_nil
+      expect(owned.reload.vm_host_id).not_to be_nil
+    end
+
     it "places up to the batch size in a round and continues in the next one" do
       create_host
       first, second = Array.new(2) { create_waiting_vm }

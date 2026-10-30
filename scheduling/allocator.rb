@@ -563,7 +563,20 @@ module Scheduling::Allocator
     private
 
     def equivalence_class(request)
-      @classes[request.to_h.except(:vm_id, :diagnostics)] ||= new_equivalence_class(request)
+      @classes[class_key(request)] ||= new_equivalence_class(request)
+    end
+
+    # Requests of different projects differ only in the hosts a project
+    # owns (the owner filter), so the requests of projects that own no
+    # hosts share their classes.
+    def class_key(request)
+      key = request.to_h.except(:vm_id, :diagnostics)
+      key[:project_id] = nil unless host_owners.include?(request.project_id)
+      key
+    end
+
+    def host_owners
+      @host_owners ||= VmHost.exclude(project_id: nil).distinct.select_map(:project_id)
     end
 
     def best_allocation(request)

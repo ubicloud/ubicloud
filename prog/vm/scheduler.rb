@@ -234,23 +234,32 @@ class Prog::Vm::Scheduler < Prog::Base
   # for runners, the project otherwise) and its request class: everything
   # its allocation request depends on. A VM's age counts from its creation,
   # when it enters the queue; its id does not tell its age.
+  # The class holds what the request is made of, not who asks: a project
+  # counts only if it owns hosts (Scheduling::Allocator::CandidateCache#class_key).
   def waiting_queue
     not_upgrade_premium = Semaphore.where(strand_id: Sequel[:github_runner][:id], name: "not_upgrade_premium").exists
+    host_owners = VmHost.exclude(project_id: nil).distinct.select_map(:project_id)
     waiting_dataset
       .join(:vm, id: Sequel[:strand][:id])
       .left_join(:github_runner, vm_id: Sequel[:vm][:id])
+      .left_join(:github_installation, id: Sequel[:github_runner][:installation_id])
+      .left_join(Sequel[:project].as(:installation_project), id: Sequel[:github_installation][:project_id])
       .select(
-        Sequel[:strand][:id], Sequel[:strand][:stack], Sequel[:vm][:created_at],
+        Sequel[:strand][:id], Sequel[:strand][:stack], Sequel[:vm][:created_at], Sequel[:vm][:project_id],
         Sequel.function(:coalesce, Sequel[:github_runner][:installation_id], Sequel[:vm][:project_id]).as(:customer),
-        Sequel[:vm][:vcpus], Sequel[:vm][:memory_gib], Sequel[:vm][:family], Sequel[:vm][:arch], Sequel[:vm][:location_id],
-        Sequel[:vm][:boot_image], Sequel[:vm][:ip4_enabled], Sequel[:vm][:project_id], Sequel[:github_runner][:installation_id],
+        Sequel[:vm][:vcpus], Sequel[:vm][:memory_gib], Sequel[:vm][:cpu_percent_limit], Sequel[:vm][:family], Sequel[:vm][:arch],
+        Sequel[:vm][:location_id], Sequel[:vm][:boot_image], Sequel[:vm][:ip4_enabled],
+        Sequel.cast(Sequel[:github_installation][:allocator_preferences], :text).as(:allocator_preferences),
+        Sequel.pg_jsonb_op(Sequel[:installation_project][:feature_flags]).get_text("free_runner_upgrade_until").as(:free_runner_upgrade_until),
         not_upgrade_premium.as(:not_upgrade_premium),
       )
       .order(Sequel[:vm][:created_at], Sequel[:strand][:id])
       .naked
       .map do |row|
         stack = row.delete(:stack)
-        row[:class] = row.except(:id, :customer, :created_at).merge(frame: stack.first.slice(*ALLOCATION_FRAME_KEYS))
+        project_id = row.delete(:project_id)
+        row[:class] = row.except(:id, :customer, :created_at)
+          .merge(owner: host_owners.include?(project_id) ? project_id : nil, frame: stack.first.slice(*ALLOCATION_FRAME_KEYS))
         row
       end
   end
