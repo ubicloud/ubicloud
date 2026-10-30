@@ -18,8 +18,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       nap delay
     end
     register_deadline("wait", 10 * 60)
-    nap 5 unless user_nic.private_subnet.strand.label == "wait"
-    nap 1 unless user_nic.strand.label == "wait"
+    nap 5 unless vm.nics.all? { it.private_subnet.strand.label == "wait" }
+    nap 1 unless vm.nics.all? { it.strand.label == "wait" }
 
     # Zone selection is a VM concern. Pick a zone on first entry, then
     # honour the value already set by retry_zone_capacity on later entries.
@@ -33,7 +33,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
 
-    user_data = "#cloud-config\n" + {
+    mgmt_nic = vm.management_nic
+    cloud_config = {
       "users" => [
         "default",
         {
@@ -44,7 +45,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           "ssh_authorized_keys" => vm.sshable.keys.map(&:public_key),
         },
       ],
-    }.to_yaml.delete_prefix("---\n")
+    }
+    cloud_config["runcmd"] = [dual_nic_netplan(mgmt_nic).script] if mgmt_nic
+    user_data = "#cloud-config\n" + cloud_config.to_yaml.delete_prefix("---\n")
 
     # An -lssd machine type bundles its local SSDs, so only the boot disk is
     # declared for it; a family without one gets them attached here. GCE
@@ -74,7 +77,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
     end
 
-    gcp_res = user_nic.nic_gcp_resource
+    network_interfaces = if mgmt_nic
+      [
+        network_interface(mgmt_nic, stack_type: "IPV4_ONLY"),
+        network_interface(user_nic, stack_type: "IPV4_IPV6", vlan: GcpDualNicNetplan::VLAN),
+      ]
+    else
+      [network_interface(user_nic, stack_type: "IPV4_IPV6")]
+    end
+
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
@@ -83,29 +94,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         on_host_maintenance: Option.gcp_on_host_maintenance(vm.family, vm.vcpus),
       ),
       disks:,
-      network_interfaces: [
-        Google::Cloud::Compute::V1::NetworkInterface.new(
-          network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
-          subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
-          network_i_p: user_nic.private_ipv4.network.to_s,
-          stack_type: "IPV4_IPV6",
-          access_configs: [
-            Google::Cloud::Compute::V1::AccessConfig.new(
-              name: "External NAT",
-              type: "ONE_TO_ONE_NAT",
-              network_tier: "STANDARD",
-              nat_i_p: gcp_res.static_ip.to_s,
-            ),
-          ],
-          ipv6_access_configs: [
-            Google::Cloud::Compute::V1::AccessConfig.new(
-              name: "External IPv6",
-              type: "DIRECT_IPV6",
-              network_tier: "PREMIUM",
-            ),
-          ],
-        ),
-      ],
+      network_interfaces:,
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
@@ -199,14 +188,19 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       nap 5
     end
 
-    ni = instance.network_interfaces.first
-    public_ipv4 = ni&.access_configs&.first&.nat_i_p
-    public_ipv6 = ni&.ipv6_access_configs&.first&.external_ipv6
-
-    if public_ipv4
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
-      vm.sshable.update(host: public_ipv4)
+    nis = instance.network_interfaces
+    ssh_ni, user_ni = if vm.management_nic
+      dynamic_nic_name = "nic0.#{GcpDualNicNetplan::VLAN}"
+      [nis.find { it.name == "nic0" }, nis.find { it.name == dynamic_nic_name } || fail("GCE instance #{vm.name} has no Dynamic NIC #{dynamic_nic_name}")]
+    else
+      [nis.first, nis.first]
     end
+    public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
+    public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
+    ssh_host = ssh_ni&.access_configs&.first&.nat_i_p
+
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4) if public_ipv4
+    vm.sshable.update(host: ssh_host) if ssh_host
 
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
     wakeup_waiting_strand("allocated_waiting_strand_id")
@@ -224,7 +218,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       push vm.update_firewall_rules_prog, {}, "update_firewall_rules"
     end
 
-    addr = vm.ip4
+    addr = vm.management_nic ? vm.sshable.host : vm.ip4
     hop_create_billing_record unless addr
 
     begin
@@ -232,6 +226,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     rescue SystemCallError
       nap 1
     end
+
+    nap 5 if vm.management_nic && !user_nic_default_routes?
 
     hop_create_billing_record
   end
@@ -332,6 +328,49 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def user_nic
     @user_nic ||= vm.user_nic
+  end
+
+  def network_interface(nic, stack_type:, vlan: nil)
+    gcp_res = nic.nic_gcp_resource
+    interface = Google::Cloud::Compute::V1::NetworkInterface.new(
+      network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
+      subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
+      network_i_p: nic.private_ipv4.network.to_s,
+      stack_type:,
+      access_configs: [
+        Google::Cloud::Compute::V1::AccessConfig.new(
+          name: "External NAT",
+          type: "ONE_TO_ONE_NAT",
+          network_tier: "STANDARD",
+          nat_i_p: gcp_res.static_ip.to_s,
+        ),
+      ],
+      vlan:,
+    )
+    if stack_type == "IPV4_IPV6"
+      interface.ipv6_access_configs << Google::Cloud::Compute::V1::AccessConfig.new(
+        name: "External IPv6",
+        type: "DIRECT_IPV6",
+        network_tier: "PREMIUM",
+      )
+    end
+    interface
+  end
+
+  def dual_nic_netplan(mgmt_nic)
+    GcpDualNicNetplan.new(
+      mgmt_ip: mgmt_nic.private_ipv4.network.to_s,
+      mgmt_gateway: mgmt_nic.private_subnet.net4.nth(1).to_s,
+      user_ip: user_nic.private_ipv4.network.to_s,
+      user_gateway: user_nic.private_subnet.net4.nth(1).to_s,
+    )
+  end
+
+  def user_nic_default_routes?
+    routes = vm.sshable.cmd("ip -o route show default; ip -o -6 route show default").lines
+    routes.size == 2 && routes.all? { it.include?(" dev user-nic ") }
+  rescue Net::SSH::AuthenticationFailed, Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+    false
   end
 
   def credential
@@ -439,11 +478,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def reallocate_private_ipv4(error_message)
-    from = user_nic.private_ipv4.network.to_s
-    new_ip = user_nic.private_subnet.random_private_ipv4
-    Clog.emit("GCE VM private IP is in use by another resource, reallocating",
-      {nic_ip_reallocated: {nic: user_nic.ubid, from:, to: new_ip.network.to_s, error: error_message}})
-    user_nic.update(private_ipv4: new_ip)
+    nics = vm.nics.select { error_message.include?("'#{it.private_ipv4.network}'") }
+    nics = vm.nics if nics.empty?
+    nics.each do |nic|
+      subnet = nic.private_subnet
+      new_ip = subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4
+      Clog.emit("GCE VM private IP is in use by another resource, reallocating",
+        {nic_ip_reallocated: {nic: nic.ubid, from: nic.private_ipv4.network.to_s, to: new_ip.network.to_s, error: error_message}})
+      nic.update(private_ipv4: new_ip)
+    end
   end
 
   def retry_zone_capacity(error_message)
