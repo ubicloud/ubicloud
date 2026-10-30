@@ -2,7 +2,7 @@
 
 class PostgresTimeline < Sequel::Model
   GcsBlobStorage = Data.define(:url)
-  GcsFileWrapper = Data.define(:key, :last_modified)
+  GcsFileWrapper = Data.define(:key, :last_modified, :size)
 
   module Gcp
     private
@@ -40,19 +40,33 @@ PGDATA=/dat/#{version}/data
       @blob_storage_client ||= location.location_credential_gcp.storage_client
     end
 
-    def gcp_list_objects(prefix, delimiter: "")
-      bucket = blob_storage_client.bucket(ubid)
-      return [] unless bucket
-
+    def gcp_list_objects_page(prefix, delimiter: "", start_after: nil, token: nil)
+      api = location.location_credential_gcp.storage_api_client
       delimiter = nil if delimiter.empty?
-      files = bucket.files(prefix:, delimiter:)
-      all_files = files.to_a
-      while (token = files.token)
-        files = bucket.files(prefix:, delimiter:, token:)
-        all_files.concat(files.to_a)
-      end
 
-      all_files.map! { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
+      # A page token already encodes its position, and the other providers only
+      # accept a cursor on the first request.
+      response = api.list_objects(ubid, prefix:, delimiter:, start_offset: (start_after if token.nil?),
+        page_token: token, max_results: 1000)
+      objects = response.items || [].freeze
+      # startOffset is inclusive, start_after is not.
+      objects = objects.drop(1) if token.nil? && start_after && objects.first&.name == start_after
+
+      [objects.map { GcsFileWrapper.new(it.name, it.updated.to_time, it.size) }, response.next_page_token]
+    rescue Google::Apis::ClientError => ex
+      raise unless ex.status_code == 404
+      [[].freeze, nil]
+    end
+
+    def gcp_list_objects(prefix, delimiter: "", start_after: nil)
+      objects = []
+      token = nil
+      loop do
+        page, token = gcp_list_objects_page(prefix, delimiter:, start_after:, token:)
+        objects.concat(page)
+        break unless token
+      end
+      objects
     end
 
     def gcp_create_bucket
