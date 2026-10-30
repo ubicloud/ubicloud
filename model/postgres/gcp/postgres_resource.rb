@@ -44,6 +44,29 @@ class PostgresResource < Sequel::Model
       ["pg_stop", "hba"].freeze
     end
 
+    def gcp_use_separate_management_nic?
+      return true if any_server_has_management_nic?
+      return false unless Config.gcp_postgres_dual_nic || project.get_ff_postgres_gcp_dual_nic
+
+      mgmt_subnet = PrivateSubnet.gcp_management_subnet(location)
+      !mgmt_subnet.nil? && mgmt_subnet.strand.label == "wait"
+    end
+
+    def gcp_ensure_management_subnet
+      return unless Config.gcp_postgres_dual_nic || project.get_ff_postgres_gcp_dual_nic
+      return if PrivateSubnet.gcp_management_subnet(location)
+
+      Prog::Vnet::Gcp::SubnetNexus.assemble_management(location.id)
+    end
+
+    def gcp_mgmt_ssh_via_user_security_group?
+      !use_separate_management_nic? || servers.any? { it.vm.management_nic.nil? }
+    end
+
+    def gcp_management_nic_use_eip?
+      !project.get_ff_postgres_gcp_ssh_ipv6
+    end
+
     def gcp_new_server_exclusion_filters
       exclude_availability_zones, availability_zone = if use_different_az_set?
         # Only exclude AZs of servers that will remain after convergence. Servers

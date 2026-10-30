@@ -44,6 +44,10 @@ class PostgresResource < Sequel::Model
     private_subnet.dedicated_mgmt_security_group?
   end
 
+  def any_server_has_management_nic?
+    !Nic.where(is_management: true, vm_id: servers_dataset.select(:vm_id)).empty?
+  end
+
   def path
     "/location/#{display_location}/postgres/#{name}"
   end
@@ -368,19 +372,14 @@ class PostgresResource < Sequel::Model
     rules
   end
 
-  # Keep port 22 in the internal firewall, which the user security group is
-  # reconciled to, only while some server still depends on the user group
-  # for control plane SSH. New AWS resources use the mgmt group from the
-  # start; existing ones switch once the mgmt group is split off and every
-  # VM has a management NIC.
-  def mgmt_ssh_via_user_security_group?
-    return true unless location.aws?
-    return false if servers.empty?
+  def remove_unneeded_internal_ssh_rules
+    return if mgmt_ssh_via_user_security_group?
 
-    ps_aws = private_subnet.private_subnet_aws_resource
-    return true if ps_aws.nil? || ps_aws.mgmt_security_group_id.nil? || ps_aws.mgmt_security_group_id == ps_aws.user_security_group_id
+    ssh_rules = internal_firewall.firewall_rules_dataset.where(port_range: Sequel.pg_range(22..22))
+    return if ssh_rules.empty?
 
-    servers.any? { it.vm.management_nic.nil? }
+    ssh_rules.destroy
+    private_subnet.apply_firewalls
   end
 
   def pg_firewall_rules(firewall: customer_firewall)

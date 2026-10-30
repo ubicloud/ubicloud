@@ -37,6 +37,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
       boot_image = postgres_resource.boot_image(server_version, arch, postgres_resource.target_image_family)
+      postgres_resource.ensure_management_subnet
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
@@ -56,9 +57,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         availability_zone_required:,
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
-        use_separate_management_nic: postgres_resource.location.aws?,
+        use_separate_management_nic: postgres_resource.use_separate_management_nic?,
         waiting_strand_id: (is_representative ? [uuid, resource_id] : uuid),
-        management_nic_use_eip: !postgres_resource.aws_ssh_ipv6?,
+        management_nic_use_eip: postgres_resource.management_nic_use_eip?,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -1031,6 +1032,7 @@ SQL
     representative_server = resource&.representative_server
     postgres_server.destroy
     representative_server&.incr_configure
+    resource&.remove_unneeded_internal_ssh_rules
 
     pop "postgres server is deleted"
   end
