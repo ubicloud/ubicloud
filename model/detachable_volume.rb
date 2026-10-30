@@ -5,9 +5,8 @@ require_relative "../model"
 class DetachableVolume < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
-  many_to_one :location
-  many_to_one :vm_host
-  many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
+  many_to_one :vm_host, read_only: true
+  many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey, read_only: true
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey, read_only: true
   one_to_one :remote_storage_server, key: :source_detachable_volume_id, read_only: true
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
