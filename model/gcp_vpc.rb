@@ -10,7 +10,30 @@ class GcpVpc < Sequel::Model
   many_to_many :private_subnets, join_table: :private_subnet_gcp_vpc, remover: nil, clearer: nil
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :update_firewall_rules
+  plugin SemaphoreMethods, :destroy, :update_firewall_rules, :update_peering
+
+  def peering_name
+    "ubicloud-peer-#{ubid}"
+  end
+
+  def peering_destroying?
+    Semaphore.where(strand_id: [id, dedicated_for_subnet_id], name: %w[destroy destroying]).any?
+  end
+
+  def configure_peering(peer_project_id:, peer_network_name:)
+    errors = {}
+    errors[:peer_project_id] = "Enter a GCP project ID (6-30 lowercase letters, digits, or hyphens)." unless peer_project_id.match?(/\A[a-z][a-z0-9-]{4,28}[a-z0-9]\z/)
+    errors[:peer_network_name] = "Enter a VPC network name (1-63 lowercase letters, digits, or hyphens)." unless peer_network_name.match?(/\A[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?\z/)
+    fail Validation::ValidationFailed.new(errors) unless errors.empty?
+
+    managed_locations = LocationCredentialGcp.where(project_id: peer_project_id).select(:id)
+    if GcpVpc.where(location_id: managed_locations, name: peer_network_name).any?
+      fail Validation::ValidationFailed.new(peer_network_name: "Choose a customer VPC, not a Ubicloud-managed VPC.")
+    end
+
+    update(peer_network: "projects/#{peer_project_id}/global/networks/#{peer_network_name}", peering_state: "creating", peering_state_message: nil)
+    incr_update_peering
+  end
 end
 
 # Table: gcp_vpc

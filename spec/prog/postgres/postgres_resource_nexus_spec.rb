@@ -625,6 +625,26 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         expect { nx.refresh_dns_record }.to hop("wait")
       end
 
+      it "publishes only private IPv4 for GCP and updates it after failover" do
+        postgres_server
+        standby = create_postgres_server(resource: postgres_resource, is_representative: false)
+        postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        dns_zone.insert_record(record_name: private_hostname, type: "AAAA", ttl: 10, data: "fd00::2")
+        dns_zone.records_dataset.update(created_at: Time.now - 10)
+
+        expect { nx.refresh_dns_record }.to hop("wait")
+        records = DnsRecord.where(dns_zone_id: dns_zone.id, name: private_hostname)
+        expect(records.where(type: "AAAA").reverse(:created_at).get(:tombstoned)).to be(true)
+        expect(records.where(type: "A", tombstoned: false).reverse(:created_at).get(:data)).to eq(postgres_server.vm.private_ipv4_string)
+        records.where(type: "A").update(created_at: Time.now - 1)
+
+        postgres_server.update(is_representative: false)
+        standby.update(is_representative: true)
+        expect { described_class.new(st).refresh_dns_record }.to hop("wait")
+        expect(records.where(type: "A", tombstoned: false).reverse(:created_at).get(:data)).to eq(standby.vm.private_ipv4_string)
+      end
+
       it "hops to wait if initial_provisioning is not set even with dns zone" do
         postgres_server
         DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")

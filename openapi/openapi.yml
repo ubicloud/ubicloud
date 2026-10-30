@@ -2375,6 +2375,58 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/vpc-peering:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_reference'
+    get:
+      operationId: getGcpVpcPeering
+      summary: Get the peering configuration of a dedicated GCP VPC
+      responses:
+        '200':
+          $ref: '#/components/responses/GcpVpcPeering'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    post:
+      operationId: createGcpVpcPeering
+      summary: Connect a dedicated GCP VPC to one customer VPC
+      description: Requires VPC peering to be enabled for the project and an existing dedicated VPC. The customer must configure the reciprocal peering. Exchanges IPv4 subnet routes only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                peer_project_id:
+                  type: string
+                peer_network_name:
+                  type: string
+              additionalProperties: false
+              required:
+                - peer_project_id
+                - peer_network_name
+      responses:
+        '200':
+          $ref: '#/components/responses/GcpVpcPeering'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    delete:
+      operationId: deleteGcpVpcPeering
+      summary: Disconnect the customer VPC
+      description: Removes the local peering configuration asynchronously. The customer must remove the reciprocal configuration in their project.
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
   /project/{project_id}/location/{location}/vm:
     get:
       operationId: listLocationVMs
@@ -4137,6 +4189,38 @@ components:
         - name
         - type
         - url
+    GcpVpcPeering:
+      type: object
+      properties:
+        peer_network:
+          type: string
+          nullable: true
+        state:
+          type: string
+          enum:
+            - not_configured
+            - creating
+            - waiting_for_peer
+            - active
+            - failed
+            - deleting
+        state_message:
+          type: string
+          nullable: true
+        local_project_id:
+          type: string
+        local_network_name:
+          type: string
+        peering_name:
+          type: string
+      additionalProperties: false
+      required:
+        - peer_network
+        - state
+        - state_message
+        - local_project_id
+        - local_network_name
+        - peering_name
     PrivateSubnet:
       type: object
       properties:
@@ -4963,6 +5047,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/CertAuthUserList'
+    GcpVpcPeering:
+      description: Peering configuration for a dedicated GCP VPC
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GcpVpcPeering'
     PrivateSubnet:
       description: A Private Subnet
       content:

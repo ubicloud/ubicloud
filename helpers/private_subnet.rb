@@ -1,6 +1,22 @@
 # frozen_string_literal: true
 
 class Clover
+  def gcp_vpc_peering_enabled?(ps)
+    ps.location.gcp? && @project.gcp_dedicated_subnet_vpcs && @project.get_ff_vpc_peering_gcp == true &&
+      (vpc = ps.gcp_vpc) && vpc.dedicated_for_subnet_id == ps.id && !vpc.is_management
+  end
+
+  def gcp_vpc_peering_details(vpc)
+    {
+      peer_network: vpc.peer_network,
+      state: vpc.peering_state || "not_configured",
+      state_message: vpc.peering_state_message,
+      local_project_id: vpc.location.location_credential_gcp.project_id,
+      local_network_name: vpc.name,
+      peering_name: vpc.peering_name,
+    }
+  end
+
   def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil, key: "private_subnet_id", id: nil, name: nil)
     authorized_object(association: :private_subnets, key:, perm:, location_id:, id:, name:)
   end

@@ -118,8 +118,10 @@ class Clover < Roda
     create_cert
     create_replica
     create_version
+    create_vpc_peering
     decline_invitation
     delete_all_cache_entries
+    delete_vpc_peering
     destroy
     destroy_invitation
     destroy_version

@@ -25,6 +25,10 @@ class PostgresResource < Sequel::Model
 
     private
 
+    def aws_private_dns_records
+      {}.freeze
+    end
+
     def aws_boot_image(pg_version, arch, family)
       location.pg_aws_ami(pg_version, arch, family)
     end

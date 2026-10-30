@@ -22,6 +22,64 @@ class Clover
       ps = @ps = @project.private_subnets_dataset.first(filter)
       check_found_object(ps)
 
+      vpc = ps.location.gcp? ? ps.gcp_vpc : nil
+      r.on !!(vpc && (gcp_vpc_peering_enabled?(ps) || vpc.peer_network)), "vpc-peering" do
+        r.get true do
+          authorize("PrivateSubnet:view", ps)
+          gcp_vpc_peering_details(vpc)
+        end
+
+        r.post true do
+          authorize("PrivateSubnet:edit", ps)
+          handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
+          DB.transaction do
+            ps.lock!(:no_key_update)
+            vpc.lock!(:no_key_update)
+            unless gcp_vpc_peering_enabled?(ps)
+              fail CloverError.new(400, "InvalidRequest", "VPC peering is not enabled for this private subnet")
+            end
+            if vpc.peering_destroying?
+              fail CloverError.new(400, "InvalidRequest", "Private subnet is being deleted")
+            end
+            if vpc.peer_network
+              fail CloverError.new(400, "InvalidRequest", "Only one peer is supported. Disconnect the existing peer and wait for removal before creating another.")
+            end
+            vpc.configure_peering(
+              peer_project_id: typecast_params.nonempty_str!("peer_project_id").strip,
+              peer_network_name: typecast_params.nonempty_str!("peer_network_name").strip,
+            )
+            @project.postgres_resources_dataset.where(private_subnet_id: ps.id).each(&:incr_refresh_dns_record)
+            audit_log(ps, "create_vpc_peering")
+          end
+
+          if api?
+            gcp_vpc_peering_details(vpc)
+          else
+            flash["notice"] = "VPC peering is being configured. Create the matching peering in your GCP project."
+            r.redirect ps, "/networking"
+          end
+        end
+
+        r.delete true do
+          authorize("PrivateSubnet:edit", ps)
+          DB.transaction do
+            vpc.lock!(:no_key_update)
+            if vpc.peer_network
+              vpc.update(peering_state: "deleting", peering_state_message: nil)
+              vpc.incr_update_peering
+            end
+            audit_log(ps, "delete_vpc_peering")
+          end
+
+          if api?
+            204
+          else
+            flash["notice"] = "VPC peering is being disconnected."
+            r.redirect ps, "/networking"
+          end
+        end
+      end
+
       r.post "connect" do
         private_subnet_connection_action("connect", typecast_params.ubid_uuid!("connected-subnet-id"))
       end

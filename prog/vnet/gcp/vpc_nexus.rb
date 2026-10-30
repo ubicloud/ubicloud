@@ -6,7 +6,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   subject_is :gcp_vpc
   frame_accessor :pending_assoc_names, :remove_assoc_resource_name, :pending_tag_key_names,
-    :pending_tag_value_names, :delete_tv, :delete_tk, :verify_assoc_try, :tag_value_retry
+    :pending_tag_value_names, :delete_tv, :delete_tk, :verify_assoc_try, :tag_value_retry, :peering_checked_at
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
@@ -219,7 +219,17 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_update_firewall_rules
     end
 
-    nap 60 * 60 * 24 * 365
+    if update_peering_set?
+      decr_update_peering
+      self.peering_checked_at = nil
+    end
+
+    if gcp_vpc.peer_network && gcp_vpc.peering_state != "failed" && Time.now.to_i - (peering_checked_at || 0) >= 60
+      self.peering_checked_at = Time.now.to_i
+      hop_push :wait, Prog::Vnet::Gcp::VpcPeering, label: "sync"
+    end
+
+    nap((gcp_vpc.peer_network && gcp_vpc.peering_state != "failed") ? 60 : 60 * 60 * 24 * 365)
   end
 
   label def update_firewall_rules
@@ -243,6 +253,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     register_deadline("destroy", 10 * 60)
+    if gcp_vpc.peer_network
+      hop_push :enumerate_destroy_state, Prog::Vnet::Gcp::VpcPeering, label: "sync"
+    end
     hop_enumerate_destroy_state
   end
 

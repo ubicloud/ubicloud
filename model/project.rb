@@ -347,6 +347,7 @@ class Project < Sequel::Model
     :spill_to_alien_runners,
     :visible_locations,
     :visible_postgres_locations,
+    :vpc_peering_gcp,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
     :postgres_backup_download_minio,

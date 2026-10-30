@@ -299,11 +299,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         unless dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
           dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
         end
+      end
 
+      unless (private_records = postgres_resource.private_dns_records).empty?
         record_name = postgres_resource.private_hostname
         dns_zone.delete_record(record_name:)
-        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
-        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
+        private_records.each { |type, data| dns_zone.insert_record(record_name:, type: type.to_s, ttl: 10, data:) }
       end
 
       self.dns_checked_at = Time.now.to_i
