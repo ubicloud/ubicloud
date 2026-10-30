@@ -664,6 +664,21 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#apply_storage_io_limits" do
+    it "reapplies limits only for volumes that were boosted for warm-up" do
+      boosted = {"disk_index" => 0, "device_id" => "d0", "vhost_block_backend_version" => "v0.1", "encrypted" => true, "max_read_mbytes_per_sec" => 50, "boost_io_until_caught_up" => true}
+      plain = {"disk_index" => 1, "device_id" => "d1", "vhost_block_backend_version" => "v0.1", "encrypted" => true, "max_read_mbytes_per_sec" => 50}
+      expect(File).to receive(:stat).with("/var/storage/test/0").and_return(instance_double(File::Stat, dev_major: 259, dev_minor: 1))
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(["/dev/disk/by-id/nvme-eui.01"])
+      expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.01").and_return("/dev/nvme0n1p1")
+      expect(File).to receive(:stat).with("/dev/nvme0n1p1").and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 1))
+      expect_any_instance_of(StorageVolume).to receive(:_run_command).with("systemctl", "set-property", "test-0-storage.service",
+        "IOReadBandwidthMax=/dev/disk/by-id/nvme-eui.01 52428800")
+
+      vs.apply_storage_io_limits([boosted, plain])
+    end
+  end
+
   describe "#setup_networking" do
     it "can setup networking" do
       vps = instance_spy(VmPath)

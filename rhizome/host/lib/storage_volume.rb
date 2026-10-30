@@ -47,6 +47,7 @@ class StorageVolume
     @allowed_cpus = params["allowed_cpus"]
     @archive_source = params["archive_source"]
     @remote_source = params["remote_source"]
+    @boost_io_until_caught_up = params.fetch("boost_io_until_caught_up", false)
   end
 
   def vp
@@ -253,15 +254,27 @@ class StorageVolume
     "Vhost Block Backend Service for #{@vm_name}"
   end
 
-  def systemd_io_rate_limits
+  def io_rate_limit_properties
     limits = {IOReadBandwidthMax: @max_read_mbytes_per_sec,
               IOWriteBandwidthMax: @max_write_mbytes_per_sec}.compact
-    return "" if limits.empty?
+    return [] if limits.empty?
 
     dev = persistent_device_id(storage_dir)
-    limits
-      .map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
-      .join("\n")
+    limits.map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
+  end
+
+  def systemd_io_rate_limits
+    # Uncapped during warm-up; apply_io_limits reapplies the cap afterward.
+    return "" if @boost_io_until_caught_up
+
+    io_rate_limit_properties.join("\n")
+  end
+
+  def apply_io_limits
+    props = io_rate_limit_properties
+    return if props.empty?
+
+    r "systemctl", "set-property", vhost_user_block_service, *props
   end
 
   def vhost_backend_config(encryption_key, key_wrapping_secrets)
@@ -487,6 +500,7 @@ class StorageVolume
   def purge_vhost_backend
     stop_service_if_loaded(sp.vhost_backend_service)
     rm_if_exists("/etc/systemd/system/#{sp.vhost_backend_service}")
+    rm_if_exists("/etc/systemd/system.control/#{sp.vhost_backend_service}.d")
     rm_if_exists(vhost_sock)
   end
 
