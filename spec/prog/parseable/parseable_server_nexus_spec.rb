@@ -7,7 +7,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
   let(:parseable_project) { Project.create(name: "parseable-svc") }
   let(:sshable) { nx.vm.sshable }
-  let(:st) { described_class.assemble(parseable_resource) }
+  let(:st) { described_class.assemble(parseable_resource).reload }
 
   let(:parseable_resource) {
     ps_st = Prog::Vnet::SubnetNexus.assemble(parseable_project.id, name: "test-parseable-subnet", location_id: Location::HETZNER_FSN1_ID)
@@ -53,8 +53,16 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
   before do
     allow(Config).to receive_messages(parseable_service_project_id: parseable_project.id, parseable_host_name: "parseable.example.com", parseable_version: "v2.6.3", postgres_service_project_id: parseable_project.id)
+    Semaphore.where(strand_id: st.id, name: "initial_provisioning").destroy
     add_ipv4_to_vm(nx.vm, "1.2.3.4")
     nx.vm.update(ephemeral_net6: "2a01::/64")
+  end
+
+  describe ".assemble" do
+    it "starts the server in initial provisioning" do
+      server = ParseableServer[described_class.assemble(parseable_resource).id]
+      expect(server.initial_provisioning_set?).to be true
+    end
   end
 
   describe "#start" do
@@ -68,14 +76,13 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect { nx.start }.to hop("bootstrap_rhizome")
     end
 
-    it "inserts A and AAAA DNS records when a dns_zone is present" do
+    it "does not insert DNS records before parseable is running" do
       nx.vm.strand.update(label: "wait")
 
       dns_zone
       expect { nx.start }.to hop("bootstrap_rhizome")
 
-      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
-      expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
+      expect(dns_zone.records_dataset.count).to eq(0)
     end
   end
 
@@ -220,16 +227,50 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
 
       expect { nx.configure_metrics }.to hop("wait")
     end
+
+    it "hops to add_dns_records during initial provisioning" do
+      nx.incr_initial_provisioning
+      allow(sshable).to receive(:_cmd)
+      allow(sshable).to receive(:write_file)
+
+      expect { nx.configure_metrics }.to hop("add_dns_records")
+    end
+  end
+
+  describe "#add_dns_records" do
+    before { nx.incr_initial_provisioning }
+
+    it "naps until parseable answers on its own address" do
+      dns_zone
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 503)
+
+      expect { nx.add_dns_records }.to nap(5)
+      expect(dns_zone.records_dataset.count).to eq(0)
+    end
+
+    it "inserts A and AAAA DNS records, ends initial provisioning and hops to wait" do
+      dns_zone
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 200)
+
+      expect { nx.add_dns_records }.to hop("wait")
+
+      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
+      expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
+    end
+
+    it "ends initial provisioning when there is no dns_zone" do
+      stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 200)
+
+      expect { nx.add_dns_records }.to hop("wait")
+
+      expect(DnsRecord.count).to eq(0)
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
+    end
   end
 
   describe "#wait" do
     before { st.update(label: "wait") }
-
-    it "decrements initial provisioning semaphore" do
-      nx.incr_initial_provisioning
-      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
-      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
-    end
 
     it "naps for approximately one month" do
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
@@ -411,9 +452,9 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
   end
 
   describe "#destroy" do
-    it "hops to_wait_children_destoyed" do
+    it "hops to stop_parseable" do
       st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
-      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect { nx.destroy }.to hop("stop_parseable")
       expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
     end
 
@@ -422,10 +463,49 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "A", ttl: 10, data: nx.vm.ip4_string)
       parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "AAAA", ttl: 10, data: nx.vm.ip6_string)
 
-      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect { nx.destroy }.to hop("stop_parseable")
 
       expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: true).count).to eq(1)
       expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: true).count).to eq(1)
+    end
+
+    it "keeps the DNS records of other servers when the VM has no address" do
+      dns_zone
+      parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "A", ttl: 10, data: nx.vm.ip4_string)
+      parseable_resource.dns_zone.insert_record(record_name: parseable_resource.hostname, type: "AAAA", ttl: 10, data: nx.vm.ip6_string)
+      unaddressed = described_class.new(described_class.assemble(parseable_resource))
+
+      expect { unaddressed.destroy }.to hop("stop_parseable")
+
+      expect(dns_zone.records_dataset.where(tombstoned: true).count).to eq(0)
+    end
+  end
+
+  describe "#stop_parseable" do
+    it "starts the stop and naps" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("stop_parseable", "sudo", "systemctl", "stop", "parseable")
+      expect { nx.stop_parseable }.to nap(5)
+    end
+
+    it "naps while the stop is in progress" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("InProgress")
+      expect { nx.stop_parseable }.to nap(5)
+    end
+
+    it "hops to wait_children_destroyed when parseable has stopped" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("Succeeded")
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
+    end
+
+    it "hops to wait_children_destroyed when the stop fails" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_return("Failed")
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
+    end
+
+    it "hops to wait_children_destroyed when the server cannot be reached" do
+      expect(sshable).to receive(:d_check).with("stop_parseable").and_raise(Errno::ECONNREFUSED)
+      expect { nx.stop_parseable }.to hop("wait_children_destroyed")
     end
   end
 

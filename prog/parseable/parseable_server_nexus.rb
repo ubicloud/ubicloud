@@ -31,18 +31,17 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
 
       id = ubid.to_uuid
       parseable_server = ParseableServer.create_with_id(id, parseable_resource_id: parseable_resource.id, vm_id: vm_st.id)
-      Strand.create_with_id(parseable_server, prog: "Parseable::ParseableServerNexus", label: "start")
+      strand = Strand.create_with_id(parseable_server, prog: "Parseable::ParseableServerNexus", label: "start")
+      parseable_server.incr_initial_provisioning
+      strand
     end
   end
 
   label def start
     nap 5 unless vm.strand.label == "wait"
-    incr_initial_provisioning
 
     register_deadline("wait", 10 * 60)
 
-    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "A", ttl: 10, data: vm.ip4_string)
-    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
     cert, cert_key = create_certificate
     parseable_server.update(cert:, cert_key:)
 
@@ -166,12 +165,24 @@ TIMER
     vm.sshable.cmd("sudo systemctl daemon-reload")
     vm.sshable.cmd("sudo systemctl enable --now parseable-metrics.timer")
 
+    when_initial_provisioning_set? do
+      hop_add_dns_records
+    end
+
+    hop_wait
+  end
+
+  label def add_dns_records
+    nap 5 unless parseable_server.healthy?
+
+    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "A", ttl: 10, data: vm.ip4_string)
+    resource.dns_zone&.insert_record(record_name: resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
+    decr_initial_provisioning
+
     hop_wait
   end
 
   label def wait
-    decr_initial_provisioning
-
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -232,9 +243,30 @@ TIMER
     register_deadline(nil, 10 * 60)
     decr_destroy
 
-    resource.dns_zone&.delete_record(record_name: resource.hostname, type: "A", data: vm.ip4_string)
-    resource.dns_zone&.delete_record(record_name: resource.hostname, type: "AAAA", data: vm.ip6_string)
+    # delete_record with nil data deletes the records of every server.
+    [["A", vm.ip4_string], ["AAAA", vm.ip6_string]].each do |type, data|
+      resource.dns_zone&.delete_record(record_name: resource.hostname, type:, data:) if data
+    end
+
     Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_stop_parseable
+  end
+
+  # A graceful stop uploads the staged logs before the data disk goes away.
+  label def stop_parseable
+    case vm.sshable.d_check("stop_parseable")
+    when "Succeeded"
+      hop_wait_children_destroyed
+    when "Failed"
+      Clog.emit("Failed to stop parseable before destroy", {parseable_stop_failed: {ubid: parseable_server.ubid}})
+      hop_wait_children_destroyed
+    when "NotStarted"
+      vm.sshable.d_run("stop_parseable", "sudo", "systemctl", "stop", "parseable")
+    end
+
+    nap 5
+  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError => ex
+    Clog.emit("Failed to stop parseable before destroy", Util.exception_to_hash(ex, into: {ubid: parseable_server.ubid}))
     hop_wait_children_destroyed
   end
 
