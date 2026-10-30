@@ -70,24 +70,24 @@ module GcpLro
     delete_from_stack(name)
   end
 
-  def poll_gcp_op(name)
+  def poll_gcp_op(name, client: nil)
     op_name, scope, scope_value = frame[name].values_at("name", "scope", "scope_value")
 
     case scope
     when "zone"
-      credential.zone_operations_client.get(
+      (client || credential.zone_operations_client).get(
         project: gcp_project_id,
         zone: scope_value,
         operation: op_name,
       )
     when "region"
-      credential.region_operations_client.get(
+      (client || credential.region_operations_client).get(
         project: gcp_project_id,
         region: scope_value,
         operation: op_name,
       )
     when "global"
-      credential.global_operations_client.get(
+      (client || credential.global_operations_client).get(
         project: gcp_project_id,
         operation: op_name,
       )
