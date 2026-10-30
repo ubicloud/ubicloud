@@ -370,6 +370,42 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#upgrade_ubiblk" do
+    let(:version) { Config.vhost_block_backend_version }
+
+    before do
+      vm_host.update(arch: "x64")
+      nx.incr_upgrade_ubiblk
+    end
+
+    it "buds the setup of the latest version when the host doesn't have it" do
+      VhostBlockBackend.create(version: "v0.2.2", allocation_weight: 100, vm_host_id: vm_host.id)
+      expect { nx.upgrade_ubiblk }.to hop("wait_upgrade_ubiblk")
+      child = Strand.first(parent_id: st.id, prog: "Storage::SetupVhostBlockBackend")
+      expect(child.stack.first).to include("version" => version, "allocation_weight" => 100, "disable_others" => true)
+      expect(vm_host.upgrade_ubiblk_set?).to be false
+    end
+
+    it "hops to wait when the host already has the latest version" do
+      latest = VhostBlockBackend.create(version:, allocation_weight: 0, vm_host_id: vm_host.id)
+      expect { nx.upgrade_ubiblk }.to hop("wait")
+      expect(latest.reload.allocation_weight).to eq(0)
+      expect(Strand.where(parent_id: st.id)).to be_empty
+      expect(vm_host.upgrade_ubiblk_set?).to be false
+    end
+  end
+
+  describe "#wait_upgrade_ubiblk" do
+    it "hops to wait once the setup is done" do
+      expect { nx.wait_upgrade_ubiblk }.to hop("wait")
+    end
+
+    it "donates its time while the setup is running" do
+      Strand.create(parent_id: st.id, prog: "Storage::SetupVhostBlockBackend", label: "start", lease: Time.now + 10)
+      expect { nx.wait_upgrade_ubiblk }.to nap(120)
+    end
+  end
+
   describe "#check_ip_reachability" do
     it "pushes the ip reachability program, returning to prep" do
       expect { nx.check_ip_reachability }.to hop("start", "CheckIpReachability") { it.strand_update_args[:stack].first["link"] == ["Vm::HostNexus", "prep"] }
@@ -588,6 +624,11 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to disable_csum_guard when needed" do
       nx.incr_disable_csum_guard
       expect { nx.wait }.to hop("disable_csum_guard")
+    end
+
+    it "hops to upgrade_ubiblk when needed" do
+      nx.incr_upgrade_ubiblk
+      expect { nx.wait }.to hop("upgrade_ubiblk")
     end
 
     it "enables the checksum guard before disabling it when both are set" do

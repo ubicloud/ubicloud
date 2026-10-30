@@ -407,6 +407,10 @@ TIMER
       hop_disable_csum_guard
     end
 
+    when_upgrade_ubiblk_set? do
+      hop_upgrade_ubiblk
+    end
+
     when_patch_set? do
       unless vm_host.allocation_state == "draining"
         vm_host.update(allocation_state: "draining")
@@ -448,6 +452,20 @@ TIMER
     end
 
     push Prog::SetupCsumGuard, {"enable" => false}
+  end
+
+  label def upgrade_ubiblk
+    decr_upgrade_ubiblk
+    version = Config.vhost_block_backend_version
+    hop_wait if vm_host.vhost_block_backends.any? { it.version == version }
+
+    register_deadline("wait", 15 * 60)
+    Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, version, parent_id: strand.id)
+    hop_wait_upgrade_ubiblk
+  end
+
+  label def wait_upgrade_ubiblk
+    reap(:wait)
   end
 
   label def unavailable
