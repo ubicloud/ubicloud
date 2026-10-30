@@ -214,6 +214,51 @@ RSpec.describe Clover, "private_subnet" do
 
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
+
+      describe "with VPC peerings" do
+        let(:location) {
+          Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2", ui_name: "aws-us-west-2", visible: true).tap {
+            LocationAz.create(location_id: it.id, az: "a", zone_id: "usw2-az1")
+          }
+        }
+
+        let(:aws_ps) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "aws-ps", location_id: location.id).subject }
+
+        let(:vp) { Prog::Vnet::VpcPeeringNexus.assemble(aws_ps, peer_account_id: "111122223333", peer_vpc_id: "vpc-0bbbbbbbbbbbbbbbb", aws: {peer_region: "us-west-2"}).subject }
+
+        let(:aws_ps_path) { "/project/#{project.ubid}/location/#{location.display_name}/private-subnet/#{aws_ps.name}" }
+
+        before do
+          vp
+          allow(Config).to receive(:vpc_peering_enabled).and_return(true)
+          project.set_ff_vpc_peering_aws(true)
+        end
+
+        it "refuses while a VPC peering is not being deleted" do
+          delete aws_ps_path
+
+          expect(last_response).to have_api_error(409, "Private subnet 'aws-ps' has VPC peerings, first, delete them.")
+          expect(aws_ps.destroy_set?(cached: false)).to be false
+        end
+
+        it "succeeds when every VPC peering is being deleted" do
+          vp.incr_destroy
+
+          delete aws_ps_path
+
+          expect(last_response.status).to eq(204)
+          expect(aws_ps.destroy_set?(cached: false)).to be true
+        end
+
+        it "succeeds while VPC peering is disabled, leaving the peerings to the subnet's destroy" do
+          project.set_ff_vpc_peering_aws(false)
+
+          delete aws_ps_path
+
+          expect(last_response.status).to eq(204)
+          expect(aws_ps.destroy_set?(cached: false)).to be true
+        end
+      end
     end
   end
 end

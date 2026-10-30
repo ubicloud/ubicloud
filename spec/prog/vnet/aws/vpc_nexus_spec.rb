@@ -412,6 +412,46 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to nap(5)
     end
 
+    describe "with VPC peerings" do
+      let(:waiting_msg) { "Cannot destroy subnet with VPC peerings, waiting for them to be destroyed" }
+
+      def peering(peer_vpc_id, subnet = ps)
+        Prog::Vnet::VpcPeeringNexus.assemble(subnet, peer_account_id: "111122223333", peer_vpc_id:, aws: {peer_region: "us-west-2"}).subject
+      end
+
+      def semaphore_names(vp)
+        Semaphore.where(strand_id: vp.id).select_order_map(:name)
+      end
+
+      it "sets destroy on its VPC peerings once and naps until they are gone" do
+        vp = peering("vpc-0bbbbbbbbbbbbbbbb")
+        other_ps = Prog::Vnet::SubnetNexus.assemble(ps.project_id, name: "other-ps", location_id: ps.location_id).subject
+        other_vp = peering("vpc-0dddddddddddddddd", other_ps)
+        expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).twice.and_call_original
+
+        expect { nx.destroy }.to nap(5)
+          .and change { semaphore_names(vp) }.from([]).to(["destroy"])
+        expect { nx.destroy }.to nap(5)
+          .and not_change { semaphore_names(vp) }
+        expect(frame_value(nx, "deadline_at")).to be_nil
+
+        vp.destroy
+        expect { nx.destroy }.to hop("delete_internet_gateway")
+        expect(semaphore_names(other_vp)).to eq []
+      end
+
+      it "does not set destroy on a VPC peering already being destroyed" do
+        destroying = peering("vpc-0bbbbbbbbbbbbbbbb")
+        destroying.incr_destroying
+        vp = peering("vpc-0cccccccccccccccc")
+        expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).and_call_original
+
+        expect { nx.destroy }.to nap(5)
+          .and change { semaphore_names(vp) }.from([]).to(["destroy"])
+        expect(semaphore_names(destroying)).to eq ["destroying"]
+      end
+    end
+
     it "hops to finish if aws resource not exists" do
       aws_resource.destroy
       nx.private_subnet.reload
@@ -529,10 +569,51 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         expect { nx.delete_vpc }.to hop("finish")
       end
 
-      it "raises DependencyViolation for strand retry" do
-        client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "VPC has dependencies"))
-        expect(Clog).to receive(:emit).with("VPC has dependencies, retrying subnet cleanup", instance_of(Hash)).and_call_original
-        expect { nx.delete_vpc }.to raise_error(Aws::EC2::Errors::DependencyViolation)
+      describe "when the vpc has dependencies" do
+        let(:inbound_query) {
+          {filters: [
+            {name: "accepter-vpc-info.vpc-id", values: ["vpc-0123456789abcdefg"]},
+            {name: "status-code", values: ["pending-acceptance"]},
+          ]}
+        }
+
+        before do
+          client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "VPC has dependencies"))
+          expect(Clog).to receive(:emit).with("VPC has dependencies, retrying subnet cleanup", instance_of(Hash)).and_call_original
+          expect(client).to receive(:describe_vpc_peering_connections).with(inbound_query).and_call_original
+        end
+
+        def stub_inbound_requests(*ids)
+          client.stub_responses(:describe_vpc_peering_connections, vpc_peering_connections: ids.map { {vpc_peering_connection_id: it} })
+        end
+
+        it "raises DependencyViolation for strand retry" do
+          stub_inbound_requests
+          expect(client).not_to receive(:reject_vpc_peering_connection)
+          expect { nx.delete_vpc }.to raise_error(Aws::EC2::Errors::DependencyViolation)
+        end
+
+        it "rejects inbound pending peering requests and naps" do
+          stub_inbound_requests("pcx-0inbound000000001", "pcx-0inbound000000002")
+          expect(client).to receive(:reject_vpc_peering_connection).with({vpc_peering_connection_id: "pcx-0inbound000000001"}).and_call_original
+          expect(client).to receive(:reject_vpc_peering_connection).with({vpc_peering_connection_id: "pcx-0inbound000000002"}).and_call_original
+          expect { nx.delete_vpc }.to nap(5)
+        end
+
+        it "naps when an inbound request has already left pending acceptance" do
+          stub_inbound_requests("pcx-0inbound000000001", "pcx-0inbound000000002")
+          client.stub_responses(:reject_vpc_peering_connection, Aws::EC2::Errors::InvalidStateTransition.new(nil, "Invalid state transition for pcx-0inbound000000001"), {})
+          expect(client).to receive(:reject_vpc_peering_connection).with({vpc_peering_connection_id: "pcx-0inbound000000001"}).and_call_original
+          expect(client).to receive(:reject_vpc_peering_connection).with({vpc_peering_connection_id: "pcx-0inbound000000002"}).and_call_original
+          expect { nx.delete_vpc }.to nap(5)
+        end
+
+        it "raises other errors from rejecting an inbound request" do
+          stub_inbound_requests("pcx-0inbound000000001")
+          client.stub_responses(:reject_vpc_peering_connection, Aws::EC2::Errors::UnauthorizedOperation.new(nil, "not authorized"))
+          expect(client).to receive(:reject_vpc_peering_connection).with({vpc_peering_connection_id: "pcx-0inbound000000001"}).and_call_original
+          expect { nx.delete_vpc }.to raise_error(Aws::EC2::Errors::UnauthorizedOperation)
+        end
       end
     end
 

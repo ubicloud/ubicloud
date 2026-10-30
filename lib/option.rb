@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "aws-partitions"
 require "yaml"
 
 module Option
@@ -511,6 +512,7 @@ module Option
   POSTGRES_LOG_LEVEL_OPTIONS = %w[DEBUG INFO WARN ERROR FATAL].freeze
 
   AWS_LOCATIONS = ["us-west-2", "us-east-1", "us-east-2", "ap-southeast-2", "eu-west-1", "eu-central-1"].freeze
+  AWS_REGIONS = Aws::Partitions.partition("aws").regions.reject { it.name == "aws-global" }.to_h { [it.name, it.description] }.freeze
 
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
   KubernetesCPOptions = [[1, "1 Node", "Single control plane node without resilience"],

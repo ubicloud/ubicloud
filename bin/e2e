@@ -187,6 +187,10 @@ def test_aws(options, test_cases)
     tests_to_wait << Prog::Test::PostgresFirewall.assemble(provider: "aws")
   end
 
+  if options[:test_cases].include?("vpc_peering")
+    tests_to_wait << Prog::Test::VpcPeering.assemble
+  end
+
   tests_to_wait.each { |st| wait_until(st) }
 end
 

@@ -72,6 +72,9 @@ module Validation
   # - Must start with a letter or number
   ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN = %r{\A[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}\z}
 
+  AWS_ACCOUNT_ID_PATTERN = %r{\A\d{12}\z}
+  AWS_VPC_ID_PATTERN = %r{\Avpc-(?:[0-9a-f]{8}|[0-9a-f]{17})\z}
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match?(ALLOWED_NAME_PATTERN)
@@ -354,6 +357,14 @@ module Validation
     unless username || options&.key?("authorization") || options&.dig("headers")&.any?
       fail ValidationFailed.new({options: "no credentials given, set username and password, options.authorization, or options.headers"})
     end
+  end
+
+  def self.validate_aws_vpc_peering(peer_account_id:, peer_vpc_id:, peer_region:)
+    details = {}
+    details["peer_account_id"] = "AWS account ID must be 12 digits, such as 123456789012. It is in the account menu at the top right of the AWS console." unless peer_account_id.match?(AWS_ACCOUNT_ID_PATTERN)
+    details["peer_vpc_id"] = "VPC ID must look like vpc-0123456789abcdef0. It is under Your VPCs in the AWS VPC console." unless peer_vpc_id.match?(AWS_VPC_ID_PATTERN)
+    details["aws.peer_region"] = "\"#{peer_region}\" is not an AWS region. Use a region code such as us-east-1." unless Option::AWS_REGIONS.key?(peer_region)
+    fail ValidationFailed.new(details) unless details.empty?
   end
 
   def self.validate_syslog_url(url)

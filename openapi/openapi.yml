@@ -2375,6 +2375,83 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/vpc-peering:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_reference'
+    get:
+      operationId: listPrivateSubnetVpcPeerings
+      summary: List VPC peerings of a private subnet
+      description: A PostgreSQL database's private subnet is named "<database id>-subnet" unless private_subnet_name was given at creation, and each read replica has its own "<replica id>-subnet".
+      responses:
+        '200':
+          $ref: '#/components/responses/VpcPeerings'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VPC Peering
+    post:
+      operationId: createPrivateSubnetVpcPeering
+      summary: Request a VPC peering between a private subnet and a VPC in your account
+      description: A PostgreSQL database's private subnet is named "<database id>-subnet" unless private_subnet_name was given at creation, and each read replica has its own "<replica id>-subnet".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                aws:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    peer_region:
+                      description: Region of the peer VPC, defaults to the region of the location
+                      type: string
+                peer_account_id:
+                  description: Account that owns the peer VPC; for AWS, the 12-digit account ID, with dashes and spaces ignored
+                  type: string
+                peer_vpc_id:
+                  description: ID of the peer VPC
+                  type: string
+              additionalProperties: false
+              required:
+                - peer_account_id
+                - peer_vpc_id
+      responses:
+        '200':
+          $ref: '#/components/responses/VpcPeering'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VPC Peering
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/vpc-peering/{vpc_peering_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_reference'
+      - $ref: '#/components/parameters/vpc_peering_id'
+    delete:
+      operationId: deletePrivateSubnetVpcPeering
+      summary: Delete a VPC peering
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VPC Peering
+    get:
+      operationId: getPrivateSubnetVpcPeering
+      summary: Get VPC peering details
+      responses:
+        '200':
+          $ref: '#/components/responses/VpcPeering'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VPC Peering
   /project/{project_id}/location/{location}/vm:
     get:
       operationId: listLocationVMs
@@ -3141,6 +3218,15 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
+    vpc_peering_id:
+      description: ID of the VPC peering
+      in: path
+      name: vpc_peering_id
+      required: true
+      schema:
+        type: string
+        example: px3dngttwvje2kmr2sn8x12x4r
+        pattern: ^px[0-9a-hj-km-np-tv-z]{24}$
   schemas:
     MaintenanceWindowDay:
       type: string
@@ -4261,6 +4347,90 @@ components:
         - storage_size_gib
         - unix_user
       x-go-name: VmSchema
+    VpcPeering:
+      type: object
+      properties:
+        aws:
+          $ref: '#/components/schemas/VpcPeeringAws'
+        created_at:
+          description: Time the VPC peering was created
+          type: string
+          format: date-time
+        id:
+          description: ID of the VPC peering
+          type: string
+          example: px3dngttwvje2kmr2sn8x12x4r
+          pattern: ^px[0-9a-hj-km-np-tv-z]{24}$
+        local_cidr:
+          description: IPv4 CIDR of the private subnet
+          type: string
+        location:
+          description: Location of the private subnet
+          type: string
+        peer_account_id:
+          description: Account that owns the peer VPC
+          type: string
+        peer_cidrs:
+          description: CIDR blocks of the peer VPC that are routed over the peering
+          type: array
+          items:
+            type: string
+        peer_vpc_id:
+          description: ID of the peer VPC
+          type: string
+        private_subnet_id:
+          description: ID of the private subnet
+          type: string
+        state:
+          description: 'State of the VPC peering: creating, waiting_for_peer, configuring, active, failed or deleting'
+          type: string
+        state_message:
+          description: Failure reason, a notice while the peering request is delayed, or warnings about the VPC peering
+          type: string
+          nullable: true
+      additionalProperties: false
+      required:
+        - created_at
+        - id
+        - local_cidr
+        - location
+        - peer_account_id
+        - peer_cidrs
+        - peer_vpc_id
+        - private_subnet_id
+        - state
+        - state_message
+      x-go-name: VpcPeeringSchema
+    VpcPeeringAws:
+      type: object
+      properties:
+        expires_at:
+          description: Time the peering request expires unless it is accepted
+          type: string
+          format: date-time
+          nullable: true
+        peer_region:
+          description: Region of the peer VPC
+          type: string
+        peering_connection_id:
+          description: ID of the AWS VPC peering connection to accept
+          type: string
+          nullable: true
+        requester_account_id:
+          description: AWS account that sends the peering request
+          type: string
+          nullable: true
+        requester_vpc_id:
+          description: ID of the VPC of the private subnet
+          type: string
+          nullable: true
+      additionalProperties: false
+      required:
+        - expires_at
+        - peer_region
+        - peering_connection_id
+        - requester_account_id
+        - requester_vpc_id
     RunCommand:
       type: object
       properties:
@@ -5054,6 +5224,29 @@ components:
             required:
               - count
               - items
+    VpcPeering:
+      description: A VPC peering
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VpcPeering'
+    VpcPeerings:
+      description: A list of VPC peerings
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VpcPeering'
+            additionalProperties: false
+            required:
+              - count
+              - items
     MachineImage:
       description: A machine image
       content:
@@ -5182,6 +5375,8 @@ tags:
     name: Project
   - description: Virtual Machine Operations
     name: Virtual Machine
+  - description: VPC Peering Operations
+    name: VPC Peering
   - description: Private Location Operations
     name: Private Location
   - description: Kubernetes Cluster Operations
