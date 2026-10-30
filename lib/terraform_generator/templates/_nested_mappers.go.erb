@@ -1,0 +1,35 @@
+<% all.each do |a| -%>
+// <%= mapper_name.call(a) %> maps the API's <%= a.tf_name %> into this <%= kind %>'s own
+// generated value types: no cross-package borrowing; empty input yields an
+// empty (never nil) list.
+func <%= mapper_name.call(a) %>(ctx context.Context, items []<%= client_ref.call(a.client_type) %>) (basetypes.ListValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	elemType := <%= elem_type.call(a) %>
+	elemValues := make([]attr.Value, 0, len(items))
+	for _, item := range items {
+<% a.nested.select(&:nested).each do |n| -%>
+		<%= lower.call(n.tf_name) %>Value, <%= lower.call(n.tf_name) %>Diags := <%= mapper_name.call(n) %>(ctx, item.<%= n.api_go_field %>)
+		diags.Append(<%= lower.call(n.tf_name) %>Diags...)
+		if diags.HasError() {
+			return basetypes.NewListUnknown(elemType), diags
+		}
+<% end -%>
+		elem := <%= new_elem.call(a) %>map[string]attr.Value{
+<% a.nested.each do |n| -%>
+			"<%= n.tf_name %>": <%= n.nested ? "#{lower.call(n.tf_name)}Value" : n.conversion("item.#{n.api_go_field}") %>,
+<% end -%>
+		})
+		elemValues = append(elemValues, elem)
+	}
+
+	listValue, listDiags := types.ListValueFrom(ctx, elemType, elemValues)
+	diags.Append(listDiags...)
+	if diags.HasError() {
+		return basetypes.NewListUnknown(elemType), diags
+	}
+
+	return listValue, diags
+}
+
+<% end -%>
