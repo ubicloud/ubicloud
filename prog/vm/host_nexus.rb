@@ -457,7 +457,10 @@ TIMER
   label def upgrade_ubiblk
     decr_upgrade_ubiblk
     version = Config.vhost_block_backend_version
-    hop_wait if vm_host.vhost_block_backends.any? { it.version == version }
+    if vm_host.vhost_block_backends.any? { it.version == version }
+      Clog.emit("Skipping ubiblk upgrade, version already installed", ubiblk_upgrade_skipped: {vm_host_ubid: vm_host.ubid, version:})
+      hop_wait
+    end
 
     register_deadline("wait", 15 * 60)
     Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, version, parent_id: strand.id)

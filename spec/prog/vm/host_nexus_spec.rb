@@ -386,8 +386,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.upgrade_ubiblk_set?).to be false
     end
 
-    it "hops to wait when the host already has the latest version" do
+    it "logs and hops to wait when the host already has the latest version" do
       latest = VhostBlockBackend.create(version:, allocation_weight: 0, vm_host_id: vm_host.id)
+      expect(Clog).to receive(:emit).with("Skipping ubiblk upgrade, version already installed", ubiblk_upgrade_skipped: {vm_host_ubid: vm_host.ubid, version:})
       expect { nx.upgrade_ubiblk }.to hop("wait")
       expect(latest.reload.allocation_weight).to eq(0)
       expect(Strand.where(parent_id: st.id)).to be_empty
