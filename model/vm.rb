@@ -191,9 +191,7 @@ class Vm < Sequel::Model
   end
 
   # Various names in linux, like interface names, are obliged to be
-  # short, so truncate the ubid. This does introduce the spectre of
-  # collisions.  When the time comes, we'll have to ensure it doesn't
-  # happen on a single host, pushing into the allocation process.
+  # short, so truncate the ubid.
   def self.ubid_to_name(id)
     id.to_s[0..7]
   end
@@ -315,6 +313,7 @@ end
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+#  vm_vm_host_id_inhost_name_uidx      | UNIQUE btree (vm_host_id, ((((get_byte(uuid_send(id), 0) << 22) | (get_byte(uuid_send(id), 1) << 14)) | (get_byte(uuid_send(id), 2) << 6)) | (get_byte(uuid_send(id), 3) >> 2)))
 #  vm_location_id_index                | btree (location_id)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
 #  vm_vm_host_id_index                 | btree (vm_host_id)
