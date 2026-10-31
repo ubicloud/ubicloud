@@ -168,7 +168,7 @@ RSpec.describe Clover, "postgres" do
       it "pre-selects the default version rather than the newest one offered" do
         visit "#{project.path}/postgres/create"
 
-        checked = all("input[name=version]", visible: false).select(&:checked?).map { |input| input.value }
+        checked = all("input[name=version]", visible: :all).select(&:checked?).map { |input| input.value }
         expect(checked).to eq([PostgresResource.default_version])
       end
 
@@ -672,7 +672,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - pg-with-permission")
         expect(page).to have_flash_error("empty string provided for parameter restore_target")
 
-        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
+        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: :all
         click_button "Fork"
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - restored-server")
@@ -1201,7 +1201,7 @@ RSpec.describe Clover, "postgres" do
 
       it "redisplays otlp log destination form on validation failure" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
+        _csrf = all("input[name='_csrf']", visible: :all).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
           name: "nr", type: "otlp", url_suffix: "bad host",
           header_keys: ["api-key", ""],
@@ -1219,7 +1219,7 @@ RSpec.describe Clover, "postgres" do
 
       it "redisplays syslog log destination form on validation failure" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
+        _csrf = all("input[name='_csrf']", visible: :all).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
           name: "mezmo", type: "syslog", url_suffix: "logs.example.com",
           structured_data_ids: ["honeybadger@61642", "", "honeybadger@61642"],
@@ -1262,7 +1262,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can create an otlp log destination with headers, ignoring rows with empty keys" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
+        _csrf = all("input[name='_csrf']", visible: :all).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
           name: "nr", type: "otlp", url_suffix: "otlp.nr-data.net",
           header_keys: ["api-key", ""],
@@ -1276,7 +1276,7 @@ RSpec.describe Clover, "postgres" do
       it "can create a syslog log destination without structured_data" do
         visit "#{project.path}#{pg.path}/logs"
         fill_in "Name", with: "mezmo"
-        find_by_id("log-destination-type", visible: false).set("syslog")
+        find_by_id("log-destination-type", visible: :all).set("syslog")
         fill_in "url-display", with: "syslog-a.logdna.com:6514"
         click_button "Add"
         expect(page).to have_flash_notice("Log destination is created")
@@ -1289,7 +1289,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can create a syslog log destination with structured_data, ignoring rows with empty sd_id or key" do
         visit "#{project.path}#{pg.path}/logs"
-        _csrf = all("input[name='_csrf']", visible: false).last.value
+        _csrf = all("input[name='_csrf']", visible: :all).last.value
         page.driver.post "#{project.path}#{pg.path}/log-destination", {
           name: "mezmo", type: "syslog", url_suffix: "logs.example.com:6514",
           structured_data_ids: ["honeybadger@61642", "honeybadger@61642", "", "honeybadger@61642"],

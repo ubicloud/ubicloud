@@ -658,7 +658,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "4 × 1600GB"
         expect(page).to have_content "4 × 3200GB"
         expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
-        expect(page.all("input[name=size][value=standard-2]", visible: false).flat_map { it.find(:xpath, "..")[:class].split }).not_to include(start_with("form_gpu_"))
+        expect(page.all("input[name=size][value=standard-2]", visible: :all).flat_map { it.find(:xpath, "..")[:class].split }).not_to include(start_with("form_gpu_"))
       end
 
       it "offers sizes with gpus only in dedicated locations" do
@@ -673,7 +673,7 @@ RSpec.describe Clover, "vm" do
 
         visit "#{project.path}/vm/create?show_gpu=true"
 
-        size_classes = ->(size) { page.all("input[name=size][value=#{size}]", visible: false).map { it.find(:xpath, "..", visible: false)[:class].split } }
+        size_classes = ->(size) { page.all("input[name=size][value=#{size}]", visible: :all).map { it.find(:xpath, "..", visible: :all)[:class].split } }
         expect(size_classes["b300-4"]).to all(include("form_location_#{dedicated.ubid}"))
         expect(size_classes["standard-30"]).to include(include("form_location_#{ps.ubid}", "form_gpu_4:3182"))
       end
@@ -788,7 +788,7 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         expect(page).to have_content "Name must only contain"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
+        expect((find_field name: "name")["value"]).to eq("invalid name")
       end
 
       it "can not create virtual machine with same name" do

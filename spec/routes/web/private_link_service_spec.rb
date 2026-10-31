@@ -31,7 +31,7 @@ RSpec.describe Clover, "private link service" do
   end
 
   def csrf_token(form_id)
-    find("form##{form_id} input[name='_csrf']", visible: false).value
+    find("form##{form_id} input[name='_csrf']", visible: :all).value
   end
 
   describe "unauthenticated" do
