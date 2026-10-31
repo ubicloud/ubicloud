@@ -199,7 +199,7 @@ RSpec.describe Clover, "Kubernetes" do
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
         expect(page).to have_content "Kubernetes cluster name must only contain lowercase"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
+        expect((find_field name: "name")["value"]).to eq("invalid name")
       end
 
       it "can not create kubernetes cluster with same name in same project & location" do

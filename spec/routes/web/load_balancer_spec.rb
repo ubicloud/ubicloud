@@ -126,7 +126,7 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
         expect(page).to have_content "Name must only contain"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
+        expect((find_field name: "name")["value"]).to eq("invalid name")
       end
 
       it "can not create load balancer in a project when does not have permissions" do
@@ -477,7 +477,7 @@ RSpec.describe Clover, "load balancer" do
         lb.update(cert_enabled: false)
         visit "#{project.path}#{lb.path}/settings"
         within("form#cert_enabled_toggle") do
-          _csrf = find("input[name='_csrf']", visible: false).value
+          _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
           page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: true, _csrf:}
         end
 
@@ -489,7 +489,7 @@ RSpec.describe Clover, "load balancer" do
         lb.update(cert_enabled: true)
         visit "#{project.path}#{lb.path}/settings"
         within("form#cert_enabled_toggle") do
-          _csrf = find("input[name='_csrf']", visible: false).value
+          _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
           page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: false, _csrf:}
         end
 

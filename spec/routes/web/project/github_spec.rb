@@ -109,7 +109,7 @@ RSpec.describe Clover, "github" do
       # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -119,7 +119,7 @@ RSpec.describe Clover, "github" do
       # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -128,7 +128,7 @@ RSpec.describe Clover, "github" do
       # disable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: false, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -152,7 +152,7 @@ RSpec.describe Clover, "github" do
       # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -162,7 +162,7 @@ RSpec.describe Clover, "github" do
       # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -171,7 +171,7 @@ RSpec.describe Clover, "github" do
       # disable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: false, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -185,7 +185,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/#{installation.ubid}/setting"
 
       within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         installation.destroy
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
@@ -199,7 +199,7 @@ RSpec.describe Clover, "github" do
       # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_scope_protected_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -209,7 +209,7 @@ RSpec.describe Clover, "github" do
       # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_scope_protected_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
       expect(page.status_code).to eq(302)
@@ -218,7 +218,7 @@ RSpec.describe Clover, "github" do
       # disable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#cache_scope_protected_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
+        _csrf = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
         page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: false, _csrf:}
       end
       expect(page.status_code).to eq(302)

@@ -417,7 +417,7 @@ RSpec.describe Clover, "OIDC auth" do
 
     # Visit the auth page to establish session and obtain a CSRF token from the form
     visit "/auth/#{oidc_provider.ubid}"
-    csrf_token = find("input[name='_csrf']", visible: false).value
+    csrf_token = find_field(name: "_csrf", type: "hidden", visible: :hidden).value
 
     # POST with redirect_uri and CSRF token; process_and_follow_redirects follows the full
     # authorize → fake OIDC → callback → dashboard redirect chain automatically.

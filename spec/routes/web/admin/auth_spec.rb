@@ -36,7 +36,7 @@ RSpec.describe CloverAdmin do
 
   it "shows invalid security token if CSRF token is not valid" do
     visit "/login"
-    find(".rodauth input[name=_csrf]", visible: false).set("")
+    find(".rodauth input[name=_csrf]", visible: :all).set("")
     click_button "Login"
     expect(page.title).to eq "Ubicloud Admin - Invalid Security Token"
     expect(audit_log_hash).to eq({})

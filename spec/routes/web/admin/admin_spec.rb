@@ -527,14 +527,14 @@ RSpec.describe CloverAdmin do
     page.refresh
     within(".association", text: "ssh_public_keys") do
       expect(find("details summary h3").text).to eq "ssh_public_keys (11)"
-      expect(page.all("details:not([open]) ul li", visible: false).length).to eq 11
+      expect(page.all("details:not([open]) ul li", visible: :all).length).to eq 11
     end
 
     Array.new(90) { |i| SshPublicKey.create(name: "key-#{i + 11}", public_key: "k v", project_id: project.id) }
     page.refresh
     within(".association", text: "ssh_public_keys") do
       expect(find("details summary h3").text).to eq "ssh_public_keys (100+)"
-      expect(page.all("details ul li", visible: false).length).to eq 101
+      expect(page.all("details ul li", visible: :all).length).to eq 101
     end
   end
 
@@ -1256,7 +1256,7 @@ RSpec.describe CloverAdmin do
     fill_in "UBID, UUID, or prefix:term", with: st.ubid
     click_button "Show Object"
 
-    find("#action-list input[name=_csrf]", visible: false).set("")
+    find("#action-list input[name=_csrf]", visible: :all).set("")
     click_button "Schedule Strand to Run Immediately"
     expect(page.title).to eq "Ubicloud Admin - Invalid Security Token"
     expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
@@ -2703,7 +2703,7 @@ RSpec.describe CloverAdmin do
 
     it "shows error for an invalid class/semaphore selection" do
       # The select only offers valid options, so submit a tampered request directly.
-      csrf = find("#start-semaphore-rollout input[name=_csrf]", visible: false).value
+      csrf = find("#start-semaphore-rollout input[name=_csrf]", visible: :all).value
       page.driver.submit :post, "/rollouts/start/RolloutSemaphore", _csrf: csrf, class_semaphore: "Page bad", increment: "increment", gap: "60"
 
       expect(page).to have_flash_error("invalid semaphore for class")
@@ -3023,7 +3023,7 @@ RSpec.describe CloverAdmin do
 
     it "shows error for an unsupported kubernetes version" do
       # The select only offers valid options, so submit a tampered request directly.
-      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: false).value
+      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: :all).value
       page.driver.submit :post, "/kubernetes-node-image", _csrf: csrf,
         kubernetes_version: "v0.1", location_id: Option.kubernetes_locations.first.ubid, image_version: "20260730.1.0"
 
@@ -3032,7 +3032,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "shows error for a location without kubernetes" do
-      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: false).value
+      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: :all).value
       page.driver.submit :post, "/kubernetes-node-image", _csrf: csrf,
         kubernetes_version: Option.kubernetes_versions.first, location_id: Location[Location::HETZNER_HEL1_ID].ubid, image_version: "20260730.1.0"
 
@@ -3500,7 +3500,7 @@ RSpec.describe CloverAdmin do
 
     expect(page).to have_content("active-vm")
     expect(page).to have_content("archived-vm")
-    expect(page.find_field("days").value).to eq "10"
+    expect(page).to have_field("days", with: "10")
   end
 
   it "shows a message when no data available" do
@@ -3509,7 +3509,7 @@ RSpec.describe CloverAdmin do
     click_button "Show Virtual Machines"
 
     expect(page).to have_content("No data available for Virtual Machines table")
-    expect(page.find_field("days").value).to eq "5"
+    expect(page).to have_field("days", with: "5")
   end
 
   describe "theme" do
@@ -3631,7 +3631,7 @@ RSpec.describe CloverAdmin do
         fill_in "days", with: "30"
         click_button "Find Archived Record"
       end
-      expect(page.find_field("days").value).to eq "15"
+      expect(page).to have_field("days", with: "15")
 
       # Test default (5) when no value provided
       within("#archived_record_form") do
@@ -3639,7 +3639,7 @@ RSpec.describe CloverAdmin do
         fill_in "days", with: nil
         click_button "Find Archived Record"
       end
-      expect(page.find_field("days").value).to eq "5"
+      expect(page).to have_field("days", with: "5")
     end
   end
 
