@@ -16,5 +16,9 @@ runner_map runner postgres
 runner_map runner clover
 runner_map runner clover_password' | sudo tee -a /etc/postgresql/17/main/pg_ident.conf > /dev/null
 sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/17/main/pg_hba.conf
+# The test database does not need to survive a crash
+echo 'fsync = off
+synchronous_commit = off
+full_page_writes = off' | sudo tee /etc/postgresql/17/main/conf.d/ci.conf > /dev/null
 sudo systemctl restart postgresql
 until pg_isready -q; do sleep 1; done
