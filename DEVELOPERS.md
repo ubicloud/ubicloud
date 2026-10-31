@@ -155,16 +155,11 @@ it.
 
 ### Installing System Dependencies
 
-`mise` will compile Ruby and/or Postgres. Additionally, some Ruby gems
-require compilation. For all of this, you must have a C compiler, a
-Rust compiler, and various libraries. [There is documentation listing
-the commands you can use for each
+`mise` will compile Ruby. Additionally, some Ruby gems require compilation.
+For all of this, you must have a C compiler, a Rust compiler, and various
+libraries. [There is documentation listing the commands you can use for each
 platform](https://github.com/rbenv/ruby-build/wiki#suggested-build-environment)
 (e.g., Homebrew on macOS, or Ubuntu).
-
-You will also need
-[dependencies](https://github.com/mise-plugins/mise-postgres#dependencies)
-installed on your system to compile Postgres.
 
 For quick reference, here are some recipes for the most common
 platforms we use.
@@ -175,20 +170,14 @@ Homebrew:
 xcode-select --install
 
 # Ruby
-brew install openssl@3 readline libyaml gmp autoconf
-
-# Postgres
-brew install gcc readline zlib curl ossp-uuid icu4c pkg-config
+brew install openssl@3 readline libyaml gmp autoconf libpq
 ```
 
 Debian/Ubuntu based:
 
 ```sh
 # Ruby
-apt-get install autoconf patch build-essential rustc libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libgmp-dev libncurses5-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev
-
-# Postgres
-apt-get install build-essential libssl-dev libreadline-dev zlib1g-dev libcurl4-openssl-dev uuid-dev icu-devtools libicu-dev pkg-config pkg-config bison flex
+apt-get install autoconf patch build-essential rustc libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libgmp-dev libncurses5-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev libpq-dev
 ```
 
 ### `mise install`
@@ -204,7 +193,7 @@ these dependencies are active:
     $ which ruby
     /home/youruser/.local/share/mise/installs/ruby/3.2.8/bin/ruby
     $ which postgres
-    /home/youruser/.local/share/mise/installs/postgres/17.6/bin/postgres
+    /home/youruser/.local/share/mise/installs/postgres/17.11/bin/postgres
     $ which node
     /home/youruser/.local/share/mise/installs/node/23.6.0/bin/node
     $ which go
@@ -222,27 +211,24 @@ set -gx GOBIN /home/youruser/.local/share/mise/installs/go/1.24.0/bin
 set -gx GOROOT /home/youruser/.local/share/mise/installs/go/1.24.0
 set -gx LD_LIBRARY_PATH /home/youruser/.local/share/mise/installs/postgres/17.6/lib
 set -gx PATH '/home/youruser/.local/share/mise/installs/ruby/3.2.8/bin:/home/youruser/.local/share/mise/installs/postgres/17.6/bin:/home/youruser/.local/share/mise/installs/node/23.6.0/bin:/home/youruser/.local/share/mise/installs/go/1.24.0/bin:/home/youruser/.local/share/mise/installs/direnv/2.35.0:/home/youruser/.local/share/mise/installs/yq/4.44.2:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'
-set -gx PGDATA /home/youruser/.local/share/mise/installs/postgres/17.6/data
+set -gx PGDATA /home/youruser/.local/share/mise/installs/postgres/17/data
 ```
 
 ### Installing Postgres
 
-You will need
-[dependencies](https://github.com/mise-plugins/mise-postgres) to
-compile Postgres installed on your system.
-
-First, set some autoconf `./configure` options to be passed to
-Postgres. `.asdf-postgres-configure-options` is not a typo, since
-`mise` uses a fork of an `asdf` plugin for this:
-
-```sh
-$ echo "POSTGRES_EXTRA_CONFIGURE_OPTIONS='--with-uuid=e2fs --with-openssl'" > ~/.asdf-postgres-configure-options
-```
-
-Then run:
+Run:
 
 ```sh
 $ mise install postgres
+```
+
+Mise recently switched from `asdf:postgres` to `conda:postgresql`, and it
+doesn't initialize the database automatically.
+
+You should initialize it with:
+
+```sh
+$ initdb -U postgres -D $PGDATA
 ```
 
 There are many alternative ways to get Postgres, e.g. via system
