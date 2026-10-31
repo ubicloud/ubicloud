@@ -10,40 +10,16 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup PostgreSQL
+    - name: Start PostgreSQL setup in the background
       shell: bash
       run: |
-        # Stop the default PostgreSQL cluster on the runner if it exists
-        sudo -u postgres pg_dropcluster 16 main --stop || true
-        # Install PostgreSQL
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-client-17
-        # Allow runner user to access PostgreSQL
-        echo 'runner_map runner postgres
-        runner_map runner clover
-        runner_map runner clover_password' | sudo tee -a /etc/postgresql/17/main/pg_ident.conf > /dev/null
-        sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/17/main/pg_hba.conf
-        sudo systemctl restart postgresql
-        until pg_isready -q; do sleep 1; done
+        (PS4='+ $(date +%T.%3N) ' "$GITHUB_ACTION_PATH/setup-postgres.sh" > "$RUNNER_TEMP/setup-postgres.log" 2>&1; echo $? > "$RUNNER_TEMP/setup-postgres.status") &
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
       with:
         ruby-version: mise.toml
         bundler-cache: true
-
-    - name: Create .env.rb file
-      shell: bash
-      run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
-
-    - name: Setup clover database
-      shell: bash
-      run: |
-        createuser -U postgres clover
-        createuser -U postgres clover_password
-        bundle exec rake setup_database\[test,true\]
 
     - name: Set up Node.js
       if: ${{ inputs.setup-node == 'true' }}
@@ -56,3 +32,21 @@ runs:
       if: ${{ inputs.setup-node == 'true' }}
       shell: bash
       run: npm ci
+
+    - name: Create .env.rb file
+      shell: bash
+      run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
+
+    - name: Wait for PostgreSQL setup
+      shell: bash
+      run: |
+        until [ -f "$RUNNER_TEMP/setup-postgres.status" ]; do sleep 1; done
+        cat "$RUNNER_TEMP/setup-postgres.log"
+        exit "$(cat "$RUNNER_TEMP/setup-postgres.status")"
+
+    - name: Setup clover database
+      shell: bash
+      run: |
+        createuser -U postgres clover
+        createuser -U postgres clover_password
+        bundle exec rake setup_database\[test,true\]

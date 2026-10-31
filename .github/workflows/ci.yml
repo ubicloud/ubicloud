@@ -11,12 +11,12 @@ on:
   pull_request:
 
 jobs:
-  ruby-ci:
+  ruby-checks:
     strategy:
       fail-fast: false
       matrix:
         runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
-    name: Ruby CI - ${{matrix.runs-on}}
+    name: Ruby checks - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
     timeout-minutes: 25
 
@@ -76,9 +76,6 @@ jobs:
         CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
       run: ruby bin/production_check
 
-    - name: Run controlplane tests
-      run: bundle exec rake default frozen_spec
-
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
 
@@ -86,13 +83,49 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: code-coverage-report-${{ matrix.runs-on }}
+        name: rhizome-code-coverage-report-${{ matrix.runs-on }}
+        path: coverage/
+
+  ruby-specs:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
+        task: [default, frozen_spec]
+    name: Ruby specs - ${{matrix.task}} - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    timeout-minutes: 25
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Clover
+      uses: $/.github/actions/setup-clover
+
+    - name: Cache spec runtimes
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: tmp/turbo_rspec_runtime.log
+        key: spec-runtime-${{ matrix.runs-on }}-${{ matrix.task }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: spec-runtime-${{ matrix.runs-on }}-${{ matrix.task }}-
+
+    - name: Run controlplane tests
+      run: bundle exec rake ${{ matrix.task }}
+
+    - name: Archive code coverage results
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: code-coverage-report-${{ matrix.task }}-${{ matrix.runs-on }}
         path: coverage/
 
     - name: Archive CLI golden-file diff
       if: failure()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: cli-golden-files-diff-${{ matrix.runs-on }}
+        name: cli-golden-files-diff-${{ matrix.task }}-${{ matrix.runs-on }}
         path: cli-golden-files.diff
         if-no-files-found: ignore
