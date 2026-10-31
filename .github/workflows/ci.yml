@@ -105,6 +105,13 @@ jobs:
     - name: Set up Clover
       uses: $/.github/actions/setup-clover
 
+    - name: Cache spec runtimes
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: tmp/turbo_rspec_runtime.log
+        key: spec-runtime-${{ matrix.runs-on }}-${{ matrix.task }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: spec-runtime-${{ matrix.runs-on }}-${{ matrix.task }}-
+
     - name: Run controlplane tests
       run: bundle exec rake ${{ matrix.task }}
 
