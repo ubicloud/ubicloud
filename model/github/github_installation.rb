@@ -20,6 +20,10 @@ class GithubInstallation < Sequel::Model
     first(installation_id:)
   end
 
+  def self.create_for_account(installation_id:, account:, project_id:)
+    create(installation_id:, name: account[:login] || account[:name], type: account[:type], project_id:)
+  end
+
   def total_active_runner_vcpus
     runners_dataset.total_active_runner_vcpus
   end

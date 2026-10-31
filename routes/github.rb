@@ -45,7 +45,7 @@ class Clover
       end
 
       begin
-        installation_response = Octokit::Client.new(access_token:).get("/user/installations")[:installations].find { it[:id].to_s == installation_id }
+        installation_response = Github.user_installation(access_token, installation_id)
       rescue Octokit::Unauthorized => e
         installation_octokit_error = e
       end
@@ -66,12 +66,7 @@ class Clover
         r.redirect project, "/dashboard"
       end
 
-      installation = GithubInstallation.create(
-        installation_id:,
-        name: installation_response[:account][:login] || installation_response[:account][:name],
-        type: installation_response[:account][:type],
-        project_id: project.id,
-      )
+      installation = GithubInstallation.create_for_account(installation_id:, account: installation_response[:account], project_id: project.id)
 
       flash["notice"] = "GitHub runner integration is enabled for #{project.name} project."
       if session["github_actions_setup"]

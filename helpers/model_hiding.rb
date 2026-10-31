@@ -20,7 +20,7 @@ class Clover < Roda
         ::BillingInfo => [:update_or_create_stripe_customer],
         ::DiscountCode => [:first],
         ::FirewallRule => [:cidr_for_source_type, :protocol_and_range_for_port_type, :port_options, :source_options],
-        ::GithubInstallation => [:with_github_installation_id],
+        ::GithubInstallation => [:create_for_account, :with_github_installation_id],
         ::GithubRepository => [:cache_size_limit],
         ::InferenceEndpoint => [:is_public],
         ::InferenceRouterModel => [:where],
