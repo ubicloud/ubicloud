@@ -28,6 +28,34 @@ great at the detail work of going to post generated state backwards to
 generated code. Engineers may make alterations to the materialized
 output and then send it to LLm for iterative study."
 
+**One consistent definition for every resource, without overfitting.**
+Daniel Farina, 1 Nov 2026: "we want consistency and elegance in
+definition for all resources, avoiding over fit. Current prototype
+proves "something" is possible already". The rebuild need not prove
+feasibility again; it starts from the shape every definition shares.
+
+**The API may change for elegance.** Daniel Farina, 1 Nov 2026: "free
+changes for elegance. Assume that the resources are not already
+perfect." Changes to the spec and to the API behind it are part of the
+rebuild, not work that must be done before it.
+
+**The published provider is not a reference either.** Daniel Farina,
+1 Nov 2026: "it's the version this was based on, with Postgres specific
+weaknesses / hacks there in."
+
+**Users re-import; there is no state migration.** Daniel Farina,
+1 Nov 2026: "re import. Carry no path dependency." The new provider has
+no state upgrader for state written by the old one.
+
+**The rebuild lives on a new local branch until it is ready for
+review.** Daniel Farina decided on 1 Nov 2026 that the branch is kept
+as a git bundle meanwhile.
+
+**The prototype does not merge.** Its coverage skip therefore never
+reaches main. Daniel Farina also decided on 1 Nov 2026 that the terraform
+suite, being slow, may run as its own GitHub workflow, and that the
+main suite's coverage may be split among jobs.
+
 ## Rules
 
 ### Derivation
