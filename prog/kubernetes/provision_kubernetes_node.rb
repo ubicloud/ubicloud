@@ -127,6 +127,14 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo systemctl enable --now nftables")
     vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
+    # Node.js and newer Go releases listen on Multipath TCP when the kernel
+    # supports it, but nothing here depends on it. MPTCP listeners are a
+    # remote path to CVE-2026-98432, so that exposure costs more than it
+    # gives. Turn MPTCP off and let them fall back to plain TCP. This only
+    # narrows the exposure: a patched kernel is the fix.
+    vm.sshable.cmd("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n")
+    vm.sshable.cmd("sudo sysctl --system")
+
     if kubernetes_nodepool.nil? && Config.operator_ssh_public_keys
       all_keys_str = "#{vm.sshable.keys.first.public_key}\n#{Config.operator_ssh_public_keys}\n"
       vm.sshable.write_file("/home/ubi/.ssh/authorized_keys", all_keys_str, user: :current)

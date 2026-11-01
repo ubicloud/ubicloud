@@ -274,7 +274,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_bootstrap_rhizome" do
-    it "hops to mount_data_disk if there are no sub-programs running" do
+    it "turns off MPTCP and hops to mount_data_disk if there are no sub-programs running" do
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n").ordered
+      expect(sshable).to receive(:_cmd).with("sudo sysctl --system").ordered
       expect { nx.wait_bootstrap_rhizome }.to hop("mount_data_disk")
     end
 
