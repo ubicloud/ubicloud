@@ -80,8 +80,21 @@ PGDATA=/dat/#{version}/data
     def aws_create_bucket
       create_bucket_configuration = {tags: Util.aws_tags(ubid)}
       create_bucket_configuration[:location_constraint] = location.name unless location.name == "us-east-1"
-      blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration:)
-    rescue ::Aws::S3::Errors::BucketAlreadyOwnedByYou
+      begin
+        blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration:)
+      rescue ::Aws::S3::Errors::BucketAlreadyOwnedByYou
+        nil
+      end
+
+      policy = {Version: "2012-10-17", Statement: [{
+        Sid: "DenyInsecureTransport",
+        Effect: "Deny",
+        Principal: "*",
+        Action: "s3:*",
+        Resource: ["arn:aws:s3:::#{ubid}", "arn:aws:s3:::#{ubid}/*"],
+        Condition: {Bool: {"aws:SecureTransport": "false"}},
+      }]}
+      blob_storage_client.put_bucket_policy(bucket: ubid, policy: policy.to_json)
     end
 
     def aws_set_lifecycle_policy(expiration_days: BACKUP_BUCKET_EXPIRATION_DAYS)

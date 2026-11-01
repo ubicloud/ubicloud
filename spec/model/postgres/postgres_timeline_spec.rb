@@ -404,18 +404,53 @@ PGDATA=/dat/17/data
       expect(Aws::S3::Client).to receive(:new).and_return(s3_client).at_least(:once)
     end
 
-    it "creates bucket" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-east-2", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
-      s3_client.stub_responses(:create_bucket)
-      expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {tags: Util.aws_tags(postgres_timeline.ubid), location_constraint: "us-east-2"}})
-      postgres_timeline.create_bucket
-    end
+    describe "#create_bucket" do
+      let(:bucket_policy) {
+        {Version: "2012-10-17", Statement: [{
+          Sid: "DenyInsecureTransport",
+          Effect: "Deny",
+          Principal: "*",
+          Action: "s3:*",
+          Resource: ["arn:aws:s3:::#{postgres_timeline.ubid}", "arn:aws:s3:::#{postgres_timeline.ubid}/*"],
+          Condition: {Bool: {"aws:SecureTransport": "false"}},
+        }]}.to_json
+      }
 
-    it "creates bucket in us-east-1" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-east-1", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
-      s3_client.stub_responses(:create_bucket)
-      expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {tags: Util.aws_tags(postgres_timeline.ubid)}})
-      postgres_timeline.create_bucket
+      before do
+        postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
+      end
+
+      it "creates bucket and denies insecure requests" do
+        expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {tags: Util.aws_tags(postgres_timeline.ubid), location_constraint: "us-east-2"}}).ordered
+        expect(s3_client).to receive(:put_bucket_policy).with(bucket: postgres_timeline.ubid, policy: bucket_policy).ordered
+
+        postgres_timeline.create_bucket
+      end
+
+      it "creates bucket in us-east-1" do
+        postgres_timeline.update(location_id: create_aws_location(name: "us-east-1").id)
+        expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {tags: Util.aws_tags(postgres_timeline.ubid)}}).ordered
+        expect(s3_client).to receive(:put_bucket_policy).with(bucket: postgres_timeline.ubid, policy: bucket_policy).ordered
+
+        postgres_timeline.create_bucket
+      end
+
+      it "retries policy installation after bucket creation succeeds" do
+        s3_client.stub_responses(:create_bucket, [{}, "BucketAlreadyOwnedByYou"])
+        s3_client.stub_responses(:put_bucket_policy, ["AccessDenied", {}])
+        expect(s3_client).to receive(:create_bucket).twice.and_call_original
+        expect(s3_client).to receive(:put_bucket_policy).with(bucket: postgres_timeline.ubid, policy: bucket_policy).twice.and_call_original
+
+        expect { postgres_timeline.create_bucket }.to raise_error(Aws::S3::Errors::AccessDenied)
+        expect { postgres_timeline.create_bucket }.not_to raise_error
+      end
+
+      it "propagates other bucket creation failures" do
+        s3_client.stub_responses(:create_bucket, "BucketAlreadyExists")
+        expect(s3_client).not_to receive(:put_bucket_policy)
+
+        expect { postgres_timeline.create_bucket }.to raise_error(Aws::S3::Errors::BucketAlreadyExists)
+      end
     end
 
     describe "#set_lifecycle_policy" do
