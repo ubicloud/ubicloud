@@ -117,7 +117,16 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap(:mount_data_disk, nap: 5)
+    reap(nap: 5) do
+      # Node.js and newer Go releases listen on Multipath TCP when the kernel
+      # supports it, but nothing here depends on it. MPTCP listeners are a
+      # remote path to CVE-2026-98432, so that exposure costs more than it
+      # gives. Turn MPTCP off and let them fall back to plain TCP. This only
+      # narrows the exposure: a patched kernel is the fix.
+      vm.sshable.cmd("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n")
+      vm.sshable.cmd("sudo sysctl --system")
+      hop_mount_data_disk
+    end
   end
 
   label def mount_data_disk
