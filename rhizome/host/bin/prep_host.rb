@@ -78,6 +78,15 @@ net.ipv4.conf.all.forwarding=1
 net.ipv4.conf.all.proxy_arp=1
 net.ipv4.ip_forward=1
 CONF
+
+# Node.js and newer Go releases listen on Multipath TCP when the kernel
+# supports it, but nothing here depends on it. MPTCP listeners are a
+# remote path to CVE-2026-98432, so that exposure costs more than it
+# gives. Turn MPTCP off and let them fall back to plain TCP. This only
+# narrows the exposure: a patched kernel is the fix.
+File.write("/etc/sysctl.d/73-clover-disable-mptcp.conf", <<CONF)
+net.mptcp.enabled=0
+CONF
 r "sysctl --system"
 
 # VmHosts make no use of RDMA, and the irdma driver that auto-loads on
