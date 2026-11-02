@@ -2205,6 +2205,10 @@ paths:
                   description: Username for basic auth, required with password
                   type: string
                   nullable: true
+              example:
+                url: https://prometheus.example.com/api/v1/write
+                username: prometheus
+                password: my-password
               additionalProperties: false
               required:
                 - url

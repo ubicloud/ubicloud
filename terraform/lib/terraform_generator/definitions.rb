@@ -14,6 +14,7 @@ module TerraformGenerator::Definitions
     postgres: {order: %i[upgrade]},
     postgres_firewall_rule: {},
     postgres_log_destination: {},
+    postgres_metric_destination: {},
     private_subnet: {},
     project: {},
     ssh_public_key: {},
