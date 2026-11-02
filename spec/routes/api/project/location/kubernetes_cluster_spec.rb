@@ -172,6 +172,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
       end
     end
 
+    describe "rename" do
+      it "answers with the detailed cluster" do
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body["cp_vms"]).to eq([])
+        expect(body["nodepools"].map { it["name"] }).to eq(["np"])
+        expect(kc.reload.name).to eq("new-name")
+      end
+    end
+
     describe "kubeconfig" do
       it "success" do
         kc.update(kubeconfig: "kubeconfig content")
@@ -304,7 +317,9 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np-renamed"}.to_json
 
           expect(last_response.status).to eq(200)
-          expect(JSON.parse(last_response.body)["name"]).to eq("np-renamed")
+          body = JSON.parse(last_response.body)
+          expect(body["name"]).to eq("np-renamed")
+          expect(body["vms"]).to eq([])
           expect(kn.reload.name).to eq("np-renamed")
         end
 
