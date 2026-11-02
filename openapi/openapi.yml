@@ -1449,14 +1449,21 @@ paths:
                     since: 2026-10-08
                     removed-in: 2
                 ha_type:
-                  description: High availability type
+                  description: High availability type, which sets the number of standbys
                   type: string
+                  default: none
+                  enum:
+                    - none
+                    - async
+                    - sync
                 size:
                   description: Requested size for the underlying VM
                   type: string
+                  example: standard-2
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                  example: 64
                 version:
                   description: Deprecated; send target_version.
                   type: string
@@ -1479,16 +1486,21 @@ paths:
                 restrict_by_default:
                   description: Whether to restrict access by default (if so, firewall rules must be added to access)
                   type: boolean
+                  default: false
+                  writeOnly: true
                 private_subnet_name:
                   description: Name for the private subnet (if not provided, a name will be auto-generated)
                   type: string
+                  writeOnly: true
                 pg_config:
+                  description: PostgreSQL parameters to set
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set
                   type: object
                   example:
                     max_client_conn: '100'
@@ -1521,8 +1533,12 @@ paths:
               type: object
               properties:
                 ha_type:
-                  description: High availability type
+                  description: High availability type, which sets the number of standbys
                   type: string
+                  enum:
+                    - none
+                    - async
+                    - sync
                 size:
                   description: Requested size for the underlying VM
                   type: string
@@ -1751,6 +1767,7 @@ paths:
               type: object
               properties:
                 pg_config:
+                  description: PostgreSQL parameters to set or, with a null value, remove
                   type: object
                   example:
                     max_connections: '100'
@@ -1758,6 +1775,7 @@ paths:
                     type: string
                     nullable: true
                 pgbouncer_config:
+                  description: PgBouncer parameters to set or, with a null value, remove
                   type: object
                   example:
                     max_client_conn: '100'
@@ -2184,13 +2202,16 @@ paths:
                 name:
                   description: Name for the read replica
                   type: string
+                  example: my-postgres-replica
                 pg_config:
+                  description: PostgreSQL parameters to set, on top of those of the parent
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set, on top of those of the parent
                   type: object
                   example:
                     max_client_conn: '100'
@@ -2244,6 +2265,7 @@ paths:
                 name:
                   description: New name for PostgreSQL database
                   type: string
+                  example: my-postgres
               additionalProperties: false
               required:
                 - name
@@ -2270,7 +2292,10 @@ paths:
               type: object
               properties:
                 password:
+                  description: New superuser password, which must be at least 12 characters long and contain a lowercase letter, an uppercase letter and a digit
                   type: string
+                  format: password
+                  example: Example-Password-123
               additionalProperties: false
               required:
                 - password
@@ -2314,17 +2339,22 @@ paths:
                 name:
                   description: Name for the newly restored Postgres database.
                   type: string
+                  example: my-postgres-restored
                 restore_target:
                   description: The RFC 3339-formatted timestamp for the point in time at which to recover.
                   type: string
                   format: date-time
+                  example: 2026-11-01T12:00:00Z
+                  writeOnly: true
                 pg_config:
+                  description: PostgreSQL parameters to set, on top of those of the source database
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set, on top of those of the source database
                   type: object
                   example:
                     max_client_conn: '100'
@@ -4102,31 +4132,58 @@ components:
           x-deprecated:
             since: 2026-10-08
         ha_type:
-          description: High availability type
+          description: High availability type, which sets the number of standbys
           type: string
+          enum:
+            - none
+            - async
+            - sync
         target_server_count:
           description: Target number of servers (primary + standbys)
           type: integer
+          readOnly: true
         id:
           description: ID of the Postgres database
           type: string
           example: pgn30gjk1d1e2jj34v9x0dq4rp
           pattern: ^pg[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the Postgres database
           type: string
+          readOnly: true
         name:
           description: Name of the Postgres database
           type: string
         state:
           description: State of the Postgres database
           type: string
+          enum:
+            - creating
+            - running
+            - restarting
+            - restoring_backup
+            - replaying_wal
+            - finalizing_restore
+            - unavailable
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - restarting
+              - restoring_backup
+              - replaying_wal
+              - finalizing_restore
+              - deleting
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+          readOnly: true
         target_storage_size_gib:
           description: Storage size in GiB that the servers converge to, which is storage_size unless storage auto-scale raised it
           type: integer
+          readOnly: true
         size:
           description: Size of the underlying VM last requested by create or update
           type: string
@@ -4140,6 +4197,7 @@ components:
             - '16'
             - '17'
             - '18'
+          readOnly: true
         target_version:
           description: Target Postgres version
           type: string
@@ -4150,13 +4208,16 @@ components:
         vm_size:
           description: Size of the underlying VM
           type: string
+          readOnly: true
         target_vm_size:
           description: VM size that the servers converge to, which is size unless storage auto-scale raised it
           type: string
+          readOnly: true
         ca_certificates:
           description: CA certificates of the root CA used to issue postgres server certificates
           type: string
           nullable: true
+          readOnly: true
         maintenance_window_start_at:
           description: Hour of the day, in UTC, at which the maintenance window starts; null if no window is set
           type: integer
@@ -4171,13 +4232,16 @@ components:
         read_replica:
           description: If the database is a read replica or not
           type: boolean
+          readOnly: true
         parent:
           description: Parent Postgres database
           type: string
           nullable: true
+          readOnly: true
         fallback_active:
           description: Whether the primary server is running on a fallback instance type
           type: boolean
+          readOnly: true
         tags:
           description: Tags of the Postgres database
           type: array
@@ -4187,6 +4251,8 @@ components:
           description: Creation timestamp of the Postgres database
           type: string
           format: date-time
+          readOnly: true
+          x-immutable: true
       additionalProperties: false
       required:
         - flavor
@@ -5389,35 +5455,44 @@ components:
                 additionalProperties: false
                 properties:
                   connection_string:
-                    description: Connection string to the Postgres database
+                    description: Connection string to the Postgres database. It contains the superuser password.
                     type: string
+                    format: password
                     nullable: true
+                    readOnly: true
                   private_connection_string:
-                    description: Private connection string to the Postgres database, accessible from connected subnets
+                    description: Private connection string to the Postgres database, accessible from connected subnets. It contains the superuser password.
                     type: string
+                    format: password
                     nullable: true
+                    readOnly: true
                   username:
                     description: Username for the Postgres database
                     type: string
                     nullable: true
+                    readOnly: true
                   password:
                     description: Password for the Postgres database
                     type: string
+                    format: password
                     nullable: true
                   hostname:
                     description: Hostname for the Postgres database
                     type: string
                     nullable: true
+                    readOnly: true
                   earliest_restore_time:
                     description: Earliest restore time (if primary), or null if there is no backup yet
                     type: string
                     format: date-time
                     nullable: true
+                    readOnly: true
                   firewall_rules:
                     description: List of Postgres firewall rules
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
+                    readOnly: true
                   private_subnet_id:
                     description: ID of the database's private subnet
                     type: string
@@ -5441,6 +5516,7 @@ components:
                   primary:
                     description: Is the database primary
                     type: boolean
+                    readOnly: true
                   metric_destinations:
                     description: List of metric destinations
                     type: array
@@ -5474,11 +5550,13 @@ components:
                         - auth_methods
                         - username
                         - url
+                    readOnly: true
                   log_destinations:
                     description: List of log destinations
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresLogDestination'
+                    readOnly: true
                   pg_config:
                     description: PostgreSQL parameters set by the user
                     type: object
@@ -5498,6 +5576,7 @@ components:
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresDatabase'
+                    readOnly: true
                 required:
                   - connection_string
                   - private_connection_string
@@ -5542,22 +5621,29 @@ components:
             type: object
             properties:
               current_version:
+                description: Major PostgreSQL version the database runs
                 type: string
                 enum:
                   - '16'
                   - '17'
                   - '18'
+                readOnly: true
               target_version:
+                description: Major PostgreSQL version that the servers converge to
                 type: string
                 enum:
                   - '16'
                   - '17'
                   - '18'
               upgrade_status:
+                description: running while the database moves to target_version, failed if the upgrade failed, and not_running when no upgrade is under way
                 type: string
+                readOnly: true
               upgrade_stage:
+                description: Current step of the servers' convergence, or null if they are not converging
                 type: string
                 nullable: true
+                readOnly: true
             additionalProperties: false
             required:
               - current_version
