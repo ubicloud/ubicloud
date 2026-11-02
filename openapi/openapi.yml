@@ -4798,12 +4798,15 @@ components:
             type: object
             properties:
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/AuditLog'
+                readOnly: true
               pagination_key:
                 description: Key to pass to get next page (only present if additional pages)
                 type: string
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -4829,11 +4832,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateLocation'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4871,11 +4878,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/Firewall'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4904,11 +4915,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubCacheEntry'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4927,11 +4942,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubRepository'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4956,11 +4975,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubInstallation'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4979,9 +5002,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/SshPublicKey'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -4999,9 +5024,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/InferenceApiKey'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -5013,9 +5040,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/InferenceEndpoint'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -5059,11 +5088,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/LoadBalancer'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5202,11 +5235,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresDatabase'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5267,6 +5304,7 @@ components:
                 description: Pass as pagination_key to retrieve the next page of results
                 type: string
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                readOnly: true
             additionalProperties: false
             required:
               - logs
@@ -5284,11 +5322,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5301,11 +5343,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresServer'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5318,11 +5364,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresBackup'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5353,11 +5403,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateLinkService'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5376,11 +5430,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateSubnet'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5453,11 +5511,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/Vm'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5476,11 +5538,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/MachineImage'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5500,11 +5566,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/MachineImageVersion'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5538,11 +5608,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/KubernetesCluster'
+                readOnly: true
             additionalProperties: false
             required:
               - count
