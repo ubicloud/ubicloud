@@ -1,0 +1,15 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/runner_metrics_collector"
+
+collector = RunnerMetricsCollector.new
+case ARGV[0]
+when "read"
+  $stdout.write(collector.read(ARGV.drop(1)))
+when "ack"
+  collector.ack($stdin.read.split("\n"))
+else
+  warn "usage: runner-metrics-collect read VM_NAME... | runner-metrics-collect ack < VM_NAME/FILE lines"
+  exit 1
+end
