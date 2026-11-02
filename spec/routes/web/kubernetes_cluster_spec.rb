@@ -523,6 +523,13 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_css(".auto-refresh", visible: :all)
       end
 
+      it "redirects a nodepool's own path to its overview page" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kn.path}"
+
+        expect(page).to have_current_path("#{project.path}#{kn.path}/overview")
+      end
+
       it "can rename a nodepool" do
         kn = kc.nodepools.first
         visit "#{project.path}#{kn.path}/settings"

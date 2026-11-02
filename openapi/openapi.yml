@@ -798,6 +798,16 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+    get:
+      operationId: getKubernetesNodepoolDetails
+      summary: Get kubernetes nodepool details
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesNodepool'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'

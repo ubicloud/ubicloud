@@ -140,9 +140,13 @@ class Clover
 
         check_found_object(kn)
 
-        r.get web? do
+        r.get true do
           authorize("KubernetesCluster:view", kc.id)
-          r.redirect kn, "/overview"
+          if api?
+            Serializers::KubernetesNodepool.serialize(kn)
+          else
+            r.redirect kn, "/overview"
+          end
         end
 
         r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
