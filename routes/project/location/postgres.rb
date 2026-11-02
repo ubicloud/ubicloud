@@ -312,14 +312,15 @@ class Clover
           Validation.validate_url(url)
           Validation.validate_metric_destination_auth(username, password, options)
 
-          DB.transaction do
+          md = DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, options:)
             pg.server_incr("configure_metrics")
             audit_log(md, "create", pg)
+            md
           end
 
           if api?
-            Serializers::Postgres.serialize(pg, {detailed: true})
+            Serializers::PostgresMetricDestination.serialize(md)
           else
             flash["notice"] = "Metric destination is created"
             r.redirect pg, "/charts"

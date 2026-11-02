@@ -283,11 +283,11 @@ class UbiCli
     params_to_hash(params, :tags, "tag", cmd)
   end
 
-  def metric_destinations_response(data)
+  def metric_destinations_response(pg)
     body = []
     body << "Metric destination added to PostgreSQL database.\n"
     body << "Current metric destinations:\n"
-    data[:metric_destinations].each_with_index do |md, i|
+    pg.info[:metric_destinations].each_with_index do |md, i|
       body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:auth_methods].join(",")
       body << "  " << md[:username] if md[:username]
       body << "  " << md[:url] << "\n"
