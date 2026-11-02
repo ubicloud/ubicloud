@@ -24,47 +24,11 @@ described: createPrivateSubnet.firewall_id: describe it
 described: patchPostgresDatabaseConfig.pg_config: describe it
 described: patchPostgresDatabaseConfig.pgbouncer_config: describe it
 described: resetSuperuserPassword.password: describe it
-described: responses/AuditLogs.items: describe it
-described: responses/Firewalls.count: describe it
-described: responses/Firewalls.items: describe it
-described: responses/GithubCacheEntries.count: describe it
-described: responses/GithubCacheEntries.items: describe it
-described: responses/GithubInstallations.count: describe it
-described: responses/GithubInstallations.items: describe it
-described: responses/GithubRepositories.count: describe it
-described: responses/GithubRepositories.items: describe it
-described: responses/InferenceApiKeys.items: describe it
-described: responses/InferenceEndpoints.items: describe it
-described: responses/KubernetesClusters.count: describe it
-described: responses/KubernetesClusters.items: describe it
-described: responses/LoadBalancers.count: describe it
-described: responses/LoadBalancers.items: describe it
-described: responses/MachineImageVersions.count: describe it
-described: responses/MachineImageVersions.items: describe it
-described: responses/MachineImages.count: describe it
-described: responses/MachineImages.items: describe it
-described: responses/PostgresBackups.count: describe it
-described: responses/PostgresBackups.items: describe it
 described: responses/PostgresDatabaseLogs.logs: describe it
 described: responses/PostgresDatabaseUpgradeStatus.current_version: describe it
 described: responses/PostgresDatabaseUpgradeStatus.target_version: describe it
 described: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: describe it
 described: responses/PostgresDatabaseUpgradeStatus.upgrade_status: describe it
-described: responses/PostgresDatabases.count: describe it
-described: responses/PostgresDatabases.items: describe it
-described: responses/PostgresFirewallRules.count: describe it
-described: responses/PostgresFirewallRules.items: describe it
-described: responses/PostgresServers.count: describe it
-described: responses/PostgresServers.items: describe it
-described: responses/PrivateLinkServices.count: describe it
-described: responses/PrivateLinkServices.items: describe it
-described: responses/PrivateLocations.count: describe it
-described: responses/PrivateLocations.items: describe it
-described: responses/PrivateSubnets.count: describe it
-described: responses/PrivateSubnets.items: describe it
-described: responses/SshPublicKeys.items: describe it
-described: responses/Vms.count: describe it
-described: responses/Vms.items: describe it
 described: restorePostgresDatabase.pg_config: describe it
 described: restorePostgresDatabase.pgbouncer_config: describe it
 described: setMaintenanceWindow.maintenance_window_days: describe it
@@ -179,33 +143,11 @@ direction: Vm.ip6: mark it readOnly, or accept it in a request
 direction: Vm.location: mark it readOnly, or accept it in a request
 direction: Vm.state: mark it readOnly, or accept it in a request
 direction: Vm.storage_size_gib: mark it readOnly, or accept it in a request
-direction: responses/AuditLogs.items: mark it readOnly, or accept it in a request
-direction: responses/AuditLogs.pagination_key: mark it readOnly, or accept it in a request
 direction: responses/FirewallDetailed/allOf/1.private_subnets: mark it readOnly, or accept it in a request
-direction: responses/Firewalls.count: mark it readOnly, or accept it in a request
-direction: responses/Firewalls.items: mark it readOnly, or accept it in a request
-direction: responses/GithubCacheEntries.count: mark it readOnly, or accept it in a request
-direction: responses/GithubCacheEntries.items: mark it readOnly, or accept it in a request
-direction: responses/GithubInstallations.count: mark it readOnly, or accept it in a request
-direction: responses/GithubInstallations.items: mark it readOnly, or accept it in a request
-direction: responses/GithubRepositories.count: mark it readOnly, or accept it in a request
-direction: responses/GithubRepositories.items: mark it readOnly, or accept it in a request
-direction: responses/InferenceApiKeys.items: mark it readOnly, or accept it in a request
-direction: responses/InferenceEndpoints.items: mark it readOnly, or accept it in a request
-direction: responses/KubernetesClusters.count: mark it readOnly, or accept it in a request
-direction: responses/KubernetesClusters.items: mark it readOnly, or accept it in a request
 direction: responses/LoadBalancer/allOf/1.subnet: mark it readOnly, or accept it in a request
-direction: responses/LoadBalancers.count: mark it readOnly, or accept it in a request
-direction: responses/LoadBalancers.items: mark it readOnly, or accept it in a request
-direction: responses/MachineImageVersions.count: mark it readOnly, or accept it in a request
-direction: responses/MachineImageVersions.items: mark it readOnly, or accept it in a request
-direction: responses/MachineImages.count: mark it readOnly, or accept it in a request
-direction: responses/MachineImages.items: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.location: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.name: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.type: mark it readOnly, or accept it in a request
-direction: responses/PostgresBackups.count: mark it readOnly, or accept it in a request
-direction: responses/PostgresBackups.items: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabase/allOf/1.connection_string: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabase/allOf/1.earliest_restore_time: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabase/allOf/1.firewall_rules: mark it readOnly, or accept it in a request
@@ -216,30 +158,14 @@ direction: responses/PostgresDatabase/allOf/1.primary: mark it readOnly, or acce
 direction: responses/PostgresDatabase/allOf/1.private_connection_string: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabase/allOf/1.read_replicas: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseLogs.logs: mark it readOnly, or accept it in a request
-direction: responses/PostgresDatabaseLogs.pagination_key: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.current_version: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.target_version: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_status: mark it readOnly, or accept it in a request
-direction: responses/PostgresDatabases.count: mark it readOnly, or accept it in a request
-direction: responses/PostgresDatabases.items: mark it readOnly, or accept it in a request
-direction: responses/PostgresFirewallRules.count: mark it readOnly, or accept it in a request
-direction: responses/PostgresFirewallRules.items: mark it readOnly, or accept it in a request
-direction: responses/PostgresServers.count: mark it readOnly, or accept it in a request
-direction: responses/PostgresServers.items: mark it readOnly, or accept it in a request
-direction: responses/PrivateLinkServices.count: mark it readOnly, or accept it in a request
-direction: responses/PrivateLinkServices.items: mark it readOnly, or accept it in a request
-direction: responses/PrivateLocations.count: mark it readOnly, or accept it in a request
-direction: responses/PrivateLocations.items: mark it readOnly, or accept it in a request
-direction: responses/PrivateSubnets.count: mark it readOnly, or accept it in a request
-direction: responses/PrivateSubnets.items: mark it readOnly, or accept it in a request
-direction: responses/SshPublicKeys.items: mark it readOnly, or accept it in a request
 direction: responses/Vm/allOf/1.firewalls: mark it readOnly, or accept it in a request
 direction: responses/Vm/allOf/1.private_ipv4: mark it readOnly, or accept it in a request
 direction: responses/Vm/allOf/1.private_ipv6: mark it readOnly, or accept it in a request
 direction: responses/Vm/allOf/1.subnet: mark it readOnly, or accept it in a request
-direction: responses/Vms.count: mark it readOnly, or accept it in a request
-direction: responses/Vms.items: mark it readOnly, or accept it in a request
 echo: CertAuthUserRequest.name: echo it in the response, or mark it writeOnly
 echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
