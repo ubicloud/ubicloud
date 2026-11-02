@@ -8,6 +8,34 @@
 module TerraformHarness::Settle
   module_function
 
+  # A new cluster reads as creating until KubernetesClusterNexus stores its
+  # kubeconfig, an upgrade leaves it upgrading until the nexus has upgraded
+  # the control plane, and a DELETE leaves it deleting until the nexus
+  # destroys it.
+  def settle_kubernetes_cluster(kc)
+    return kc.destroy if kc.destroy_set?
+
+    kc.strand.update(label: "wait")
+    kc.decr_upgrade
+    kc.update(kubeconfig: "apiVersion: v1\nkind: Config\n")
+  end
+
+  # A new nodepool reads as creating until KubernetesNodepoolNexus has
+  # bootstrapped its nodes, and a resize leaves it resizing until the
+  # nexus has added nodes or marked the surplus ones for retirement. An
+  # upgrade leaves the nodepool, and its cluster, upgrading until each of
+  # the nodepool's nodes has been upgraded. A DELETE leaves it deleting
+  # until its nexus destroys it.
+  def settle_kubernetes_nodepool(kn)
+    return kn.destroy if kn.destroy_set?
+
+    kn.strand.update(label: "wait")
+    kn.decr_start_bootstrapping
+    kn.decr_scale_worker_count
+    kn.decr_upgrade_requested
+    kn.cluster.decr_upgrade_nodepools
+  end
+
   # A DELETE leaves a load balancer in place until LoadBalancerNexus
   # destroys it, together with its VM memberships and ports.
   def settle_load_balancer(lb)
@@ -61,8 +89,10 @@ end
 
 RSpec.configure do |config|
   # A database's servers and internal firewall belong to the postgres
-  # service project, which the test configuration does not set.
+  # service project, and a cluster's internal firewalls to the kubernetes
+  # service project. The test configuration sets neither.
   config.before do
     allow(Config).to receive(:postgres_service_project_id) { @postgres_service_project_id ||= Project.create(name: "postgres-service").id }
+    allow(Config).to receive(:kubernetes_service_project_id) { @kubernetes_service_project_id ||= Project.create(name: "kubernetes-service").id }
   end
 end

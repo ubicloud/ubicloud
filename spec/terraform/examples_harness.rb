@@ -15,6 +15,10 @@ RSpec.describe "the generated examples" do
   # an object input without an example.
   second_values = {"options" => {"headers" => {"x-example" => "1"}}}
 
+  # Verbs that no change of a single attribute can run: the API upgrades a
+  # nodepool only to its cluster's version, as kubernetes_harness.rb tests.
+  alone = {"kubernetes_cluster_nodepool" => ["/upgrade"]}
+
   define_method(:second_values) { second_values }
 
   # The kinds of attribute whose second value the spec gives.
@@ -79,6 +83,7 @@ RSpec.describe "the generated examples" do
       seen = []
       type["verbs"].each do |verb|
         owned, seen = verb["body"] - seen, seen | verb["body"]
+        next if alone.fetch(type["name"], []).include?(verb["path"])
         item = type["item"].delete_prefix("/project/{project_id}").delete_prefix("/location/{location}").delete_prefix("/")
         request = /\A#{verb["method"]} #{Regexp.escape(item + verb["path"]).gsub(/\\\{\w+\\\}/, "[^/]+")}\z/
 
