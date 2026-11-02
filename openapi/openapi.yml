@@ -3641,6 +3641,7 @@ components:
         dst_port:
           description: Destination port for the Load Balancer
           type: integer
+          nullable: true
         health_check_endpoint:
           description: Health check endpoint URL
           type: string
@@ -3664,6 +3665,7 @@ components:
         src_port:
           description: Source port for the Load Balancer
           type: integer
+          nullable: true
         cert_enabled:
           description: Whether SSL certificate is enabled
           type: boolean
