@@ -22,8 +22,12 @@ class Clover
     cert_enabled = cert_enabled_param.nil? ? health_check_protocol == "https" : cert_enabled_param
     health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
 
-    unless (ps = authorized_private_subnet)
+    unless (ps = authorized_private_subnet(location_id: @location&.id))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
+    end
+
+    if load_balancer_name_taken?(name, ps.location_id)
+      fail Validation::ValidationFailed.new("name" => "Load balancer with this name already exists in this location")
     end
 
     lb = nil
@@ -48,6 +52,14 @@ class Clover
       flash["notice"] = "'#{name}' is created"
       request.redirect lb
     end
+  end
+
+  # The unique index is on private_subnet_id and name, but the routes
+  # look up a load balancer by name within a location.
+  def load_balancer_name_taken?(name, location_id)
+    !@project.load_balancers_dataset
+      .where(name:, private_subnet_id: @project.private_subnets_dataset.where(location_id:).select(:id))
+      .empty?
   end
 
   def generate_load_balancer_options
