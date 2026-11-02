@@ -20,6 +20,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "EXT4-fs error.*ext4_mb_generate_buddy.*block bitmap and bg descriptor inconsistent",
     "kernel BUG at arch/x86/kernel/alternative.c:[0-9]+",
     "GRUB_FORCE_PARTUUID set, attempting initrdless boot\\.\\s*$",
+    "EFI stub: WARNING: Decompression failed: ZSTD-compressed data is corrupt",
+    "EFI stub: ERROR: Failed to decompress kernel",
   ].freeze
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil, schedule: nil)
