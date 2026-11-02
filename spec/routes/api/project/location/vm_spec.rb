@@ -463,6 +463,50 @@ RSpec.describe Clover, "vm" do
         body = JSON.parse(last_response.body)
         expect(body["name"]).to eq(vm.name)
         expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{vm.display_location}/firewall/default-#{vm.display_location}-default"])
+        expect(body["subnet"]).to eq(vm.user_nic.private_subnet.name)
+        expect(body["private_ipv4"]).to eq(vm.private_ipv4.to_s)
+        expect(body["private_ipv6"]).to eq(vm.private_ipv6.to_s)
+        expect(body).to include("gpu" => nil)
+      end
+
+      it "success with a gpu" do
+        vm_host = create_vm_host
+        PciDevice.create(vm_host_id: vm_host.id, vm_id: vm.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "20b5", iommu_group: 0)
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["gpu"]).to eq("1x NVIDIA A100 80GB PCIe")
+      end
+
+      it "success without a private subnet" do
+        vm = create_vm(project_id: project.id, location_id: Location[display_name: TEST_LOCATION].id)
+
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "subnet", "gpu")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "subnet" => nil, "gpu" => nil)
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::Vm).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
+      end
+
+      it "checks the firewalls in the response against the schema" do
+        expect(Serializers::Vm).to receive(:serialize_internal).and_wrap_original do |m, *args|
+          body = m.call(*args)
+          body[:firewalls] = body[:firewalls].map { it.merge(undocumented: true) }
+          body
+        end
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
       end
 
       it "success ubid" do

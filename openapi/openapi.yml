@@ -5338,7 +5338,8 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Vm'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   firewalls:
                     description: List of firewalls
@@ -5349,25 +5350,26 @@ components:
                     description: Private IPv4 address
                     type: string
                     format: ipv4
+                    nullable: true
                   private_ipv6:
                     description: Private IPv6 address
                     type: string
                     format: ipv6
+                    nullable: true
                   subnet:
-                    description: Subnet of the VM
+                    description: Name of the VM's private subnet
                     type: string
-                  unix_user:
-                    description: Unix user of the VM
-                    type: string
+                    nullable: true
                   gpu:
                     description: GPU configuration
                     type: string
+                    nullable: true
                 required:
                   - firewalls
+                  - gpu
                   - private_ipv4
                   - private_ipv6
                   - subnet
-                  - unix_user
     Vms:
       description: A list of VMs
       content:
