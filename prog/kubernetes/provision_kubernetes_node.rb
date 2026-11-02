@@ -125,7 +125,6 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     NFT
     vm.sshable.cmd("sudo tee /etc/nftables.conf > /dev/null", stdin: nft_rules)
     vm.sshable.cmd("sudo systemctl enable --now nftables")
-    vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
     # Node.js and newer Go releases listen on Multipath TCP when the kernel
     # supports it, but nothing here depends on it. MPTCP listeners are a
@@ -134,6 +133,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     # narrows the exposure: a patched kernel is the fix.
     vm.sshable.cmd("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n")
     vm.sshable.cmd("sudo sysctl --system")
+    vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
     if kubernetes_nodepool.nil? && Config.operator_ssh_public_keys
       all_keys_str = "#{vm.sshable.keys.first.public_key}\n#{Config.operator_ssh_public_keys}\n"

@@ -213,9 +213,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       sshable = prog.vm.sshable
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n").ordered
       expect(sshable).to receive(:_cmd).with("sudo sysctl --system").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
       authorized_keys = "#{sshable.keys.first.public_key}\n#{operator_key}\n"
       expect(sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: authorized_keys).ordered
 
@@ -235,9 +235,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       sshable = prog.vm.sshable
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n").ordered
       expect(sshable).to receive(:_cmd).with("sudo sysctl --system").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
 
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
       expect(Strand.where(prog: "BootstrapRhizome").get(:stack)[0]["no_bundler_install"]).to be true
@@ -248,9 +248,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       sshable = prog.vm.sshable
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n").ordered
       expect(sshable).to receive(:_cmd).with("sudo sysctl --system").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
 
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
@@ -262,9 +262,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       sshable = prog.vm.sshable
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/sysctl.d/99-disable-mptcp.conf > /dev/null", stdin: "net.mptcp.enabled=0\n").ordered
       expect(sshable).to receive(:_cmd).with("sudo sysctl --system").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
 
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
