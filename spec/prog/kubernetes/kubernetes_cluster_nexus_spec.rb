@@ -357,6 +357,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       kubernetes_cluster.nodepools.first.strand.update(label: "wait")
       expect { nx.wait_nodes }.to hop("wait")
     end
+
+    it "hops to wait when the cluster has no nodepool" do
+      kubernetes_cluster.nodepools.each(&:destroy)
+      expect { nx.wait_nodes }.to hop("wait")
+    end
   end
 
   describe "#update_billing_records" do

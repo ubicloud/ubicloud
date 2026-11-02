@@ -104,8 +104,8 @@ RSpec.describe OpenapiNorms do
   describe "deprecation" do
     def deprecated(**x) = size.merge("deprecated" => true, "x-deprecated" => {"since" => Date.new(2026, 11, 2), **x})
 
-    it "accepts a deprecated input that names its removal and replacement, and a deprecated response property" do
-      body = {"old" => deprecated("removed-in" => 2, "use" => ["size"]), "older" => deprecated("removed-in" => 3),
+    it "accepts a deprecated input that names its removal and a sibling or operation to use, and a deprecated response property" do
+      body = {"old" => deprecated("removed-in" => 2, "use" => ["size"]), "older" => deprecated("removed-in" => 3, "use" => ["getThing"]),
               "renamed" => deprecated("removed-in" => 2, "renamed-to" => "size"), "size" => size}
       paths = create(body)
       paths["/thing/{name}"]["post"].merge!("deprecated" => true, "x-deprecated" => {"since" => Date.new(2025, 1, 1), "removed-in" => 2, "use" => ["getThing"]})

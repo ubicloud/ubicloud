@@ -74,8 +74,6 @@ echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or
 echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.private_subnet_id: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
-echo: createKubernetesCluster.worker_nodes: echo it in the response, or mark it writeOnly
-echo: createKubernetesCluster.worker_size: echo it in the response, or mark it writeOnly
 echo: createMachineImage.destroy_source: echo it in the response, or mark it writeOnly
 echo: createMachineImage.version: echo it in the response, or mark it writeOnly
 echo: createMachineImage.vm: echo it in the response, or mark it writeOnly
@@ -94,7 +92,6 @@ examples: PrivateLinkServiceCreate.aws: give it an example
 examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
 examples: PrivateLocation.id: give it an example
 examples: createKubernetesCluster.version: give it an example
-examples: createKubernetesCluster.worker_size: give it an example
 examples: createKubernetesNodepool.name: give it an example
 examples: createKubernetesNodepool.node_count: give it an example
 examples: createKubernetesNodepool.node_size: give it an example

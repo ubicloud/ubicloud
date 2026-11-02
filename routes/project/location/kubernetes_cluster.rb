@@ -232,12 +232,6 @@ class Clover
           authorize("KubernetesCluster:edit", kc.id)
 
           DB.transaction do
-            kc.lock!
-
-            if !kn.destroying? && kc.nodepools(eager: [:strand, :semaphores]).count { !it.destroying? } == 1
-              fail_kubernetes_unprocessable("You cannot delete the last nodepool of a cluster")
-            end
-
             kn.incr_destroy
             audit_log(kn, "destroy", [kc])
           end

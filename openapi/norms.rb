@@ -99,15 +99,16 @@ class OpenapiNorms
     end
   end
 
-  # An operation's use names other operations, and a property's use names its siblings. Only a
-  # request property may be renamed, to a sibling that is not deprecated and has the same type.
+  # An operation's use names other operations, a request property's use names its siblings or any
+  # operation, and a response property's use names its siblings. Only a request property may be
+  # renamed, to a sibling that is not deprecated and has the same type.
   def norm_deprecation
     ids = @operations.map(&:id)
     @operations.filter_map { deprecation(it.op, it.id, ids - [it.id]) } +
       @operations.flat_map do |o|
         o.request.filter_map do |name, (s, at)|
           siblings = o.request.except(name).transform_values(&:first)
-          deprecation(s, at, siblings.keys, siblings:, required: o.required.include?(name))
+          deprecation(s, at, siblings.keys + ids, siblings:, required: o.required.include?(name))
         end
       end +
       answers.flat_map do |o|

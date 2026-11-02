@@ -149,7 +149,9 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-cluster")
         expect(JSON.parse(last_response.body)["version"]).to eq(version)
-        expect(KubernetesCluster[name: "test-cluster"]).not_to be_nil
+        expect(last_response["warning"]).to eq('299 - "worker_size is deprecated: use createKubernetesNodepool instead", ' \
+          '299 - "worker_nodes is deprecated: use createKubernetesNodepool instead"')
+        expect(KubernetesCluster[name: "test-cluster"].nodepools.map { [it.name, it.node_count, it.target_node_size] }).to eq([["test-cluster-np", 2, "standard-2"]])
       end
 
       it "fails if project has hit spending cutoff" do
@@ -166,7 +168,40 @@ RSpec.describe Clover, "kubernetes-cluster" do
       end
 
       def create_cluster(name: "test-cluster", **body)
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/#{name}", {version: Option.selectable_kubernetes_versions.last, worker_size: "standard-2", **body}.to_json
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/#{name}", {version: Option.selectable_kubernetes_versions.last, **body}.to_json
+      end
+
+      it "creates a cluster without a nodepool when no worker input is given" do
+        create_cluster
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["deprecation"]).to be_nil
+        expect(JSON.parse(last_response.body)["nodepools"]).to eq([])
+        expect(KubernetesCluster[name: "test-cluster"].nodepools).to be_empty
+      end
+
+      it "still makes a default nodepool from worker_size alone in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        create_cluster(worker_size: "standard-4")
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "worker_size is deprecated: use createKubernetesNodepool instead"')
+        expect(KubernetesCluster[name: "test-cluster"].nodepools.map { [it.node_count, it.target_node_size] }).to eq([[1, "standard-4"]])
+      end
+
+      it "refuses worker_nodes without worker_size" do
+        create_cluster(worker_nodes: 2)
+
+        expect(last_response).to have_api_error(400, "missing parameter for worker_size")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "checks vCPU quota against the control plane alone when no worker input is given" do
+        project.add_quota(quota_id: ProjectQuota.default_quotas["KubernetesVCpu"]["id"], value: 4)
+        create_cluster(cp_node_count: 3)
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: cp_node_count")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
       end
 
       it "creates the cluster with cp_node_count, in both API versions" do
@@ -203,7 +238,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
       end
 
       it "accepts a name of 37 characters, and refuses a longer one" do
-        create_cluster(name: "a" * 37)
+        create_cluster(name: "a" * 37, worker_size: "standard-2")
         expect(last_response.status).to eq(200)
         expect(KubernetesCluster[name: "a" * 37].nodepools.map(&:name)).to eq(["#{"a" * 37}-np"])
 
@@ -497,23 +532,11 @@ RSpec.describe Clover, "kubernetes-cluster" do
           end
         end
 
-        it "does not allow deleting the last nodepool of a cluster" do
+        it "deletes the last nodepool of a cluster" do
           delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
 
-          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
-          expect(kn.destroy_set?).to be false
-        end
-
-        it "does not allow deleting the last nodepool that is not already being destroyed" do
-          kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
-
-          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn2.name}"
           expect(last_response.status).to eq(204)
-
-          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
-
-          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
-          expect(kn.destroy_set?).to be false
+          expect(kn.destroy_set?).to be true
         end
       end
 
