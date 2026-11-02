@@ -86,6 +86,10 @@ class PostgresResource < Sequel::Model
   RUNNING_STRAND_LABELS = %w[wait refresh_certificates wait_refresh_public_cert refresh_dns_record].freeze
   UNAVAILABLE_STRAND_LABELS = %w[unavailable lockout wait_lockout_attempt wait_locked_out].freeze
 
+  # The values that display_state can return. The enum of
+  # PostgresDatabase.state in openapi.yml must list the same ones.
+  DISPLAY_STATES = %w[creating running restarting restoring_backup replaying_wal finalizing_restore unavailable deleting].freeze
+
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
