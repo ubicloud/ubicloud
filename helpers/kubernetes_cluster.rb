@@ -57,6 +57,10 @@ class Clover
     node_size = Validation.validate_vm_size(target_node_size, "x64")
     Validation.validate_vcpu_quota(@project, "KubernetesVCpu", node_count * node_size.vcpus, name: :node_count)
 
+    if (version = typecast_params.nonempty_str("version")) && version != @kc.version
+      fail Validation::ValidationFailed.new({version: "Nodepool can only be created at the cluster's version, #{@kc.version}"})
+    end
+
     unless @kc.nodepools_dataset.where(name:).empty?
       fail Validation::ValidationFailed.new({name: "A nodepool with the name \"#{name}\" already exists in this cluster"})
     end

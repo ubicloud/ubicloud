@@ -193,6 +193,19 @@ class Clover
           authorize("KubernetesCluster:edit", kc.id)
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
+          # Check for a no-op request first, so that a client can resend a
+          # request whose response it lost. By then the nodepool is already
+          # at that version, so the checks below would refuse it.
+          version = typecast_params.nonempty_str("version")
+          if version == kn.version
+            no_audit_log
+            next Serializers::KubernetesNodepool.serialize(kn)
+          end
+
+          if version && version != kc.version
+            fail Validation::ValidationFailed.new({version: "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
+          end
+
           unless kn.ready_for_upgrade?
             fail_kubernetes_unprocessable("Nodepool is not ready to be upgraded")
           end
@@ -270,6 +283,21 @@ class Clover
 
       r.post "upgrade" do
         authorize("KubernetesCluster:edit", kc)
+
+        # Check for a no-op request first, so that a client can resend a
+        # request whose response it lost. By then the cluster is already
+        # at that version, so the checks below would refuse it.
+        version = typecast_params.nonempty_str("version")
+        if version == kc.version
+          no_audit_log
+          next Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+        end
+
+        upgrade_candidate = kc.available_upgrade_version
+        if version && version != upgrade_candidate
+          fail Validation::ValidationFailed.new({version: upgrade_candidate ? "Cluster can only be upgraded to the next version, #{upgrade_candidate}" : "Cluster is at the latest version, #{kc.version}"})
+        end
+
         unless kc.nodepools_within_version_skew?
           fail_kubernetes_unprocessable("All nodepools must be upgraded to within two minor versions of the cluster first")
         end
@@ -277,7 +305,6 @@ class Clover
           fail_kubernetes_unprocessable("Cluster is not ready to be upgraded")
         end
 
-        upgrade_candidate = kc.available_upgrade_version
         DB.transaction do
           kc.request_upgrade
           audit_log(kc, "upgrade")

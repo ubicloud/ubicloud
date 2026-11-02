@@ -29,7 +29,6 @@ direction: KubernetesCluster.location: mark it readOnly, or accept it in a reque
 direction: KubernetesCluster.node_size: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.id: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.kubernetes_cluster_id: mark it readOnly, or accept it in a request
-direction: KubernetesNodepool.version: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.vms: mark it readOnly, or accept it in a request
 direction: MachineImage.arch: mark it readOnly, or accept it in a request
 direction: MachineImage.created_at: mark it readOnly, or accept it in a request
