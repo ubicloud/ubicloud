@@ -145,6 +145,36 @@ RSpec.describe Clover, "load-balancer" do
         expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
       end
 
+      it "success with an attached vm" do
+        vm = create_vm(project_id: project.id)
+        lb.add_vm(vm)
+
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["subnet"]).to eq("subnet-1")
+        expect(body["vms"]).to eq([vm.ubid])
+        expect(body.slice("location", "stack", "cert_enabled")).to eq("location" => TEST_LOCATION, "stack" => "dual", "cert_enabled" => false)
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::LoadBalancer).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
+      end
+
+      it "checks that the vms in the response are unique" do
+        vm = create_vm(project_id: project.id)
+        expect(Serializers::LoadBalancer).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(vms: [vm.ubid, vm.ubid]) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
+        }.to raise_error(Committee::InvalidResponse, /contains duplicate items/)
+      end
+
       it "not found" do
         get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid"
 
@@ -206,7 +236,7 @@ RSpec.describe Clover, "load-balancer" do
         }.to_json
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["vms"].length).to eq(1)
+        expect(JSON.parse(last_response.body)["vms"]).to eq([vm.ubid])
         expect(lb.reload.cert_enabled).to be_falsey
       end
 
