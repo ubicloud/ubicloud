@@ -312,6 +312,16 @@ RSpec.describe Validation do
         expect { described_class.validate_cidr("2001:db8::/32") }.not_to raise_error
       end
 
+      it "reads a bare address as a single host" do
+        expect(described_class.validate_cidr("10.0.0.5").to_s).to eq("10.0.0.5/32")
+        expect(described_class.validate_cidr("2001:db8::5").to_s).to eq("2001:db8::5/128")
+      end
+
+      it "keeps an explicit prefix" do
+        expect(described_class.validate_cidr("10.0.0.5/8").to_s).to eq("10.0.0.0/8")
+        expect(described_class.validate_cidr("2001:db8::5/64").to_s).to eq("2001:db8::/64")
+      end
+
       it "invalid cidr" do
         expect { described_class.validate_cidr("192.168.1.256/24") }.to raise_error described_class::ValidationFailed
         expect { described_class.validate_cidr("10.256.0.0/8") }.to raise_error described_class::ValidationFailed

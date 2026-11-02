@@ -50,6 +50,16 @@ RSpec.describe Clover, "firewall" do
       expect(rule.description).to be_nil
     end
 
+    it "create firewall rule for a bare IPv6 address" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
+        cidr: "2001:db8::5",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["cidr"]).to eq "2001:db8::5/128"
+      expect(FirewallRule.first.cidr.to_s).to eq "2001:db8::5/128"
+    end
+
     it "can not create same firewall rule" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: firewall_rule.cidr,
