@@ -18,16 +18,13 @@ class Serializers::Postgres < Serializers::Base
       flavor: PostgresResource::STANDARD_FLAVOR,
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
+      maintenance_window_days: pg.maintenance_window_day_names,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
       fallback_active: pg.representative_server.fallback_active?,
       tags: pg.tags || [],
       created_at: pg.created_at.iso8601,
     }
-
-    if pg.project.get_ff_postgres_enable_maintenance_window_days
-      base[:maintenance_window_days] = pg.maintenance_window_day_names
-    end
 
     if options[:detailed]
       base.merge!(
@@ -39,7 +36,7 @@ class Serializers::Postgres < Serializers::Base
         primary: pg.representative_server.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
-        read_replicas: Serializers::Postgres.serialize(pg.read_replicas_dataset.eager(:project).all, {include_path: true}),
+        read_replicas: Serializers::Postgres.serialize(pg.read_replicas),
         log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
       )
 

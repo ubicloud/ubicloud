@@ -139,6 +139,7 @@ module ThawedMock
   allow_mocking(Scheduling::Allocator::VmHostCpuAllocation, :new)
   allow_mocking(Scheduling::Allocator::VmHostAllocation, :new)
   allow_mocking(Serializers::LoadBalancer, :serialize_internal)
+  allow_mocking(Serializers::Postgres, :serialize_internal)
   allow_mocking(Serializers::PrivateSubnet, :serialize_internal)
   allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SemSnap, :new)
