@@ -5255,6 +5255,13 @@ components:
       description: An empty response after successful resource delete
     Error:
       description: An error response
+      headers:
+        Retry-After:
+          description: Number of seconds to wait before sending the same request again. Sent only when the request was refused because a resource was busy.
+          schema:
+            type: integer
+            example: 5
+            minimum: 1
       content:
         application/json:
           schema:
