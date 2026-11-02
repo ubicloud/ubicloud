@@ -1722,7 +1722,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Firewall Rule
+        - Postgres Firewall Rule
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination:
     parameters:
       - $ref: '#/components/parameters/location'
@@ -3555,7 +3555,7 @@ components:
           description: UI name of the private location
           type: string
         provider:
-          description: Name of the private location
+          description: Cloud provider of the private location
           type: string
         path:
           description: Path of the private location
@@ -4253,7 +4253,7 @@ components:
           description: CIDR of the firewall rule
           type: string
         description:
-          description: Port information for the firewall rule
+          description: Description of the firewall rule
           type: string
         id:
           description: ID of the firewall rule
@@ -5145,7 +5145,7 @@ components:
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
                   latest_restore_time:
-                    description: Latest restore time (if primary)"
+                    description: Latest restore time (if primary)
                     type: string
                   primary:
                     description: Is the database primary
