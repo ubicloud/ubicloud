@@ -462,10 +462,9 @@ module Option
     [name, PostgresSizeOption.new(name, *args)]
   end.freeze
 
-  POSTGRES_LEGACY_SIZE_OPTIONS = POSTGRES_SIZE_OPTIONS.merge([
-    ["burstable-1", POSTGRES_SIZE_OPTIONS["hobby-1"]],
-    ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]],
-  ].to_h).freeze
+  POSTGRES_RENAMED_SIZES = {"burstable-1" => "hobby-1", "burstable-2" => "hobby-2"}.freeze
+
+  POSTGRES_LEGACY_SIZE_OPTIONS = POSTGRES_SIZE_OPTIONS.to_h { |name, _| [name, name] }.merge(POSTGRES_RENAMED_SIZES).freeze
 
   POSTGRES_FAMILY_FALLBACK_CHAINS = [
     ["c6gd", "c7gd", "c8gd"],

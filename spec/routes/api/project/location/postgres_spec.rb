@@ -225,6 +225,29 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
       end
 
+      it "refuses the legacy burstable sizes on create" do
+        {"burstable-1" => "hobby-1", "burstable-2" => "hobby-2"}.each do |size, hobby|
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+            size:,
+            storage_size: 64,
+          }.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size. Use #{hobby} instead."})
+        end
+        expect(PostgresResource.where(name: "test-postgres").count).to eq 0
+      end
+
+      it "refuses the legacy burstable sizes on update" do
+        {"burstable-1" => "hobby-1", "burstable-2" => "hobby-2"}.each do |size, hobby|
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size:,
+          }.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size. Use #{hobby} instead."})
+        end
+        expect(pg.reload.target_vm_size).to eq "standard-2"
+      end
+
       it "invalid config values" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",

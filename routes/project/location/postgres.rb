@@ -57,7 +57,7 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "Read replicas cannot be modified directly! Please modify the parent database instead.")
         end
 
-        size = typecast_params.nonempty_str("size", pg.requested_vm_size).gsub("burstable", "hobby")
+        size = typecast_params.nonempty_str("size", pg.requested_vm_size)
         storage_size = typecast_params.pos_int("storage_size", pg.requested_storage_size_gib)
         # Move a target only when its request changes, so that a client
         # resending the same request does not undo a storage auto-scale.
