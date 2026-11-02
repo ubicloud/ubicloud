@@ -289,6 +289,22 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
+    it "leaves the private IPv4 to GCE when the NIC has none" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      nic.update(private_ipv4: nil)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-gce-ip")
+      expect(compute_client).to receive(:insert) do |args|
+        ni = args[:instance_resource].network_interfaces.first
+        expect(ni.has_network_i_p?).to be false
+        expect(ni.subnetwork).to include("subnetworks/ubicloud-")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
     it "leaves the AccessConfig NAT IP unset for an ephemeral address without a static IP" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
@@ -1004,6 +1020,35 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(vm.allocated_at).to be_within(2).of(Time.now)
       expect(vm.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
       expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
+    end
+
+    it "records the private IPv4 GCE assigned to a NIC created without one" do
+      nic.update(private_ipv4: nil)
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [
+          Google::Cloud::Compute::V1::NetworkInterface.new(
+            network_i_p: "172.24.18.7",
+            access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")],
+          ),
+        ],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(nic.reload.private_ipv4.to_s).to eq("172.24.18.7/32")
+    end
+
+    it "keeps the private IPv4 a NIC was created with" do
+      ip = nic.private_ipv4.to_s
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [Google::Cloud::Compute::V1::NetworkInterface.new(network_i_p: "172.24.18.7")],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(nic.reload.private_ipv4.to_s).to eq(ip)
     end
 
     it "updates the sshable host" do
