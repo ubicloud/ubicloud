@@ -1166,6 +1166,98 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["private_connection_string"]).to eq(pg.private_connection_string)
       end
 
+      it "success with destinations, a read replica and restore times" do
+        md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+        backup_at = Time.now - 60 * 60
+        pg.timeline.update(cached_earliest_backup_at: backup_at)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["metric_destinations"]).to eq([{"id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "user", "url" => "https://metrics.example.com"}])
+        expect(body["log_destinations"]).to eq([{"id" => ld.ubid, "name" => "graylog", "type" => "syslog", "url" => "tcp://logs.example.com:6514"}])
+        expect(body["read_replicas"].map { it.slice("id", "read_replica", "parent") }).to eq([{"id" => replica.ubid, "read_replica" => true, "parent" => pg.path}])
+        expect(body["earliest_restore_time"]).to eq((backup_at + 5 * 60).utc.iso8601)
+        expect(body).to have_key("latest_restore_time")
+      end
+
+      it "success for a read replica, which has no restore times" do
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+
+        get "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body).to include("read_replica" => true, "primary" => false)
+        expect(body.keys).not_to include("earliest_restore_time", "latest_restore_time")
+      end
+
+      it "success without the maintenance window days flag" do
+        pg.update(maintenance_window_start_at: 9)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("maintenance_window_start_at", "maintenance_window_days")).to eq("maintenance_window_start_at" => 9, "maintenance_window_days" => [])
+      end
+
+      it "success without the maintenance window days flag, showing days stored while it was on" do
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["tue"]))
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_days"]).to eq(["tue"])
+      end
+
+      it "success with the maintenance window days flag" do
+        project.set_ff_postgres_enable_maintenance_window_days(true)
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["mon", "thu"]))
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_days"]).to eq(["mon", "thu"])
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::Postgres).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
+      end
+
+      it "checks the metric destinations in the response against the schema" do
+        PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        expect(Serializers::Postgres).to receive(:serialize_internal).and_wrap_original do |m, *args|
+          body = m.call(*args)
+          body[:metric_destinations] = body[:metric_destinations].map { it.merge(password: "pass") }
+          body
+        end
+
+        expect {
+          get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: password/)
+      end
+
       it "success ubid" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"
 
