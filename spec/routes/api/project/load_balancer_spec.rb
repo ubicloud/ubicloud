@@ -31,5 +31,16 @@ RSpec.describe Clover, "load-balancer" do
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)
     end
+
+    it "success load balancer without ports" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location::HETZNER_FSN1_ID)
+      Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(ps.id, name: "lb-1", ports: [])
+      get "/project/#{project.ubid}/load-balancer"
+
+      expect(last_response.status).to eq(200)
+      lb = JSON.parse(last_response.body)["items"].first
+      expect(lb["src_port"]).to be_nil
+      expect(lb["dst_port"]).to be_nil
+    end
   end
 end
