@@ -35,6 +35,19 @@ class VmPath
     write(systemd_service, s)
   end
 
+  def runner_metrics_service
+    "/etc/systemd/system/#{@vm_name}-metrics.service"
+  end
+
+  def write_runner_metrics_service(s)
+    write(runner_metrics_service, s)
+  end
+
+  # Outside the VM's home, so the VM user has no access.
+  def runner_metrics_dir
+    "/var/lib/runner-metrics/#{@vm_name}"
+  end
+
   def home(n)
     File.join("", "vm", @vm_name, n)
   end
@@ -61,6 +74,7 @@ class VmPath
     nftables_conf
     prep.json
     cert
+    metrics.raw
   ].freeze.each do |file_name|
     method_name = file_name.tr(".-", "_")
 
