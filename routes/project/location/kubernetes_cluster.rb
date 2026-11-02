@@ -158,11 +158,11 @@ class Clover
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
           unless kn.idle?
-            fail_kubernetes_unprocessable("Nodepool is not ready to be resized")
+            fail_kubernetes_busy("Nodepool is not ready to be resized")
           end
 
           unless kc.idle?
-            fail_kubernetes_unprocessable("Cluster is not ready to resize a nodepool")
+            fail_kubernetes_busy("Cluster is not ready to resize a nodepool")
           end
 
           node_count = typecast_params.pos_int!("node_count")
@@ -206,11 +206,14 @@ class Clover
             fail Validation::ValidationFailed.new({version: "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
           end
 
-          unless kn.ready_for_upgrade?
-            fail_kubernetes_unprocessable("Nodepool is not ready to be upgraded")
+          unless (upgrade_candidate = kn.available_upgrade_version)
+            fail_kubernetes_unprocessable("Nodepool is already at the cluster's version, #{kc.version}")
           end
 
-          upgrade_candidate = kn.available_upgrade_version
+          unless kc.idle?
+            fail_kubernetes_busy("Cluster is not ready to upgrade a nodepool")
+          end
+
           DB.transaction do
             kn.request_upgrade
             audit_log(kn, "upgrade", [kc])
@@ -298,11 +301,14 @@ class Clover
           fail Validation::ValidationFailed.new({version: upgrade_candidate ? "Cluster can only be upgraded to the next version, #{upgrade_candidate}" : "Cluster is at the latest version, #{kc.version}"})
         end
 
+        unless upgrade_candidate
+          fail_kubernetes_unprocessable("Cluster is at the latest version, #{kc.version}")
+        end
         unless kc.nodepools_within_version_skew?
           fail_kubernetes_unprocessable("All nodepools must be upgraded to within two minor versions of the cluster first")
         end
-        unless kc.ready_for_upgrade?
-          fail_kubernetes_unprocessable("Cluster is not ready to be upgraded")
+        unless kc.idle?
+          fail_kubernetes_busy("Cluster is not ready to be upgraded")
         end
 
         DB.transaction do

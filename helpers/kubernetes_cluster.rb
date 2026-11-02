@@ -45,11 +45,20 @@ class Clover
     raise CloverError.new(422, "UnprocessableContent", message)
   end
 
+  # Use this only for a refusal that ends once the cluster and its
+  # nodepools are idle again, so that a client may resend the request. A
+  # cluster or nodepool being deleted will never be idle again, so its
+  # refusal is final.
+  def fail_kubernetes_busy(message)
+    retry_after = 10 unless @kc.destroying? || @kn&.destroying?
+    raise CloverError.new(422, "UnprocessableContent", message, retry_after:)
+  end
+
   def kubernetes_nodepool_post(name)
     authorize("KubernetesCluster:edit", @kc.id)
 
     unless @kc.idle?
-      fail_kubernetes_unprocessable("Cluster is not ready to add a nodepool")
+      fail_kubernetes_busy("Cluster is not ready to add a nodepool")
     end
 
     target_node_size = typecast_params.nonempty_str!("node_size")
