@@ -659,8 +659,10 @@ paths:
               type: object
               properties:
                 version:
-                  description: Version of the kubernetes cluster
+                  description: Kubernetes version of the cluster, which must be one of the two newest versions that Ubicloud supports. Any other version that matches the pattern is refused with an error that lists the two.
                   type: string
+                  example: v1.36
+                  pattern: ^v\d+\.\d+$
                 worker_size:
                   description: Deprecated; create a nodepool instead. Size of each worker VM in a default nodepool, which the cluster gets only if this is given.
                   type: string
@@ -679,12 +681,17 @@ paths:
                     removed-in: 2
                     renamed-to: cp_node_count
                 cp_node_count:
-                  description: Number of control plane nodes
+                  description: Number of control plane nodes. With 3, the control plane stays available if one of them fails.
                   type: integer
+                  default: 1
+                  enum:
+                    - 1
+                    - 3
                 worker_nodes:
                   description: Deprecated; create a nodepool instead. Number of worker nodes in the default nodepool, 1 by default; it is refused without worker_size.
                   type: integer
                   deprecated: true
+                  minimum: 1
                   x-deprecated:
                     since: 2026-11-02
                     removed-in: 3
@@ -786,17 +793,22 @@ paths:
               type: object
               properties:
                 name:
-                  description: Name of the nodepool
+                  description: Name of the nodepool, which must be unique in its cluster
                   type: string
+                  example: my-nodepool-name
                 node_count:
                   description: Number of worker nodes in the nodepool
                   type: integer
+                  example: 2
+                  minimum: 1
                 node_size:
                   description: Size of each worker node
                   type: string
+                  example: standard-2
                 version:
                   description: Kubernetes version of the nodepool. Since a nodepool is always created at its cluster's version, this must be the cluster's version.
                   type: string
+                  pattern: ^v\d+\.\d+$
               additionalProperties: false
               required:
                 - name
@@ -854,6 +866,7 @@ paths:
                 name:
                   description: New name for kubernetes nodepool
                   type: string
+                  example: my-nodepool-name
               additionalProperties: false
               required:
                 - name
@@ -883,6 +896,8 @@ paths:
                 node_count:
                   description: New number of nodes for the kubernetes nodepool
                   type: integer
+                  example: 3
+                  minimum: 1
               additionalProperties: false
               required:
                 - node_count
@@ -912,6 +927,7 @@ paths:
                 version:
                   description: Version to upgrade to, which must be the cluster's version. If the nodepool is already at this version, the request does nothing. If version is omitted, the nodepool is upgraded to the cluster's version.
                   type: string
+                  pattern: ^v\d+\.\d+$
               additionalProperties: false
       responses:
         '200':
@@ -938,6 +954,7 @@ paths:
                 name:
                   description: New name for kubernetes cluster
                   type: string
+                  example: my-cluster-name
               additionalProperties: false
               required:
                 - name
@@ -966,6 +983,7 @@ paths:
                 version:
                   description: Version to upgrade to, which must be the minor version after the cluster's current one. If the cluster is already at this version, the request does nothing. If version is omitted, the cluster is upgraded to the next minor version.
                   type: string
+                  pattern: ^v\d+\.\d+$
               additionalProperties: false
       responses:
         '200':
@@ -5138,6 +5156,9 @@ components:
         cp_node_count:
           description: Number of control plane nodes
           type: integer
+          enum:
+            - 1
+            - 3
         display_state:
           description: Deprecated. The same as state.
           type: string
@@ -5151,10 +5172,12 @@ components:
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the KubernetesCluster
           type: string
           example: eu-central-h1
+          readOnly: true
         name:
           description: Name of the KubernetesCluster
           type: string
@@ -5162,6 +5185,9 @@ components:
         node_size:
           description: Size of each control plane node
           type: string
+          example: standard-2
+          readOnly: true
+          x-immutable: true
         services_load_balancer_url:
           description: Hostname of the load balancer for the cluster's LoadBalancer services; null until the cluster has one
           type: string
@@ -5203,11 +5229,13 @@ components:
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         id:
           description: ID of the KubernetesNodepool
           type: string
           example: knqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kn[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the KubernetesNodepool
           type: string
@@ -5238,10 +5266,11 @@ components:
           description: Version of the KubernetesNodepool
           type: string
         vms:
-          description: Worker VMs definition
+          description: Worker VMs of the nodepool
           type: array
           items:
             $ref: '#/components/schemas/Vm'
+          readOnly: true
       additionalProperties: false
       required:
         - kubernetes_cluster_id
