@@ -122,6 +122,14 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
           ip6 daddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept
         }
       }
+
+      # pod netns keep net.mptcp.enabled=1, so strip MPTCP from incoming SYNs (CVE-2026-98432)
+      table inet strip_mptcp {
+        chain prerouting {
+          type filter hook prerouting priority raw; policy accept;
+          tcp flags syn tcp option mptcp exists reset tcp option mptcp
+        }
+      }
     NFT
     vm.sshable.cmd("sudo tee /etc/nftables.conf > /dev/null", stdin: nft_rules)
     vm.sshable.cmd("sudo systemctl enable --now nftables")
