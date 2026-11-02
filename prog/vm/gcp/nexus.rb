@@ -209,6 +209,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     else
       [nis.first, nis.first]
     end
+    user_nic.update(private_ipv4: user_ni.network_i_p) unless user_nic.private_ipv4
     public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
     public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
     ssh_host = if mgmt_nic && management_ipv6?(mgmt_nic)
@@ -364,7 +365,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     interface = Google::Cloud::Compute::V1::NetworkInterface.new(
       network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
       subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
-      network_i_p: nic.private_ipv4.network.to_s,
+      **({network_i_p: nic.private_ipv4.network.to_s} if nic.private_ipv4),
       stack_type:,
       vlan:,
     )

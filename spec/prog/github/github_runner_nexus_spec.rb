@@ -307,6 +307,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_gce_image)
         expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["c4-standard-lssd"])
         expect(picked_vm.nics.map(&:private_subnet_id)).to eq([gcp_runner_subnet.id])
+        expect(picked_vm.user_nic.private_ipv4).to be_nil
         expect(picked_vm.user_nic.strand.stack.first["use_eip"]).to be(false)
         expect(installation.private_subnets).to be_empty
       end
