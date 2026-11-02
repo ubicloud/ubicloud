@@ -1,0 +1,3 @@
+! Unexpected response status: 400
+Details: project_id and location_id and name is already taken
+  name: project_id and location_id and name is already taken

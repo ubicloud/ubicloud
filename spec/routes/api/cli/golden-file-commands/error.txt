@@ -86,6 +86,7 @@ pg list -f invalid
 pg list invalid
 ps eu-central-h1/test-ps connect psfzm3e26xky5m9ggetw4dpqe2
 ps eu-central-h1/test-ps disconnect psfzm3e26xky5m9ggetw4dpqe2
+ps eu-central-h1/test-ps create
 ps eu-central-h1/test2-ps create invalid
 ps eu-central-h1/test-ps destroy invalid
 ps list -f invalid

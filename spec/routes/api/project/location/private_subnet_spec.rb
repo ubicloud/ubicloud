@@ -90,6 +90,13 @@ RSpec.describe Clover, "private_subnet" do
         expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
       end
 
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
       it "not authorized" do
         project
         post "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/foo-subnet"

@@ -97,6 +97,27 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq 0
       end
 
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}", {
+          public_key: "ssh key",
+        }.to_json
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
+      it "names every column of a colliding index whose columns all refer to other rows" do
+        errors = Sequel::Model::Errors.new
+        errors.add([:project_id, :location_id], "is already taken")
+        expect(Prog::Vm::Nexus).to receive(:assemble).and_raise(Sequel::ValidationFailed.new(errors))
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+        }.to_json
+
+        message = "project_id and location_id is already taken"
+        expect(last_response).to have_api_error(400, message, {"project_id" => message, "location_id" => message})
+      end
+
       it "rejects the web-only machine_image field" do
         expect {
           post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {

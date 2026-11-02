@@ -252,7 +252,27 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
+    when Sequel::ValidationFailed
+      code = 400
+      type = "InvalidRequest"
+      message = e.to_s
+
+      # Sequel keys the error for a unique index by its column, or by an
+      # array of its columns. Repeat it in details under each column, so
+      # that a client can attach it to a field, but leave out a column that
+      # refers to another row, such as project_id, since it identifies the
+      # scope that the path supplies. If that leaves none, keep them all.
+      taken = {}
+      e.errors&.each do |columns, messages|
+        next unless messages.include?("is already taken")
+        columns = Array(columns)
+        taken_message = "#{columns.join(" and ")} is already taken"
+        chosen = columns.reject { it.end_with?("_id") }
+        chosen = columns if chosen.empty?
+        chosen.each { taken[it.to_s] = taken_message }
+      end
+      details = taken unless taken.empty?
+    when Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
