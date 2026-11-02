@@ -701,6 +701,5 @@ three hand-written types.
    still, which can differ from production.
 7. **A broken deadline shows as a hang** rather than a failure, since no example tests it; the
    workflow's timeout ends the run.
-8. **Not all shown yet.** These parts have not run: the hooks for load balancers and kubernetes,
-   and destroying VMs and databases in their hooks. The commit that builds each part will show that
-   it works.
+8. **Not all shown yet.** These parts have not run: the hook for kubernetes, and destroying VMs
+   and databases in their hooks. The commit that builds each part will show that it works.

@@ -200,3 +200,54 @@ RSpec.describe "ubicloud_private_subnet" do
     expect(tf.plan.actions).to eq("ubicloud_private_subnet.net" => :create)
   end
 end
+
+RSpec.describe "ubicloud_load_balancer" do
+  def load_balancer(**attrs)
+    attrs = {name: "lb", algorithm: "round_robin", health_check_protocol: "http", src_port: 80, dst_port: 8080, **attrs}
+    <<~HCL
+      resource "ubicloud_private_subnet" "net" {
+        location = "eu-central-h1"
+        name     = "net"
+      }
+
+      resource "ubicloud_load_balancer" "lb" {
+        location          = "eu-central-h1"
+        private_subnet_id = ubicloud_private_subnet.net.id
+        #{attrs.map { |k, v| "#{k} = #{JSON.generate(v)}" }.join("\n")}
+      }
+    HCL
+  end
+
+  def lb = LoadBalancer.first(project_id: project.id)
+  def vm(name) = create_vm(project_id: project.id, name:)
+
+  # toggle-ssl-certificate is not a verb, since the PATCH also takes
+  # cert_enabled.
+  it "updates the ports and cert_enabled with one PATCH" do
+    tf.apply load_balancer
+
+    expect(tf.apply(load_balancer(src_port: 443, cert_enabled: true)).mutations).to eq ["PATCH load-balancer/@lb"]
+    expect([lb.src_port, lb.dst_port, lb.cert_enabled]).to eq [443, 8080, true]
+    expect(tf.plan).to be_empty
+  end
+
+  # The create does not take vms, so a PATCH sets them right after it.
+  it "attaches the VMs in vms right after the create, and detaches one removed" do
+    a, b = vm("a"), vm("b")
+
+    expect(tf.apply(load_balancer(vms: [a.ubid, b.ubid])).mutations("* load-balancer/*")).to eq ["POST load-balancer/lb", "PATCH load-balancer/@lb"]
+    expect(lb.vms.map(&:ubid).sort).to eq [a.ubid, b.ubid].sort
+
+    expect(tf.apply(load_balancer(vms: [a.ubid])).mutations).to eq ["PATCH load-balancer/@lb"]
+    expect(lb.vms.map(&:ubid)).to eq [a.ubid]
+    expect(tf.plan).to be_empty
+  end
+
+  it "plans no change when the API returns the VMs in another order" do
+    tf.apply load_balancer(vms: [vm("a"), vm("b")].map(&:ubid))
+    vms = tf.state("ubicloud_load_balancer.lb")["vms"]
+    at(:response, "GET load-balancer/@lb") { it.answer(200, it.response.merge("vms" => vms.reverse)) }
+
+    expect(tf.plan).to be_empty
+  end
+end
