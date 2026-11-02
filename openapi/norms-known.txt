@@ -23,12 +23,6 @@ direction: GithubInstallation.name: mark it readOnly, or accept it in a request
 direction: GithubRepository.id: mark it readOnly, or accept it in a request
 direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
 direction: GithubRepository.name: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.id: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.location: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.node_size: mark it readOnly, or accept it in a request
-direction: KubernetesNodepool.id: mark it readOnly, or accept it in a request
-direction: KubernetesNodepool.kubernetes_cluster_id: mark it readOnly, or accept it in a request
-direction: KubernetesNodepool.vms: mark it readOnly, or accept it in a request
 direction: MachineImage.arch: mark it readOnly, or accept it in a request
 direction: MachineImage.created_at: mark it readOnly, or accept it in a request
 direction: MachineImage.id: mark it readOnly, or accept it in a request
@@ -91,10 +85,6 @@ examples: PrivateLinkService.id: give it an example
 examples: PrivateLinkServiceCreate.aws: give it an example
 examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
 examples: PrivateLocation.id: give it an example
-examples: createKubernetesCluster.version: give it an example
-examples: createKubernetesNodepool.name: give it an example
-examples: createKubernetesNodepool.node_count: give it an example
-examples: createKubernetesNodepool.node_size: give it an example
 examples: createLocationPostgresFirewallRule.cidr: give it an example
 examples: createMachineImage.vm: give it an example
 examples: createMachineImageVersion.vm: give it an example
@@ -103,9 +93,6 @@ examples: createPrivateLocation.name: give it an example
 examples: createPrivateLocation.provider_location_name: give it an example
 examples: createPrivateLocation.secret_key: give it an example
 examples: parameters/private_location_name: give it an example
-examples: renameKubernetesCluster.name: give it an example
-examples: renameKubernetesNodepool.name: give it an example
 examples: renameMachineImage.name: give it an example
-examples: resizeKubernetesNodepool.node_count: give it an example
 examples: updateMachineImage.latest_version: give it an example
 examples: updatePrivateLocation.name: give it an example

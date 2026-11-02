@@ -163,7 +163,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
         expect(last_response.status).to eq(200)
         expect(last_response["deprecation"]).to be_nil
-        expect(JSON.parse(last_response.body)["nodepools"]).to eq([])
+        expect(JSON.parse(last_response.body).slice("cp_node_count", "nodepools")).to eq("cp_node_count" => 1, "nodepools" => [])
         expect(KubernetesCluster[name: "test-cluster"].nodepools).to be_empty
       end
 
@@ -222,6 +222,22 @@ RSpec.describe Clover, "kubernetes-cluster" do
         create_cluster(cp_nodes: 3)
 
         expect(last_response).to have_api_error(400, "cp_nodes was removed in API version 2: use cp_node_count instead")
+      end
+
+      it "refuses a control plane node count other than 1 or 3" do
+        expect { create_cluster(cp_node_count: 2) }.to raise_error(Committee::InvalidRequest, /2 isn't part of the enum/)
+        expect { create_cluster(cp_node_count: 0) }.to raise_error(Committee::InvalidRequest, /0 isn't part of the enum/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses a worker node count below 1" do
+        expect { create_cluster(worker_size: "standard-2", worker_nodes: 0) }.to raise_error(Committee::InvalidRequest, /worker_nodes 0 is less than minimum value/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses a version that is not of the form vMAJOR.MINOR" do
+        expect { create_cluster(version: "1.36") }.to raise_error(Committee::InvalidRequest, /does not match value: "1\.36"/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
       end
 
       it "accepts a name of 37 characters, and refuses a longer one" do
@@ -408,6 +424,23 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(kc.nodepools_dataset.count).to eq(2)
         end
 
+        it "refuses a node count below 1" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 0}.to_json
+          }.to raise_error(Committee::InvalidRequest, /node_count 0 is less than minimum value/)
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "refuses a version that is not of the form vMAJOR.MINOR" do
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: ""}.to_json
+          }.to raise_error(Committee::InvalidRequest, /does not match value: ""/)
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
         it "returns an error while the cluster is not in wait" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
 
@@ -563,12 +596,13 @@ RSpec.describe Clover, "kubernetes-cluster" do
           end
         end
 
-        it "returns validation error for bad input" do
+        it "refuses a node count below 1" do
           kc.strand.update(label: "wait")
           kn.strand.update(label: "wait")
-          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
-
-          expect(last_response.status).to eq(400)
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
+          }.to raise_error(Committee::InvalidRequest, /node_count 0 is less than minimum value/)
+          expect(kn.reload.node_count).to eq(2)
         end
 
         it "returns an error while the cluster is not in wait" do
@@ -687,6 +721,13 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
           expect(kn.reload.version).to eq(Option.kubernetes_versions[2])
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
+        it "refuses a version that is not of the form vMAJOR.MINOR" do
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: kc.version.delete_prefix("v")}.to_json
+          }.to raise_error(Committee::InvalidRequest, /does not match value/)
           expect(kn.upgrade_requested_set?).to be false
         end
 
@@ -828,6 +869,13 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: "v1.99"}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Cluster is at the latest version, #{kc.version}"})
+        expect(kc.reload.upgrade_set?).to be false
+      end
+
+      it "refuses a version that is not of the form vMAJOR.MINOR" do
+        expect {
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: "v1.99.1"}.to_json
+        }.to raise_error(Committee::InvalidRequest, /does not match value: "v1\.99\.1"/)
         expect(kc.reload.upgrade_set?).to be false
       end
 
