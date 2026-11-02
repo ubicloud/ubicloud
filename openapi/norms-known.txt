@@ -1,0 +1,350 @@
+described: CertAuthUserList.items: describe it
+described: KubernetesCluster.cp_vms: describe it
+described: KubernetesCluster.nodepools: describe it
+described: PostgresConfig.pg_config: describe it
+described: PostgresConfig.pgbouncer_config: describe it
+described: PostgresPrivateLinkServiceCreate.name: describe it
+described: PrivateLinkService.id: describe it
+described: PrivateLinkService.ip_address_type: describe it
+described: PrivateLinkService.location: describe it
+described: PrivateLinkService.name: describe it
+described: PrivateLinkService.ports: describe it
+described: PrivateLinkService.state: describe it
+described: PrivateSubnet.firewalls: describe it
+described: Project.id: describe it
+described: ResourceMetrics.metrics: describe it
+described: SshPublicKeyCreate.name: describe it
+described: SshPublicKeyCreate.public_key: describe it
+described: connectPrivateSubnet.connected-subnet-id: describe it
+described: createPostgresDatabase.pg_config: describe it
+described: createPostgresDatabase.pgbouncer_config: describe it
+described: createPostgresDatabaseReadReplica.pg_config: describe it
+described: createPostgresDatabaseReadReplica.pgbouncer_config: describe it
+described: createPrivateSubnet.firewall_id: describe it
+described: patchPostgresDatabaseConfig.pg_config: describe it
+described: patchPostgresDatabaseConfig.pgbouncer_config: describe it
+described: resetSuperuserPassword.password: describe it
+described: responses/AuditLogs.items: describe it
+described: responses/Firewalls.count: describe it
+described: responses/Firewalls.items: describe it
+described: responses/GithubCacheEntries.count: describe it
+described: responses/GithubCacheEntries.items: describe it
+described: responses/GithubInstallations.count: describe it
+described: responses/GithubInstallations.items: describe it
+described: responses/GithubRepositories.count: describe it
+described: responses/GithubRepositories.items: describe it
+described: responses/InferenceApiKeys.items: describe it
+described: responses/InferenceEndpoints.items: describe it
+described: responses/KubernetesClusters.count: describe it
+described: responses/KubernetesClusters.items: describe it
+described: responses/LoadBalancers.count: describe it
+described: responses/LoadBalancers.items: describe it
+described: responses/MachineImageVersions.count: describe it
+described: responses/MachineImageVersions.items: describe it
+described: responses/MachineImages.count: describe it
+described: responses/MachineImages.items: describe it
+described: responses/PostgresBackups.count: describe it
+described: responses/PostgresBackups.items: describe it
+described: responses/PostgresDatabaseLogs.logs: describe it
+described: responses/PostgresDatabaseUpgradeStatus.current_version: describe it
+described: responses/PostgresDatabaseUpgradeStatus.target_version: describe it
+described: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: describe it
+described: responses/PostgresDatabaseUpgradeStatus.upgrade_status: describe it
+described: responses/PostgresDatabases.count: describe it
+described: responses/PostgresDatabases.items: describe it
+described: responses/PostgresFirewallRules.count: describe it
+described: responses/PostgresFirewallRules.items: describe it
+described: responses/PostgresServers.count: describe it
+described: responses/PostgresServers.items: describe it
+described: responses/PrivateLinkServices.count: describe it
+described: responses/PrivateLinkServices.items: describe it
+described: responses/PrivateLocations.count: describe it
+described: responses/PrivateLocations.items: describe it
+described: responses/PrivateSubnets.count: describe it
+described: responses/PrivateSubnets.items: describe it
+described: responses/SshPublicKeys.items: describe it
+described: responses/Vms.count: describe it
+described: responses/Vms.items: describe it
+described: restorePostgresDatabase.pg_config: describe it
+described: restorePostgresDatabase.pgbouncer_config: describe it
+described: setMaintenanceWindow.maintenance_window_days: describe it
+described: setMaintenanceWindow.maintenance_window_start_at: describe it
+described: setVMMaintenanceWindow.maintenance_window_start_at: describe it
+described: updateLocationPrivateLinkService.aws: describe it
+described: updateSshPublicKey.name: describe it
+described: updateSshPublicKey.public_key: describe it
+direction: CertAuthUserList.items: mark it readOnly, or accept it in a request
+direction: Firewall.firewall_rules: mark it readOnly, or accept it in a request
+direction: Firewall.id: mark it readOnly, or accept it in a request
+direction: Firewall.location: mark it readOnly, or accept it in a request
+direction: Firewall.path: mark it readOnly, or accept it in a request
+direction: FirewallRule.id: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.created_at: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.id: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.installation_name: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.key: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.last_accessed_at: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.repository_name: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.scope: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.size: mark it readOnly, or accept it in a request
+direction: GithubInstallation.id: mark it readOnly, or accept it in a request
+direction: GithubInstallation.name: mark it readOnly, or accept it in a request
+direction: GithubRepository.id: mark it readOnly, or accept it in a request
+direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
+direction: GithubRepository.name: mark it readOnly, or accept it in a request
+direction: InferenceApiKey.id: mark it readOnly, or accept it in a request
+direction: InferenceApiKey.key: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.cp_node_count: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.cp_vms: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.display_state: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.id: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.location: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.node_size: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.nodepools: mark it readOnly, or accept it in a request
+direction: KubernetesCluster.services_load_balancer_url: mark it readOnly, or accept it in a request
+direction: KubernetesNodepool.id: mark it readOnly, or accept it in a request
+direction: KubernetesNodepool.kubernetes_cluster_id: mark it readOnly, or accept it in a request
+direction: KubernetesNodepool.version: mark it readOnly, or accept it in a request
+direction: KubernetesNodepool.vms: mark it readOnly, or accept it in a request
+direction: LoadBalancer.hostname: mark it readOnly, or accept it in a request
+direction: LoadBalancer.id: mark it readOnly, or accept it in a request
+direction: LoadBalancer.location: mark it readOnly, or accept it in a request
+direction: MachineImage.arch: mark it readOnly, or accept it in a request
+direction: MachineImage.created_at: mark it readOnly, or accept it in a request
+direction: MachineImage.id: mark it readOnly, or accept it in a request
+direction: MachineImage.location: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.actual_size_mib: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.archive_size_mib: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.created_at: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.id: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.latest: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.state: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.version: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.access_key_id: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.bucket: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.endpoint: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.expiration: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.region: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.secret_access_key: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.session_token: mark it readOnly, or accept it in a request
+direction: PostgresCapabilities.metadata: mark it readOnly, or accept it in a request
+direction: PostgresCapabilities.option_tree: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.ca_certificates: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.created_at: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.fallback_active: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.id: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.location: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.parent: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.read_replica: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.state: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.storage_size_gib: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.target_server_count: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.target_storage_size_gib: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.target_version: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.target_vm_size: mark it readOnly, or accept it in a request
+direction: PostgresDatabase.vm_size: mark it readOnly, or accept it in a request
+direction: PostgresFirewallRule.id: mark it readOnly, or accept it in a request
+direction: PostgresFirewallRule.port: mark it readOnly, or accept it in a request
+direction: PostgresLogDestination.id: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.allowed_principals: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.id: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.location: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.postgres_resource: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_dns_name: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_hostname: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_subnet: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.state: mark it readOnly, or accept it in a request
+direction: PrivateLocation.id: mark it readOnly, or accept it in a request
+direction: PrivateLocation.path: mark it readOnly, or accept it in a request
+direction: PrivateLocation.provider: mark it readOnly, or accept it in a request
+direction: PrivateLocation.ui_name: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.firewalls: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.id: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.location: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.net4: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.net6: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.nics: mark it readOnly, or accept it in a request
+direction: PrivateSubnet.state: mark it readOnly, or accept it in a request
+direction: Project.id: mark it readOnly, or accept it in a request
+direction: Project.name: mark it readOnly, or accept it in a request
+direction: ResourceMetrics.metrics: mark it readOnly, or accept it in a request
+direction: RunCommand.output: mark it readOnly, or accept it in a request
+direction: RunCommand.status: mark it readOnly, or accept it in a request
+direction: RunCommand.timestamp: mark it readOnly, or accept it in a request
+direction: SshPublicKey.id: mark it readOnly, or accept it in a request
+direction: Vm.id: mark it readOnly, or accept it in a request
+direction: Vm.ip4: mark it readOnly, or accept it in a request
+direction: Vm.ip4_enabled: mark it readOnly, or accept it in a request
+direction: Vm.ip6: mark it readOnly, or accept it in a request
+direction: Vm.location: mark it readOnly, or accept it in a request
+direction: Vm.state: mark it readOnly, or accept it in a request
+direction: Vm.storage_size_gib: mark it readOnly, or accept it in a request
+direction: responses/AuditLogs.items: mark it readOnly, or accept it in a request
+direction: responses/AuditLogs.pagination_key: mark it readOnly, or accept it in a request
+direction: responses/FirewallDetailed/allOf/1.private_subnets: mark it readOnly, or accept it in a request
+direction: responses/Firewalls.count: mark it readOnly, or accept it in a request
+direction: responses/Firewalls.items: mark it readOnly, or accept it in a request
+direction: responses/GithubCacheEntries.count: mark it readOnly, or accept it in a request
+direction: responses/GithubCacheEntries.items: mark it readOnly, or accept it in a request
+direction: responses/GithubInstallations.count: mark it readOnly, or accept it in a request
+direction: responses/GithubInstallations.items: mark it readOnly, or accept it in a request
+direction: responses/GithubRepositories.count: mark it readOnly, or accept it in a request
+direction: responses/GithubRepositories.items: mark it readOnly, or accept it in a request
+direction: responses/InferenceApiKeys.items: mark it readOnly, or accept it in a request
+direction: responses/InferenceEndpoints.items: mark it readOnly, or accept it in a request
+direction: responses/KubernetesClusters.count: mark it readOnly, or accept it in a request
+direction: responses/KubernetesClusters.items: mark it readOnly, or accept it in a request
+direction: responses/LoadBalancer/allOf/1.subnet: mark it readOnly, or accept it in a request
+direction: responses/LoadBalancers.count: mark it readOnly, or accept it in a request
+direction: responses/LoadBalancers.items: mark it readOnly, or accept it in a request
+direction: responses/MachineImageVersions.count: mark it readOnly, or accept it in a request
+direction: responses/MachineImageVersions.items: mark it readOnly, or accept it in a request
+direction: responses/MachineImages.count: mark it readOnly, or accept it in a request
+direction: responses/MachineImages.items: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.location: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.name: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.type: mark it readOnly, or accept it in a request
+direction: responses/PostgresBackups.count: mark it readOnly, or accept it in a request
+direction: responses/PostgresBackups.items: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.connection_string: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.earliest_restore_time: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.firewall_rules: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.hostname: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.log_destinations: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.metric_destinations: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.primary: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.private_connection_string: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabase/allOf/1.read_replicas: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseLogs.logs: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseLogs.pagination_key: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseUpgradeStatus.current_version: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseUpgradeStatus.target_version: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseUpgradeStatus.upgrade_status: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabases.count: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabases.items: mark it readOnly, or accept it in a request
+direction: responses/PostgresFirewallRules.count: mark it readOnly, or accept it in a request
+direction: responses/PostgresFirewallRules.items: mark it readOnly, or accept it in a request
+direction: responses/PostgresServers.count: mark it readOnly, or accept it in a request
+direction: responses/PostgresServers.items: mark it readOnly, or accept it in a request
+direction: responses/PrivateLinkServices.count: mark it readOnly, or accept it in a request
+direction: responses/PrivateLinkServices.items: mark it readOnly, or accept it in a request
+direction: responses/PrivateLocations.count: mark it readOnly, or accept it in a request
+direction: responses/PrivateLocations.items: mark it readOnly, or accept it in a request
+direction: responses/PrivateSubnets.count: mark it readOnly, or accept it in a request
+direction: responses/PrivateSubnets.items: mark it readOnly, or accept it in a request
+direction: responses/SshPublicKeys.items: mark it readOnly, or accept it in a request
+direction: responses/Vm/allOf/1.firewalls: mark it readOnly, or accept it in a request
+direction: responses/Vm/allOf/1.private_ipv4: mark it readOnly, or accept it in a request
+direction: responses/Vm/allOf/1.private_ipv6: mark it readOnly, or accept it in a request
+direction: responses/Vm/allOf/1.subnet: mark it readOnly, or accept it in a request
+direction: responses/Vms.count: mark it readOnly, or accept it in a request
+direction: responses/Vms.items: mark it readOnly, or accept it in a request
+echo: CertAuthUserRequest.name: echo it in the response, or mark it writeOnly
+echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.private_subnet_id: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
+echo: actionLocationFirewallAttachSubnet.private_subnet_id: echo it in the response, or mark it writeOnly
+echo: actionLocationFirewallDetachSubnet.private_subnet_id: echo it in the response, or mark it writeOnly
+echo: attachVmLocationLoadBalancer.vm_id: echo it in the response, or mark it writeOnly
+echo: connectPrivateSubnet.connected-subnet-id: echo it in the response, or mark it writeOnly
+echo: createKubernetesCluster.cp_nodes: echo it in the response, or mark it writeOnly
+echo: createKubernetesCluster.worker_nodes: echo it in the response, or mark it writeOnly
+echo: createKubernetesCluster.worker_size: echo it in the response, or mark it writeOnly
+echo: createLocationPostgresLogDestination.options: echo it in the response, or mark it writeOnly
+echo: createLocationPostgresMetricDestination.options: echo it in the response, or mark it writeOnly
+echo: createLocationPostgresMetricDestination.url: echo it in the response, or mark it writeOnly
+echo: createMachineImage.destroy_source: echo it in the response, or mark it writeOnly
+echo: createMachineImage.version: echo it in the response, or mark it writeOnly
+echo: createMachineImage.vm: echo it in the response, or mark it writeOnly
+echo: createMachineImageVersion.destroy_source: echo it in the response, or mark it writeOnly
+echo: createMachineImageVersion.vm: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.pg_config: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.pgbouncer_config: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.private_subnet_name: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.restrict_by_default: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.size: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabaseReadReplica.pg_config: echo it in the response, or mark it writeOnly
+echo: createPostgresDatabaseReadReplica.pgbouncer_config: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.access_key: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
+echo: createPrivateSubnet.firewall_id: echo it in the response, or mark it writeOnly
+echo: createVM.enable_ip4: echo it in the response, or mark it writeOnly
+echo: createVM.init_script: echo it in the response, or mark it writeOnly
+echo: createVM.public_key: echo it in the response, or mark it writeOnly
+echo: createVM.storage_size: echo it in the response, or mark it writeOnly
+echo: detachVmLocationLoadBalancer.vm_id: echo it in the response, or mark it writeOnly
+echo: patchPostgresDatabase.size: echo it in the response, or mark it writeOnly
+echo: patchPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
+echo: restorePostgresDatabase.pg_config: echo it in the response, or mark it writeOnly
+echo: restorePostgresDatabase.pgbouncer_config: echo it in the response, or mark it writeOnly
+echo: restorePostgresDatabase.restore_target: echo it in the response, or mark it writeOnly
+echo_agreement: PostgresPrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
+echo_agreement: PrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
+echo_agreement: patchPostgresDatabaseConfig.pg_config: accept every value PostgresConfig.pg_config may hold
+echo_agreement: patchPostgresDatabaseConfig.pgbouncer_config: accept every value PostgresConfig.pgbouncer_config may hold
+examples: CertAuthUserRequest.name: give it an example
+examples: PostgresPrivateLinkServiceCreate.aws: give it an example
+examples: PostgresPrivateLinkServiceCreate.name: give it an example
+examples: PrivateLinkService.id: give it an example
+examples: PrivateLinkServiceCreate.aws: give it an example
+examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
+examples: PrivateLocation.id: give it an example
+examples: SshPublicKeyCreate.name: give it an example
+examples: SshPublicKeyCreate.public_key: give it an example
+examples: actionLocationFirewallAttachSubnet.private_subnet_id: give it an example
+examples: actionLocationFirewallDetachSubnet.private_subnet_id: give it an example
+examples: attachVmLocationLoadBalancer.vm_id: give it an example
+examples: createKubernetesCluster.version: give it an example
+examples: createKubernetesCluster.worker_size: give it an example
+examples: createKubernetesNodepool.name: give it an example
+examples: createKubernetesNodepool.node_count: give it an example
+examples: createKubernetesNodepool.node_size: give it an example
+examples: createLocationFirewallRule.cidr: give it an example
+examples: createLocationLoadBalancer.algorithm: give it an example
+examples: createLocationLoadBalancer.dst_port: give it an example
+examples: createLocationLoadBalancer.health_check_protocol: give it an example
+examples: createLocationLoadBalancer.private_subnet_id: give it an example
+examples: createLocationLoadBalancer.src_port: give it an example
+examples: createLocationPostgresFirewallRule.cidr: give it an example
+examples: createLocationPostgresLogDestination.name: give it an example
+examples: createLocationPostgresLogDestination.type: give it an example
+examples: createLocationPostgresLogDestination.url: give it an example
+examples: createLocationPostgresMetricDestination.url: give it an example
+examples: createMachineImage.vm: give it an example
+examples: createMachineImageVersion.vm: give it an example
+examples: createPostgresDatabase.size: give it an example
+examples: createPostgresDatabase.storage_size: give it an example
+examples: createPostgresDatabaseReadReplica.name: give it an example
+examples: createPrivateLocation.access_key: give it an example
+examples: createPrivateLocation.name: give it an example
+examples: createPrivateLocation.provider_location_name: give it an example
+examples: createPrivateLocation.secret_key: give it an example
+examples: createVM.public_key: give it an example
+examples: detachVmLocationLoadBalancer.vm_id: give it an example
+examples: parameters/private_location_name: give it an example
+examples: patchLocationLoadBalancer.algorithm: give it an example
+examples: patchLocationLoadBalancer.dst_port: give it an example
+examples: patchLocationLoadBalancer.health_check_endpoint: give it an example
+examples: patchLocationLoadBalancer.src_port: give it an example
+examples: patchLocationLoadBalancer.vms: give it an example
+examples: renameFirewall.name: give it an example
+examples: renameKubernetesCluster.name: give it an example
+examples: renameKubernetesNodepool.name: give it an example
+examples: renameLoadBalancer.name: give it an example
+examples: renameMachineImage.name: give it an example
+examples: renamePostgres.name: give it an example
+examples: renamePrivateSubnet.name: give it an example
+examples: renameVM.name: give it an example
+examples: resetSuperuserPassword.password: give it an example
+examples: resizeKubernetesNodepool.node_count: give it an example
+examples: restorePostgresDatabase.name: give it an example
+examples: restorePostgresDatabase.restore_target: give it an example
+examples: setVMMaintenanceWindow.maintenance_window_start_at: give it an example
+examples: toggleSslCertificateLoadBalancer.cert_enabled: give it an example
+examples: updateFirewall.description: give it an example
+examples: updateMachineImage.latest_version: give it an example
+examples: updatePrivateLocation.name: give it an example
