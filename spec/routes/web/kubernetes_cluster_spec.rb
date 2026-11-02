@@ -560,12 +560,16 @@ RSpec.describe Clover, "Kubernetes" do
         expect(kn2.destroy_set?).to be true
       end
 
-      it "does not show the deletion section for the last nodepool" do
+      it "can delete the last nodepool" do
         kn = kc.nodepools.first
         visit "#{project.path}#{kn.path}/settings"
 
-        expect(page).to have_no_content("Danger Zone")
-        expect(page).to have_no_button("Delete")
+        within("#kn-delete-#{kn.ubid}") do
+          click_button "Delete"
+        end
+
+        expect(page).to have_flash_notice("kn nodepool is scheduled for deletion")
+        expect(kn.destroy_set?).to be true
       end
 
       it "can create a nodepool from the nodepools page" do

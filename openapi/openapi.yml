@@ -3,7 +3,7 @@ info:
   description: |-
     API for managing resources on Ubicloud
 
-    To use version 2 of the API, send `Accept: application/vnd.ubicloud+json; version=2`. Version 2 refuses each deprecated operation and request property whose `x-deprecated` sets `removed-in` to 2. A request that does not name that media type gets version 1, which still accepts these, but reports their use in the `Deprecation` and `Warning` response headers and may refuse a share of the requests that use them. Responses are the same in both versions.
+    To use version 2 of the API, send `Accept: application/vnd.ubicloud+json; version=2`. A request that does not name that media type gets version 1. Each version refuses a deprecated operation or request property whose `x-deprecated` sets `removed-in` to that version or an earlier one. It accepts one removed in a later version, but reports its use in the `Deprecation` and `Warning` response headers, and may refuse a share of the requests that use it. Responses are the same in both versions.
   title: Clover API
   version: 0.1.0
   x-api-version: 2
@@ -662,8 +662,14 @@ paths:
                   description: Version of the kubernetes cluster
                   type: string
                 worker_size:
-                  description: Size of each worker VM
+                  description: Deprecated; create a nodepool instead. Size of each worker VM in a default nodepool, which the cluster gets only if this is given.
                   type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 3
+                    use:
+                      - createKubernetesNodepool
                 cp_nodes:
                   description: Deprecated; send cp_node_count.
                   type: integer
@@ -676,12 +682,17 @@ paths:
                   description: Number of control plane nodes
                   type: integer
                 worker_nodes:
-                  description: Number of worker nodes
+                  description: Deprecated; create a nodepool instead. Number of worker nodes in the default nodepool, 1 by default; it is refused without worker_size.
                   type: integer
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 3
+                    use:
+                      - createKubernetesNodepool
               additionalProperties: false
               required:
                 - version
-                - worker_size
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -3449,7 +3460,7 @@ components:
         example: akkkmx0f2vke4h36nk9cm8v8q0
         pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
     kubernetes_cluster_new_name:
-      description: Name for a new kubernetes cluster, of at most 37 characters, since its default nodepool is named after it with "-np" appended and a nodepool's name may have at most 40
+      description: Name for a new kubernetes cluster, of at most 37 characters, since the default nodepool that worker_size asks for is named after the cluster with "-np" appended, and a nodepool's name may have at most 40
       example: my-cluster
       in: path
       name: kubernetes_cluster_reference

@@ -11,15 +11,20 @@ class Clover
       fail Validation::ValidationFailed.new({name: "Kubernetes cluster name must have max length 37."})
     end
 
-    version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
+    version = typecast_params.nonempty_str!("version")
     Validation.validate_kubernetes_version(version)
-    node_count = typecast_params.pos_int("worker_nodes", 1)
     cp_node_count = typecast_params.pos_int("cp_node_count", 1)
-    node_size = Validation.validate_vm_size(target_node_size, "x64")
-
     requested_kubernetes_vcpu_count = cp_node_count * 2 # since default control plane size is standard-2
-    requested_kubernetes_vcpu_count += node_count * node_size.vcpus
-    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: :worker_nodes)
+
+    # The deprecated worker inputs ask for a default nodepool; without them,
+    # the cluster starts with none.
+    if typecast_params.present?("worker_size") || typecast_params.present?("worker_nodes")
+      target_node_size = typecast_params.nonempty_str!("worker_size")
+      node_count = typecast_params.pos_int("worker_nodes", 1)
+      node_size = Validation.validate_vm_size(target_node_size, "x64")
+      requested_kubernetes_vcpu_count += node_count * node_size.vcpus
+    end
+    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: node_count ? :worker_nodes : :cp_node_count)
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -30,12 +35,14 @@ class Clover
         version:,
       ).subject
 
-      Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-        name: name + "-np",
-        node_count:,
-        kubernetes_cluster_id: kc.id,
-        target_node_size:,
-      )
+      if node_count
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+          name: name + "-np",
+          node_count:,
+          kubernetes_cluster_id: kc.id,
+          target_node_size:,
+        )
+      end
       audit_log(kc, "create")
 
       if api?
