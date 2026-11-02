@@ -5,6 +5,7 @@
 # where that order matters.
 module TerraformGenerator::Definitions
   TYPES = {
+    inference_api_key: {},
     project: {},
     ssh_public_key: {},
   }.freeze
