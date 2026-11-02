@@ -477,6 +477,18 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "rename" do
+      it "answers with the detailed VM" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body.keys).to include("firewalls", "private_ipv4", "private_ipv6", "subnet", "gpu")
+        expect(vm.reload.name).to eq("new-name")
+      end
+    end
+
     describe "set-maintenance-window" do
       it "can set maintenance window" do
         post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {

@@ -141,7 +141,7 @@ class Clover
         end
       end
 
-      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, serializer_options: {detailed: true}, template_prefix: "postgres" do
         pg.incr_refresh_dns_record
         pg.incr_refresh_certificates unless pg.hostname_version == "v3"
         pg.server_incr("configure_metrics")
@@ -476,7 +476,7 @@ class Clover
         end
 
         if api?
-          Serializers::Postgres.serialize(pg)
+          Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "'#{pg.name}' will be promoted in a few minutes, please refresh the page"
           r.redirect pg, "/settings"

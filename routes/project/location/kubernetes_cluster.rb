@@ -53,7 +53,7 @@ class Clover
         metrics_response(Metrics::KUBERNETES_METRICS, kc.ubid, VictoriaMetricsResource.client_for_project(Config.kubernetes_service_project_id))
       end
 
-      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
+      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, serializer_options: {detailed: true}, template_prefix: "kubernetes-cluster"
 
       r.show_object(kc, actions: %w[overview nodepools charts networking settings].freeze, perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
@@ -145,7 +145,7 @@ class Clover
           r.redirect kn, "/overview"
         end
 
-        r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
+        r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, serializer_options: {detailed: true}, template_prefix: "kubernetes-cluster/nodepool"
 
         r.show_object(kn, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/nodepool/show")
 

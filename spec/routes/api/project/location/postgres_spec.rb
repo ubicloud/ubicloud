@@ -570,6 +570,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).keys).to include("connection_string", "password", "firewall_rules", "read_replicas")
       end
 
       it "promote-read-replica via deprecated promote endpoint" do
@@ -580,6 +581,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).keys).to include("connection_string", "password", "firewall_rules", "read_replicas")
       end
 
       it "fails to promote if not read_replica" do
@@ -1280,6 +1282,18 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["items"][4]["description"]).to eq("")
         expect(JSON.parse(last_response.body)["items"][5]["description"]).to eq("")
         expect(JSON.parse(last_response.body)["count"]).to eq(6)
+      end
+    end
+
+    describe "rename" do
+      it "answers with the detailed database" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body["connection_string"]).to eq(pg.reload.connection_string)
+        expect(body.keys).to include("password", "hostname", "primary", "firewall_rules", "read_replicas")
       end
     end
 

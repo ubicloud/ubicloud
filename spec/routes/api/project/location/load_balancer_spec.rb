@@ -152,6 +152,19 @@ RSpec.describe Clover, "load-balancer" do
       end
     end
 
+    describe "rename" do
+      it "answers with the detailed load balancer" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body["subnet"]).to eq("subnet-1")
+        expect(body["vms"]).to eq([])
+        expect(lb.reload.name).to eq("new-name")
+      end
+    end
+
     describe "update" do
       let(:vm) {
         nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
