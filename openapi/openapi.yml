@@ -770,6 +770,9 @@ paths:
                 node_size:
                   description: Size of each worker node
                   type: string
+                version:
+                  description: Kubernetes version of the nodepool. Since a nodepool is always created at its cluster's version, this must be the cluster's version.
+                  type: string
               additionalProperties: false
               required:
                 - name
@@ -875,6 +878,17 @@ paths:
     post:
       operationId: upgradeKubernetesNodepool
       summary: Upgrade a kubernetes nodepool to the cluster version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  description: Version to upgrade to, which must be the cluster's version. If the nodepool is already at this version, the request does nothing. If version is omitted, the nodepool is upgraded to the cluster's version.
+                  type: string
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/KubernetesNodepool'
@@ -917,7 +931,18 @@ paths:
       - $ref: '#/components/parameters/kubernetes_cluster_reference'
     post:
       operationId: upgradeKubernetesCluster
-      summary: Upgrade a kubernetes cluster
+      summary: Upgrade a kubernetes cluster to the next minor version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  description: Version to upgrade to, which must be the minor version after the cluster's current one. If the cluster is already at this version, the request does nothing. If version is omitted, the cluster is upgraded to the next minor version.
+                  type: string
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'

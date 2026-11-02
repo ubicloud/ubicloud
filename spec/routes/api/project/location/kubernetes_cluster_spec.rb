@@ -336,6 +336,22 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(kc.nodepools_dataset.first(name: "np2")).to be_nil
         end
 
+        it "accepts the cluster's version, and refuses another" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: Option.kubernetes_versions[1]}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Nodepool can only be created at the cluster's version, #{kc.version}"})
+          expect(kc.nodepools_dataset.count).to eq(1)
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: kc.version}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)["version"]).to eq(kc.version)
+          expect(kc.nodepools_dataset.count).to eq(2)
+        end
+
         it "returns an error while the cluster is not in wait" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
 
@@ -576,6 +592,33 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(kc.upgrade_nodepools_set?).to be true
         end
 
+        it "upgrades to version when it is the cluster's version, and does nothing when resent" do
+          kn.update(version: Option.kubernetes_versions[1])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          2.times do
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: kc.version}.to_json
+
+            expect(last_response.status).to eq(200)
+            expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => kc.version, "state" => "upgrading")
+          end
+          expect(kn.reload.version).to eq(kc.version)
+          expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+        end
+
+        it "refuses a version that is not the cluster's" do
+          kn.update(version: Option.kubernetes_versions[2])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: Option.kubernetes_versions[1]}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
+          expect(kn.reload.version).to eq(Option.kubernetes_versions[2])
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
         it "returns an error when the nodepool is at the cluster version" do
           kc.strand.update(label: "wait")
           kn.strand.update(label: "wait")
@@ -666,6 +709,40 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions[1])
         expect(kn.upgrade_requested_set?).to be false
         expect(kn.upgrade_set?).to be false
+      end
+
+      it "upgrades to version when it is the next version, and does nothing when resent" do
+        kc.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        2.times do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: Option.kubernetes_versions[0]}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => Option.kubernetes_versions[0], "state" => "upgrading")
+        end
+        expect(kc.reload.version).to eq(Option.kubernetes_versions[0])
+        expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+      end
+
+      it "refuses a version that is not the next one" do
+        kc.update(version: Option.kubernetes_versions[2])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: Option.kubernetes_versions[0]}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Cluster can only be upgraded to the next version, #{Option.kubernetes_versions[1]}"})
+        expect(kc.reload.version).to eq(Option.kubernetes_versions[2])
+        expect(kc.upgrade_set?).to be false
+      end
+
+      it "refuses a version when the cluster is at the latest version" do
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: "v1.99"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Cluster is at the latest version, #{kc.version}"})
+        expect(kc.reload.upgrade_set?).to be false
       end
 
       it "returns an error when no upgrade is available" do
