@@ -92,7 +92,7 @@ r "update-initramfs -u"
 # reservation from MemAvailable before that reboot, and it would then hold the
 # driver's memory back from hugepages for the host's whole life. Unload the
 # driver now so the measurement matches the host the reservation lands on.
-r "modprobe -r irdma" if File.directory?("/sys/module/irdma")
+r "rmmod irdma" if File.directory?("/sys/module/irdma")
 
 # OS images.
 
