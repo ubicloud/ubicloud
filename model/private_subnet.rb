@@ -38,6 +38,7 @@ class PrivateSubnet < Sequel::Model
   DEFAULT_SUBNET_PREFIX_LEN = 26
 
   GCP_MANAGEMENT_SUBNET_NAME = "ubicloud-pg-mgmt"
+  GCP_GITHUB_RUNNER_SUBNET_NAME = "ubicloud-github-runners"
 
   dataset_module Pagination
 
@@ -86,6 +87,10 @@ class PrivateSubnet < Sequel::Model
 
   def gcp_management?
     name == GCP_MANAGEMENT_SUBNET_NAME && project_id == Config.postgres_service_project_id
+  end
+
+  def gcp_github_runner?
+    name == GCP_GITHUB_RUNNER_SUBNET_NAME && project_id == Config.github_runner_service_project_id
   end
 
   def dedicated_gcp_vpc?
