@@ -46,13 +46,36 @@ RSpec.describe Clover, "firewall" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall"
 
       expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["items"].length).to eq(2)
+      items = JSON.parse(last_response.body)["items"]
+      expect(items.length).to eq(2)
+      expect(items.map { it["path"] }).to contain_exactly("/location/#{TEST_LOCATION}/firewall/#{firewall.name}", "/location/#{TEST_LOCATION}/firewall/#{firewall.name}-2")
     end
 
     it "success get firewall" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}"
 
       expect(last_response.status).to eq(200)
+    end
+
+    it "success get firewall with its path and private subnets" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, firewall_id: firewall.id).subject
+
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}"
+
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body["path"]).to eq("/location/#{TEST_LOCATION}/firewall/#{firewall.name}")
+      expect(body["private_subnets"].map { it["id"] }).to eq([ps.ubid])
+      expect(body["private_subnets"].first["firewalls"].first["path"]).to eq(body["path"])
+    end
+
+    it "checks the private subnets of the detailed firewall against the schema" do
+      Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, firewall_id: firewall.id)
+      expect(Serializers::PrivateSubnet).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+      expect {
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}"
+      }.to raise_error(Committee::InvalidResponse, /undocumented/)
     end
 
     it "get does not exist for valid name" do

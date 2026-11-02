@@ -3607,6 +3607,10 @@ components:
         name:
           description: Name of the firewall
           type: string
+        path:
+          description: Path of the firewall, relative to the project
+          type: string
+          example: /location/eu-central-h1/firewall/my-firewall
       additionalProperties: false
       required:
         - description
@@ -3614,6 +3618,7 @@ components:
         - id
         - location
         - name
+        - path
     FirewallRule:
       type: object
       properties:
@@ -4820,7 +4825,8 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Firewall'
-              - properties:
+              - type: object
+                properties:
                   private_subnets:
                     description: List of private subnets
                     type: array

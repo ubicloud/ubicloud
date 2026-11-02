@@ -56,7 +56,7 @@ RSpec.describe Serializers::Vm do
         ip4_enabled: true,
         ip4: "192.168.1.0",
         maintenance_window_start_at: nil,
-        firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
+        firewalls: Serializers::Firewall.serialize(vm.firewalls),
         private_ipv4: vm.private_ipv4.to_s,
         private_ipv6: vm.private_ipv6.to_s,
         subnet: "default-eu-central-h1",
