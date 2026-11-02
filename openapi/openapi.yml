@@ -1693,7 +1693,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostgresConfig'
+              type: object
+              properties:
+                pg_config:
+                  description: PostgreSQL parameters to set, replacing any set before. A number is stored as a string.
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    anyOf:
+                      - type: string
+                      - type: number
+                pgbouncer_config:
+                  description: PgBouncer parameters to set, replacing any set before. A number is stored as a string.
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    anyOf:
+                      - type: string
+                      - type: number
+              additionalProperties: false
+              required:
+                - pg_config
+                - pgbouncer_config
       responses:
         '200':
           description: Successful response
@@ -3527,21 +3550,19 @@ components:
       type: object
       properties:
         pg_config:
+          description: PostgreSQL parameters set by the user
           type: object
           example:
             max_connections: '100'
           additionalProperties:
-            anyOf:
-              - type: string
-              - type: number
+            type: string
         pgbouncer_config:
+          description: PgBouncer parameters set by the user
           type: object
           example:
             max_client_conn: '100'
           additionalProperties:
-            anyOf:
-              - type: string
-              - type: number
+            type: string
         default_pg_config:
           description: System-computed configuration values based on instance size. User overrides in pg_config take precedence.
           type: object
@@ -5401,6 +5422,20 @@ components:
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresLogDestination'
+                  pg_config:
+                    description: PostgreSQL parameters set by the user
+                    type: object
+                    example:
+                      max_connections: '100'
+                    additionalProperties:
+                      type: string
+                  pgbouncer_config:
+                    description: PgBouncer parameters set by the user
+                    type: object
+                    example:
+                      max_client_conn: '100'
+                    additionalProperties:
+                      type: string
                   read_replicas:
                     description: List of read replicas of the Postgres database
                     type: array
@@ -5416,6 +5451,8 @@ components:
                   - primary
                   - metric_destinations
                   - log_destinations
+                  - pg_config
+                  - pgbouncer_config
                   - read_replicas
     PostgresDatabases:
       description: A list of Postgres Databases

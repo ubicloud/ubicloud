@@ -1,8 +1,6 @@
 described: CertAuthUserList.items: describe it
 described: KubernetesCluster.cp_vms: describe it
 described: KubernetesCluster.nodepools: describe it
-described: PostgresConfig.pg_config: describe it
-described: PostgresConfig.pgbouncer_config: describe it
 described: PostgresPrivateLinkServiceCreate.name: describe it
 described: PrivateLinkService.id: describe it
 described: PrivateLinkService.ip_address_type: describe it
@@ -140,26 +138,18 @@ echo: createMachineImage.version: echo it in the response, or mark it writeOnly
 echo: createMachineImage.vm: echo it in the response, or mark it writeOnly
 echo: createMachineImageVersion.destroy_source: echo it in the response, or mark it writeOnly
 echo: createMachineImageVersion.vm: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabase.pg_config: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabase.pgbouncer_config: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.private_subnet_name: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.restrict_by_default: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.size: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabaseReadReplica.pg_config: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabaseReadReplica.pgbouncer_config: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.access_key: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.size: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
-echo: restorePostgresDatabase.pg_config: echo it in the response, or mark it writeOnly
-echo: restorePostgresDatabase.pgbouncer_config: echo it in the response, or mark it writeOnly
 echo: restorePostgresDatabase.restore_target: echo it in the response, or mark it writeOnly
 echo_agreement: PostgresPrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
 echo_agreement: PrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
-echo_agreement: patchPostgresDatabaseConfig.pg_config: accept every value PostgresConfig.pg_config may hold
-echo_agreement: patchPostgresDatabaseConfig.pgbouncer_config: accept every value PostgresConfig.pgbouncer_config may hold
 examples: CertAuthUserRequest.name: give it an example
 examples: PostgresPrivateLinkServiceCreate.aws: give it an example
 examples: PostgresPrivateLinkServiceCreate.name: give it an example
