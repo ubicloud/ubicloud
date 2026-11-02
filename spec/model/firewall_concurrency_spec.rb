@@ -282,6 +282,56 @@ RSpec.describe Firewall, :no_db_transaction do
     expect(DB[:nic].where(private_subnet_id: subnet.id).count).to eq(2)
   end
 
+  it "does not make two VMs joining the GitHub runner subnet wait for each other" do
+    project = make_project
+    allow(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+    location = Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "fw-cc-gcp-#{tag}", ui_name: "fw-cc-gcp-#{tag}", visible: true, project_id: project.id)
+    created[:locations] << location.id
+    subnet = PrivateSubnet.create(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, location_id: location.id, project_id: project.id,
+      net6: "fd10:ccff::/64", net4: "10.199.0.0/16", state: "active")
+    created[:private_subnets] << subnet.id
+
+    # Pause the first VM inside its transaction right after its NIC insert;
+    # the second VM must still finish while the first is open.
+    mutex = Mutex.new
+    calls = 0
+    first_inside = Queue.new
+    first_may_finish = Queue.new
+    expect(Prog::Vnet::NicNexus).to receive(:assemble).twice.and_wrap_original do |m, *args, **kwargs|
+      result = m.call(*args, **kwargs)
+      if mutex.synchronize { (calls += 1) == 1 }
+        first_inside.push(true)
+        first_may_finish.pop
+      end
+      result
+    end
+
+    results = Array.new(2)
+    join = ->(i) {
+      Thread.new do
+        vm = Prog::Vm::Nexus.assemble("ssh-ed25519 key", project.id, name: "fw-cc-runner-#{tag}-#{i}", size: "n4d-standard-8",
+          location_id: location.id, boot_image: "ubuntu-noble", private_subnet_id: subnet.id, arch: "x64",
+          storage_volumes: [{size_gib: 200, encrypted: true}], use_eip: false).subject
+        mutex.synchronize { created[:vms] << vm.id }
+        results[i] = :ok
+      rescue => e
+        results[i] = [:error, e.class.name, e.message]
+      end
+    }
+
+    first = join.call(0)
+    begin
+      first_inside.pop
+      second = join.call(1)
+      expect(second.join(5)).not_to be_nil
+      expect(results[1]).to eq(:ok)
+    ensure
+      first_may_finish.push(true)
+      first.join(5)
+    end
+    expect(results[0]).to eq(:ok)
+  end
+
   it "lets the second transaction observe the first's committed attach through the lock" do
     project = make_project
     location = make_gcp_location(project.id)

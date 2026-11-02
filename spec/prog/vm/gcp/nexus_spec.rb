@@ -126,6 +126,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       }
     end
 
+    it "lets a VM join the GitHub runner subnet without checking the firewall cap" do
+      location_credential
+      gcp_vpc
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id).at_least(:once)
+      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME,
+        location_id: location.id).subject
+      9.times do |i|
+        Firewall.create(name: "runner-fw-#{i}", description: "d",
+          location_id: location.id, project_id: project.id)
+          .associate_with_private_subnet(subnet, apply_firewalls: false)
+      end
+      expect(subnet.reload.firewalls.count).to be > 9
+      v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+        location_id: location.id, unix_user: "test-user",
+        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+        name: "testvm-runner", size: "c4a-standard-8", arch: "arm64",
+        private_subnet_id: subnet.id).subject
+      expect(v.nics.map(&:private_subnet_id)).to eq([subnet.id])
+    end
+
     # Lock-ordering and race behavior is covered by the real two-connection
     # concurrency specs in spec/model/firewall_concurrency_spec.rb. No smoke-
     # test stand-in here. It would only have been testable by mocking lock!,

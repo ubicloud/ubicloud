@@ -112,10 +112,14 @@ class Prog::Vm::Nexus < Prog::Base
         subnet = project.default_private_subnet(location)
       end
 
+      # The GitHub runner subnet has one firewall and its VMs have none, so
+      # they can never reach the GCP firewall cap the lock below protects.
+      runner_subnet = subnet.gcp_github_runner?
+
       # Lock before the NIC insert, which takes a key share lock on the
       # subnet row: two VMs joining one GCP subnet at once would otherwise
       # each hold that and wait for the other's FOR UPDATE.
-      subnet.lock! if location.gcp?
+      subnet.lock! if location.gcp? && !runner_subnet
 
       unless nic_id
         availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic
@@ -140,7 +144,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id:,
         hypervisor_id: ch_version && Hypervisor.first(name: "ch", version: ch_version)&.id,
       ) { it.id = ubid.to_uuid }
-      vm.validate_subnet_firewall_cap(subnet)
+      vm.validate_subnet_firewall_cap(subnet) unless runner_subnet
       nic.update(vm_id: vm.id)
 
       if use_separate_management_nic
