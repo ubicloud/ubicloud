@@ -145,7 +145,7 @@ class Clover
           r.redirect kn, "/overview"
         end
 
-        r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, serializer_options: {detailed: true}, template_prefix: "kubernetes-cluster/nodepool"
+        r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
 
         r.show_object(kn, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/nodepool/show")
 
@@ -178,7 +178,7 @@ class Clover
           end
 
           if api?
-            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+            Serializers::KubernetesNodepool.serialize(kn.reload)
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
             r.redirect kn, "/settings"
@@ -200,7 +200,7 @@ class Clover
           end
 
           if api?
-            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+            Serializers::KubernetesNodepool.serialize(kn)
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be upgraded to #{upgrade_candidate}"
             r.redirect kn, "/settings"
@@ -257,7 +257,7 @@ class Clover
         end
 
         if api?
-          Serializers::KubernetesNodepool.serialize(np.reload, {detailed: true})
+          Serializers::KubernetesNodepool.serialize(np.reload)
         else
           flash["notice"] = "Node #{node.name} is scheduled to be retired"
           r.redirect np, "/nodes"
@@ -280,7 +280,7 @@ class Clover
         end
 
         if api?
-          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+          Serializers::KubernetesCluster.serialize(kc.reload, {detailed: true})
         else
           flash["notice"] = "#{kc.name} will be upgraded to #{upgrade_candidate}"
           r.redirect kc

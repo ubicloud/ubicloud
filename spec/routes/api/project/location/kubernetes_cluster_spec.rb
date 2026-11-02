@@ -102,6 +102,36 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(parsed_body["count"]).to eq(1)
         expect(parsed_body["items"][0]["name"]).to eq("cluster")
         expect(parsed_body["items"][0]["version"]).to eq(Option.selectable_kubernetes_versions.first)
+        expect(parsed_body["items"][0]["state"]).to eq("creating")
+        expect(parsed_body["items"][0].keys).not_to include("cp_vms", "nodepools")
+      end
+
+      it "lists several clusters, each with its services load balancer" do
+        kc2 = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster2", version: kc.version, project_id: project.id, location_id: kc.location_id).subject
+        kc3 = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster3", version: kc.version, project_id: project.id, location_id: kc.location_id).subject
+        # Use version 1 hostnames, which include part of the subnet's ubid,
+        # so that serializing them reads each load balancer's subnet.
+        hostnames = [kc2, kc3].map do |c|
+          lb = Prog::Vnet::LoadBalancerNexus.assemble(c.private_subnet_id, name: c.services_load_balancer_name, src_port: 80, dst_port: 8080, hostname_version: 1).subject
+          c.update(services_lb_id: lb.id, kubeconfig: "stored")
+          lb.hostname
+        end
+
+        if Config.unfrozen_test?
+          # The duplicate query check can't catch these lookups, since Sequel
+          # writes the key being looked up into the SQL.
+          expect(LoadBalancer).not_to receive(:primary_key_lookup)
+          expect(PrivateSubnet).not_to receive(:primary_key_lookup)
+        end
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["items"].map { it.slice("name", "state", "services_load_balancer_url") }).to contain_exactly(
+          {"name" => "cluster", "state" => "creating", "services_load_balancer_url" => nil},
+          {"name" => "cluster2", "state" => "running", "services_load_balancer_url" => hostnames[0]},
+          {"name" => "cluster3", "state" => "running", "services_load_balancer_url" => hostnames[1]},
+        )
       end
     end
 
@@ -155,7 +185,48 @@ RSpec.describe Clover, "kubernetes-cluster" do
         get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(kc.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(kc.name)
+        expect(body.slice("state", "display_state", "services_load_balancer_url")).to eq("state" => "creating", "display_state" => "creating", "services_load_balancer_url" => nil)
+        expect(body["nodepools"].map { it.slice("name", "state", "vms") }).to eq([{"name" => "np", "state" => "creating", "vms" => []}])
+      end
+
+      it "shows a cluster with a kubeconfig as running while the nexus does routine work" do
+        kc.update(kubeconfig: "stored")
+        kc.strand.update(label: "sync_kubernetes_services")
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("state", "display_state")).to eq("state" => "running", "display_state" => "running")
+      end
+
+      it "shows the hostname of the services load balancer" do
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet_id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8080).subject
+        kc.update(services_lb_id: lb.id)
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["services_load_balancer_url"]).to eq(lb.hostname)
+      end
+
+      it "shows the state of each nodepool" do
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id)
+        kc.nodepools_dataset.first(name: "np").strand.update(label: "wait")
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["nodepools"].map { it.slice("name", "state") }).to eq([{"name" => "np", "state" => "running"}, {"name" => "np2", "state" => "creating"}])
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::KubernetesCluster).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
       end
 
       it "success ubid" do
@@ -236,6 +307,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(body["node_count"]).to eq(2)
           expect(body["node_size"]).to eq("standard-2")
           expect(body["version"]).to eq(kc.version)
+          expect(body.slice("state", "vms")).to eq("state" => "creating", "vms" => [])
           expect(kc.nodepools_dataset.first(name: "np2").start_bootstrapping_set?).to be true
         end
 
@@ -353,6 +425,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
             expect(last_response.status).to eq(200)
             body = JSON.parse(last_response.body)
             expect(body["node_count"]).to eq(new_count)
+            expect(body["state"]).to eq("resizing")
             expect(kn.reload.node_count).to eq(new_count)
             expect(kn.scale_worker_count_set?).to be true
           end
@@ -435,7 +508,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
           expect(last_response.status).to eq(200)
-          expect(JSON.parse(last_response.body)["version"]).to eq(kc.version)
+          expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => kc.version, "state" => "upgrading")
           expect(kn.reload.version).to eq(kc.version)
           expect(kn.upgrade_requested_set?).to be true
           expect(kn.upgrade_set?).to be false
@@ -525,6 +598,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["state"]).to eq("upgrading")
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(kc.upgrade_set?).to be true
         expect(kc.upgrade_nodepools_set?).to be false

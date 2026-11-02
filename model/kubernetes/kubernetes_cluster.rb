@@ -54,13 +54,17 @@ class KubernetesCluster < Sequel::Model
     end
   end
 
+  # The values that display_state can return. The enum of
+  # KubernetesCluster.state in openapi.yml must list the same ones.
+  DISPLAY_STATES = %w[creating running upgrading deleting].freeze
+
+  # The strand's label can't tell us whether creation is done, since the
+  # nexus leaves wait for routine work. But the nexus stores a kubeconfig
+  # only once the control plane and every nodepool are up, so go by that.
   def display_state
-    label = strand.label
     return "deleting" if destroying_set? || destroy_set?
     return "upgrading" if upgrading?
-    return "running" if label == "wait" && !kubeconfig.nil?
-
-    "creating"
+    kubeconfig ? "running" : "creating"
   end
 
   def display_location

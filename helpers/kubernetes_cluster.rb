@@ -68,7 +68,7 @@ class Clover
     end
 
     if api?
-      Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+      Serializers::KubernetesNodepool.serialize(kn)
     else
       flash["notice"] = "'#{name}' nodepool will be added to the cluster"
       request.redirect kn, "/overview"
@@ -80,7 +80,7 @@ class Clover
     dataset = dataset.where(location_id: @location.id) if @location
     dataset = dataset_authorize(dataset, "KubernetesCluster:view")
     if api?
-      paginated_result(dataset, Serializers::KubernetesCluster)
+      paginated_result(dataset.eager(:location, :strand, :semaphores, services_lb: :private_subnet), Serializers::KubernetesCluster)
     else
       @kcs = dataset.all
       if @kcs.empty? && has_project_permission("KubernetesCluster:create")
