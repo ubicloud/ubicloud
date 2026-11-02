@@ -24,7 +24,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   let(:project) { installation.project }
   let(:client) { instance_double(Octokit::Client) }
   let(:now) { Time.utc(2026, 2, 5, 19, 0) }
-  let(:boot_bug_grep) { "sudo grep -qszE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent\\|kernel\\ BUG\\ at\\ arch/x86/kernel/alternative.c:\\[0-9\\]+\\|GRUB_FORCE_PARTUUID\\ set,\\ attempting\\ initrdless\\ boot\\\\.\\\\s\\*\\$ /vm/#{vm.inhost_name}/serial.log && echo match || true" }
+  let(:boot_bug_grep) { "sudo grep -qszE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent\\|kernel\\ BUG\\ at\\ arch/x86/kernel/alternative.c:\\[0-9\\]+\\|GRUB_FORCE_PARTUUID\\ set,\\ attempting\\ initrdless\\ boot\\\\.\\\\s\\*\\$\\|EFI\\ stub:\\ WARNING:\\ Decompression\\ failed:\\ ZSTD-compressed\\ data\\ is\\ corrupt\\|EFI\\ stub:\\ ERROR:\\ Failed\\ to\\ decompress\\ kernel /vm/#{vm.inhost_name}/serial.log && echo match || true" }
 
   before do
     allow(Config).to receive(:github_runner_service_project_id).and_return(vm.project_id)
@@ -1265,6 +1265,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       re = Regexp.new(described_class::KNOWN_KERNEL_BOOT_BUG_SIGNATURES.join("|"))
       expect(re).to match("[    3.912345] EXT4-fs error (device vda1): ext4_mb_generate_buddy:1217: group 729, block bitmap and bg descriptor inconsistent: 32510 vs 32511 free clusters")
       expect(re).to match("[    4.070436] kernel BUG at arch/x86/kernel/alternative.c:2564!")
+      expect(re).to match("EFI stub: WARNING: Decompression failed: ZSTD-compressed data is corrupt")
+      expect(re).to match("EFI stub: ERROR: Failed to decompress kernel")
     end
 
     it "matches the GRUB initrdless boot line only when it is the last line of the serial log" do
