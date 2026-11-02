@@ -19,7 +19,7 @@ class Serializers::Vm < Serializers::Base
 
     if options[:detailed]
       base.merge!(
-        firewalls: Serializers::Firewall.serialize(vm.firewalls(eager: [:location, :firewall_rules]), {include_path: true}),
+        firewalls: Serializers::Firewall.serialize(vm.firewalls(eager: [:location, :firewall_rules])),
         private_ipv4: vm.private_ipv4,
         private_ipv6: vm.private_ipv6,
         subnet: vm.user_nic&.private_subnet&.name,

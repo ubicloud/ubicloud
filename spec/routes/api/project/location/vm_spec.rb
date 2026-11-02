@@ -447,7 +447,9 @@ RSpec.describe Clover, "vm" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(vm.name)
+        expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{vm.display_location}/firewall/default-#{vm.display_location}-default"])
       end
 
       it "success ubid" do

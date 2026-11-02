@@ -113,6 +113,7 @@ RSpec.describe Clover, "private_subnet" do
         resp_body = JSON.parse(last_response.body)
         expect(resp_body["name"]).to eq("test-ps")
         expect(resp_body["firewalls"].first["id"]).to eq(fw.ubid)
+        expect(resp_body["firewalls"].first["path"]).to eq("/location/#{TEST_LOCATION}/firewall/default-firewall")
       end
 
       it "with invalid firewall id" do
@@ -141,7 +142,9 @@ RSpec.describe Clover, "private_subnet" do
         get "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(ps.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(ps.name)
+        expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{ps.display_location}/firewall/dummy-ps-1-default"])
       end
 
       it "success id" do
