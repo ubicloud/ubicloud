@@ -323,6 +323,38 @@ RSpec.describe Clover, "load-balancer" do
         expect(lb.reload.cert_enabled).to be true
       end
 
+      it "attaches several vms in one request" do
+        vm2 = create_vm(project_id: project.id, name: "test-vm-2")
+        Nic.create(name: "nic-2", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:02", private_ipv4: "1.1.1.2", private_ipv6: "2001:db8::2", state: "active", vm_id: vm2.id)
+        lb.update(cert_enabled: true)
+
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid, vm2.ubid],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["vms"]).to contain_exactly(vm.ubid, vm2.ubid)
+        expect(lb.reload.vms.map(&:id)).to contain_exactly(vm.id, vm2.id)
+        expect(lb.vm_ports.count).to eq(4)
+        expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").select_map(:stack).map { it[0]["vm_id"] }).to contain_exactly(vm.id, vm2.id)
+      end
+
+      it "detaches several vms in one request" do
+        vm2 = create_vm(project_id: project.id, name: "test-vm-2")
+        lb.update(cert_enabled: true)
+        lb.add_vm(vm)
+        lb.add_vm(vm2)
+
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(lb.reload.vms).to be_empty
+        expect(lb.vm_ports).to be_empty
+        expect(Strand.where(prog: "Vnet::CertServer", label: "remove_cert_server").select_map(:stack).map { it[0]["vm_id"] }).to contain_exactly(vm.id, vm2.id)
+      end
+
       it "detaches vms" do
         lb.add_vm(vm)
 
@@ -357,6 +389,24 @@ RSpec.describe Clover, "load-balancer" do
         }.to_json
 
         expect(last_response).to have_api_error(400)
+      end
+
+      it "names the vm that another request attached after the check" do
+        vm2 = create_vm(project_id: project.id, name: "test-vm-2")
+        Nic.create(name: "nic-2", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:02", private_ipv4: "1.1.1.2", private_ipv6: "2001:db8::2", state: "active", vm_id: vm2.id)
+        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 8080).subject
+        calls = 0
+        expect(LoadBalancerVm).to receive(:generate_uuid).twice.and_wrap_original do |m|
+          LoadBalancerVm.dataset.insert(id: m.call, load_balancer_id: lb2.id, vm_id: vm.id) if (calls += 1) == 1
+          m.call
+        end
+
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid, vm2.ubid], cert_enabled: false,
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vms", {"vms" => "VM #{vm.ubid} is already attached to a load balancer"})
+        expect(lb.reload.vms).to be_empty
       end
 
       it "vm already attached to the same load balancer" do
@@ -398,6 +448,19 @@ RSpec.describe Clover, "load-balancer" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "fails for vm that another request attached after the check" do
+        vm.update(project_id: project.id, ip4_enabled: true)
+        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 8080).subject
+        expect(LoadBalancerVm).to receive(:generate_uuid).and_wrap_original do |m|
+          LoadBalancerVm.dataset.insert(id: m.call, load_balancer_id: lb2.id, vm_id: vm.id)
+          m.call
+        end
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id", {"vm_id" => "VM is already attached to a load balancer"})
+        expect(lb.reload.vms).to be_empty
       end
 
       it "not existing vm" do

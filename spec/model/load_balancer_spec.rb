@@ -13,6 +13,9 @@ RSpec.describe LoadBalancer do
     prj = lb.private_subnet.project
     Prog::Vm::Nexus.assemble("pub key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
   }
+  let(:vm2) {
+    Prog::Vm::Nexus.assemble("pub key", lb.private_subnet.project_id, name: "test-vm2", private_subnet_id: lb.private_subnet.id).subject
+  }
 
   it "disallows VM ubid format as name" do
     ps = described_class.new(name: described_class.generate_ubid.to_s)
@@ -147,6 +150,16 @@ RSpec.describe LoadBalancer do
       expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv4" }).to eq(1)
       expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv6" }).to eq(2)
     end
+
+    it "adds only ipv4 vm ports for an ipv4 load balancer" do
+      lb.update(stack: "ipv4")
+      expect {
+        lb.add_port(443, 8443)
+      }.to change { lb.reload.vm_ports.count }.from(2).to(3)
+
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv4" }).to eq(2)
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv6" }).to eq(1)
+    end
   end
 
   describe "remove_port" do
@@ -183,6 +196,14 @@ RSpec.describe LoadBalancer do
         .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(0).to(1)
     end
 
+    it "sets up the cert server only while certificates are enabled" do
+      lb.add_vm(vm1)
+      lb.update(cert_enabled: false)
+      lb.add_vm(vm2)
+
+      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").select_map(:stack).map { it[0]["vm_id"] }).to eq([vm1.id])
+    end
+
     it "returns distinct VMs for vms_to_dns when a VM is attached through multiple ports" do
       lb.add_vm(vm1)
       lb.add_port(443, 8443)
@@ -207,6 +228,15 @@ RSpec.describe LoadBalancer do
         .to change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
         .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(1).to(2)
       expect(lb.vm_ports.first[:state]).to eq("evacuating")
+    end
+
+    it "leaves detaching ports and the ports of other VMs alone" do
+      lb.add_vm(vm2)
+      lb.vm_ports_by_vm(vm1).where(stack: "ipv6").update(state: "detaching")
+      lb.evacuate_vm(vm1)
+
+      expect(lb.vm_ports_by_vm(vm1).to_hash(:stack, :state)).to eq("ipv4" => "evacuating", "ipv6" => "detaching")
+      expect(lb.vm_ports_by_vm(vm2).select_map(:state)).to eq(["down", "down"])
     end
   end
 
@@ -251,6 +281,14 @@ RSpec.describe LoadBalancer do
     it "deletes the vm" do
       lb.remove_vm(vm1)
       expect(lb.load_balancer_vms.count).to eq(0)
+    end
+
+    it "deletes only the given vm and its ports" do
+      lb.add_vm(vm2)
+      lb.remove_vm(vm1)
+
+      expect(lb.load_balancer_vms_dataset.select_map(:vm_id)).to eq([vm2.id])
+      expect(lb.vm_ports_dataset.count).to eq(2)
     end
   end
 
