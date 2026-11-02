@@ -628,15 +628,16 @@ they move:
 | `described` | `norm_described` |
 
 The generator keeps the five that are about derivation (`doc/terraform-generator-design.md` §4.7),
-and adds rule `norms`, which requires `openapi/norms.rb` by path and refuses a defined type whose
-operations break any norm, with no known violations allowed:
+and the parts of `examples` and `described` that the norms do not cover, such as a parent's id and
+a nested object's properties. It adds rule `norms`, which requires `openapi/norms.rb` by path and
+refuses a defined type whose operations break any norm, with no known violations allowed:
 
 ```ruby
 # The API's norms hold for every operation of a defined type.
 def norms
   ids = [@create, @get, @api.paths[@item.path]["delete"]].compact.map { it["operationId"] } + @verbs.select(&:verb).map(&:id)
   violations = OpenapiNorms.new(@api.doc, only: ids).violations
-  refuse @name, "breaks the API's norms:\n#{violations.join("\n")}" if violations.any?
+  refuse "definitions #{@name}", "breaks the API's norms:\n#{violations.join("\n")}" if violations.any?
 end
 ```
 

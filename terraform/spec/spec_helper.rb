@@ -20,7 +20,6 @@ if ENV["COVERAGE"]
   end
 end
 
-require "json"
 require_relative "../lib/terraform_generator"
 
 RSpec.configure do |config|
@@ -29,10 +28,18 @@ RSpec.configure do |config|
   config.order = :random
 
   config.include(Module.new do
-    # Specs write the document with symbol keys; the round trip through JSON
-    # gives it the string keys that YAML would.
-    def openapi(paths:, **components)
-      JSON.parse(JSON.generate({paths:, components:}))
+    # Specs write the document with symbol keys, and this gives it the
+    # string keys that YAML would. A round trip through JSON would do the
+    # same, but would turn a Date into a String, which norm_deprecation
+    # refuses as an x-deprecated since date.
+    def openapi(paths:, **components) = string_keys({paths:, components:})
+
+    def string_keys(node)
+      case node
+      in Hash then node.to_h { |k, v| [k.to_s, string_keys(v)] }
+      in Array then node.map { string_keys(it) }
+      else node
+      end
     end
 
     # A spec with the scope and one type, thing, whose item GET returns a

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "did_you_mean"
+require_relative "../../../openapi/norms"
 
 # Derive gives the Type of one definition. Each derivation rule is a method
 # of the same name, and a statement's provenance names the rules that
@@ -53,8 +54,8 @@ class TerraformGenerator::Derive
   end
 
   def type
+    norms
     attrs = [identity, *attribute_set.map { attribute(it) }].sort_by(&:name)
-    response_direction
     input_echo
     body = body_example
     values = example(body)
@@ -174,8 +175,6 @@ class TerraformGenerator::Derive
   end
 
   def attribute(a)
-    echo_agreement(a)
-    immutable_readonly(a)
     flags = FLAGS.to_h { [it, send(it, a)] }
     name, type, from, of = typed(a.name, a.name, canonical(a), input?(a), attribute_set.map(&:name))
     checks, checked = checks(a)
@@ -304,7 +303,7 @@ class TerraformGenerator::Derive
   def nesting(name, kind, prop, input)
     at = ref_name(prop.schema) || prop.at
     required = prop.schema.fetch("required", [])
-    inner = properties(prop.schema, at).reject { |_, s| s["deprecated"] }
+    inner = prop.schema.fetch("properties", {}).reject { |_, s| s["deprecated"] }
     attrs = inner.map do |n, s|
       part = Prop.new(s, "#{at}.#{n}")
       a = input ? Source.new(n, nil, part, nil) : Source.new(n, nil, nil, part)
@@ -420,54 +419,23 @@ class TerraformGenerator::Derive
   # pending, and those in which it has failed.
   def lifecycle
     marked = @response.select { |_, prop| prop.schema.key?("x-lifecycle") }
-    lifecycle_enum(marked)
     marked.flat_map do |name, prop|
-      prop.schema["x-lifecycle"].slice("pending", "failed").map { |kind, values| LIFECYCLE[kind].new(name, values.sort, [[:lifecycle, prop.at]]) }
+      prop.schema["x-lifecycle"].map { |kind, values| LIFECYCLE[kind].new(name, values.sort, [[:lifecycle, prop.at]]) }
     end
   end
 
-  def lifecycle_enum(marked)
-    refuse @get["operationId"], "x-lifecycle marks #{marked.keys.join(" and ")}; mark one" if marked.size > 1
-    marked.each_value do |prop|
-      lifecycle = prop.schema["x-lifecycle"]
-      unless lifecycle.is_a?(Hash) && (lifecycle.keys - LIFECYCLE.keys).empty? && lifecycle.values.all? { it.is_a?(Array) && it.all?(String) }
-        refuse prop.at, "x-lifecycle needs an object whose pending and failed members list strings"
-      end
-      listed = lifecycle.values_at(*LIFECYCLE.keys).flatten.compact
-      next if prop.schema["readOnly"] && (listed - prop.schema.fetch("enum", [])).empty?
-      refuse prop.at, "x-lifecycle needs a readOnly property whose enum lists #{listed.join(", ")}"
-    end
-  end
-
-  def immutable_readonly(a)
-    [a.req, a.resp].compact.each { |prop| refuse prop.at, "x-immutable without readOnly; it marks outputs only" if prop.schema["x-immutable"] && !prop.schema["readOnly"] }
-  end
-
-  def response_direction
-    @response.each do |name, prop|
-      next if prop.schema["readOnly"] || @keys.key?(name) || @request.key?(name)
-      refuse prop.at, "neither readOnly nor accepted by an input; mark it readOnly, or accept it in the create or a verb"
-    end
+  # The API's norms hold for each operation of a defined type, with no
+  # known violations allowed.
+  def norms
+    ids = [@create, @get, @api.paths[@item.path]["delete"]].compact.map { it["operationId"] } + @verbs.select(&:verb).map(&:id)
+    violations = OpenapiNorms.new(@api.doc, only: ids).violations
+    refuse "definitions #{@name}", "breaks the API's norms:\n#{violations.join("\n")}" if violations.any?
   end
 
   def input_echo
     [@create_body, *@verbs.select(&:verb).map(&:body)].each do |body|
       body.each { |name, prop| refuse prop.at, "neither in the response nor writeOnly; mark it writeOnly or echo it" unless @response.key?(name) || prop.schema["writeOnly"] }
     end
-  end
-
-  # A request may be looser than the response that echoes it, and nullable
-  # may differ.
-  def echo_agreement(a)
-    return unless a.req && a.resp && !accepts?(a.req.schema, a.resp.schema)
-    refuse a.req.at, "accepts less than #{a.resp.at} returns; make the request accept every value the response allows"
-  end
-
-  def accepts?(req, resp)
-    return (req["anyOf"] || req["oneOf"]).any? { accepts?(it, resp) } if req["anyOf"] || req["oneOf"]
-    req["type"] == resp["type"] && [nil, resp["format"]].include?(req["format"]) &&
-      (!req["enum"] || resp["enum"]&.difference(req["enum"])&.empty?) &&
-      %w[items additionalProperties].all? { |k| !(req[k].is_a?(Hash) && resp[k].is_a?(Hash)) || accepts?(req[k], resp[k]) }
   end
 
   # An attribute's example comes from its request property, else its path
@@ -505,34 +473,25 @@ class TerraformGenerator::Derive
   # invariants, which hold for defined types only.
   def id_pattern(item) = content(success(@api.paths[item.path]["get"] || {}))&.dig("properties", "id", "pattern")
 
-  # The generated examples need a value for each path parameter, required
-  # attribute and id.
+  # The generated examples need a value for each required attribute and for
+  # the id. The norms miss three cases: a parent's id, which another type's
+  # GET returns; an identity whose examples have no entry named name; and an
+  # example that is null.
   def examples(values)
-    params = @item.params.map { param_prop(it) }.reject { it.schema.slice("example", "examples").compact.any? }
-    attrs = [id_source, *attribute_set.select { required(it) }].reject { values.key?(it.name) }.map { candidates(it).first }
-    missing = [*params, *attrs]
-    refuse missing.map(&:at).join(", "), "no example; add one to each" if missing.any?
+    missing = [id_source, *attribute_set.select { required(it) }].reject { values.key?(it.name) }
+    refuse missing.map { candidates(it).first.at }.join(", "), "no example; add one to each" if missing.any?
   end
 
   def response_props(op)
     name = response_name(op)
-    properties(content(success(op)) || {}, name).filter_map { |n, s| [n, Prop.new(s, "#{name}.#{n}")] unless s["deprecated"] }.to_h
+    (content(success(op)) || {}).fetch("properties", {}).filter_map { |n, s| [n, Prop.new(s, "#{name}.#{n}")] unless s["deprecated"] }.to_h
   end
 
   def response_name(op) = ref_name(success(op)) || op["operationId"]
 
   def body(op)
     id = op["operationId"]
-    properties(content(op["requestBody"]) || {}, id).filter_map { |n, s| [n, Prop.new(s, "#{id}.#{n}")] unless s["readOnly"] || s["deprecated"] }.to_h
-  end
-
-  def properties(schema, at)
-    typed_allof(schema, at)
-    schema.fetch("properties", {})
-  end
-
-  def typed_allof(schema, at)
-    refuse at, "an allOf member lacks type: object; add it" if schema.fetch("allOf", []).any? { it["type"] != "object" }
+    (content(op["requestBody"]) || {}).fetch("properties", {}).filter_map { |n, s| [n, Prop.new(s, "#{id}.#{n}")] unless s["readOnly"] || s["deprecated"] }.to_h
   end
 
   def param_prop(param) = Prop.new(param.fetch("schema", {}).merge(param.slice("description", "example", "examples")), "{#{param["name"]}}")

@@ -17,7 +17,8 @@ class TerraformGenerator::Api
   # Time, and x-deprecated gives its dates unquoted, which YAML reads as Date.
   def self.load = new(YAML.load_file(TerraformGenerator::SPEC, permitted_classes: [Time, Date]))
 
-  attr_reader :paths, :scope, :items
+  # doc is the document as loaded, which the norms read.
+  attr_reader :doc, :paths, :scope, :items
 
   def initialize(doc)
     @doc = doc

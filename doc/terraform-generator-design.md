@@ -604,6 +604,12 @@ whole document against a list of known violations that may only shrink
 (`doc/api-versions-design.md` §5). Rule `norms` runs the same file over a defined type's operations
 with no known violations allowed, so a generated type keeps every norm.
 
+Derivation keeps the parts of `examples` and `described` that the norms do not cover. It refuses a
+required attribute or the id when it finds no example value for it; the norms let that through for
+a parent's id, which another type's GET returns, for an identity whose `examples` has no entry
+named `name`, and for an `example` that is null. It also refuses an attribute without a
+description, which the norms let through for a nested object's properties.
+
 `input_echo` is not the norm `echo`. The norm says that an operation answers with what it was
 sent; the invariant says that the object read back holds it, which is what drift detection needs.
 A config verb that answers with `PostgresConfig` keeps the norm and still needs C20 to keep the
@@ -903,8 +909,9 @@ whose pattern is another type's `id` pattern, refer to that type's example
 (`private_subnet_id = ubicloud_private_subnet.example.id`), whose block the same file includes.
 `import.sh` shows the derived import id built from the `id` examples, and a datasource's example
 looks the object up by `name` where it can, else by `id`. The norm `examples`, which rule `norms`
-applies to every defined type, makes a missing value a `SpecError`. Because the harness applies
-every example (§8.2), a value the API refuses fails CI on the day it lands.
+applies to every defined type, makes a missing value a `SpecError`, and so does derivation where the
+norm does not reach (§4.7). Because the harness applies every example (§8.2), a value the API
+refuses fails CI on the day it lands.
 
 ```hcl
 # rake terraform:generate; rake terraform:diff; sha256:637f820451f74f9d
