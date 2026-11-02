@@ -1907,18 +1907,42 @@ paths:
                 name:
                   description: Name for the Log Destination
                   type: string
+                  example: graylog
                 type:
                   description: Destination type. "otlp" sends via OTLP HTTP (https://...); "syslog" sends via RFC 5424 over TLS (tcp://host:port)
                   type: string
+                  example: syslog
                   enum:
                     - otlp
                     - syslog
                 url:
                   description: 'Endpoint URL. For otlp: https://... For syslog: tcp://host:port'
                   type: string
+                  example: tcp://logs.example.com:6514
                 options:
-                  description: 'Authentication options. For otlp: {"headers": {"Header-Name": "value"}}. For syslog: {"structured_data": {"sd-id": {"key": "value"}}}'
+                  description: Authentication options, which are never returned. An otlp destination takes only headers, and a syslog destination only structured_data.
                   type: object
+                  format: password
+                  additionalProperties: false
+                  properties:
+                    headers:
+                      description: HTTP headers to send with each OTLP request, as a map from name to value
+                      type: object
+                      example:
+                        api-key: my-license-key
+                      additionalProperties:
+                        type: string
+                    structured_data:
+                      description: RFC 5424 structured data to send with each message, as a map from each SD-ID to its parameters
+                      type: object
+                      example:
+                        token@41058:
+                          tag: my-token
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          type: string
+                  writeOnly: true
               additionalProperties: false
               required:
                 - name
@@ -2057,16 +2081,45 @@ paths:
               type: object
               properties:
                 options:
-                  description: 'Additional Prometheus remote_write authentication, as {"authorization": {"type": "Bearer", "credentials": "token"}} and/or {"headers": {"Header-Name": "value"}}'
+                  description: Additional Prometheus remote_write authentication, which is never returned. Without username and password, it must give authorization or at least one header.
                   type: object
+                  format: password
+                  additionalProperties: false
                   nullable: true
+                  properties:
+                    authorization:
+                      description: Scheme and credentials for the Authorization header. It cannot be combined with username and password.
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        type:
+                          description: Authentication scheme, which is Bearer when omitted and cannot be Basic
+                          type: string
+                          minLength: 1
+                        credentials:
+                          description: Credentials sent after the scheme, such as a bearer token
+                          type: string
+                          minLength: 1
+                      required:
+                        - credentials
+                    headers:
+                      description: HTTP headers to send with each remote_write request, as a map from name to value. Authorization and the other headers that Prometheus reserves cannot be set.
+                      type: object
+                      example:
+                        X-Scope-OrgID: tenant1
+                      additionalProperties:
+                        type: string
+                  writeOnly: true
                 password:
-                  description: Password for basic auth, required with username
+                  description: Password for basic auth. It is required with username, and never returned.
                   type: string
+                  format: password
                   nullable: true
+                  writeOnly: true
                 url:
                   description: URL for the Metric Destination
                   type: string
+                  example: https://prometheus.example.com/api/v1/write
                 username:
                   description: Username for basic auth, required with password
                   type: string
@@ -4564,7 +4617,7 @@ components:
         id:
           description: ID of the metric destination
           type: string
-          example: md7ekmf54nae5nya9s6vebg43f
+          example: et7ekmf54nae5nya9s6vebg43f
           pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
           readOnly: true
         auth_methods:

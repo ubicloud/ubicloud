@@ -344,20 +344,6 @@ module Validation
     allowed_key = (type == "otlp") ? "headers" : "structured_data"
     extra = options.keys - [allowed_key]
     fail ValidationFailed.new({options: "options may only contain '#{allowed_key}' for #{type}"}) if extra.any?
-
-    if type == "otlp"
-      headers = options["headers"]
-      if headers
-        fail ValidationFailed.new({options: "options.headers must be a flat object with string values"}) unless
-          headers.is_a?(Hash) && headers.values.all?(String)
-      end
-    else
-      sd = options["structured_data"]
-      if sd
-        fail ValidationFailed.new({options: "options.structured_data must be an object mapping SD-IDs to key/value objects"}) unless
-          sd.is_a?(Hash) && sd.values.all? { it.is_a?(Hash) && it.values.all?(String) }
-      end
-    end
   end
 
   # Headers a remote_write client may not set, from reservedHeaders and
@@ -372,26 +358,15 @@ module Validation
     fail ValidationFailed.new({username: "must be set together with password"}) if username.nil? != password.nil?
 
     if options
-      extra = options.keys - %w[authorization headers]
-      fail ValidationFailed.new({options: "options may only contain 'authorization' and 'headers'"}) if extra.any?
-
-      if options.key?("authorization")
-        authorization = options["authorization"]
-        fail ValidationFailed.new({options: "options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'"}) unless
-          authorization.is_a?(Hash) && (authorization.keys - %w[type credentials]).empty? &&
-            authorization["credentials"].is_a?(String) && !authorization["credentials"].empty?
-
+      if (authorization = options["authorization"])
         # Prometheus trims the type and defaults it to Bearer when empty.
-        type = authorization.fetch("type", "Bearer")
-        fail ValidationFailed.new({options: "options.authorization.type must be a non-empty string"}) unless type.is_a?(String) && !type.strip.empty?
-        fail ValidationFailed.new({options: "options.authorization.type cannot be basic, set username and password instead"}) if type.strip.casecmp?("basic")
+        type = authorization.fetch("type", "Bearer").strip
+        fail ValidationFailed.new({options: "options.authorization.type must be a non-empty string"}) if type.empty?
+        fail ValidationFailed.new({options: "options.authorization.type cannot be basic, set username and password instead"}) if type.casecmp?("basic")
         fail ValidationFailed.new({options: "options.authorization cannot be combined with username and password"}) if username
       end
 
-      if options.key?("headers")
-        headers = options["headers"]
-        fail ValidationFailed.new({options: "options.headers must be a flat object with string values"}) unless
-          headers.is_a?(Hash) && headers.values.all?(String)
+      if (headers = options["headers"])
         reserved = headers.keys.select { PROMETHEUS_RESERVED_HEADERS.include?(it.downcase) }
         fail ValidationFailed.new({options: "options.headers cannot set #{reserved.join(", ")}"}) if reserved.any?
       end

@@ -85,8 +85,6 @@ echo: PrivateLinkServiceCreate.target_ports: echo it in the response, or mark it
 echo: createKubernetesCluster.cp_nodes: echo it in the response, or mark it writeOnly
 echo: createKubernetesCluster.worker_nodes: echo it in the response, or mark it writeOnly
 echo: createKubernetesCluster.worker_size: echo it in the response, or mark it writeOnly
-echo: createLocationPostgresLogDestination.options: echo it in the response, or mark it writeOnly
-echo: createLocationPostgresMetricDestination.options: echo it in the response, or mark it writeOnly
 echo: createLocationPostgresMetricDestination.url: echo it in the response, or mark it writeOnly
 echo: createMachineImage.destroy_source: echo it in the response, or mark it writeOnly
 echo: createMachineImage.version: echo it in the response, or mark it writeOnly
@@ -111,10 +109,6 @@ examples: createKubernetesNodepool.name: give it an example
 examples: createKubernetesNodepool.node_count: give it an example
 examples: createKubernetesNodepool.node_size: give it an example
 examples: createLocationPostgresFirewallRule.cidr: give it an example
-examples: createLocationPostgresLogDestination.name: give it an example
-examples: createLocationPostgresLogDestination.type: give it an example
-examples: createLocationPostgresLogDestination.url: give it an example
-examples: createLocationPostgresMetricDestination.url: give it an example
 examples: createMachineImage.vm: give it an example
 examples: createMachineImageVersion.vm: give it an example
 examples: createPrivateLocation.access_key: give it an example
