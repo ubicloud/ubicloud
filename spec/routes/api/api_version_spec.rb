@@ -126,6 +126,41 @@ RSpec.describe Clover, "api version" do
     end
   end
 
+  describe "a renamed input" do
+    def create_vm(accept, name: "vm", **body)
+      header "Accept", accept
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/#{name}", {public_key: "ssh key", **body}.to_json
+    end
+
+    it "reaches the route under its new name in version 1, with the warning" do
+      create_vm("application/json", enable_ip4: true)
+      expect(last_response.status).to eq(200)
+      expect(Vm.first.ip4_enabled).to be true
+      expect(last_response["deprecation"]).to eq("@#{Time.utc(2026, 11, 2).to_i}")
+      expect(last_response["warning"]).to eq('299 - "enable_ip4 is deprecated: use ip4_enabled instead"')
+    end
+
+    it "is refused together with its new name" do
+      create_vm("application/json", enable_ip4: true, ip4_enabled: false)
+      expect(last_response).to have_api_error(400, "enable_ip4 and ip4_enabled name one value; send only ip4_enabled", {"enable_ip4" => "send only ip4_enabled"})
+      expect(Vm.count).to eq(0)
+    end
+
+    it "is refused in version 2, naming the new name" do
+      create_vm(v2, enable_ip4: true)
+      expect(last_response).to have_api_error(400, "enable_ip4 was removed in API version 2: use ip4_enabled instead")
+    end
+
+    it "is not needed: the new name works in both versions" do
+      ["application/json", v2].each_with_index do |accept, i|
+        create_vm(accept, name: "vm-#{i}", ip4_enabled: true)
+        expect(last_response.status).to eq(200)
+        expect(last_response["deprecation"]).to be_nil
+        expect(Vm.first(name: "vm-#{i}").ip4_enabled).to be true
+      end
+    end
+  end
+
   describe "a deprecated operation" do
     let(:pg) do
       Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject

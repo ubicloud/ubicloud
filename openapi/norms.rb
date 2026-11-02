@@ -76,13 +76,15 @@ class OpenapiNorms
     end
   end
 
-  # An operation's use names other operations, and a property's use names its siblings.
+  # An operation's use names other operations, and a property's use names its siblings. Only a
+  # request property may be renamed, to a sibling that is not deprecated and has the same type.
   def norm_deprecation
     ids = @operations.map(&:id)
     @operations.filter_map { deprecation(it.op, it.id, ids - [it.id]) } +
       @operations.flat_map do |o|
         o.request.filter_map do |name, (s, at)|
-          deprecation(s, at, o.request.keys - [name], required: o.required.include?(name))
+          siblings = o.request.except(name).transform_values(&:first)
+          deprecation(s, at, siblings.keys, siblings:, required: o.required.include?(name))
         end
       end +
       answers.flat_map do |o|
@@ -90,7 +92,7 @@ class OpenapiNorms
       end
   end
 
-  def deprecation(node, at, names, required: false, response: false)
+  def deprecation(node, at, names, siblings: {}, required: false, response: false)
     return unless node["deprecated"] || node["x-deprecated"]
     x = node["x-deprecated"]
     return "deprecation: #{at}: give it both deprecated: true and x-deprecated" unless node["deprecated"] && x.is_a?(Hash)
@@ -101,9 +103,15 @@ class OpenapiNorms
       ("make use a list of names that exist" unless use.is_a?(Array) && (use - names).empty?),
       ("give x-deprecated removed-in, an API version above 1" if !response && !(version.is_a?(Integer) && version > 1)),
       ("drop removed-in, since responses are the same in every version" if response && x.key?("removed-in")),
+      ("make renamed-to name a sibling request property of the same type" unless renamed?(x["renamed-to"], node, siblings)),
       ("take it out of required, since a client may send its replacement instead" if required),
     ].compact
     "deprecation: #{at}: #{problems.join("; ")}" if problems.any?
+  end
+
+  def renamed?(name, node, siblings)
+    return true unless name
+    (to = siblings[name]) && !to["deprecated"] && resolve(to)["type"] == resolve(node)["type"]
   end
 
   def operation(op, parameters)

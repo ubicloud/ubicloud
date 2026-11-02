@@ -14,7 +14,7 @@ module ContentGenerator
       private_subnet[:display_name]
     end
 
-    def self.enable_ip4(location, value)
+    def self.ip4_enabled(location, value)
       unit_price = BillingRate.unit_price_from_resource_properties("IPAddress", "IPv4", location.name)
 
       "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"

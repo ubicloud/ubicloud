@@ -138,7 +138,6 @@ direction: RunCommand.timestamp: mark it readOnly, or accept it in a request
 direction: SshPublicKey.id: mark it readOnly, or accept it in a request
 direction: Vm.id: mark it readOnly, or accept it in a request
 direction: Vm.ip4: mark it readOnly, or accept it in a request
-direction: Vm.ip4_enabled: mark it readOnly, or accept it in a request
 direction: Vm.ip6: mark it readOnly, or accept it in a request
 direction: Vm.location: mark it readOnly, or accept it in a request
 direction: Vm.state: mark it readOnly, or accept it in a request
@@ -198,10 +197,8 @@ echo: createPrivateLocation.access_key: echo it in the response, or mark it writ
 echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
 echo: createPrivateSubnet.firewall_id: echo it in the response, or mark it writeOnly
-echo: createVM.enable_ip4: echo it in the response, or mark it writeOnly
 echo: createVM.init_script: echo it in the response, or mark it writeOnly
 echo: createVM.public_key: echo it in the response, or mark it writeOnly
-echo: createVM.storage_size: echo it in the response, or mark it writeOnly
 echo: detachVmLocationLoadBalancer.vm_id: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.size: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly

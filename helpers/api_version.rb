@@ -6,10 +6,12 @@ class Clover < Roda
   API_VERSIONS = (1..OPENAPI.raw_schema.dig("info", "x-api-version")).to_a.freeze
 
   # A deprecated operation (name is nil) or request body property, as
-  # described by its x-deprecated mark in the spec.
-  Deprecation = Data.define(:operation, :name, :use, :since, :removed_in) do
+  # described by its x-deprecated mark in the spec. rename is the new name of
+  # a property that was simply renamed.
+  Deprecation = Data.define(:operation, :name, :rename, :use, :since, :removed_in) do
     def self.from(operation, name, x)
-      new(operation, name, x.fetch("use", []).freeze, x.fetch("since"), x.fetch("removed-in"))
+      rename = x["renamed-to"]
+      new(operation, name, rename, (rename ? [rename] : x.fetch("use", [])).freeze, x.fetch("since"), x.fetch("removed-in"))
     end
 
     def used?(body) = !name || body.key?(name)
@@ -49,6 +51,8 @@ class Clover < Roda
 
   # Committee accepts every deprecated name, since the spec still lists them
   # all. Refuse those that the request's version removed, and warn of the rest.
+  # Pass a renamed property's value on under its new name, since routes read
+  # only that name.
   def check_deprecations(operation)
     return unless (deprecations = DEPRECATIONS[operation.request_operation.operation_object.operation_id])
     return if (used = deprecations.select { it.used?(request.POST) }).empty?
@@ -56,6 +60,7 @@ class Clover < Roda
     refuse_removed(used)
     @deprecations_used = used
     brownout(used, operation.path_params["project_id"])
+    used.select(&:rename).each { rename_input(request.POST, it) }
   end
 
   def refuse_removed(used)
@@ -79,6 +84,13 @@ class Clover < Roda
     message = "#{used.map { deprecation_message(it) }.join("; ")}. Requests that use a deprecated name will stop working; " \
       "to warn of that, #{format("%g", share * 100)}% of them are refused now, including this one."
     fail CloverError.new(400, "Deprecated", message, used.select(&:name).to_h { [it.name, deprecation_message(it)] })
+  end
+
+  def rename_input(body, d)
+    if body.key?(d.rename)
+      fail CloverError.new(400, "InvalidRequest", "#{d.name} and #{d.rename} name one value; send only #{d.rename}", {d.name => "send only #{d.rename}"})
+    end
+    body[d.rename] = body.delete(d.name)
   end
 
   # Called from the after hook, because the error handler resets the response

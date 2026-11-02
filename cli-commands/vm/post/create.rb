@@ -31,7 +31,7 @@ class UbiCli
     run do |public_key, opts, command|
       params = underscore_keys(opts[:vm_create])
       unless params.delete(:ipv6_only)
-        params[:enable_ip4] = "1"
+        params[:ip4_enabled] = "1"
       end
       if params[:private_subnet_id]
         params[:private_subnet_id] = convert_name_to_id(sdk.private_subnet, params[:private_subnet_id])
