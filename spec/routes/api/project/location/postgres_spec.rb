@@ -1033,18 +1033,26 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
+        pg.update(maintenance_window_start_at: 12)
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: 25,
+          maintenance_window_start_at: nil,
         }.to_json
 
-        expect(last_response.status).to eq(400)
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to be_nil
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: -2,
-        }.to_json
+        expect do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+            maintenance_window_start_at: 24,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at 24 is more than maximum value/)
 
-        expect(last_response.status).to eq(400)
+        expect do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+            maintenance_window_start_at: -1,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at -1 is less than minimum value/)
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
 
@@ -1086,6 +1094,17 @@ RSpec.describe Clover, "postgres" do
             maintenance_window_days: ["funday"],
           }.to_json
         }.to raise_error(Committee::InvalidRequest, /isn't part of the enum/)
+      end
+
+      it "accepts empty maintenance window days without the feature enabled" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+          maintenance_window_days: [],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("maintenance_window_start_at", "maintenance_window_days")).to eq("maintenance_window_start_at" => 9, "maintenance_window_days" => [])
+        expect(pg.reload.maintenance_window_start_at).to eq(9)
       end
 
       it "returns an error when maintenance window days are set without the feature enabled" do

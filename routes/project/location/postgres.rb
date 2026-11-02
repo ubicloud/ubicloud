@@ -580,7 +580,7 @@ class Clover
         maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
         if @project.get_ff_postgres_enable_maintenance_window_days
           update_params[:maintenance_window_days_bitmask] = PostgresResource.maintenance_window_days_mask(maintenance_window_days)
-        elsif maintenance_window_days
+        elsif maintenance_window_days&.any?
           raise CloverError.new(400, "InvalidRequest", "Maintenance window days are not enabled for this project.")
         end
 

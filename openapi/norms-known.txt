@@ -23,8 +23,6 @@ described: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: describe it
 described: responses/PostgresDatabaseUpgradeStatus.upgrade_status: describe it
 described: restorePostgresDatabase.pg_config: describe it
 described: restorePostgresDatabase.pgbouncer_config: describe it
-described: setMaintenanceWindow.maintenance_window_days: describe it
-described: setMaintenanceWindow.maintenance_window_start_at: describe it
 described: updateLocationPrivateLinkService.aws: describe it
 direction: CertAuthUserList.items: mark it readOnly, or accept it in a request
 direction: GithubCacheEntry.created_at: mark it readOnly, or accept it in a request

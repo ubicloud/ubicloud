@@ -2377,8 +2377,14 @@ paths:
               type: object
               properties:
                 maintenance_window_start_at:
+                  description: Hour of the day, in UTC, at which the maintenance window starts. A null or omitted value unsets the window and clears its days.
                   type: integer
+                  example: 3
+                  maximum: 23
+                  minimum: 0
+                  nullable: true
                 maintenance_window_days:
+                  description: Days of the week the maintenance window applies to. An empty or omitted list means every day. Only projects with maintenance window days enabled may name days.
                   type: array
                   items:
                     $ref: '#/components/schemas/MaintenanceWindowDay'
@@ -4152,8 +4158,10 @@ components:
           type: string
           nullable: true
         maintenance_window_start_at:
-          description: Maintenance window start time
+          description: Hour of the day, in UTC, at which the maintenance window starts; null if no window is set
           type: integer
+          maximum: 23
+          minimum: 0
           nullable: true
         maintenance_window_days:
           description: Days of the week the maintenance window applies to (empty list means every day)
