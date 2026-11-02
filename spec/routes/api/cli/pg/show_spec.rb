@@ -46,9 +46,7 @@ RSpec.describe Clover, "cli pg show" do
       tags:
       firewall-rules:
         1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
-        2: #{rules[1].ubid}  0.0.0.0/0  6432  
-        3: #{rules[2].ubid}  ::/0  5432  
-        4: #{rules[3].ubid}  ::/0  6432  
+        2: #{rules[1].ubid}  ::/0  5432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  basic_auth  md-user  https://md.example.com
       log-destinations:
@@ -82,9 +80,7 @@ RSpec.describe Clover, "cli pg show" do
       tags:
       firewall-rules:
         1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
-        2: #{rules[1].ubid}  0.0.0.0/0  6432  
-        3: #{rules[2].ubid}  ::/0  5432  
-        4: #{rules[3].ubid}  ::/0  6432  
+        2: #{rules[1].ubid}  ::/0  5432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  basic_auth  md-user  https://md.example.com
       log-destinations:
