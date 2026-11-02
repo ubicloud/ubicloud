@@ -574,11 +574,11 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to be_nil
         expect(vm.reload.maintenance_window_start_at).to be_nil
 
-        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
-          maintenance_window_start_at: 25,
-        }.to_json
-
-        expect(last_response.status).to eq(400)
+        expect do
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+            maintenance_window_start_at: 24,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at 24 is more than maximum value/)
         expect(vm.reload.maintenance_window_start_at).to be_nil
 
         expect do

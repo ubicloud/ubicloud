@@ -66,8 +66,11 @@ parameter or nested property is neither warned of nor refused.
 ### `x-immutable`
 
 `x-immutable: true` marks a `readOnly` response property whose value never changes once the server
-has returned it, such as an inference API key's `key`. A client may keep the first value it reads;
-the terraform provider keeps it in plans, rather than showing it as unknown after each update.
+has returned it, such as an inference API key's `key`. A value returned while the response's
+`x-lifecycle` property holds a pending value need not be final: a VM's `ip4` is null until the VM
+is placed on a host, and fixed from then on. A client may keep the first value it reads once the
+object is no longer pending; the terraform provider keeps it in plans, rather than showing it as
+unknown after each update.
 
 ### `x-lifecycle`
 
@@ -89,7 +92,7 @@ state:
 | Key | Meaning |
 |---|---|
 | `pending` | values in which the server is still creating or changing the object |
-| `failed` | values in which the object has failed and will not become ready |
+| `failed` | values in which the object has failed, or is not expected to become ready |
 
 Either key may be left out, and at most one property of a response may carry `x-lifecycle`. After a
 create or an update, a client reads the object again while the property holds a pending value, and

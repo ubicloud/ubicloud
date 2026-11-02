@@ -140,6 +140,11 @@ class Vm < Sequel::Model
     run_commands_dataset.first(command: "fetch_serial_log")
   end
 
+  # The values that display_state can return. The enum of Vm.state in
+  # openapi.yml must list the same ones.
+  DISPLAY_STATES = ["creating", "running", "rebooting", "starting", "deleting", "stopped by admin",
+    "restarting", "stopping", "stopped", "unavailable", "waiting for capacity", "no capacity available"].freeze
+
   def display_state
     label = strand&.label
     return "deleting" if destroying_set? || destroy_set?
