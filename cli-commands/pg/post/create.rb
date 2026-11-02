@@ -22,7 +22,7 @@ class UbiCli
     help_option_values("Version:", Option::POSTGRES_VERSION_OPTIONS)
 
     run do |opts, cmd|
-      params = underscore_keys(opts[:pg_create])
+      params = underscore_keys(opts[:pg_create]).transform_keys!(version: :target_version)
       params.delete(:flavor)
       pg_tags_to_hash(params, cmd)
       params_to_hash(params, :pg_config, "config", cmd)

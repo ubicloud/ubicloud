@@ -9,7 +9,10 @@ class Clover
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
-    version = typecast_params.nonempty_str("version", PostgresResource.default_version)
+    # The web form still sends version: its fields take the names of the
+    # option tree's levels, and renaming that level would change the
+    # capabilities response.
+    version = typecast_params.nonempty_str(api? ? "target_version" : "version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])

@@ -142,6 +142,39 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
+      it "creates the database at target_version, in both API versions" do
+        ["application/json", "application/vnd.ubicloud+json; version=2"].each_with_index do |accept, i|
+          header "Accept", accept
+          post "/project/#{project.ubid}/location/eu-central-h1/postgres/pg-#{i}", {size: "standard-2", storage_size: 64, target_version: "17"}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(last_response["deprecation"]).to be_nil
+          expect(JSON.parse(last_response.body)["target_version"]).to eq("17")
+        end
+      end
+
+      it "takes the deprecated version as target_version in API version 1, with a warning" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "version is deprecated: use target_version instead"')
+        expect(JSON.parse(last_response.body)["target_version"]).to eq("17")
+      end
+
+      it "refuses version together with target_version" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17", target_version: "16"}.to_json
+
+        expect(last_response).to have_api_error(400, "version and target_version name one value; send only target_version", {"version" => "send only target_version"})
+        expect(PostgresResource.count).to eq(0)
+      end
+
+      it "refuses version in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17"}.to_json
+
+        expect(last_response).to have_api_error(400, "version was removed in API version 2: use target_version instead")
+      end
+
       it "names the colliding columns when the name is taken" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-2",
@@ -1869,6 +1902,31 @@ RSpec.describe Clover, "postgres" do
         expect(response["current_version"]).to eq(pg.version)
         expect(response["target_version"]).to eq(pg.reload.target_version)
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "upgrades to target_version when it is the next version, and does nothing when resent" do
+        2.times do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "17"}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)).to include("current_version" => "16", "target_version" => "17", "upgrade_status" => "running")
+        end
+        expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+      end
+
+      it "does nothing when target_version is the current version" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "16"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("target_version" => "16", "upgrade_status" => "not_running")
+        expect(pg.reload.target_version).to eq("16")
+      end
+
+      it "refuses a target_version that skips a version" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "18"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: target_version", {"target_version" => "Database can only be upgraded to the next version, 17"})
+        expect(pg.reload.target_version).to eq("16")
       end
 
       it "logs the upgrade request" do
