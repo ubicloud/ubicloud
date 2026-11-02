@@ -285,6 +285,7 @@ class Clover < Roda
       type = e.type
       message = e.message
       details = e.details
+      response.headers["retry-after"] = e.retry_after.to_s if e.retry_after
     when Committee::BadRequest, Committee::InvalidRequest
       code = 400
       type = "BadRequest"
