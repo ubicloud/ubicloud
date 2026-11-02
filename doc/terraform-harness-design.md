@@ -223,11 +223,15 @@ begins:
 
 ```ruby
 def settle_postgres_resource(pg)
-  return pg.destroy if pg.destroy_set?
+  if pg.destroy_set?
+    pg.servers.each(&:destroy)
+    return pg.destroy
+  end
 
   pg.strand.update(label: "wait")
-  Semaphore.where(strand_id: pg.id, name: "initial_provisioning").destroy
-  # and puts each server at the target version, size and storage
+  pg.decr_initial_provisioning
+  # then adds or removes standbys to match ha_type, and puts each server at
+  # the target version, size and storage
 ```
 
 The hook runs before the response gate and before the answer leaves, so the provider's first read
@@ -701,5 +705,5 @@ three hand-written types.
    still, which can differ from production.
 7. **A broken deadline shows as a hang** rather than a failure, since no example tests it; the
    workflow's timeout ends the run.
-8. **Not all shown yet.** These parts have not run: the hook for kubernetes, and destroying
-   databases in their hooks. The commit that builds each part will show that it works.
+8. **Not all shown yet.** The hook for kubernetes has not run. The commit that builds it will show
+   that it works.

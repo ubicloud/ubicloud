@@ -9,6 +9,7 @@ module TerraformGenerator::Definitions
     firewall_rule: {},
     inference_api_key: {},
     load_balancer: {},
+    postgres: {order: %i[upgrade]},
     private_subnet: {},
     project: {},
     ssh_public_key: {},

@@ -10,6 +10,7 @@ RSpec.describe TerraformGenerator, ".special_cases" do
   # A commit that adds a special case must change this pin, so that review
   # sees it by name.
   it "pins the special cases of the definitions" do
-    expect(described_class.special_cases).to eq("item_post_verb" => %i[ssh_public_key], "union_collapse" => %i[firewall_rule])
+    expect(described_class.special_cases).to eq("definitions order" => %i[postgres], "item_post_verb" => %i[ssh_public_key],
+      "merge_subroute" => %i[postgres], "name_carrier" => %i[postgres], "union_collapse" => %i[firewall_rule])
   end
 end
