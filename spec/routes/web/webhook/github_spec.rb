@@ -288,6 +288,15 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
     end
 
+    it "stores the conclusion when the requested workflow run requires approval" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(status: "completed", conclusion: "action_required")))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777)
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("action_required")
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
     it "uses the head_commit id for commit_hash when head_sha is null" do
       send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(head_sha: nil, head_commit: {id: "a" * 40, message: "cm"})))
       expect(page.status_code).to eq(200)
@@ -345,7 +354,53 @@ RSpec.describe Clover, "github" do
       send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(run_id: workflow_run.run_id, conclusion: "success")))
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}.to_json)
-      expect(SemSnap.new(workflow_run.id).set?("destroy")).to be true
+      expect(workflow_run.destroy_set?).to be true
+    end
+
+    it "keeps the workflow run and does not schedule destruction when the received action is 'completed' with an action_required conclusion" do
+      Strand.create_with_id(workflow_run, prog: "Github::GithubActiveWorkflowRunNexus", label: "start")
+      expect { send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(status: "completed", conclusion: "action_required"))) }
+        .not_to change { GithubActiveWorkflowRun.count }
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] awaiting approval"}.to_json)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("action_required")
+      expect(workflow_run.completed_at).to be_nil
+      expect(workflow_run.destroy_set?).to be false
+    end
+
+    it "handles a workflow run that requires approval through requested, completed, in_progress, and completed actions" do
+      awaiting_approval = workflow_run_object(status: "completed", conclusion: "action_required")
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: awaiting_approval))
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("action_required")
+
+      send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: awaiting_approval))
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] awaiting approval"}.to_json)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("action_required")
+      expect(workflow_run.completed_at).to be_nil
+      expect(workflow_run.destroy_set?).to be false
+
+      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(status: "in_progress")))
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}.to_json)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("in_progress")
+      expect(workflow_run.conclusion).to be_nil
+      expect(workflow_run.destroy_set?).to be false
+
+      send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(status: "completed", conclusion: "success")))
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}.to_json)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("success")
+      expect(workflow_run.completed_at).not_to be_nil
+      expect(workflow_run.destroy_set?).to be true
+      expect(GithubActiveWorkflowRun.count).to eq(1)
     end
 
     it "returns error if workflow run does not exist when the received action is 'completed'" do
@@ -362,8 +417,50 @@ RSpec.describe Clover, "github" do
       expect(workflow_run.reload.status).to eq("in_progress")
     end
 
-    it "returns error if workflow run does not exist for known actions" do
-      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(run_id: 999)))
+    it "clears the action_required conclusion when an approved workflow run is in progress" do
+      workflow_run.update(status: "completed", conclusion: "action_required")
+      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(run_id: workflow_run.run_id, status: "in_progress")))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}.to_json)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("in_progress")
+      expect(workflow_run.conclusion).to be_nil
+    end
+
+    it "does not update status for in_progress action if the workflow run already has a final conclusion" do
+      workflow_run.update(status: "completed", conclusion: "success")
+      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(run_id: workflow_run.run_id, status: "in_progress")))
+      expect(page.status_code).to eq(200)
+      workflow_run.reload
+      expect(workflow_run.status).to eq("completed")
+      expect(workflow_run.conclusion).to eq("success")
+    end
+
+    it "creates a workflow run when the received action is 'in_progress' and the workflow run does not exist" do
+      expect { send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(status: "in_progress"))) }
+        .to change { GithubActiveWorkflowRun.count }.by(1)
+        .and change { Strand.count }.by(2)
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1)
+      expect(workflow_run.status).to eq("in_progress")
+      expect(workflow_run.conclusion).to be_nil
+      expect(workflow_run.cache_scope).to eq("test-branch")
+      expect(workflow_run.create_date).to eq(Time.now.utc.to_date)
+      expect(Strand[workflow_run.id].label).to eq("start")
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "returns error if workflow run does not exist and the in_progress workflow_run data is incomplete" do
+      expect { send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(status: "in_progress").merge(run_started_at: nil))) }
+        .not_to change { GithubActiveWorkflowRun.count }
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Missing or incomplete workflow_run in the payload"}}.to_json)
+    end
+
+    it "does not create a workflow run when the received action is 'completed' and the workflow run does not exist" do
+      expect { send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(status: "completed", conclusion: "success"))) }
+        .to not_change { GithubActiveWorkflowRun.count }
+        .and not_change { GithubRepository.count }
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered workflow_run"}}.to_json)
     end

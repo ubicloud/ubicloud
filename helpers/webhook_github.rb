@@ -49,7 +49,15 @@ class Clover
       return {error: {message: "Missing or incomplete workflow_run in the payload"}}
     end
 
-    if action == "requested"
+    unless action == "requested"
+      unless (workflow_run = installation.active_workflow_runs_dataset.first(repository_name:, run_id:, run_attempt:))
+        if action == "completed"
+          return {error: {message: "Unregistered workflow_run"}}
+        end
+      end
+    end
+
+    if action == "requested" || (action == "in_progress" && workflow_run.nil?)
       head_branch = run["head_branch"]
       head_repository_full_name = run.dig("head_repository", "full_name")
       event = run["event"]
@@ -87,25 +95,28 @@ class Clover
         commit_message:,
         actor_login:,
         cache_scope: github_workflow_run_cache_scope(run),
+        conclusion: run["conclusion"],
       )
 
       return {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}
     end
 
-    unless (workflow_run = installation.active_workflow_runs_dataset.first(repository_name:, run_id:, run_attempt:))
-      return {error: {message: "Unregistered workflow_run"}}
-    end
-
     if action == "completed"
-      workflow_run.this.update(
-        status:,
-        completed_at: run["updated_at"],
-        conclusion: run["conclusion"],
-      )
-      workflow_run.incr_destroy
-      {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}
+      conclusion = run["conclusion"]
+      if conclusion == "action_required"
+        workflow_run.this.update(status:, conclusion:)
+        {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] awaiting approval"}
+      else
+        workflow_run.this.update(
+          status:,
+          completed_at: run["updated_at"],
+          conclusion:,
+        )
+        workflow_run.incr_destroy
+        {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}
+      end
     else # "in_progress"
-      workflow_run.this.where(conclusion: nil).update(status:)
+      workflow_run.this.where(Sequel[conclusion: nil] | {conclusion: "action_required"}).update(status:, conclusion: nil)
       {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}
     end
   end
