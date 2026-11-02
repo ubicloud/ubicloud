@@ -17,6 +17,7 @@ class Serializers::LoadBalancer < Serializers::Base
     }
 
     if options[:detailed]
+      base[:private_subnet_id] = lb.private_subnet.ubid
       base[:subnet] = lb.private_subnet.name
       base[:vms] = lb.vms.map { it.ubid } || []
     end

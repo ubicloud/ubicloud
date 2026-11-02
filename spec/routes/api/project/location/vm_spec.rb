@@ -450,6 +450,7 @@ RSpec.describe Clover, "vm" do
         body = JSON.parse(last_response.body)
         expect(body["name"]).to eq(vm.name)
         expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{vm.display_location}/firewall/default-#{vm.display_location}-default"])
+        expect(body["private_subnet_id"]).to eq(vm.user_nic.private_subnet.ubid)
         expect(body["subnet"]).to eq(vm.user_nic.private_subnet.name)
         expect(body["private_ipv4"]).to eq(vm.private_ipv4.to_s)
         expect(body["private_ipv6"]).to eq(vm.private_ipv6.to_s)
@@ -473,7 +474,7 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
-        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "subnet", "gpu")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "subnet" => nil, "gpu" => nil)
+        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "private_subnet_id" => nil, "subnet" => nil, "gpu" => nil)
       end
 
       it "checks the detailed part of the response against the schema" do
@@ -517,7 +518,7 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
         expect(body["name"]).to eq("new-name")
-        expect(body.keys).to include("firewalls", "private_ipv4", "private_ipv6", "subnet", "gpu")
+        expect(body.keys).to include("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu")
         expect(vm.reload.name).to eq("new-name")
       end
     end

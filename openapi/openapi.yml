@@ -5007,8 +5007,13 @@ components:
               - $ref: '#/components/schemas/LoadBalancer'
               - type: object
                 properties:
+                  private_subnet_id:
+                    description: ID of the Load Balancer's private subnet
+                    type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
                   subnet:
-                    description: Subnet of the Load Balancer
+                    description: Name of the Load Balancer's private subnet
                     type: string
                   vms:
                     description: IDs of the VMs attached to the Load Balancer
@@ -5020,6 +5025,7 @@ components:
                     uniqueItems: true
                 additionalProperties: false
                 required:
+                  - private_subnet_id
                   - subnet
                   - vms
     LoadBalancers:
@@ -5393,6 +5399,12 @@ components:
                     type: string
                     format: ipv6
                     nullable: true
+                  private_subnet_id:
+                    description: ID of the VM's private subnet
+                    type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    nullable: true
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
                   subnet:
                     description: Name of the VM's private subnet
                     type: string
@@ -5406,6 +5418,7 @@ components:
                   - gpu
                   - private_ipv4
                   - private_ipv6
+                  - private_subnet_id
                   - subnet
     Vms:
       description: A list of VMs
