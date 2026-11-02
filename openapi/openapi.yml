@@ -1843,6 +1843,16 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
+    get:
+      operationId: getLocationPostgresFirewallRule
+      summary: Get a PostgreSQL firewall rule
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
     patch:
       operationId: patchLocationPostgresFirewallRule
       summary: Update a PostgreSQL firewall rule
@@ -1933,6 +1943,16 @@ paths:
       responses:
         '204':
           $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Log Destination
+    get:
+      operationId: getLocationPostgresLogDestination
+      summary: Get a PostgreSQL log destination
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresLogDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2073,6 +2093,16 @@ paths:
       responses:
         '204':
           $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+    get:
+      operationId: getLocationPostgresMetricDestination
+      summary: Get a PostgreSQL metric destination
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresMetricDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -4489,9 +4519,11 @@ components:
           type: string
           example: frmjgkgbktw62k53005jpx8tt7
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         port:
           description: Port for the Postgres firewall rule
           type: integer
+          readOnly: true
       additionalProperties: false
       required:
         - cidr
@@ -4504,6 +4536,7 @@ components:
           type: string
           example: 1d000000000000000000000000
           pattern: ^1d[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the log destination
           type: string
@@ -4521,6 +4554,40 @@ components:
         - id
         - name
         - type
+        - url
+    PostgresMetricDestination:
+      type: object
+      properties:
+        id:
+          description: ID of the metric destination
+          type: string
+          example: md7ekmf54nae5nya9s6vebg43f
+          pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
+        auth_methods:
+          description: Kinds of Prometheus remote write authentication the destination uses
+          type: array
+          items:
+            type: string
+            enum:
+              - basic_auth
+              - authorization
+              - headers
+          readOnly: true
+        username:
+          description: Username for basic authentication
+          type: string
+          nullable: true
+          readOnly: true
+        url:
+          description: Prometheus remote write URL
+          type: string
+          readOnly: true
+      additionalProperties: false
+      required:
+        - id
+        - auth_methods
+        - username
         - url
     PostgresPrivateLinkServiceCreate:
       description: Neutral settings at the top level; everything provider-shaped under the provider's key, matching the response. The subnet is the database's.
@@ -5521,35 +5588,7 @@ components:
                     description: List of metric destinations
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          description: ID of the metric destination
-                          type: string
-                          example: md7ekmf54nae5nya9s6vebg43f
-                          pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
-                        auth_methods:
-                          description: Kinds of Prometheus remote write authentication the destination uses
-                          type: array
-                          items:
-                            type: string
-                            enum:
-                              - basic_auth
-                              - authorization
-                              - headers
-                        username:
-                          description: Username for basic authentication
-                          type: string
-                          nullable: true
-                        url:
-                          description: Prometheus remote write URL
-                          type: string
-                      additionalProperties: false
-                      required:
-                        - id
-                        - auth_methods
-                        - username
-                        - url
+                      $ref: '#/components/schemas/PostgresMetricDestination'
                     readOnly: true
                   log_destinations:
                     description: List of log destinations
@@ -5661,6 +5700,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/PostgresLogDestination'
+    PostgresMetricDestination:
+      description: A Postgres Metric Destination
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresMetricDestination'
     PostgresDatabaseLogs:
       description: Log entries for a Postgres Database
       content:
