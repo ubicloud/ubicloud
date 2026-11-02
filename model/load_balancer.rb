@@ -49,10 +49,14 @@ class LoadBalancer < Sequel::Model
   end
 
   def vm_ports_by_vm(vm)
+    vm_ports_by_vms([vm])
+  end
+
+  def vm_ports_by_vms(vms)
     # Use subquery instead of joins as this is the basis for a dataset that will be used in an UPDATE query
     LoadBalancerVmPort.where(
       load_balancer_port_id: ports_dataset.select(:id),
-      load_balancer_vm_id: vms_dataset.where(vm_id: vm.id).select(Sequel[:load_balancers_vms][:id]),
+      load_balancer_vm_id: vms_dataset.where(vm_id: vms.map(&:id)).select(Sequel[:load_balancers_vms][:id]),
     )
   end
 
@@ -63,17 +67,17 @@ class LoadBalancer < Sequel::Model
   def add_port(src_port, dst_port)
     DB.transaction do
       port = super(src_port:, dst_port:)
-      load_balancer_vms.each do |lb_vm|
-        add_port_with_stack(port, lb_vm.id)
-      end
+      add_vm_ports([port], load_balancer_vms.map(&:id))
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
-  def add_port_with_stack(port, lb_vm_id)
-    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv4") if ipv4_enabled?
-    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv6") if ipv6_enabled?
+  def add_vm_ports(ports, lb_vm_ids)
+    stacks = []
+    stacks << "ipv4" if ipv4_enabled?
+    stacks << "ipv6" if ipv6_enabled?
+    LoadBalancerVmPort.import([:load_balancer_port_id, :load_balancer_vm_id, :stack], ports.map(&:id).product(lb_vm_ids, stacks))
   end
 
   def remove_port(port)
@@ -86,62 +90,63 @@ class LoadBalancer < Sequel::Model
   end
 
   def add_vm(vm)
+    add_vms([vm])
+  end
+
+  def add_vms(vms)
     DB.transaction do
-      load_balancer_vm = LoadBalancerVm.create(load_balancer_id: id, vm_id: vm.id)
-      ports.each { |port|
-        add_port_with_stack(port, load_balancer_vm.id)
-      }
-      setup_cert_server(vm.id) if cert_enabled
+      lb_vm_ids = vms.map { LoadBalancerVm.generate_uuid }
+      LoadBalancerVm.import([:id, :load_balancer_id, :vm_id], lb_vm_ids.zip(vms).map { |lb_vm_id, vm| [lb_vm_id, id, vm.id] })
+      add_vm_ports(ports, lb_vm_ids)
+      create_cert_server_strands("setup_cert_server", vms) if cert_enabled
       incr_rewrite_dns_records
     end
   end
 
   def enable_cert_server
     update(cert_enabled: true)
-    DB.ignore_duplicate_queries do
-      vms.each { |vm| setup_cert_server(vm.id) }
-    end
+    create_cert_server_strands("setup_cert_server", vms)
   end
 
   def disable_cert_server
     update(cert_enabled: false)
-    DB.ignore_duplicate_queries do
-      vms.each { |vm| remove_cert_server(vm.id) }
-    end
+    create_cert_server_strands("remove_cert_server", vms)
     certs.each(&:incr_destroy)
   end
 
   def detach_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
-      remove_cert_server(vm.id) if cert_enabled
+      create_cert_server_strands("remove_cert_server", [vm]) if cert_enabled
       incr_update_load_balancer
     end
   end
 
   def evacuate_vm(vm)
+    evacuate_vms([vm])
+  end
+
+  def evacuate_vms(vms)
     DB.transaction do
-      vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
-      remove_cert_server(vm.id) if cert_enabled
+      vm_ports_by_vms(vms).where(state: ["up", "down"]).update(state: "evacuating")
+      create_cert_server_strands("remove_cert_server", vms) if cert_enabled
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
-  def remove_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
-  end
-
-  def setup_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
+  def create_cert_server_strands(label, vms)
+    Strand.import([:id, :prog, :label, :stack, :parent_id], vms.map { [Strand.generate_uuid, "Vnet::CertServer", label, Sequel.pg_jsonb([{subject_id: id, vm_id: it.id}]), id] })
   end
 
   def remove_vm(vm)
+    remove_vms([vm])
+  end
+
+  def remove_vms(vms)
     DB.transaction do
-      DB.ignore_duplicate_queries do
-        vm_ports_by_vm(vm).destroy
-      end
-      load_balancer_vms_dataset[vm_id: vm.id].destroy
+      vm_ports_by_vms(vms).destroy
+      load_balancer_vms_dataset.where(vm_id: vms.map(&:id)).destroy
       incr_rewrite_dns_records
     end
   end

@@ -43,7 +43,12 @@ class Clover
               fail Validation::ValidationFailed.new("vm_id" => "You cannot attach a VM to a load balancer with IPv4 enabled if the VM does not have IPv4 enabled") unless vm.ip4_enabled
             end
 
-            lb.add_vm(vm)
+            begin
+              lb.add_vm(vm)
+            rescue Sequel::UniqueConstraintViolation
+              # A concurrent request attached the VM after the check above.
+              fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
+            end
             audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
           else
@@ -103,20 +108,21 @@ class Clover
             fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
 
-          new_vms.each do |vm|
-            if (lb_id = vm.load_balancer&.id)
-              next if lb_id == lb.id
-
-              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
-            end
-            lb.add_vm(vm)
+          attached_vms, vms_to_attach = new_vms.partition(&:load_balancer)
+          if attached_vms.any? { it.load_balancer.id != lb.id }
+            fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+          end
+          begin
+            lb.add_vms(vms_to_attach) unless vms_to_attach.empty?
+          rescue Sequel::UniqueConstraintViolation => e
+            # A concurrent request attached the VM after the check above.
+            vm = vms_to_attach.find { e.message.include?(it.id) }
+            fail Validation::ValidationFailed.new("vms" => "VM #{vm.ubid} is already attached to a load balancer")
           end
 
-          lb.vms.each do |vm|
-            next if new_vms.any? { it.id == vm.id }
-
-            lb.evacuate_vm(vm)
-            lb.remove_vm(vm)
+          unless (removed_vms = lb.vms.reject { vm_ids.include?(it.id) }).empty?
+            lb.evacuate_vms(removed_vms)
+            lb.remove_vms(removed_vms)
           end
 
           lb.incr_update_load_balancer
