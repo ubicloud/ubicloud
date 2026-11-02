@@ -211,6 +211,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(args[:instance_resource].machine_type).to end_with("machineTypes/c4a-standard-8")
 
         expect(args[:instance_resource].tags).to be_nil
+        expect(args[:instance_resource].params).to be_nil
         expect(args[:instance_resource].labels.to_h).to eq("ubicloud" => "555666777")
 
         ni = args[:instance_resource].network_interfaces.first
@@ -270,6 +271,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert) do |args|
         ac = args[:instance_resource].network_interfaces.first.access_configs.first
         expect(ac.nat_i_p).to eq("35.192.0.99")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "binds the subnet and firewall tags at creation for a VM in the GitHub runner subnet" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      ps = nic.private_subnet
+      ps.update(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+      fw = ps.firewalls.first
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner-tags")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].params.resource_manager_tags.to_h).to eq(
+          "test-gcp-project/ubicloud-fw-#{fw.ubid}" => "active",
+          "test-gcp-project/ubicloud-subnet-#{ps.ubid}" => "active",
+        )
         op
       end
 
@@ -357,17 +378,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     {
-      "ResourceExhaustedError" => Google::Cloud::ResourceExhaustedError.new("zone capacity"),
-      "UnavailableError" => Google::Cloud::UnavailableError.new("service unavailable"),
-      "InvalidArgumentError for missing machine type" => Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."),
-    }.each do |label, error|
-      it "retries in a different zone on #{label}" do
+      "ResourceExhaustedError" => [Google::Cloud::ResourceExhaustedError.new("zone capacity"), 5],
+      "UnavailableError" => [Google::Cloud::UnavailableError.new("service unavailable"), 5],
+      "InvalidArgumentError for missing machine type" => [Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."), 5],
+    }.each do |label, (error, delay)|
+      it "retries in a different zone on #{label} after #{delay} seconds" do
         nic.strand.update(label: "wait")
         ensure_nic_gcp_resource(nic)
         expect(compute_client).to receive(:insert).and_raise(error)
         expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-        expect { nx.start }.to nap(5)
+        expect { nx.start }.to nap(delay)
         stack = st.stack.first
         expect(stack["exclude_zones"]).to be_a(Array)
         expect(stack["exclude_zones"].length).to eq(1)
@@ -1040,6 +1061,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(vm.allocated_at).to be_within(2).of(Time.now)
       expect(vm.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
       expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
+    end
+
+    it "leaves the tags bound at creation alone for a VM in the GitHub runner subnet" do
+      nic.private_subnet.update(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [Google::Cloud::Compute::V1::NetworkInterface.new(network_i_p: "10.0.0.7")],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(vm.reload.update_firewall_rules_set?).to be false
     end
 
     it "records the private IPv4 GCE assigned to a NIC created without one" do

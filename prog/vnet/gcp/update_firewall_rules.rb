@@ -6,6 +6,20 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   subject_is :vm
 
+  # Namespaced names (project_id/tag_key_short_name/tag_value_short_name)
+  # of the tag values a VM needs: one per firewall with rules, and the
+  # subnet "active" tag, without which the VPC-wide DENY rules
+  # (65531-65534) would block all private egress from the VM. Namespaced
+  # names are deterministic from project_id + firewall.ubid + subnet.ubid,
+  # so the VM side needs neither a DB column nor a CRM lookup to resolve
+  # them.
+  def self.desired_tag_values(vm, project_id)
+    tag_values = vm.firewalls(eager: :firewall_rules).filter_map do |fw|
+      "#{project_id}/ubicloud-fw-#{fw.ubid}/#{GcpFirewallPolicy::TAG_VALUE}" if fw.firewall_rules.any?
+    end
+    tag_values << "#{project_id}/ubicloud-subnet-#{vm.user_nic.private_subnet.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
+  end
+
   def before_run
     # If the VM is being torn down, exit successfully even if rules were never
     # synced: the per-VM tag bindings are deleted with the instance, and any
@@ -18,19 +32,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # Reconcile tag bindings for this VM. Shared VPC state (tag keys/values,
     # policy rules, orphan cleanup) is owned by VpcUpdateFirewallRules; we
     # only bind the per-firewall and subnet tags this VM needs.
-    #
-    # Tag values are referenced by their GCP "namespaced name"
-    # (parent_id/tag_key_short_name/tag_value_short_name) instead of the
-    # canonical tagValues/{numeric-id} form. Namespaced names are
-    # deterministic from project_id + firewall.ubid + subnet.ubid, so the
-    # VM side needs neither a DB column nor a CRM lookup to resolve them.
-    desired_tag_values = vm.firewalls(eager: :firewall_rules).filter_map do |fw|
-      firewall_tag_namespaced_name(fw) if fw.firewall_rules.any?
-    end
-
-    # Subnet "active" tag - without it, the VPC-wide DENY rules
-    # (65531-65534) would block all private egress from this VM.
-    desired_tag_values << subnet_tag_namespaced_name
+    desired_tag_values = self.class.desired_tag_values(vm, credential.project_id)
 
     # Vm::Gcp#enforce_firewall_cap caps firewalls at 9 per GCP VM,
     # so with the subnet tag we are always <= 10. If we hit this, the
@@ -85,14 +87,6 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   private
-
-  def firewall_tag_namespaced_name(firewall)
-    "#{credential.project_id}/ubicloud-fw-#{firewall.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
-  end
-
-  def subnet_tag_namespaced_name
-    "#{credential.project_id}/ubicloud-subnet-#{vm.user_nic.private_subnet.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
-  end
 
   def create_tag_binding(parent_resource, tag_value_namespaced_name)
     tag_binding_obj = Google::Apis::CloudresourcemanagerV3::TagBinding.new(

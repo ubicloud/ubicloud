@@ -84,7 +84,16 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     gcp_res = user_nic.nic_gcp_resource
+    # The tags of the GitHub runner subnet and its firewall exist long before
+    # a runner VM, so bind them at creation instead of after the VM runs.
+    if runner_subnet?
+      tags = Prog::Vnet::Gcp::UpdateFirewallRules.desired_tag_values(vm, gcp_project_id)
+      params = Google::Cloud::Compute::V1::InstanceParams.new(
+        resource_manager_tags: tags.to_h { |tag| tag.rpartition("/").values_at(0, 2) },
+      )
+    end
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
+      params:,
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
       labels: {"ubicloud" => Config.provider_resource_tag_value},
@@ -226,7 +235,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
     wakeup_waiting_strand("allocated_waiting_strand_id")
 
-    vm.incr_update_firewall_rules
+    vm.incr_update_firewall_rules unless runner_subnet?
     hop_wait_sshable
   end
 
@@ -363,6 +372,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def runner
     return @runner if defined?(@runner)
     @runner = GithubRunner[vm_id: vm.id]
+  end
+
+  def runner_subnet?
+    user_nic.private_subnet.gcp_github_runner?
   end
 
   def credential
