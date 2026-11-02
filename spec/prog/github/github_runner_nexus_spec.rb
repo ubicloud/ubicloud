@@ -250,6 +250,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(nx).not_to receive(:rand)
         expect(nx.pick_vm.location.aws?).to be(true)
       end
+
+      it "keeps it on AWS without drawing in the E2E suite" do
+        expect(Config).to receive(:is_e2e).and_return(true)
+        expect(nx).not_to receive(:rand)
+        expect(nx.pick_vm.location.aws?).to be(true)
+      end
     end
 
     describe "for a runner drawn for gcp" do
@@ -288,6 +294,31 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         picked_vm = nx.pick_vm
         expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
         expect(picked_vm.nics.map(&:private_subnet_id)).not_to include(gcp_runner_subnet.id)
+      end
+    end
+
+    describe "for a premium runner sent to AWS by the ratio flag" do
+      before do
+        runner.update(label: "ubicloud-premium-8")
+        project.set_ff_aws_alien_runners_ratio(1.0)
+        enable_gcp_spill
+        project.set_ff_gcp_alien_runners_percentage(100)
+      end
+
+      it "keeps it on AWS" do
+        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+        LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+        LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+        expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+        expect(nx.pick_vm.location_id).to eq(location.id)
+      end
+
+      it "draws GCP in the E2E suite" do
+        expect(Config).to receive(:is_e2e).and_return(true)
+        LocationCredentialGcp.create_with_id(gcp_location, project_id: "runner-gcp", service_account_email: "runner@runner-gcp.iam.gserviceaccount.com", credentials_json: "{}")
+        picked_vm = nx.pick_vm
+        expect(picked_vm.location_id).to eq(gcp_location.id)
+        expect(picked_vm.family).to eq("n4d-standard")
       end
     end
 
