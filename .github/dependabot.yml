@@ -62,3 +62,15 @@ updates:
       github-actions-dependencies:
         patterns:
           - "*"
+  - package-ecosystem: 'gomod'
+    directory: '/terraform/provider'
+    schedule:
+      interval: 'weekly'
+    cooldown:
+      default-days: 14
+    allow:
+      - dependency-type: "all"
+    groups:
+      terraform-provider-dependencies:
+        patterns:
+          - "*"

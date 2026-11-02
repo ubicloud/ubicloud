@@ -733,7 +733,7 @@ terraform/provider/                      Go module github.com/ubicloud/terraform
     <type>_gen.go                        generated, one per type; registers itself in init(); ignored
   examples/resources/ubicloud_<type>/resource.tf, import.sh       generated; ignored
   examples/data-sources/ubicloud_<type>/data-source.tf            generated; ignored
-  examples/provider/provider.tf, templates/index.md.tmpl          hand-written
+  examples/provider/provider.tf                                   hand-written
 ```
 
 The generated files sit in the engine's package and import nothing, so an import list can never be
