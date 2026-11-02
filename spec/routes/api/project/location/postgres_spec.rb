@@ -142,6 +142,16 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-2",
+          storage_size: 64,
+        }.to_json
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
       it "ignores submitted flavor" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
           size: "standard-2",

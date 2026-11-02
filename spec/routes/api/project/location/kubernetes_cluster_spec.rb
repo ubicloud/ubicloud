@@ -313,7 +313,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np2"}.to_json
 
-          expect(last_response).to have_api_error(400, "kubernetes_cluster_id and name is already taken")
+          message = "kubernetes_cluster_id and name is already taken"
+          expect(last_response).to have_api_error(400, message, {"name" => message})
           expect(kn.reload.name).to eq("np")
         end
 
