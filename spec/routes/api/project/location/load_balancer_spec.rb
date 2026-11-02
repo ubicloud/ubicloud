@@ -210,6 +210,7 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
+        expect(body["private_subnet_id"]).to eq(lb.private_subnet.ubid)
         expect(body["subnet"]).to eq("subnet-1")
         expect(body["vms"]).to eq([vm.ubid])
         expect(body.slice("location", "stack", "cert_enabled")).to eq("location" => TEST_LOCATION, "stack" => "dual", "cert_enabled" => false)
@@ -246,6 +247,7 @@ RSpec.describe Clover, "load-balancer" do
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
         expect(body["name"]).to eq("new-name")
+        expect(body["private_subnet_id"]).to eq(lb.private_subnet.ubid)
         expect(body["subnet"]).to eq("subnet-1")
         expect(body["vms"]).to eq([])
         expect(lb.reload.name).to eq("new-name")

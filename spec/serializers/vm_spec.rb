@@ -59,6 +59,7 @@ RSpec.describe Serializers::Vm do
         firewalls: Serializers::Firewall.serialize(vm.firewalls),
         private_ipv4: vm.private_ipv4.to_s,
         private_ipv6: vm.private_ipv6.to_s,
+        private_subnet_id: vm.user_nic.private_subnet.ubid,
         subnet: "default-eu-central-h1",
         gpu: "1x NVIDIA A100 80GB PCIe",
       }
@@ -71,6 +72,7 @@ RSpec.describe Serializers::Vm do
       vm.reload
 
       serialized = described_class.serialize_internal(vm, {detailed: true})
+      expect(serialized[:private_subnet_id]).to be_nil
       expect(serialized[:subnet]).to be_nil
     end
   end

@@ -18,11 +18,13 @@ class Serializers::Vm < Serializers::Base
     }
 
     if options[:detailed]
+      subnet = vm.user_nic&.private_subnet
       base.merge!(
         firewalls: Serializers::Firewall.serialize(vm.firewalls(eager: [:location, :firewall_rules])),
         private_ipv4: vm.private_ipv4,
         private_ipv6: vm.private_ipv6,
-        subnet: vm.user_nic&.private_subnet&.name,
+        private_subnet_id: subnet&.ubid,
+        subnet: subnet&.name,
         gpu: vm.display_gpu,
       )
     end
