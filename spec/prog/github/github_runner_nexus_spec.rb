@@ -300,6 +300,31 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
     end
 
+    describe "for a premium runner sent to AWS by the ratio flag" do
+      before do
+        runner.update(label: "ubicloud-premium-8")
+        project.set_ff_aws_alien_runners_ratio(1.0)
+        enable_gcp_spill
+        project.set_ff_gcp_alien_runners_ratio(1.0)
+      end
+
+      it "keeps it on AWS" do
+        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+        LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+        LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+        expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+        expect(nx.pick_vm.location_id).to eq(location.id)
+      end
+
+      it "draws GCP in the E2E suite" do
+        expect(Config).to receive(:is_e2e).and_return(true)
+        LocationCredentialGcp.create_with_id(gcp_location, project_id: "runner-gcp", service_account_email: "runner@runner-gcp.iam.gserviceaccount.com", credentials_json: "{}")
+        picked_vm = nx.pick_vm
+        expect(picked_vm.location_id).to eq(gcp_location.id)
+        expect(picked_vm.family).to eq("n4d-standard")
+      end
+    end
+
     it "uses metal vms if alien runners are disabled for the project" do
       project.set_ff_no_alien_runners(true)
       project.set_ff_aws_alien_runners_ratio(1.0)

@@ -78,7 +78,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # Neither cloud has a 30 vCPU size, so 30 vCPU runners get a 32 vCPU
       # instance, but the customer is still billed for 30 vCPUs.
       vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
-      if (gcp = github_runner.spill_over_set? && draw_gcp_spill?)
+      if (gcp = (github_runner.spill_over_set? || Config.is_e2e) && draw_gcp_spill?)
         Clog.emit("spilled runner to gcp", {gcp_spilled_runner: {label: github_runner.label, repository_name: github_runner.repository_name}})
         boot_image = Config.send(:"#{boot_image.tr("-", "_")}_x64_gce_image")
         location_id = Config.github_runner_gcp_location_id

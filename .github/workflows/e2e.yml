@@ -186,6 +186,8 @@ jobs:
         ENV["IS_E2E"] = "true"
         ENV["GITHUB_RUNNER_SERVICE_PROJECT_ID"] = "89841457-35a2-8ed2-a88a-424ea5ddd83b"
         ENV["GITHUB_RUNNER_AWS_LOCATION_ID"] = "88adf710-4d8b-8c20-a480-618cbbef802d"
+        ENV["GITHUB_RUNNER_GCP_LOCATION_ID"] = "5279330d-3144-8020-a2a6-2d36b11b383e"
+        ENV["GITHUB_RUNNER_GCP_PRIVATE_SUBNET_ID"] = "0ef88e4f-351c-86d9-8700-9f356c9d21c1"
         ENV["POSTGRES_SERVICE_PROJECT_ID"] = "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
         ENV["KUBERNETES_SERVICE_PROJECT_ID"] = "4e762e09-2a22-82d2-93c2-cfbefbda8c69"
         ENV["MINIO_SERVICE_PROJECT_ID"] = "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
@@ -416,6 +418,21 @@ jobs:
         secret-access-key: ${{ secrets.E2E_AWS_SECRET_KEY }}
         run-id: ${{ github.run_id }}
         github-token: ${{ github.token }}
+
+    - name: Download e2e logs
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: e2e-aws-${{ github.run_id }}-logs
+
+    - name: Check for GCP runner resources
+      id: gcp-runners
+      run: echo "found=$(grep -qs gcp_instance_created foreman.log && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+    - name: Cleanup GCP resources
+      if: steps.gcp-runners.outputs.found == 'true'
+      uses: $/.github/actions/gcp-cleanup-e2e
+      with:
+        credentials-base64: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
 
   cleanup-gcp:
     needs: [setup, e2e]
