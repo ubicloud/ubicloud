@@ -1,0 +1,58 @@
+name: Terraform provider
+
+permissions:
+  contents: read
+
+# This has no path filter, because a change to the routes or serializers
+# can break the provider without touching openapi/openapi.yml.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  terraform:
+    name: Terraform provider
+    runs-on: ubicloud-standard-4
+    timeout-minutes: 20
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Clover
+      uses: $/.github/actions/setup-clover
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: terraform/provider/go.mod
+        cache-dependency-path: terraform/provider/go.sum
+
+    # Keep these in step with terraform's version in mise.toml and its
+    # linux-x64 checksum in mise.lock. rake terraform checks the version.
+    - name: Install terraform
+      env:
+        VERSION: 1.15.8
+        SHA256: d25ce7b6902013ad905db3d2eab0be4cd905887fe88b81a6171b8d5503c31f3d
+      run: |
+        curl -fsSLo "$RUNNER_TEMP/terraform.zip" "https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip"
+        echo "$SHA256  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+        unzip -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip" terraform
+        echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
+
+    - name: Run the terraform loop
+      run: bundle exec rake terraform CHECK=1
+
+    - name: Archive the coverage and run files
+      if: failure()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: terraform
+        path: |
+          coverage/terraform/
+          tmp/terraform/
