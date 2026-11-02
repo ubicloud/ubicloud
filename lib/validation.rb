@@ -217,6 +217,7 @@ module Validation
     if cidr.include?(".")
       NetAddr::IPv4Net.parse(cidr)
     elsif cidr.include?(":")
+      cidr += "/128" unless cidr.include?("/")
       NetAddr::IPv6Net.parse(cidr)
     else
       fail ValidationFailed.new({cidr: "Invalid CIDR"})
