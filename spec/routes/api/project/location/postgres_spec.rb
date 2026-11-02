@@ -490,10 +490,10 @@ RSpec.describe Clover, "postgres" do
         expect(replica.init_script.init_script).to eq("sudo whoami")
       end
 
-      it "read-replica inherits and merges config from parent" do
+      it "read-replica inherits and merges config from parent, storing its numbers as strings" do
         pg.update(
-          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
-          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+          user_config: {"max_connections" => 3000, "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => 150, "pool_mode" => "transaction"},
         )
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
@@ -850,10 +850,10 @@ RSpec.describe Clover, "postgres" do
         expect(restored.init_script.init_script).to eq("sudo whoami")
       end
 
-      it "restore inherits and merges config from parent" do
+      it "restore inherits and merges config from parent, storing its numbers as strings" do
         pg.update(
-          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
-          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+          user_config: {"max_connections" => 3000, "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => 150, "pool_mode" => "transaction"},
         )
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
@@ -1593,15 +1593,52 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["default_pg_config"]).to include("shared_buffers", "work_mem", "max_connections", "effective_cache_size")
       end
 
-      it "serializes numeric config values without failing response validation" do
-        pg.update(user_config: {"max_connections" => 100}, pgbouncer_user_config: {"max_client_conn" => 100})
+      it "returns stored numbers as strings, and stores them as strings on the next update" do
+        pg.update(user_config: {"max_connections" => 100, "work_mem" => "8MB"}, pgbouncer_user_config: {"max_client_conn" => 100})
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
-
         expect(last_response.status).to eq(200)
         response_body = JSON.parse(last_response.body)
-        expect(response_body["pg_config"]).to eq({"max_connections" => 100})
-        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => 100})
+        expect(response_body["pg_config"]).to eq({"max_connections" => "100", "work_mem" => "8MB"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"max_connections" => "100", "work_mem" => "8MB"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"work_mem" => "16MB"},
+        }.to_json
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["message"]).to be_nil
+        expect(pg.reload.user_config).to eq({"max_connections" => "100", "work_mem" => "16MB"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "100"})
+      end
+
+      it "stores a number sent to the full update as a string" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"max_connections" => 200, "ubicloud.shared_memory_percent" => 50},
+          pgbouncer_config: {"max_client_conn" => 300},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("pg_config", "pgbouncer_config")).to eq(
+          "pg_config" => {"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"},
+          "pgbouncer_config" => {"max_client_conn" => "300"},
+        )
+        expect(pg.reload.user_config).to eq({"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "300"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
+        expect(JSON.parse(last_response.body)["pg_config"]).to eq({"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(JSON.parse(last_response.body).slice("pg_config", "pgbouncer_config")).to eq(
+          "pg_config" => {"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"},
+          "pgbouncer_config" => {"max_client_conn" => "300"},
+        )
       end
 
       it "full update" do

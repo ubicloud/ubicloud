@@ -38,6 +38,8 @@ class Serializers::Postgres < Serializers::Base
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas),
         log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
+        pg_config: pg.user_config.transform_values(&:to_s),
+        pgbouncer_config: pg.pgbouncer_user_config.transform_values(&:to_s),
       )
 
       if pg.timeline && pg.representative_server.primary?

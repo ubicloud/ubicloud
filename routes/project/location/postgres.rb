@@ -414,8 +414,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
-        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
-        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {})).transform_values(&:to_s)
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {})).transform_values(&:to_s)
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
@@ -490,8 +490,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
-        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
-        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {})).transform_values(&:to_s)
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {})).transform_values(&:to_s)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
@@ -894,8 +894,8 @@ class Clover
           authorize("Postgres:view", pg)
 
           {
-            pg_config: pg.user_config,
-            pgbouncer_config: pg.pgbouncer_user_config,
+            pg_config: pg.user_config.transform_values(&:to_s),
+            pgbouncer_config: pg.pgbouncer_user_config.transform_values(&:to_s),
             default_pg_config: pg.representative_server.configure_hash[:configs],
           }
         end
@@ -913,15 +913,17 @@ class Clover
             pgbouncer_values = typecast_params.array(:str, "pgbouncer_config_values") || []
             pgbouncer_config = config_hash_from_kvs(pgbouncer_keys, pgbouncer_values)
           elsif r.patch?
-            pg_config = typecast_params.Hash("pg_config") || {}
-            pgbouncer_config = typecast_params.Hash("pgbouncer_config") || {}
-            # For PATCH requests, merge with existing config
-            pg_config = pg.user_config.merge(pg_config).compact
-            pgbouncer_config = pg.pgbouncer_user_config.merge(pgbouncer_config).compact
+            pg_config = pg.user_config.merge(typecast_params.Hash("pg_config") || {})
+            pgbouncer_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config") || {})
           else
             pg_config = typecast_params.Hash!("pg_config")
             pgbouncer_config = typecast_params.Hash!("pgbouncer_config")
           end
+
+          # A PATCH deletes a key by sending null. Store values as strings,
+          # since a POST may send numbers and older rows may hold them.
+          pg_config = pg_config.compact.transform_values(&:to_s)
+          pgbouncer_config = pgbouncer_config.compact.transform_values(&:to_s)
 
           validate_postgres_config(pg.version, pg_config, pgbouncer_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
@@ -931,7 +933,7 @@ class Clover
             pg.lock!
             Validation.validate_postgres_restart_sensitive_params(pg.version, pg_config, parent:, children: pg.read_replicas)
 
-            old_config = pg.user_config
+            old_config = pg.user_config.transform_values(&:to_s)
             pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
             pg.server_incr("configure")
