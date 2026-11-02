@@ -43,12 +43,17 @@ firewall_id:
 | `since` | the date the name was deprecated, unquoted so that it loads as a date; the `Deprecation` header carries it |
 | `removed-in` | the first version that refuses the name, above 1; required on an operation or request property, and absent on a response property |
 | `use` | a list of what to use instead: sibling properties, or operationIds for an operation; if it is absent, clients are told to omit the name |
+| `renamed-to` | on a request property only, in place of `use`: the sibling property that now takes its value |
 
 Versions before `removed-in` accept the name. The server logs each request that uses a deprecated
 name ("deprecated api use", with the project, the version and the user agent), and the response
 carries a `Deprecation` header giving the earliest `since` among the names used, and a
 `Warning: 299` header saying what to use instead. From `removed-in` on, the server refuses a
 property with 400 and `details` keyed by its name, and an operation with 410.
+
+Before `removed-in`, the server passes the value of a property with `renamed-to` to the route
+under its new name, so that the route need read only that name. A request that sends both names
+is refused with 400.
 
 `API_DEPRECATION_BROWNOUT` makes versions before `removed-in` refuse a share of the requests that
 use the name, with 400 and type `Deprecated`. It takes comma-separated version:share pairs: `2:0.05`

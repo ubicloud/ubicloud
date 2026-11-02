@@ -103,7 +103,7 @@ Optional keyword arguments for each type:
 * LoadBalancer: `health_check_endpoint`
 * Postgres: size, `storage_size`, `ha_type`, `version`
 * PrivateSubnet: `firewall_id`
-* Vm: `size`, `storage_size`, `unix_user`, `boot_image`, `enable_ip4`,
+* Vm: `size`, `storage_size`, `unix_user`, `boot_image`, `ip4_enabled`,
   `private_subnet_id`
 
 #### Retrieving An Object

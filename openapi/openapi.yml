@@ -2619,7 +2619,15 @@ paths:
                   description: VM init script
                   type: string
                 enable_ip4:
-                  description: Enable IPv4
+                  description: Deprecated; send ip4_enabled.
+                  type: boolean
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    renamed-to: ip4_enabled
+                ip4_enabled:
+                  description: Whether the VM has a public IPv4 address
                   type: boolean
                 private_subnet_id:
                   description: ID of the private subnet
@@ -2631,10 +2639,24 @@ paths:
                   description: Size of the VM
                   type: string
                 storage_size:
-                  description: Requested storage size in GiB
+                  description: Requested size of each storage volume in GiB
                   type: integer
                 gpu:
-                  description: Requested GPU count and type, in the form of "count:type"
+                  description: Deprecated; send gpu_count and gpu_device, which take precedence. Requested GPU count and device, as "count:device".
+                  type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    use:
+                      - gpu_count
+                      - gpu_device
+                gpu_count:
+                  description: Number of GPUs
+                  type: integer
+                  minimum: 0
+                gpu_device:
+                  description: PCI device ID of the GPUs, such as 20b5; requires gpu_count
                   type: string
                 unix_user:
                   description: Unix user of the VM
@@ -4578,8 +4600,12 @@ components:
         state:
           description: State of the VM
           type: string
+        storage_size:
+          description: Size of each storage volume in GiB, as requested when the VM was created
+          type: integer
+          nullable: true
         storage_size_gib:
-          description: Storage size in GiB
+          description: Total size of the storage volumes in GiB
           type: integer
         unix_user:
           description: Unix user of the VM
@@ -4596,6 +4622,7 @@ components:
         - name
         - size
         - state
+        - storage_size
         - storage_size_gib
         - unix_user
       x-go-name: VmSchema
@@ -5496,9 +5523,18 @@ components:
                     description: GPU configuration
                     type: string
                     nullable: true
+                  gpu_count:
+                    description: Number of GPUs attached to the VM; 0 until the VM is placed on a host
+                    type: integer
+                  gpu_device:
+                    description: PCI device ID of the GPUs attached to the VM; null if it has none
+                    type: string
+                    nullable: true
                 required:
                   - firewalls
                   - gpu
+                  - gpu_count
+                  - gpu_device
                   - private_ipv4
                   - private_ipv6
                   - private_subnet_id

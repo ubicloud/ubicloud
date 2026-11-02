@@ -9,6 +9,7 @@ class Serializers::Vm < Serializers::Base
       location: vm.display_location,
       size: vm.display_size,
       unix_user: vm.unix_user,
+      storage_size: vm.vm_storage_volumes.find(&:boot)&.size_gib,
       storage_size_gib: vm.storage_size_gib,
       boot_image: vm.boot_image,
       ip6: vm.ip6,
@@ -19,6 +20,7 @@ class Serializers::Vm < Serializers::Base
 
     if options[:detailed]
       subnet = vm.user_nic&.private_subnet
+      gpus = vm.pci_devices.select(&:is_gpu)
       base.merge!(
         firewalls: Serializers::Firewall.serialize(vm.firewalls(eager: [:location, :firewall_rules])),
         private_ipv4: vm.private_ipv4,
@@ -26,6 +28,8 @@ class Serializers::Vm < Serializers::Base
         private_subnet_id: subnet&.ubid,
         subnet: subnet&.name,
         gpu: vm.display_gpu,
+        gpu_count: gpus.count,
+        gpu_device: gpus.first&.device,
       )
     end
 

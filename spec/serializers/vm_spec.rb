@@ -30,6 +30,7 @@ RSpec.describe Serializers::Vm do
         location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
+        storage_size: 100,
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
@@ -51,6 +52,7 @@ RSpec.describe Serializers::Vm do
         location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
+        storage_size: 100,
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
@@ -62,6 +64,8 @@ RSpec.describe Serializers::Vm do
         private_subnet_id: vm.user_nic.private_subnet.ubid,
         subnet: "default-eu-central-h1",
         gpu: "1x NVIDIA A100 80GB PCIe",
+        gpu_count: 1,
+        gpu_device: "20b5",
       }
 
       expect(prepare_for_comparison(described_class.serialize_internal(vm, {detailed: true}))).to eq(expected_result)

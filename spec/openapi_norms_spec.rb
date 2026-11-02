@@ -81,7 +81,8 @@ RSpec.describe OpenapiNorms do
     def deprecated(**x) = size.merge("deprecated" => true, "x-deprecated" => {"since" => Date.new(2026, 11, 2), **x})
 
     it "accepts a deprecated input that names its removal and replacement, and a deprecated response property" do
-      body = {"old" => deprecated("removed-in" => 2, "use" => ["size"]), "older" => deprecated("removed-in" => 3), "size" => size}
+      body = {"old" => deprecated("removed-in" => 2, "use" => ["size"]), "older" => deprecated("removed-in" => 3),
+              "renamed" => deprecated("removed-in" => 2, "renamed-to" => "size"), "size" => size}
       paths = create(body)
       paths["/thing/{name}"]["post"].merge!("deprecated" => true, "x-deprecated" => {"since" => Date.new(2025, 1, 1), "removed-in" => 2, "use" => ["getThing"]})
       paths["/thing/{name}"]["get"] = {"operationId" => "getThing", "responses" => {"200" => paths["/thing/{name}"]["post"]["responses"]["200"]}}
@@ -91,12 +92,16 @@ RSpec.describe OpenapiNorms do
 
     it "reports a deprecation that does not say what the API does with it" do
       body = {"a" => size.merge("deprecated" => true), "b" => deprecated("since" => "soon", "removed-in" => 1, "use" => "size"),
-              "c" => deprecated("removed-in" => 2, "use" => ["gone"])}
-      expect(violations(create(body, required: ["c"]), schemas: thing("d" => deprecated("removed-in" => 2)), parameters: name).grep(/\Adeprecation/)).to eq [
+              "c" => deprecated("removed-in" => 2, "use" => ["gone"]), "e" => deprecated("removed-in" => 2, "renamed-to" => "c"),
+              "f" => deprecated("removed-in" => 2, "renamed-to" => "count"), "count" => {"type" => "integer"}}
+      schemas = thing("d" => deprecated("removed-in" => 2, "renamed-to" => "id"))
+      expect(violations(create(body, required: ["c"]), schemas:, parameters: name).grep(/\Adeprecation/)).to eq [
         "deprecation: createThing.a: give it both deprecated: true and x-deprecated",
         "deprecation: createThing.b: give x-deprecated a since date; make use a list of names that exist; give x-deprecated removed-in, an API version above 1",
         "deprecation: createThing.c: make use a list of names that exist; take it out of required, since a client may send its replacement instead",
-        "deprecation: Thing.d: drop removed-in, since responses are the same in every version",
+        "deprecation: createThing.e: make renamed-to name a sibling request property of the same type",
+        "deprecation: createThing.f: make renamed-to name a sibling request property of the same type",
+        "deprecation: Thing.d: drop removed-in, since responses are the same in every version; make renamed-to name a sibling request property of the same type",
       ]
     end
   end

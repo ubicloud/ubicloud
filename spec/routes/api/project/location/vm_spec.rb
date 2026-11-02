@@ -174,7 +174,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: ps_id,
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -232,7 +232,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -244,7 +244,7 @@ RSpec.describe Clover, "vm" do
           unix_user: "ubi",
           size: "standard-2",
           boot_image: "invalid-boot-image",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: boot_image", {"boot_image" => "\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"gpu-ubuntu-resolute\", \"gpu-ubuntu-noble\", \"ubuntu-resolute\", \"ubuntu-noble\", \"ubuntu-jammy\", \"debian-13\", \"debian-12\", \"almalinux-10\", \"almalinux-9\"], or you can use machine-image-name@version, machine-image-name@latest"})
@@ -255,7 +255,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-gpu-6",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\", \"burstable-1\", \"burstable-2\"]"})
@@ -266,7 +266,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           boot_image: "ubuntu-jammy",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -279,7 +279,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: "invalid-ubid",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-central-h1\""})
@@ -293,7 +293,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: ps_id,
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-central-h1\""})
@@ -304,7 +304,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "invalid-gpu-format",
         }.to_json
 
@@ -316,7 +316,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "3:20b5",
         }.to_json
 
@@ -328,7 +328,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:20b5",
         }.to_json
 
@@ -341,7 +341,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:unsupported",
         }.to_json
 
@@ -354,7 +354,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "burstable-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:20b5",
         }.to_json
 
@@ -366,7 +366,7 @@ RSpec.describe Clover, "vm" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:",
         }.to_json
 
@@ -394,6 +394,26 @@ RSpec.describe Clover, "vm" do
         expect(frame.slice("gpu_count", "gpu_device", "distinct_storage_devices")).to eq("gpu_count" => 4, "gpu_device" => "3182", "distinct_storage_devices" => true)
         expect(frame["storage_volumes"].map { it["size_gib"] }).to eq([1600] * 4)
         expect(frame["storage_volumes"].map { it["boot"] }).to eq([true, false, false, false])
+      end
+
+      it "succeeds with gpu_count and gpu_device, answering with each volume's storage size and the total" do
+        create_b300_vm(gpu_count: 4, gpu_device: "3182", storage_size: 3200)
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("storage_size", "storage_size_gib")).to eq("storage_size" => 3200, "storage_size_gib" => 12800)
+        expect(Vm.first(name: "test-vm").strand.stack.first.slice("gpu_count", "gpu_device")).to eq("gpu_count" => 4, "gpu_device" => "3182")
+      end
+
+      it "prefers gpu_count and gpu_device to the deprecated gpu" do
+        create_b300_vm(gpu: "1:3182", gpu_count: 4, gpu_device: "3182")
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "fails with gpu_device and no gpu_count" do
+        create_b300_vm(gpu_device: "3182")
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu_count", {"gpu_count" => "gpu_count is required with gpu_device"})
       end
 
       it "succeeds with the gpus of the size and the larger storage size" do
@@ -448,7 +468,7 @@ RSpec.describe Clover, "vm" do
         public_key: "ssh key",
         unix_user: "ubi",
         size: "standard-2",
-        enable_ip4: true,
+        ip4_enabled: true,
         gpu: "0:",
       }.to_json
 
@@ -467,7 +487,7 @@ RSpec.describe Clover, "vm" do
         expect(body["subnet"]).to eq(vm.user_nic.private_subnet.name)
         expect(body["private_ipv4"]).to eq(vm.private_ipv4.to_s)
         expect(body["private_ipv6"]).to eq(vm.private_ipv6.to_s)
-        expect(body).to include("gpu" => nil)
+        expect(body).to include("gpu" => nil, "gpu_count" => 0, "gpu_device" => nil, "storage_size" => 40, "storage_size_gib" => 40)
       end
 
       it "success with a gpu" do
@@ -477,7 +497,7 @@ RSpec.describe Clover, "vm" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["gpu"]).to eq("1x NVIDIA A100 80GB PCIe")
+        expect(JSON.parse(last_response.body).slice("gpu", "gpu_count", "gpu_device")).to eq("gpu" => "1x NVIDIA A100 80GB PCIe", "gpu_count" => 1, "gpu_device" => "20b5")
       end
 
       it "success without a private subnet" do
@@ -487,7 +507,7 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
-        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "private_subnet_id" => nil, "subnet" => nil, "gpu" => nil)
+        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu", "storage_size")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "private_subnet_id" => nil, "subnet" => nil, "gpu" => nil, "storage_size" => nil)
       end
 
       it "checks the detailed part of the response against the schema" do
