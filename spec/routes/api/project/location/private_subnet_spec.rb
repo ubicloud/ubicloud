@@ -117,7 +117,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "with invalid firewall id" do
-        firewall_id = "a" * 25 + "b"
+        firewall_id = Firewall.generate_ubid.to_s
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id:}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"#{firewall_id}\" and location \"eu-central-h1\" is not found"})

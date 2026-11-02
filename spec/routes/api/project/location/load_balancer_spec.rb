@@ -131,7 +131,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "invalid private_subnet_id" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
-          private_subnet_id: "invalid",
+          private_subnet_id: PrivateSubnet.generate_ubid.to_s,
           stack: LoadBalancer::Stack::IPV6,
           src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
@@ -286,6 +286,14 @@ RSpec.describe Clover, "load-balancer" do
         expect do
           patch "/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {}.to_json
         end.to raise_error(Committee::InvalidRequest, /missing required parameters: algorithm, dst_port, health_check_endpoint, src_port, vms/)
+      end
+
+      it "refuses an algorithm the spec does not list" do
+        expect do
+          patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
+            src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "bad", vms: [],
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /"bad" isn't part of the enum/)
       end
 
       it "updates vms and switches cert enabled off" do

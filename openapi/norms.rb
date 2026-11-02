@@ -72,6 +72,23 @@ class OpenapiNorms
     end
   end
 
+  def norm_lifecycle_enum
+    answers.flat_map do |o|
+      marked = o.response.values.select { |s, _| s.key?("x-lifecycle") }
+      wrong = marked.filter_map do |s, at|
+        "lifecycle_enum: #{at}: mark it readOnly, and list only values of its enum under pending and failed" unless lifecycle?(s)
+      end
+      wrong << "lifecycle_enum: #{marked.map(&:last).join(", ")}: mark only one property of a response with x-lifecycle" if marked.size > 1
+      wrong
+    end
+  end
+
+  def lifecycle?(s)
+    x = s["x-lifecycle"]
+    return false unless s["readOnly"] && x.is_a?(Hash) && (x.keys - %w[pending failed]).empty?
+    x.values.all? { it.is_a?(Array) && (it - s.fetch("enum", [])).empty? }
+  end
+
   # A parameter may give named examples instead of an example.
   def norm_examples
     needed = parameters.select { it[0]["in"] == "path" } +
