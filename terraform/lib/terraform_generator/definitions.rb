@@ -12,6 +12,7 @@ module TerraformGenerator::Definitions
     private_subnet: {},
     project: {},
     ssh_public_key: {},
+    vm: {},
   }.freeze
 
   # The keys an entry may have. order names verbs that run before the
