@@ -128,8 +128,8 @@ The Ruby records mirror the Go builder calls member for member, so the renderer 
 names: `Attr` becomes `t.attr(...)`, `Verb` becomes `t.verb(...)`, and adding a statement kind
 takes only a new record and a new builder function.
 
-With the fourteen types of the first cut defined, the Ruby comes to about 870 lines. `derive.rb`
-has 475 of them; `api.rb`, `tree.rb`, `terraform_generator.rb`, `hcl.rb` and `go.rb` have 50 to
+With the fourteen types of the first cut defined, the Ruby comes to about 910 lines. `derive.rb`
+has 510 of them; `api.rb`, `tree.rb`, `terraform_generator.rb`, `hcl.rb` and `go.rb` have 50 to
 90 each; and `definitions.rb` has 27.
 
 ## 3. Definitions
@@ -184,7 +184,8 @@ first five come from a rule or from the spec, and timeouts are one runtime polic
 The first cut is these fourteen types; kubernetes rests on C36, and the metric destination on
 C29. Abbreviations: R required, O optional, C computed, D default from the spec, WO write-only,
 S sensitive, X replace on change, st stable (kept in plans), set and map for collection types.
-The change ids C1 to C38 are listed in §5. Attribute names are the spec's; there are no renames.
+The change ids C1 to C38 are listed in §5. Attribute names are the spec's, except those that rule
+`ids` gives; there are no other renames.
 
 **project** (`project: {}`)
 
@@ -212,7 +213,7 @@ The change ids C1 to C38 are listed in §5. Attribute names are the spec's; ther
 |---|---|
 | create | `createInferenceApiKey`, on the collection, empty body |
 | outputs | `id` st; `key` S st (`format: password`, `x-immutable`) |
-| datasource | none: the identity accepts only an id, and a datasource would copy a secret into more states |
+| datasource | by `id`; `key` stays sensitive |
 | import | `<id>` |
 | needs | C17 |
 
@@ -223,7 +224,7 @@ The change ids C1 to C38 are listed in §5. Attribute names are the spec's; ther
 | create | `createLocationFirewall`, on the item, body `{description}` |
 | keys | `location` R X; `name` R, renamed by `renameFirewall` |
 | inputs | `description` O C D `""`, updated by `updateFirewall` |
-| outputs | `id` st; `path`; `firewall_rules` and `private_subnets`, nested one level (rule `nesting`) |
+| outputs | `id` st; `path`; `firewall_rule_ids` and `private_subnet_ids` (rule `ids`) |
 | not verbs | attach-subnet and detach-subnet: their bodies carry no firewall attribute |
 | datasource | by `id` or `name` |
 | import | `<location>/<id or name>` |
@@ -237,7 +238,7 @@ The change ids C1 to C38 are listed in §5. Attribute names are the spec's; ther
 | keys | `location` R X; `firewall_id` R X, with `Firewall.id`'s pattern |
 | inputs | `cidr` R (format `cidr`); `port_range` O C D `0..65535` (format `port-range`); `protocol` O C D `tcp`, one of tcp and udp (the response's enum); `description` O C D `""`; all updated by `modifyFirewallRule` |
 | outputs | `id` st |
-| datasource | none: the identity accepts only an id |
+| datasource | by `location`, `firewall_id`, and `id` |
 | import | `<location>/<firewall_id>/<id>` |
 | needs | C2, C3, C14, C18 |
 
@@ -251,7 +252,7 @@ always one rule, never the array a subnet reference expands to.
 | create | `createPrivateSubnet`, on the item, body `{firewall_id}` |
 | keys | `location` R X; `name` R, renamed by `renamePrivateSubnet` |
 | inputs | `firewall_id` O WO X |
-| outputs | `id` st; `net4`, `net6` st (`x-immutable`); `state`; `firewalls`, `nics` nested |
+| outputs | `id` st; `net4`, `net6` st (`x-immutable`); `state`; `firewall_ids`; `nics` nested |
 | waits | settles while `state` is `creating`, `refreshing_keys` or `deleting`; delete waits for 404 |
 | not verbs | connect (its body carries no subnet attribute) and disconnect (no body) |
 | datasource | by `id` or `name` |
@@ -280,7 +281,7 @@ always one rule, never the array a subnet reference expands to.
 | keys | `location` R X; `name` R, renamed by `renameVM` |
 | inputs that replace | `public_key` R WO X; `init_script` O WO S X; `boot_image` O C X; `ip4_enabled` O C D `false` X; `private_subnet_id` O C X; `size` O C D `standard-2` X; `storage_size` O C X; `gpu_count`, `gpu_device` O C X; `unix_user` O C D `ubi` X |
 | inputs updated in place | `maintenance_window_start_at` O, 0 to 23, null to clear, by `setVMMaintenanceWindow`, which runs right after create when it is configured |
-| outputs | `id` st; `state`; `ip4`, `ip6`, `private_ipv4`, `private_ipv6`, `storage_size_gib` st (`x-immutable`); `firewalls` nested; `subnet`; `gpu` |
+| outputs | `id` st; `state`; `ip4`, `ip6`, `private_ipv4`, `private_ipv6`, `storage_size_gib` st (`x-immutable`); `firewall_ids`; `subnet`; `gpu` |
 | waits | settles while `state` is `creating`, `starting`, `rebooting`, `restarting`, `stopping`, `waiting for capacity` or `deleting`; fails on `no capacity available`; delete waits for 404 |
 | not verbs | restart, start and stop have no body |
 | datasource | by `id` or `name` |
@@ -296,7 +297,7 @@ A stopped or unavailable VM is not pending, so a rename of one returns at once.
 | keys | `location` R X; `name` R, renamed by `renamePostgres` |
 | inputs | `size` R, `storage_size` R, `ha_type` O C D `none`, `tags` O C (all by `patchPostgresDatabase`); `target_version` O C (by `upgradePostgresDatabase`); `pg_config`, `pgbouncer_config` O C map of string (by `updatePostgresDatabaseConfig`); `maintenance_window_start_at` O, null to clear, `maintenance_window_days` O C (by `setMaintenanceWindow`); `password` O C S (by `resetSuperuserPassword`) |
 | inputs that replace | `restrict_by_default` O C WO D `false` X; `private_subnet_name` O WO X |
-| outputs | `id` st; `state`; the observed `vm_size`, `storage_size_gib`, `version`; the converging `target_vm_size`, `target_storage_size_gib`; `hostname`, `connection_string` S, `private_connection_string` S, `ca_certificates`, `primary`, `fallback_active`, `read_replica`, `parent`, `earliest_restore_time`, `target_server_count`, `username`; `private_subnet_id`, `created_at` st; `firewall_id`, null once that firewall is deleted, renamed or detached from the subnet; `firewall_rules`, `log_destinations`, `metric_destinations`, `read_replicas` nested |
+| outputs | `id` st; `state`; the observed `vm_size`, `storage_size_gib`, `version`; the converging `target_vm_size`, `target_storage_size_gib`; `hostname`, `connection_string` S, `private_connection_string` S, `ca_certificates`, `primary`, `fallback_active`, `read_replica`, `parent`, `earliest_restore_time`, `target_server_count`, `username`; `private_subnet_id`, `created_at` st; `firewall_id`, null once that firewall is deleted, renamed or detached from the subnet; `firewall_rule_ids`, `log_destination_ids`, `metric_destination_ids`, `read_replica_ids` |
 | verbs, in order | upgrade (the definition), PATCH, config, rename, reset-superuser-password, set-maintenance-window |
 | not verbs | `patchPostgresDatabaseConfig` (clause `merge_subroute`); read-replica and restore (clause `name_carrier`); restart, recycle and promote have no body; `cert/*` are not direct subroutes |
 | waits | settles while `state` is `creating`, `restoring_backup`, `replaying_wal`, `finalizing_restore`, `restarting` or `deleting`; delete waits for 404 |
@@ -317,6 +318,7 @@ only records the desired state.
 | keys | `location` R X; `postgres_id` R X, with `PostgresDatabase.id`'s pattern |
 | inputs | `cidr` R (format `cidr`); `description` O C D `""`; both by `patchLocationPostgresFirewallRule` |
 | outputs | `id` st; not `port`, which C27 deprecates |
+| datasource | by `location`, `postgres_id`, and `id` |
 | import | `<location>/<postgres_id>/<id>` |
 | needs | C26, C27, C28 |
 
@@ -331,6 +333,7 @@ later create of the same CIDR fails on the leftover 6432 rule.
 | keys | `location` R X; `postgres_id` R X |
 | inputs, all X | `name` R; `type` R, one of otlp and syslog; `url` R; `options` O WO S, an object with `headers` (map of string) and `structured_data` (map of map of string) |
 | outputs | `id` st |
+| datasource | by `location`, `postgres_id`, and `id` |
 | needs | C26, C28 |
 
 **postgres_metric_destination** (`postgres_metric_destination: {}`)
@@ -341,6 +344,7 @@ later create of the same CIDR fails on the leftover 6432 rule.
 | keys | `location` R X; `postgres_id` R X |
 | inputs, all X | `url` R; `username` O; `password` O WO S; `options` O WO S |
 | outputs | `id` st; `auth_methods` |
+| datasource | by `location`, `postgres_id`, and `id` |
 | needs | C26, C28, C29 |
 
 Until C29 the create returns the parent database, from which the new destination's id cannot be
@@ -353,7 +357,7 @@ known, and invariant `create_response` refuses the type.
 | create | `createKubernetesCluster`, on the item, after C36 without a default nodepool |
 | keys | `location` R X; `name` R, at most 37 characters at create, renamed by `renameKubernetesCluster` |
 | inputs | `version` R, by `upgradeKubernetesCluster`; `cp_node_count` O C D `1`, one of 1 and 3, X |
-| outputs | `id` st; `state`; `node_size` st (`x-immutable`); `services_load_balancer_url`; `cp_vms`, `nodepools` nested |
+| outputs | `id` st; `state`; `node_size` st (`x-immutable`); `services_load_balancer_url`; `cp_vm_ids`, `nodepool_ids` |
 | waits | settles while `state` is `creating`, `upgrading` or `deleting`; delete waits for 404 |
 | datasource | by `id` or `name` |
 | needs | C4, C6, C31, C33 to C37 |
@@ -365,7 +369,7 @@ known, and invariant `create_response` refuses the type.
 | create | `createKubernetesNodepool`, on the collection |
 | keys | `location` R X; `kubernetes_cluster_id` R X, merged with the response property of that name |
 | inputs | `name` R (`renameKubernetesNodepool`); `node_count` R, at least 1 (`resizeKubernetesNodepool`); `version` O C (`upgradeKubernetesNodepool`); `node_size` R X |
-| outputs | `id` st; `state`; `vms` nested |
+| outputs | `id` st; `state`; `vm_ids` |
 | waits | settles while `state` is `creating`, `resizing`, `upgrading` or `deleting`; delete waits for 404 |
 | datasource | by `location`, `kubernetes_cluster_id`, and `id` or `name` |
 | needs | C4, C32 to C34, C37 |
@@ -412,7 +416,7 @@ error.
 
 **kinds.** A type is named when its identity parameter accepts a name (schema `Reference`); the
 name is then its create's idempotency key (§7.5). A type is a resource if `create_op` finds a
-create. It has a datasource if its item path has a GET and it is named or its identity is the scope.
+create. Every type has a datasource, which reads with the item GET that `crud_ops` requires.
 
 **scope.** `{project_id}` is provider configuration, filled from the provider's `project_id`; it is
 never an attribute. A token manages one project, so a per-resource project would repeat the token.
@@ -454,8 +458,10 @@ the create body requires without a `default`.
 **optional.** Any other input is optional.
 
 **computed.** An attribute is computed if it is a response property that no input carries, an
-optional input the response echoes, or an input with a `default`. A required input is never
-computed.
+input with a `default`, or an optional input the response echoes, since the server may fill in
+such an input when the configuration leaves it out. But an echoed input whose request property is
+`nullable`, such as a VM's `maintenance_window_start_at`, is not computed, so that leaving it out
+of the configuration sends null and clears the value. A required input is never computed.
 
 **default.** A request property's `default` becomes the framework default, so the value is always
 sent and a later change of the server's default cannot cause drift.
@@ -494,13 +500,31 @@ lowercases it, so the plan insists on `tcp`.
 the path parameter's; a parent key takes the parent's `id` description. A type's description is
 its item response's.
 
-**nesting.** Objects nest one level. Inside a nested object, properties that are objects or lists
-of objects are left out; that detail is in the nested type's resource or datasource. This cuts
-every cycle, such as a firewall's subnets' firewalls' rules.
+**nesting.** An object nests to any depth, unless rule `ids` holds only its id. Objects in an input
+always nest, because the configuration must be able to write every part of a body, such as the
+`authorization` object in a metric destination's `options`. No cycle needs cutting: `Api` resolves
+each `$ref` in place, which a cyclic spec would not allow.
 
-**lookup.** A datasource takes the keys as required arguments, and also `id`, or `name` where the
-identity accepts one; exactly one of `id` and `name` must be given. A datasource of the scope takes
-no arguments. Every other attribute is computed, and write-only attributes are left out.
+**ids.** An object in a response whose schema is an item schema of a type the spec derives is held
+as its id, typed as that type's `id`. A type's item schemas are those that its item GET's response
+names by `$ref`, itself or as an `allOf` member, so `Firewall` is the firewall's, whose response
+`FirewallDetailed` extends it. The attribute is the property's name with `_id` appended, or, for an
+array, with a final `s` dropped and `_ids` appended, giving a list of ids, or a set under
+`uniqueItems`; option `idsOf` names the property that the engine reads the objects from. So a VM has
+`firewall_ids`; a firewall has `firewall_rule_ids` and `private_subnet_ids`; a cluster has
+`cp_vm_ids` and `nodepool_ids`; and a postgres database has `read_replica_ids`, of its own type,
+beside `firewall_rule_ids`, `log_destination_ids` and `metric_destination_ids`. A subnet's `nics`
+and a database's `tags` have no type of their own and nest in full. The object's detail belongs to
+its own type, and a configuration reads it through that type's resource or datasource. Held in
+full, an object would show each change to it as drift on every resource that holds it, and would
+put copies of it in state, as a nodepool would of each of its VMs; terraform providers refer to
+another resource by id instead, as `aws_instance` does with `vpc_security_group_ids`. The type need
+not be defined, so that defining a type changes no other type's attributes.
+
+**lookup.** A datasource takes the keys as required arguments, and also `id`. Where the identity
+accepts a name, it takes `id` or `name`, and exactly one of them must be given. A datasource of the
+scope takes no arguments. Every other attribute is computed, a sensitive attribute stays sensitive,
+and write-only attributes are left out.
 
 ### 4.4 Update verbs
 
@@ -569,6 +593,7 @@ than as wrong Go.
 | `create_response` | the create's success response is the item schema, its `allOf` base, or a union containing one |
 | `input_echo` | every create or verb body property is echoed by the item GET's response, `writeOnly`, or deprecated |
 | `closed_types` | every attribute's type is in `attr_type`'s table |
+| `ids` | the name that rule `ids` gives an attribute is no other property's |
 | `norms` | every operation of the type (its create, GET, DELETE and verbs) keeps the API's norms |
 
 The other facts the spec must state are facts about the document, not about deriving a type, so
@@ -675,7 +700,7 @@ module TerraformGenerator::Go
   def self.literal(v)
     case v
     in Call then "#{camel(v.name)}(#{args(v.args)})"           # listOf(str), atLeast(1)
-    in Nested then "#{camel(NESTED.fetch(v.kind))}(#{v.var})"   # listOf(o_firewalls)
+    in Nested then "#{camel(NESTED.fetch(v.kind))}(#{v.var})"   # listOf(o_nics)
     in Symbol then camel(v)                                     # a type or a flag: writeOnly
     in Set then v.map { camel(it) }.join("|")                   # flags: required|replace
     in String if v.include?("\\") && !v.match?(/[`\x00-\x1f]/) then "`#{v}`"
@@ -690,7 +715,10 @@ A statement record renders as `receiver.<class name>(members...)`, with symbols 
 (`:write_only` is `writeOnly`); `Type` renders as `t := newType(name, item, doc)` and closes with
 `register(t)`, and `Dropped` renders as a comment line only. A nested object renders first, as
 `o_<attribute> := object()` followed by an `o_<attribute>.attr(...)` statement for each of its
-properties. `TerraformGenerator::Hcl` writes the HCL examples the same way.
+properties. An object nested in another renders the same way, before the outer object's statement
+that uses it, and its variable is the outer object's variable, an underscore and its property's
+name, as in `o_options_authorization`. `TerraformGenerator::Hcl` writes the HCL examples the same
+way.
 
 ### 6.2 The module
 
@@ -775,12 +803,8 @@ postgres and vm files show:
 ```go
 	// lifecycle: Vm.state
 	t.failed("state", "no capacity available")
-	// nesting: Vm.firewalls
-	o_firewalls := object()
-	// computed: Firewall.id
-	o_firewalls.attr("id", str, computed, "ID of the firewall")
-	// computed: Vm.firewalls; attr_type: Vm.firewalls
-	t.attr("firewalls", listOf(o_firewalls), computed, "Firewalls that apply to the VM")
+	// computed: Vm.firewalls; attr_type: Vm.firewalls; ids: FirewallDetailed.id
+	t.attr("firewall_ids", listOf(str), computed, "Firewalls that apply to the VM", idsOf("firewalls"))
 ```
 
 ### 6.4 Provenance
@@ -931,8 +955,9 @@ A `typeDesc` embeds an `objectDesc`, so the same `attr` declares the attributes 
 of a nested object. Types are `str`, `i64`, `boolean`, `timestamp`, `stringOf(format)`, `listOf`,
 `setOf`, `mapOf` and `single`; flags are `required`, `optional`, `computed`, `sensitive`,
 `replace`, `stable`, `writeOnly` and `nullable`; options are `matches`, `oneOf`, `atLeast`,
-`atMost`, `defaultString`, `defaultInt` and `defaultBool`. `atLeast` and `atMost` bound an integer,
-or the length of a string. `stable` becomes a plan modifier that keeps the prior value when the
+`atMost`, `defaultString`, `defaultInt`, `defaultBool` and `idsOf`. `atLeast` and `atMost` bound an
+integer, or the length of a string. `idsOf(property)` reads the attribute from that response
+property, taking the `id` of each object there (rule `ids`). `stable` becomes a plan modifier that keeps the prior value when the
 plan does not know it, as UseStateForUnknown does. `replace` becomes one that requires
 replacement, or, together with `writeOnly`, the replace-unless-imported modifier.
 
