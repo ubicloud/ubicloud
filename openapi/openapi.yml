@@ -3772,13 +3772,16 @@ components:
       additionalProperties: false
       required:
         - algorithm
+        - cert_enabled
         - dst_port
         - health_check_endpoint
         - health_check_protocol
         - hostname
         - id
+        - location
         - name
         - src_port
+        - stack
       x-go-name: LoadBalancerSchema
     MachineImage:
       type: object
@@ -5000,17 +5003,21 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/LoadBalancer'
-              - properties:
+              - type: object
+                properties:
                   subnet:
                     description: Subnet of the Load Balancer
                     type: string
                   vms:
+                    description: IDs of the VMs attached to the Load Balancer
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
+                      type: string
+                      example: vmhfy8gff8c67hasb0eez2k1pd
+                      pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
+                    uniqueItems: true
                 additionalProperties: false
                 required:
-                  - location
                   - subnet
                   - vms
     LoadBalancers:
