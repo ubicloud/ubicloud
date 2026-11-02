@@ -165,6 +165,20 @@ RSpec.describe VmStats do
         {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40},
       ])
     end
+
+    it "skips read-only volumes, which have no storage unit" do
+      expect(File).to receive(:read).with("/vm/vmh6b1sz/prep.json").and_return(
+        JSON.generate({
+          "storage_volumes" => [
+            {"disk_index" => 0, "read_only" => true, "vhost_block_backend_version" => "v0.1"},
+            {"disk_index" => 1, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 80},
+          ],
+        }),
+      )
+      expect(vm_stats.ubiblk_disks).to eq([
+        {"disk_index" => 1, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 80},
+      ])
+    end
   end
 
   describe "#ubiblk_stats" do

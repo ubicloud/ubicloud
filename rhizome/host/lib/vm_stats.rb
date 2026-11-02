@@ -139,6 +139,7 @@ class VmStats
 
   def ubiblk_disks
     @ubiblk_disks ||= vm_params.fetch("storage_volumes").filter_map do |sv|
+      next if sv["read_only"]
       next unless sv["vhost_block_backend_version"]
       sv.slice("disk_index", "storage_device", "vhost_block_backend_version", "num_queues", "queue_size", "size_gib")
     end
