@@ -818,27 +818,27 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with unsupported options key" do
-        post_metric_destination(url: "https://example.com", options: {oauth2: {client_id: "id"}})
-
-        expect(metric_destination_error["options"]).to eq("options may only contain 'authorization' and 'headers'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {oauth2: {client_id: "id"}})
+        }.to raise_error(Committee::InvalidRequest, /options does not define properties: oauth2/)
       end
 
       it "metric-destination with malformed authorization" do
-        post_metric_destination(url: "https://example.com", options: {authorization: {type: "Bearer"}})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: {type: "Bearer"}})
+        }.to raise_error(Committee::InvalidRequest, /authorization missing required parameters: credentials/)
       end
 
       it "metric-destination with null authorization" do
-        post_metric_destination(url: "https://example.com", options: {authorization: nil})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: nil})
+        }.to raise_error(Committee::InvalidRequest, /authorization does not allow null values/)
       end
 
       it "metric-destination with empty credentials" do
-        post_metric_destination(url: "https://example.com", options: {authorization: {credentials: ""}})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: {credentials: ""}})
+        }.to raise_error(Committee::InvalidRequest, /credentials "" is shorter than min length/)
       end
 
       it "metric-destination with blank authorization type" do
@@ -854,9 +854,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with null headers" do
-        post_metric_destination(url: "https://example.com", username: "username", password: "password", options: {headers: nil})
-
-        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+        expect {
+          post_metric_destination(url: "https://example.com", username: "username", password: "password", options: {headers: nil})
+        }.to raise_error(Committee::InvalidRequest, /headers does not allow null values/)
       end
 
       it "metric-destination setting a prometheus remote_write version header" do
@@ -866,9 +866,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with non-string header values" do
-        post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => 1}})
-
-        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => 1}})
+        }.to raise_error(Committee::InvalidRequest, /headers\/additionalProperties expected string, but received Integer: 1/)
       end
 
       it "metric-destination setting a header prometheus reserves" do
@@ -897,6 +897,30 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)).to include("type" => "otlp", "url" => "https://otlp.nr-data.net")
+      end
+
+      def post_log_destination(params)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination", params.to_json
+      end
+
+      it "log-destination (otlp) with headers" do
+        post_log_destination(name: "nr", type: "otlp", url: "https://otlp.nr-data.net", options: {headers: {"api-key" => "secret"}})
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).not_to have_key("options")
+        expect(pg.log_destinations.first.options).to eq({"headers" => {"api-key" => "secret"}})
+      end
+
+      it "log-destination (syslog) with headers" do
+        post_log_destination(name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514", options: {headers: {"api-key" => "secret"}})
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: options", {"options" => "options may only contain 'structured_data' for syslog"})
+      end
+
+      it "log-destination with structured data that is not a map of maps" do
+        expect {
+          post_log_destination(name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514", options: {structured_data: {"token@41058" => "my-token"}})
+        }.to raise_error(Committee::InvalidRequest, /structured_data\/additionalProperties expected object, but received String: "my-token"/)
       end
 
       it "log-destination invalid syslog port" do

@@ -515,27 +515,6 @@ RSpec.describe Validation do
         expect(e.details[:options]).to include("may only contain 'structured_data'")
       }
     end
-
-    it "rejects non-string header values" do
-      expect { described_class.validate_log_destination_options("otlp", {"headers" => {"key" => 123}}) }.to raise_error { |e|
-        expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to include("flat object with string values")
-      }
-    end
-
-    it "rejects structured_data with non-hash SD-ID values" do
-      expect { described_class.validate_log_destination_options("syslog", {"structured_data" => {"id" => "not-a-hash"}}) }.to raise_error { |e|
-        expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to include("SD-IDs to key/value objects")
-      }
-    end
-
-    it "rejects structured_data with non-string leaf values" do
-      expect { described_class.validate_log_destination_options("syslog", {"structured_data" => {"id" => {"key" => 99}}}) }.to raise_error { |e|
-        expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to include("SD-IDs to key/value objects")
-      }
-    end
   end
 
   describe "#validate_vcpu_quota" do
