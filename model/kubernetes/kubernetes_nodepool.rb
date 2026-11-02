@@ -29,6 +29,10 @@ class KubernetesNodepool < Sequel::Model
     destroy_set? || strand.label == "destroy"
   end
 
+  # The values that display_state can return. The enum of
+  # KubernetesNodepool.state in openapi.yml must list the same ones.
+  DISPLAY_STATES = %w[creating running resizing upgrading deleting].freeze
+
   def display_state
     return "deleting" if destroying?
     return "upgrading" if upgrading? || upgrade_requested_set?

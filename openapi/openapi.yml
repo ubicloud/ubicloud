@@ -5070,13 +5070,14 @@ components:
         cp_node_count:
           description: Number of control plane nodes
           type: integer
-        cp_vms:
-          type: array
-          items:
-            $ref: '#/components/schemas/Vm'
         display_state:
-          description: State of the KubernetesCluster
+          description: Deprecated. The same as state.
           type: string
+          deprecated: true
+          x-deprecated:
+            since: 2026-11-02
+            use:
+              - state
         id:
           description: ID of the KubernetesCluster
           type: string
@@ -5093,14 +5094,25 @@ components:
         node_size:
           description: Size of each control plane node
           type: string
-        nodepools:
-          type: array
-          items:
-            $ref: '#/components/schemas/KubernetesNodepool'
         services_load_balancer_url:
-          description: Services
+          description: Hostname of the load balancer for the cluster's LoadBalancer services; null until the cluster has one
           type: string
           nullable: true
+          readOnly: true
+        state:
+          description: State of the KubernetesCluster
+          type: string
+          enum:
+            - creating
+            - running
+            - upgrading
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - upgrading
+              - deleting
         version:
           description: Version of the KubernetesCluster
           type: string
@@ -5111,6 +5123,8 @@ components:
         - location
         - name
         - node_size
+        - services_load_balancer_url
+        - state
         - version
       x-go-name: KubernetesClusterSchema
     KubernetesNodepool:
@@ -5136,6 +5150,22 @@ components:
         node_size:
           description: Size of each worker node
           type: string
+        state:
+          description: State of the KubernetesNodepool
+          type: string
+          enum:
+            - creating
+            - running
+            - resizing
+            - upgrading
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - resizing
+              - upgrading
+              - deleting
         version:
           description: Version of the KubernetesNodepool
           type: string
@@ -5151,7 +5181,9 @@ components:
         - name
         - node_count
         - node_size
+        - state
         - version
+        - vms
       x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
       description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from location -> family -> size -> storage_size -> ha_type'
@@ -6096,6 +6128,24 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/KubernetesCluster'
+              - type: object
+                additionalProperties: false
+                properties:
+                  cp_vms:
+                    description: Control plane VMs
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                    readOnly: true
+                  nodepools:
+                    description: Nodepools of the cluster, in order of name
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KubernetesNodepool'
+                    readOnly: true
+                required:
+                  - cp_vms
+                  - nodepools
     KubernetesClusters:
       description: A list of KubernetesClusters
       content:

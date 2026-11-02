@@ -39,9 +39,9 @@ RSpec.describe KubernetesCluster do
     kc.update(kubeconfig: "stored")
     expect(kc.display_state).to eq "running"
 
-    kc.strand.update(label: "start")
+    kc.strand.update(label: "sync_kubernetes_services")
     kc.reload
-    expect(kc.display_state).to eq "creating"
+    expect(kc.display_state).to eq "running"
 
     kc.strand.update(label: "upgrade")
     np.strand.update(label: "wait")

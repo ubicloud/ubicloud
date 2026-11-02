@@ -1,6 +1,4 @@
 described: CertAuthUserList.items: describe it
-described: KubernetesCluster.cp_vms: describe it
-described: KubernetesCluster.nodepools: describe it
 described: PostgresPrivateLinkServiceCreate.name: describe it
 described: PrivateLinkService.id: describe it
 described: PrivateLinkService.ip_address_type: describe it
@@ -26,13 +24,9 @@ direction: GithubRepository.id: mark it readOnly, or accept it in a request
 direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
 direction: GithubRepository.name: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.cp_node_count: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.cp_vms: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.display_state: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.id: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.location: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.node_size: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.nodepools: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.services_load_balancer_url: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.id: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.kubernetes_cluster_id: mark it readOnly, or accept it in a request
 direction: KubernetesNodepool.version: mark it readOnly, or accept it in a request
