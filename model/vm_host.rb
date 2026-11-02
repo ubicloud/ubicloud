@@ -425,6 +425,35 @@ class VmHost < Sequel::Model
     }
   end
 
+  def export_metrics(session:, tsdb_client:)
+    export_github_runner_metrics(session)
+    super
+  end
+
+  def export_github_runner_metrics(session)
+    return unless (project_id = Config.github_runner_metrics_project_id)
+
+    runners = GithubRunner.where(vm_id: vms_dataset.select(:id)).eager(:vm, installation: :project).all
+    runners.select! { it.installation.project.get_ff_github_runner_metrics }
+    return if runners.empty?
+
+    labels_by_vm_name = runners.to_h do |runner|
+      [runner.vm.inhost_name, {"ubicloud_resource_id" => runner.ubid, "vm" => runner.vm.ubid, "vm_host" => ubid}]
+    end
+    ssh_session = session[:ssh_session]
+    output = ssh_session.exec!("sudo host/bin/runner-metrics-collect read :shelljoin_vm_names", shelljoin_vm_names: labels_by_vm_name.keys)
+    samples, acks = GithubRunnerMetrics.parse(output, labels_by_vm_name)
+    return if acks.empty?
+
+    unless samples.empty?
+      tsdb_client = session.fetch(:github_runner_metrics_client) do
+        session[:github_runner_metrics_client] = VictoriaMetricsResource.client_for_project(project_id)
+      end
+      tsdb_client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: Time.now, samples:))
+    end
+    ssh_session.exec!("sudo host/bin/runner-metrics-collect ack", stdin: acks.join("\n"))
+  end
+
   def disk_device_ids
     storage_devices.flat_map { |sd| sd.unix_device_list }
   end

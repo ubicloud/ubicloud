@@ -61,4 +61,76 @@ module GithubRunnerMetrics
       sudo systemctl start ubicloud-metrics-writer.service
     COMMAND
   end
+
+  # section => [item name key, label, {field => metric}]
+  SECTIONS = {
+    "cpu-load" => ["cpu", "cpu", {"user" => "runner_cpu_load_user", "nice" => "runner_cpu_load_nice", "system" => "runner_cpu_load_system", "iowait" => "runner_cpu_load_iowait", "steal" => "runner_cpu_load_steal"}],
+    "queue" => [nil, nil, {"ldavg-1" => "runner_queue_ldavg_1", "ldavg-5" => "runner_queue_ldavg_5", "ldavg-15" => "runner_queue_ldavg_15"}],
+    "memory" => [nil, nil, {"memused" => "runner_memory_memused", "avail" => "runner_memory_avail", "cached" => "runner_memory_cached"}],
+    "filesystems" => ["mountpoint", "mountpoint", {"%fsused" => "runner_filesystems_fsused_percent"}],
+    "disk" => ["disk-device", "device", {"rkB" => "runner_disk_rkb", "wkB" => "runner_disk_wkb"}],
+    "net-dev" => ["iface", "iface", {"rxkB" => "runner_net_dev_rxkb", "txkB" => "runner_net_dev_txkb"}],
+  }.freeze
+  MAX_ITEMS = 4
+  LABEL_VALUE = %r{\A[\w./-]{1,64}\z}
+  MAX_AGE = 60 * 60
+  MAX_CLOCK_SKEW = 60
+
+  # Returns the Prometheus samples and the files to ack from runner-metrics-collect output.
+  def self.parse(output, labels_by_vm_name, now: Time.now)
+    samples = +""
+    acks = []
+    output.each_line(chomp: true) do |line|
+      vm_name, file, json = line.split(" ", 3)
+      next unless (labels = labels_by_vm_name[vm_name])
+
+      unless json
+        acks << "#{vm_name} #{file}"
+        next
+      end
+
+      entry = begin
+        JSON.parse(json, max_nesting: 10)
+      rescue JSON::ParserError
+        next
+      end
+      add_samples(samples, entry, labels, now)
+    end
+
+    [samples, acks]
+  end
+
+  def self.add_samples(samples, entry, labels, now)
+    stats = entry.dig("sysstat", "hosts", 0, "statistics", 0) if entry.is_a?(Hash)
+    return unless stats.is_a?(Hash) && (timestamp = stats["timestamp"]).is_a?(Hash)
+
+    time = begin
+      Time.strptime("#{timestamp["date"]} #{timestamp["time"]} UTC", "%Y-%m-%d %H:%M:%S %Z")
+    rescue ArgumentError
+      return
+    end
+    return unless time.between?(now - MAX_AGE, now + MAX_CLOCK_SKEW)
+
+    timestamp_ms = (time.to_f * 1000).to_i
+    SECTIONS.each do |section, (item_key, item_label, metrics)|
+      data = (section == "net-dev") ? stats.dig("network", "net-dev") : stats[section]
+      items = item_key ? Array(data).first(MAX_ITEMS) : [data]
+      items.each do |item|
+        next unless item.is_a?(Hash)
+
+        item_labels = labels
+        if item_key
+          next unless LABEL_VALUE.match?(value = item[item_key].to_s)
+          item_labels = labels.merge(item_label => value)
+        end
+        label_text = item_labels.map { |key, label_value| "#{key}=\"#{label_value}\"" }.join(",")
+
+        metrics.each do |field, metric|
+          next unless (value = item[field]).is_a?(Numeric)
+
+          samples << "#{metric}{#{label_text}} #{value} #{timestamp_ms}\n"
+        end
+      end
+    end
+  end
 end
