@@ -251,24 +251,76 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       nx.report
     end
 
-    it "pops clean when every table is safe" do
+    # The reindex script for the given lines of the jobs hash, followed by the
+    # given comment lines.
+    def script(job_lines, by_hand = [])
+      <<~RUBY + by_hand.join
+        pg = udec("#{postgres_resource.ubid}")
+        sshable = pg.representative_server.vm.sshable
+        jobs = {
+        #{job_lines.join("\n")}
+        }
+        jobs.each_with_index do |(db, sqls), i|
+          sshable.d_run("ctype_reindex_\#{i}", "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
+            "-d", PostgresServer.conninfo(db), "-v", "ON_ERROR_STOP=1", *sqls.flat_map { ["-c", it] })
+        end
+      RUBY
+    end
+
+    let(:users) { {"relation" => "users", "objects" => ["citext: users_email_key"]} }
+    let(:users_script) { script(['  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key"],']) }
+
+    it "pops clean, with no reindex script, when every table is safe" do
       results = {"app" => empty_result.merge("safe" => 2, "refresh" => ["materialized_view: mv"])}
       expect { report_with(results) }.to exit({"msg" => "clean", "rebuild_databases" => [], "large_databases" => [], "failed_databases" => [], "refresh_databases" => ["app"], "unresolved_databases" => [], "databases" => results})
     end
 
-    it "pops rebuild when a table has non-ASCII rows" do
-      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}]), "postgres" => empty_result}
-      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results})
+    it "pops rebuild with a script that reindexes each index once per database, and lists other objects for work by hand" do
+      results = {
+        "app" => empty_result.merge("rebuild" => [
+          {"relation" => "users", "objects" => ["citext: users_email_key", "pg_trgm: users_name_trgm"]},
+          {"relation" => "posts", "objects" => ["expression: posts_lower_idx", "stored_column: posts.body_tsv"]},
+        ]),
+        "postgres" => empty_result,
+        "shop" => empty_result.merge("rebuild" => [{"relation" => "items", "objects" => ["pg_trgm: items_name_trgm", "pg_trgm: items_name_trgm"]}]),
+      }
+      expected_script = script([
+        '  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key", "REINDEX INDEX CONCURRENTLY users_name_trgm", "REINDEX INDEX CONCURRENTLY posts_lower_idx"],',
+        '  "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"],',
+      ], ["# By hand, not indexes:\n", %(#   "app: stored_column: posts.body_tsv"\n)])
+      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app", "shop"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
+        "reindex_script" => expected_script})
+    end
+
+    it "pops a script with only comments when no object to rebuild is an index" do
+      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["check_constraint: t.t_check"]}])}
+      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
+        "reindex_script" => script([""], ["# By hand, not indexes:\n", %(#   "app: check_constraint: t.t_check"\n)])})
+    end
+
+    it "puts customer names into the script only as Ruby string literals" do
+      database = %(it's "\#{x})
+      index = %("Odd ""i\#{dx}"")
+      column = %(t."a\nsystem('x')")
+      results = {database => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["pg_trgm: #{index}", "stored_column: #{column}"]}])}
+      script = catch(:prog_return) { report_with(results) }.exitval["reindex_script"]
+      expect { RubyVM::InstructionSequence.compile(script) }.not_to raise_error
+      jobs = eval(script[/^jobs = \{.*?^\}$/m].delete_prefix("jobs = "))  # rubocop:disable Security/Eval
+      expect(jobs).to eq(database => ["REINDEX INDEX CONCURRENTLY #{index}"])
+      expect(script.lines.last).to eq("#   #{"#{database}: stored_column: #{column}".inspect}\n")
+      expect(script.lines.count { it.start_with?("#") }).to eq(2)
     end
 
     it "pops fork_scan when a table is over the size limit, before rebuild" do
-      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}]), "postgres" => empty_result.merge("large" => [{"relation" => "events"}])}
-      expect { report_with(results) }.to exit({"msg" => "fork_scan", "rebuild_databases" => ["app"], "large_databases" => ["postgres"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results})
+      results = {"app" => empty_result.merge("rebuild" => [users]), "postgres" => empty_result.merge("large" => [{"relation" => "events"}])}
+      expect { report_with(results) }.to exit({"msg" => "fork_scan", "rebuild_databases" => ["app"], "large_databases" => ["postgres"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
+        "reindex_script" => users_script})
     end
 
     it "pops review when a scan failed or an object is unresolved, before rebuild" do
-      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "users"}], "unresolved" => ["partition_key: parted"]), "postgres" => empty_result.merge("failed" => [{"error" => "boom"}])}
-      expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results})
+      results = {"app" => empty_result.merge("rebuild" => [users], "unresolved" => ["partition_key: parted"]), "postgres" => empty_result.merge("failed" => [{"error" => "boom"}])}
+      expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results,
+        "reindex_script" => users_script})
     end
   end
 
