@@ -127,6 +127,9 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   # as failed.
   LOG_READ_LIMIT = 12
 
+  # The audit kinds that are indexes, which a REINDEX rebuilds.
+  INDEX_KINDS = %w[expression citext pg_trgm].freeze
+
   EMPTY_RESULT = {"safe" => 0, "rebuild" => [], "large" => [], "failed" => [], "refresh" => [], "unresolved" => []}.freeze
 
   frame_reader :max_table_gib
@@ -222,8 +225,42 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
 
     result = {"msg" => msg, "rebuild_databases" => rebuild, "large_databases" => large, "failed_databases" => failed,
               "refresh_databases" => refresh, "unresolved_databases" => unresolved, "databases" => results}
+    if (script = reindex_script)
+      result["reindex_script"] = script
+    end
     Clog.emit("postgres ctype scan", {postgres_ctype_scan: result.merge("resource" => postgres_resource.ubid)})
     pop result
+  end
+
+  # A console script that rebuilds the indexes of the tables to rebuild, to
+  # run on the new primary after the move: one daemonizer unit per database,
+  # one psql -c per index, as REINDEX CONCURRENTLY cannot run in a
+  # transaction block. Other objects are listed as comments, for work by
+  # hand. Names come from the customer, so each goes in through inspect, and
+  # the units are numbered, as a database name need not be a valid unit name.
+  def reindex_script
+    jobs = {}
+    by_hand = []
+    results.each do |database, result|
+      kinds = result["rebuild"].flat_map { it["objects"] }.map { it.split(": ", 2) }
+      indexes, others = kinds.partition { |kind, _| INDEX_KINDS.include?(kind) }
+      jobs[database] = indexes.map { |_, name| "REINDEX INDEX CONCURRENTLY #{name}" }.uniq unless indexes.empty?
+      by_hand.concat(others.map { |kind, name| "#{database}: #{kind}: #{name}" })
+    end
+    return if jobs.empty? && by_hand.empty?
+
+    script = <<~RUBY
+      pg = udec(#{postgres_resource.ubid.inspect})
+      sshable = pg.representative_server.vm.sshable
+      jobs = {
+      #{jobs.map { |database, sqls| "  #{database.inspect} => [#{sqls.map(&:inspect).join(", ")}]," }.join("\n")}
+      }
+      jobs.each_with_index do |(db, sqls), i|
+        sshable.d_run("ctype_reindex_\#{i}", "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
+          "-d", PostgresServer.conninfo(db), "-v", "ON_ERROR_STOP=1", *sqls.flat_map { ["-c", it] })
+      end
+    RUBY
+    by_hand.empty? ? script : script + "# By hand, not indexes:\n" + by_hand.map { "#   #{it.inspect}\n" }.join
   end
 
   # A caught-up standby is read when there is one, so the full-table scans
