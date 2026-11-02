@@ -19,4 +19,16 @@ module TerraformHarness::Settle
   def settle_private_subnet(ps)
     ps.destroy if ps.destroy_set?
   end
+
+  # A new VM reads as creating until its prog starts it on a host, and a
+  # DELETE leaves it deleting until its prog destroys it and has NicNexus
+  # destroy its NICs.
+  def settle_vm(vm)
+    if vm.destroy_set?
+      vm.nics.each(&:destroy)
+      vm.destroy
+    elsif vm.display_state == "creating"
+      vm.update(display_state: "running")
+    end
+  end
 end
