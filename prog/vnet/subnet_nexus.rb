@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil, id: PrivateSubnet.generate_uuid)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -15,9 +15,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       fail "Cannot specify both allow_only_ssh and firewall_id"
     end
 
-    ubid = PrivateSubnet.generate_ubid
-    id = ubid.to_uuid
-    name ||= PrivateSubnet.ubid_to_name(ubid)
+    name ||= PrivateSubnet.ubid_to_name(UBID.from_uuidish(id))
 
     Validation.validate_name(name)
     ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
