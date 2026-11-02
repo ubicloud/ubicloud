@@ -1,11 +1,11 @@
-<%# locals: (resource:, metrics:, running_subject:, nodes: nil) %>
+<%# locals: (resource:, metrics:, running_subject:, nodes: nil, metrics_url: path(resource), available: resource.display_state != "creating") %>
 <div
   id="metrics-container"
   class="p-6"
-  data-metrics-url="<%= path(resource) %>"
+  data-metrics-url="<%= metrics_url %>"
   data-zoomable
 >
-  <% if resource.display_state != "creating" %>
+  <% if available %>
     <div class="mb-4 flex gap-2 justify-end">
       <%== part("components/button", attributes: {id: "reset-zoom-button"}, text: "Reset zoom", type: "primary", extra_class: "hidden") %>
 

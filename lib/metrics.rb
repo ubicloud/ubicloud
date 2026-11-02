@@ -388,4 +388,119 @@ module Metrics
       ],
     ),
   }
+
+  GITHUB_RUNNER_METRICS = {
+    cpu_usage:
+    MetricDefinition.new(
+      name: "CPU Usage",
+      description: "Percentage of CPU time spent in each mode",
+      unit: "%",
+      series: [
+        TimeSeries.new(
+          labels: {mode: "user"},
+          query: "sum(runner_cpu_load_user{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {mode: "system"},
+          query: "sum(runner_cpu_load_system{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {mode: "iowait"},
+          query: "sum(runner_cpu_load_iowait{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {mode: "steal"},
+          query: "sum(runner_cpu_load_steal{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {mode: "nice"},
+          query: "sum(runner_cpu_load_nice{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+      ],
+    ),
+    load_average:
+    MetricDefinition.new(
+      name: "Load Average",
+      description: "Average number of runnable and uninterruptible tasks",
+      unit: "count",
+      series: [
+        TimeSeries.new(
+          labels: {name: "1m"},
+          query: "sum(runner_queue_ldavg_1{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {name: "5m"},
+          query: "sum(runner_queue_ldavg_5{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+        TimeSeries.new(
+          labels: {name: "15m"},
+          query: "sum(runner_queue_ldavg_15{ubicloud_resource_id=\"$ubicloud_resource_id\"})",
+        ),
+      ],
+    ),
+    memory_usage:
+    MetricDefinition.new(
+      name: "Memory Usage",
+      description: "Memory in use, available, and used for the page cache",
+      unit: "bytes",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Used"},
+          query: "sum(runner_memory_memused{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+        TimeSeries.new(
+          labels: {name: "Available"},
+          query: "sum(runner_memory_avail{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+        TimeSeries.new(
+          labels: {name: "Cached"},
+          query: "sum(runner_memory_cached{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+      ],
+    ),
+    disk_usage:
+    MetricDefinition.new(
+      name: "Disk Usage",
+      description: "Percentage of the root filesystem in use",
+      unit: "%",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Used"},
+          query: "sum(runner_filesystems_fsused_percent{ubicloud_resource_id=\"$ubicloud_resource_id\", mountpoint=\"/\"})",
+        ),
+      ],
+    ),
+    disk_io:
+    MetricDefinition.new(
+      name: "Disk Throughput",
+      description: "Bytes read from and written to the root disk",
+      unit: "bytes/s",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Read"},
+          query: "sum(runner_disk_rkb{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+        TimeSeries.new(
+          labels: {name: "Write"},
+          query: "sum(runner_disk_wkb{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+      ],
+    ),
+    network_traffic:
+    MetricDefinition.new(
+      name: "Network Traffic",
+      description: "Incoming and outgoing network traffic",
+      unit: "bytes/s",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Received"},
+          query: "sum(runner_net_dev_rxkb{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+        TimeSeries.new(
+          labels: {name: "Transmitted"},
+          query: "sum(runner_net_dev_txkb{ubicloud_resource_id=\"$ubicloud_resource_id\"}) * 1024",
+        ),
+      ],
+    ),
+  }
 end
