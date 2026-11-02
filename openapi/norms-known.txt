@@ -85,7 +85,6 @@ examples: PrivateLinkService.id: give it an example
 examples: PrivateLinkServiceCreate.aws: give it an example
 examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
 examples: PrivateLocation.id: give it an example
-examples: createLocationPostgresFirewallRule.cidr: give it an example
 examples: createMachineImage.vm: give it an example
 examples: createMachineImageVersion.vm: give it an example
 examples: createPrivateLocation.access_key: give it an example
