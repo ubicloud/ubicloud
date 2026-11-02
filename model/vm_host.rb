@@ -425,6 +425,43 @@ class VmHost < Sequel::Model
     }
   end
 
+  def export_metrics(session:, tsdb_client:)
+    count = super
+    export_github_runner_metrics(session)
+    count
+  end
+
+  def export_github_runner_metrics(session)
+    return unless Config.github_runner_metrics_project_id
+
+    runners = GithubRunner.where(vm_id: vms_dataset.select(:id)).runner_metrics_enabled.eager(:vm).all
+    return if runners.empty?
+
+    labels_by_vm_name = runners.to_h do |runner|
+      [runner.vm.inhost_name, {"ubicloud_resource_id" => runner.ubid, "vm" => runner.vm.ubid, "vm_host" => ubid}]
+    end
+    ssh_session = session[:ssh_session]
+    output = ssh_session.exec!("host/bin/runner-metrics-collect read :shelljoin_vm_names", shelljoin_vm_names: labels_by_vm_name.keys)
+    # The agents write only validated entries, so other output means a broken
+    # or compromised host; its files stay unacked until someone looks.
+    tag_parts = ["GithubRunnerMetricsInvalid", id]
+    begin
+      samples, acks = GithubRunnerMetrics.parse(output, labels_by_vm_name)
+    rescue JSON::ParserError, GithubRunnerMetrics::InvalidOutput => ex
+      Clog.emit("Invalid GitHub runner metrics", {invalid_github_runner_metrics: Util.exception_to_hash(ex, into: {ubid:})})
+      Prog::PageNexus.assemble("Invalid GitHub runner metrics on #{ubid}", tag_parts, ubid, resource_id: id)
+      return
+    end
+    Page.from_tag_parts(*tag_parts)&.incr_resolve
+    return if acks.empty?
+
+    tsdb_client = session.fetch(:github_runner_metrics_client) do
+      session[:github_runner_metrics_client] = GithubRunner.victoria_metrics_client
+    end
+    tsdb_client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: Time.now, samples:))
+    ssh_session.exec!("host/bin/runner-metrics-collect ack", stdin: acks.join("\n"))
+  end
+
   def disk_device_ids
     storage_devices.flat_map { |sd| sd.unix_device_list }
   end

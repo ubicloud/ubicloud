@@ -81,4 +81,30 @@ module GithubRunnerMetrics
       sudo systemctl start ubicloud-metrics-writer.service
     COMMAND
   end
+
+  class InvalidOutput < StandardError; end
+
+  # Returns the Prometheus samples and the "<vm> <file>" lines to ack from
+  # runner-metrics-collect output. The host agents write only validated
+  # entries, {"time":<seconds>,"<metric>":<value>,...}, so anything else raises.
+  def self.parse(output, labels_by_vm_name)
+    label_texts = labels_by_vm_name.transform_values do |labels|
+      labels.map { |key, value| "#{key}=\"#{value}\"" }.join(",")
+    end
+    samples = +""
+    acks = []
+    output.each_line(chomp: true) do |line|
+      vm_name, file, json = line.split(" ", 3)
+      label_text = label_texts[vm_name]
+      entry = JSON.parse(json) if label_text && json
+      time = entry.delete("time") if entry.is_a?(Hash)
+      fail InvalidOutput, "unexpected line: #{line}" unless time.is_a?(Integer)
+
+      ack = "#{vm_name} #{file}"
+      acks << ack unless acks.last == ack
+      entry.each { |metric, value| samples << "#{metric}{#{label_text}} #{value} #{time * 1000}\n" }
+    end
+
+    [samples, acks]
+  end
 end
