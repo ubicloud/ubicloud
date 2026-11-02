@@ -59,6 +59,25 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "#gcp_github_runner?" do
+    before { allow(Config).to receive(:github_runner_service_project_id).and_return(private_subnet.project_id) }
+
+    it "is true for the reserved name in the GitHub runner service project" do
+      private_subnet.update(name: described_class::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(private_subnet.gcp_github_runner?).to be true
+    end
+
+    it "is false for another name in the GitHub runner service project" do
+      expect(private_subnet.gcp_github_runner?).to be false
+    end
+
+    it "is false for the reserved name in another project" do
+      private_subnet.update(name: described_class::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(Project.create(name: "other").id)
+      expect(private_subnet.gcp_github_runner?).to be false
+    end
+  end
+
   describe "#gcp_management?" do
     before { allow(Config).to receive(:postgres_service_project_id).and_return(private_subnet.project_id) }
 
