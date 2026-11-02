@@ -1581,6 +1581,23 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
       end
 
+      it "partial update of pgbouncer_config alone" do
+        pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pgbouncer_config: {"max_client_conn" => "200"},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.user_config).to eq({"max_connections" => "100"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "200"})
+      end
+
+      it "partial update with an empty body" do
+        expect {
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {}.to_json
+        }.to raise_error(Committee::InvalidRequest, /less than minProperties/)
+      end
+
       it "rejects increasing a restart-sensitive param beyond a read replica's value" do
         pg.update(user_config: {"max_connections" => "100"})
         replica = Prog::Postgres::PostgresResourceNexus.assemble(

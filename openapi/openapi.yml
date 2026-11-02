@@ -524,7 +524,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/FirewallRuleUpdate'
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                protocol:
+                  description: Protocol of the firewall rule (tcp or udp)
+                  type: string
+                description:
+                  description: Description of the firewall rule
+                  type: string
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           $ref: '#/components/responses/FirewallRule'
@@ -1632,7 +1647,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostgresPatchConfig'
+              type: object
+              properties:
+                pg_config:
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                    nullable: true
+                pgbouncer_config:
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
+                    nullable: true
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           description: Successful response
@@ -2969,7 +3001,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SshPublicKeyUpdate'
+              type: object
+              properties:
+                name:
+                  type: string
+                public_key:
+                  type: string
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           description: Successful response
@@ -3412,109 +3451,6 @@ components:
       required:
         - name
         - public_key
-    FirewallRuleUpdate:
-      anyOf:
-        - type: object
-          properties:
-            cidr:
-              description: CIDR of the firewall rule
-              type: string
-            port_range:
-              description: Port range of the firewall rule
-              type: string
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - cidr
-        - type: object
-          properties:
-            port_range:
-              description: Port range of the firewall rule
-              type: string
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - port_range
-        - type: object
-          properties:
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - protocol
-        - type: object
-          properties:
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - description
-    SshPublicKeyUpdate:
-      anyOf:
-        - type: object
-          properties:
-            name:
-              type: string
-            public_key:
-              type: string
-          additionalProperties: false
-          required:
-            - name
-        - type: object
-          properties:
-            public_key:
-              type: string
-          additionalProperties: false
-          required:
-            - public_key
-    PostgresPatchConfig:
-      anyOf:
-        - type: object
-          properties:
-            pg_config:
-              type: object
-              example:
-                max_connections: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-            pgbouncer_config:
-              type: object
-              example:
-                max_client_conn: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-          additionalProperties: false
-          required:
-            - pg_config
-        - type: object
-          properties:
-            pgbouncer_config:
-              type: object
-              example:
-                max_client_conn: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-          additionalProperties: false
-          required:
-            - pgbouncer_config
     CertAuthUserRequest:
       type: object
       properties:
