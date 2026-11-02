@@ -356,6 +356,29 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns a retryable error while another nodepool is still being set up" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "bootstrap_worker_nodes")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns a final error while the cluster is being deleted" do
+          kc.strand.update(label: "wait")
+          kc.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kc.nodepools_dataset.count).to eq(1)
         end
 
@@ -522,6 +545,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to resize a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -533,6 +557,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to resize a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -542,6 +567,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -553,6 +579,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kn.reload.node_count).to eq(2)
+        end
+
+        it "returns a final error while the nodepool is being deleted" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          kn.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -625,7 +664,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
-          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(last_response).to have_api_error(422, "Nodepool is already at the cluster's version, #{kc.version}")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.reload.version).to eq(kc.version)
           expect(kn.upgrade_requested_set?).to be false
         end
@@ -637,8 +677,22 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
-          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(last_response).to have_api_error(422, "Cluster is not ready to upgrade a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.version).to eq(Option.kubernetes_versions[1])
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
+        it "returns a final error when the cluster is being deleted" do
+          kn.update(version: Option.kubernetes_versions[1])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          kc.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to upgrade a nodepool")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.upgrade_requested_set?).to be false
         end
       end
@@ -752,7 +806,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
-        expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
+        expect(last_response).to have_api_error(422, "Cluster is at the latest version, #{original_version}")
+        expect(last_response.headers).not_to have_key("retry-after")
         expect(kc.reload.version).to eq(original_version)
       end
 
@@ -766,6 +821,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response).to have_api_error(422, "All nodepools must be upgraded to within two minor versions of the cluster first")
+        expect(last_response.headers).not_to have_key("retry-after")
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions[1])
         expect(kc.upgrade_set?).to be false
       end
@@ -779,6 +835,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
+        expect(last_response.headers["retry-after"]).to eq("10")
         expect(kc.reload.version).to eq(original_version)
         expect(kc.upgrade_set?).to be false
       end
