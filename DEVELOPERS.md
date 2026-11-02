@@ -460,11 +460,23 @@ $ bundle exec rake terraform
 ```
 
 It runs the generator's specs, writes the provider's generated files,
-checks and tests the provider's Go, and fails unless the tests cover
-every statement of its hand-written part. `rake -T terraform` lists
-the steps that can be run alone. The tests above run none of this. CI
-runs it in the terraform workflow, with `CHECK=1` so that a generated
-file that has been edited fails it.
+checks and tests the provider's Go, runs the examples in
+`spec/terraform/`, and fails unless the Go tests and the examples
+together cover every statement of the provider's hand-written engine.
+`rake -T terraform` lists the steps that can be run alone. The tests
+above run none of this. CI runs it in the terraform workflow, with
+`CHECK=1` so that a generated file that has been edited fails it.
+
+A misbehaviour of the provider is written as an rspec example in
+`spec/terraform/`, where terraform and the provider run against the API
+in process.
+[doc/terraform-harness-design.md](doc/terraform-harness-design.md) says
+how to write one. A file of examples runs like any spec file; the
+harness generates and builds the provider as it loads:
+
+```sh
+$ bundle exec rspec spec/terraform/ssh_public_key_harness.rb
+```
 
 ### Running Web Console
 

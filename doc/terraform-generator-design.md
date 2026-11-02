@@ -1153,7 +1153,7 @@ jobs:
       - run: bundle exec rake terraform CHECK=1
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with: {name: terraform, path: "coverage/terraform/\ntmp/terraform/"}
+        with: {name: terraform, path: "coverage/terraform/\ntmp/terraform/\n!tmp/terraform/bin/"}
 ```
 
 It runs the command an engineer runs, in strict mode. Go comes from the module's `go` directive, as
@@ -1164,22 +1164,21 @@ The command measures the coverage of the hand-written engine. The target is 100%
 counting `go test` and the harness together. `go test -cover` writes its counters to one coverage
 directory (`-test.gocoverdir`); the provider binary is built with `go build -cover`, and every
 terraform run in the harness gives it a second directory as `GOCOVERDIR`; and `go tool covdata
-textfmt` reads both into one profile, from which the report names each uncovered statement.
-`main.go` is reached only through the harness. The generated `*_gen.go` files are data and are
-not counted. An important regression may also get a test of its own, in either layer. The
-generator's suite measures the coverage of `terraform/lib`, and the harness measures no Ruby
-coverage, so the main suite's coverage needs no merge across workflows. The everyday loop, `rake`
-and the main suite, never runs Go, terraform or the generator. The workflow meets zizmor's rules:
-pinned actions, read-only permissions, no persisted credentials. It should take about two minutes,
-most of it setup.
+textfmt` reads both into one profile, from which the report names each uncovered statement. The
+generated `*_gen.go` files are data and are not counted. Neither is `main.go`, which only starts
+the server; no test reaches its call of `log.Fatal`, which runs only if serving fails. An important
+regression may also get a test of its own, in either layer. The generator's suite measures the
+coverage of `terraform/lib`, and the harness measures no Ruby coverage, so the main suite's coverage
+needs no merge across workflows. The everyday loop, `rake` and the main suite, never runs Go,
+terraform or the generator. The workflow meets zizmor's rules: pinned actions, read-only
+permissions, no persisted credentials. It should take about two minutes, most of it setup.
 
 ### 8.4 The one command
 
 `bundle exec rake terraform` runs the whole loop, and `rake -T terraform` lists it and its parts:
 
 1. **Preflight.** Check `go version` and `terraform version` against `mise.toml`, and if either
-   differs, print `mise install` and stop. Check that the test database is reachable and migrated,
-   and if not, print `rake setup_database[test,true]` and stop.
+   differs, print `mise install` and stop.
 2. **Generator's suite.** Run rspec in `terraform/` with `COVERAGE=1`, so that a file short of 100%
    line or branch coverage fails it.
 3. **Generate.** Write the generated files, keeping edited ones, and print each file's status.

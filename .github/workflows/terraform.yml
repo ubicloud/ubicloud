@@ -56,3 +56,4 @@ jobs:
         path: |
           coverage/terraform/
           tmp/terraform/
+          !tmp/terraform/bin/
