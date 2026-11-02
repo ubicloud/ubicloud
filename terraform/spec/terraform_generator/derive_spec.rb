@@ -5,12 +5,14 @@ RSpec.describe TerraformGenerator::Derive do
 
   def expect_refusal(message, facts = {}, **parts) = expect { derive(facts, **parts) }.to raise_error(TerraformGenerator::SpecError, message)
 
-  def parent
-    id = {type: "string", readOnly: true, pattern: "^pa[0-9a-z]{24}$", description: "ID of the parent"}
+  def parent(**id)
+    id = {type: "string", readOnly: true, pattern: "^pa[0-9a-z]{24}$", description: "ID of the parent", **id}
     {"/parent/{parent_reference}" => path_item("/project/{project_id}/parent/{parent_reference}", get: {operationId: "getParent", responses: {"200": {description: "A parent", **json(object({id:}))}}})}
   end
 
   def verb(id, body) = op(id, body)
+
+  def deprecated(**x) = {type: "string", deprecated: true, "x-deprecated": {since: Date.new(2026, 11, 2), **x}}
 
   # An item path's parameters, with examples in place of the identity's example.
   def identity_examples(item, **examples) = path_item("/project/{project_id}#{item}")[:parameters].then { [*it[...-1], it.last.except(:example).merge(examples:)] }
@@ -133,7 +135,7 @@ RSpec.describe TerraformGenerator::Derive do
 
   describe "create_response" do
     it "refuses a create whose response is not the item" do
-      responses = {Other: {description: "Another", **json(object({other: {type: "string"}}))}}
+      responses = {Other: {description: "Another", **json(object({other: {type: "string", readOnly: true}}))}}
       expect_refusal(/createThing: the success response is not the item schema/, responses:, paths: {"/thing" => {post: op("createThing", {}, response: "Other")}})
     end
   end
@@ -152,9 +154,9 @@ RSpec.describe TerraformGenerator::Derive do
 
   describe "attribute_set" do
     it "merges a request property and a response property of one name, and leaves out deprecated ones and the request's readOnly ones" do
-      type = derive(create: {color: {type: "string"}, old: {type: "string", deprecated: true}, echo: {type: "string", readOnly: true}},
-        response: {color: {type: "string"}, gone: {type: "string", deprecated: true}})
-      expect(statements(type, :Attr).map(&:name)).to eq %w[color id]
+      type = derive(create: {color: {type: "string"}, old: deprecated("removed-in": 2), echo: {type: "string", readOnly: true}},
+        response: {color: {type: "string"}, echo: {type: "string", readOnly: true}, gone: deprecated})
+      expect(statements(type, :Attr).map(&:name)).to eq %w[color echo id]
       expect(statements(type, :Create).first.body).to eq %w[color]
     end
   end
@@ -274,7 +276,7 @@ RSpec.describe TerraformGenerator::Derive do
     it "nests a response object to any depth, leaving out deprecated properties" do
       inner = {description: "Inner", **nested(deeper: {description: "Deeper", **nested})}
       part = {readOnly: true, description: "A part", **nested(inner:, old: {type: "string", deprecated: true, description: "Old"}, tags: {type: "array", items: {type: "string"}, description: "Tags"})}
-      attr = derive_attr(:part, response: {part: {"$ref": "#/components/schemas/Part"}}, schemas: {Part: part}, item: "/thing/{thing_reference}")
+      attr = derive_attr(:part, response: {part: {"$ref": "#/components/schemas/Part", readOnly: true}}, schemas: {Part: part}, item: "/thing/{thing_reference}")
       inner = attr.type.attrs.first
       expect([attr.type.var, attr.type.why, attr.type.attrs.map(&:name), inner.type.attrs.map(&:name), inner.type.attrs.first.type.var, inner.type.attrs.first.why])
         .to eq ["o_part", [[:nesting, "Thing.part"]], %w[inner name tags], %w[deeper name], "o_part_inner_deeper", [[:computed, "Part.inner.deeper"], [:attr_type, "Part.inner.deeper"]]]
@@ -338,7 +340,7 @@ RSpec.describe TerraformGenerator::Derive do
     def attrs(type) = statements(type, :Attr).to_h { [it.name, it] }
 
     it "holds the id of a response object whose schema is a type's item schema, or the ids of an array of them, in a list or a set" do
-      type = typed(response: {part:, plus: {"$ref": "#/components/schemas/PartPlus"}, parts:, bags: parts(uniqueItems: true), bit: {"$ref": "#/components/schemas/Bit"}})
+      type = typed(response: {part: {**part, readOnly: true}, plus: {"$ref": "#/components/schemas/PartPlus", readOnly: true}, parts:, bags: parts(uniqueItems: true), bit: {"$ref": "#/components/schemas/Bit", readOnly: true}})
       expect(attrs(type).except("id", "bit").transform_values { it.to_h.values_at(:type, :flags, :checks, :why) }).to eq(
         "part_id" => [:str, Set[:computed], [call(:ids_of, "part")], [[:computed, "Thing.part"], [:ids, "PartDetailed.id"]]],
         "plus_id" => [:str, Set[:computed], [call(:ids_of, "plus")], [[:computed, "Thing.plus"], [:ids, "PartDetailed.id"]]],
@@ -401,18 +403,25 @@ RSpec.describe TerraformGenerator::Derive do
   end
 
   describe "doc" do
-    it "takes the response property's description, else the request property's, else the parameter's, and names any but the first" do
-      type = derive(create: {color: {type: "string", description: "Requested color"}, size: {type: "string", description: "Requested size"}},
-        response: {color: {type: "string", description: "Color"}, size: {type: "string", description: nil}}, item: "/location/{location}/thing/{thing_id}")
+    it "takes the response property's description, else the request property's, else the parameter's" do
+      type = derive(create: {color: {type: "string", description: "Requested color"}, size: {type: "string", writeOnly: true, description: "Requested size"}},
+        response: {color: {type: "string", description: "Color"}}, item: "/location/{location}/thing/{thing_id}")
       expect(statements(type, :Attr).to_h { [it.name, [it.doc, it.why.assoc(:doc)]] }).to include(
-        "color" => ["Color", nil], "size" => ["Requested size", [:doc, "createThing.size"]], "location" => ["The location", nil],
+        "color" => ["Color", nil], "size" => ["Requested size", nil], "location" => ["The location", nil],
       )
+    end
+
+    it "takes a parent key's description from the parent's id, ahead of the response property's, and names the parent's id as its source" do
+      attr = derive_attr(:parent_id, name: :parent_thing, create: {}, item: "/parent/{parent_reference}/thing/{thing_id}", paths: parent,
+        response: {parent_id: {type: "string", readOnly: true, description: "Parent"}})
+      expect([attr.doc, attr.why.assoc(:doc)]).to eq ["ID of the parent", [:doc, "getParent.id"]]
     end
   end
 
   describe "described" do
-    it "refuses an attribute without a description" do
-      expect_refusal("Thing.state: no description; add one", response: {state: {type: "string", readOnly: true, description: nil}}, item: "/thing/{thing_reference}")
+    it "refuses a nested property without a description, which the norms do not check" do
+      part = {type: "object", readOnly: true, properties: {size: {type: "string"}}}
+      expect_refusal("Thing.part.size: no description; add one", response: {part:}, item: "/thing/{thing_reference}")
     end
 
     it "refuses a type without a description, naming its item response" do
@@ -516,70 +525,23 @@ RSpec.describe TerraformGenerator::Derive do
     end
   end
 
-  describe "lifecycle_enum" do
-    it "refuses x-lifecycle on two properties" do
-      marked = {type: "string", readOnly: true, enum: %w[a], "x-lifecycle": {pending: %w[a]}}
-      expect_refusal("getThing: x-lifecycle marks a and b; mark one", create: {}, response: {a: marked, b: marked})
-    end
-
-    it "refuses x-lifecycle on a property that is not readOnly or whose enum lacks a listed value" do
-      expect_refusal("Thing.state: x-lifecycle needs a readOnly property whose enum lists creating, broken",
-        create: {}, response: {state: {type: "string", readOnly: true, enum: %w[creating], "x-lifecycle": {pending: %w[creating], failed: %w[broken]}}})
-      expect_refusal(/Thing.state: x-lifecycle needs a readOnly/, create: {state: {type: "string"}}, response: {state: {type: "string", enum: %w[a], "x-lifecycle": {pending: %w[a]}}})
-    end
-
-    it "refuses x-lifecycle that is not an object whose pending and failed members list strings" do
-      [true, {pending: "a"}, {pendng: %w[a]}, {failed: [1]}].each do |lifecycle|
-        expect_refusal("Thing.state: x-lifecycle needs an object whose pending and failed members list strings",
-          create: {}, response: {state: {type: "string", readOnly: true, enum: %w[a], "x-lifecycle": lifecycle}})
-      end
-    end
-  end
-
-  describe "typed_allof" do
-    it "refuses an allOf member without type: object" do
-      expect_refusal("Thing: an allOf member lacks type: object; add it", create: {}, responses: {Thing: {description: "A thing", **json(allOf: [object({id: {type: "string", readOnly: true}}), {properties: {}}])}})
-    end
-  end
-
-  describe "response_direction" do
-    it "refuses a response property that is neither readOnly nor accepted by an input" do
-      expect_refusal("Thing.color: neither readOnly nor accepted by an input; mark it readOnly, or accept it in the create or a verb", create: {}, response: {color: {type: "string"}})
+  describe "norms" do
+    it "refuses a type whose operations break the API's norms, listing every violation, and ignores other operations" do
+      paths = {"/other/{other_id}" => path_item("/project/{project_id}/other/{other_id}", get: op("getOther", response: "Other"))}
+      responses = {Other: {description: "Another", **json(object({color: {type: "string"}}))}}
+      delete = {operationId: "deleteThing", parameters: [{name: "force", in: "query", schema: {type: "boolean"}}], responses: {"204": {description: "Deleted"}}}
+      expect_refusal(<<~END.chomp, create: {size: {type: "string"}}, response: {color: {type: "string"}}, ops: {delete:}, paths:, responses:)
+        definitions thing: breaks the API's norms:
+        described: deleteThing param force: describe it
+        direction: responses/Thing.color: mark it readOnly, or accept it in a request
+        echo: createThing.size: echo it in the response, or mark it writeOnly
+      END
     end
   end
 
   describe "input_echo" do
-    it "refuses a body property that is neither in the response nor writeOnly" do
-      expect_refusal("createThing.public_key: neither in the response nor writeOnly; mark it writeOnly or echo it", create: {public_key: {type: "string"}})
-    end
-  end
-
-  describe "echo_agreement" do
-    it "refuses a request that accepts less than the response returns, in type, format or enum" do
-      [
-        [{type: "integer"}, {type: "string"}],
-        [{type: "string", format: "cidr"}, {type: "string"}],
-        [{type: "string", enum: %w[a]}, {type: "string", enum: %w[a b]}],
-        [{type: "string", enum: %w[a]}, {type: "string"}],
-        [{type: "array", items: {type: "integer"}}, {type: "array", items: {type: "string"}}],
-      ].each do |req, resp|
-        expect_refusal("createThing.v: accepts less than Thing.v returns; make the request accept every value the response allows", create: {v: req}, response: {v: resp})
-      end
-    end
-
-    it "accepts a looser request, and nullable on one side only" do
-      create = {
-        config: {type: "object", additionalProperties: {anyOf: [{type: "string"}, {type: "number"}]}},
-        mode: {type: "string", enum: %w[a b c]}, note: {type: "string", nullable: true}, cidr: {type: "string"},
-      }
-      response = {config: {type: "object", additionalProperties: {type: "string"}}, mode: {type: "string", enum: %w[a b]}, note: {type: "string"}, cidr: {type: "string", format: "cidr"}}
-      expect(statements(derive(create:, response:), :Attr).map(&:name)).to eq %w[cidr config id mode note]
-    end
-  end
-
-  describe "immutable_readonly" do
-    it "refuses x-immutable on a property that is not readOnly" do
-      expect_refusal("Thing.net: x-immutable without readOnly; it marks outputs only", create: {net: {type: "string"}}, response: {net: {type: "string", "x-immutable": true}})
+    it "refuses a body property that the item response holds only as deprecated, which norm_echo accepts" do
+      expect_refusal("createThing.color: neither in the response nor writeOnly; mark it writeOnly or echo it", create: {color: {type: "string"}}, response: {color: deprecated})
     end
   end
 
@@ -595,7 +557,7 @@ RSpec.describe TerraformGenerator::Derive do
       id = {type: "string", readOnly: true, example: "pa1", description: "ID of the parent"}
       paths = {"/parent/{parent_reference}" => path_item("/project/{project_id}/parent/{parent_reference}", get: {operationId: "getParent", responses: {"200": {description: "A parent", **json(object({id:}))}}})}
       item = "/parent/{parent_reference}/thing/{thing_reference}"
-      response = {name: {type: "string", example: "other"}}
+      response = {name: {type: "string", readOnly: true, example: "other"}}
       type = derive(name: :parent_thing, create: {}, on_item: true, item:, paths:, response:, ops: {parameters: identity_examples(item, id: {value: "th1"}, name: {value: "my-thing"})})
       expect([type.examples, type.references]).to eq [{"id" => "x", "name" => "my-thing", "parent_id" => "pa1"}, {"parent_id" => "parent"}]
     end
@@ -622,10 +584,9 @@ RSpec.describe TerraformGenerator::Derive do
   end
 
   describe "examples" do
-    it "refuses a required create input or an id without an example" do
+    it "refuses a required create input whose example is null, or a parent key whose parent's id has none" do
       expect_refusal("createThing.color: no example; add one to each", create: {color: {type: "string", writeOnly: true, example: nil}}, required: %w[color])
-      responses = {Thing: {description: "A thing", **json(type: "object", properties: {id: {type: "string", readOnly: true, description: "ID"}})}}
-      expect_refusal("Thing.id: no example; add one to each", create: {}, responses:)
+      expect_refusal("getParent.id: no example; add one to each", name: :parent_thing, create: {}, item: "/parent/{parent_reference}/thing/{thing_id}", paths: parent(example: nil))
     end
 
     it "refuses a name the identity fills whose examples have no entry named name" do

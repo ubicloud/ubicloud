@@ -130,6 +130,14 @@ RSpec.describe OpenapiNorms do
     end
   end
 
+  it "checks only the operations it is given, whose deprecations may name any operation" do
+    other = {"get" => {"operationId" => "getOther", "responses" => {"200" => {"content" => {"application/json" => {"schema" => {"type" => "object", "properties" => {"size" => size}}}}}}}}
+    old = size.merge("deprecated" => true, "x-deprecated" => {"since" => Date.new(2026, 11, 2), "removed-in" => 2, "use" => ["getOther"]})
+    doc = {"paths" => create({"size" => size, "old" => old}).merge("/other" => other), "components" => {"schemas" => thing("size" => size), "parameters" => name}}
+    expect(described_class.new(doc).violations).to eq ["direction: getOther 200.size: mark it readOnly, or accept it in a request"]
+    expect(described_class.new(doc, only: %w[createThing]).violations).to eq []
+  end
+
   it "holds for openapi.yml, but for the known violations, which may only shrink" do
     found = described_class.new(YAML.safe_load_file("openapi/openapi.yml", permitted_classes: [Date, Time])).violations.sort
     known = File.readlines("openapi/norms-known.txt", chomp: true)

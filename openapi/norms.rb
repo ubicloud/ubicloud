@@ -8,8 +8,8 @@ require "date"
 # responses/FirewallDetailed/allOf/1.private_subnets for an allOf member's property, or
 # parameters/location.
 #
-# The terraform generator, which must not load clover, is to check its types with this file, so
-# the file uses only the standard library.
+# The terraform generator, which must not load clover, checks its types with this file, so the
+# file uses only the standard library.
 class OpenapiNorms
   METHODS = %w[get put post patch delete].freeze
 
@@ -17,12 +17,16 @@ class OpenapiNorms
   # success response to [schema, place]. response is nil when no success response has a JSON body.
   Operation = Data.define(:id, :op, :parameters, :request, :required, :response)
 
-  def initialize(doc)
+  # only, if given, lists the operationIds of the operations to check. A deprecation's use may
+  # still name any operation in the document.
+  def initialize(doc, only: nil)
     @doc = doc
     @operations = doc["paths"].flat_map do |_, item|
       shared = item.fetch("parameters", [])
       item.slice(*METHODS).map { |_, op| operation(op, shared + op.fetch("parameters", [])) }
     end
+    @ids = @operations.map(&:id)
+    @operations.select! { only.include?(it.id) } if only
   end
 
   def violations
@@ -103,12 +107,11 @@ class OpenapiNorms
   # operation, and a response property's use names its siblings. Only a request property may be
   # renamed, to a sibling that is not deprecated and has the same type.
   def norm_deprecation
-    ids = @operations.map(&:id)
-    @operations.filter_map { deprecation(it.op, it.id, ids - [it.id]) } +
+    @operations.filter_map { deprecation(it.op, it.id, @ids - [it.id]) } +
       @operations.flat_map do |o|
         o.request.filter_map do |name, (s, at)|
           siblings = o.request.except(name).transform_values(&:first)
-          deprecation(s, at, siblings.keys + ids, siblings:, required: o.required.include?(name))
+          deprecation(s, at, siblings.keys + @ids, siblings:, required: o.required.include?(name))
         end
       end +
       answers.flat_map do |o|
