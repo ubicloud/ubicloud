@@ -8,6 +8,8 @@ module TerraformGenerator::Definitions
     firewall: {},
     firewall_rule: {},
     inference_api_key: {},
+    kubernetes_cluster: {},
+    kubernetes_cluster_nodepool: {},
     load_balancer: {},
     postgres: {order: %i[upgrade]},
     postgres_firewall_rule: {},

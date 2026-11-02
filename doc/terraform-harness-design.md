@@ -334,7 +334,8 @@ value comes from the spec: the next value of an enum, the other boolean, the nex
 bounds, a string whose trailing number is incremented or whose last character is changed while it
 still matches its pattern, a map of the spec's example with each value changed so, or the spec's
 example where the current value is null. Only an object input without an example, such as a postgres
-destination's `options`, takes its value from a table, keyed by attribute name.
+destination's `options`, takes its value from a table, keyed by attribute name. A verb that no
+change of one attribute can run, a nodepool's upgrade, is left to the type's own examples.
 `spec/terraform/types.rb` reads the types in a separate process and prints what the loop needs. That
 covers every type's create, read, update, replace, import and delete against the API without a line
 written for the type, and is where a missing hook first shows. Every example that expects a failure
@@ -706,5 +707,3 @@ three hand-written types.
    still, which can differ from production.
 7. **A broken deadline shows as a hang** rather than a failure, since no example tests it; the
    workflow's timeout ends the run.
-8. **Not all shown yet.** The hook for kubernetes has not run. The commit that builds it will show
-   that it works.
