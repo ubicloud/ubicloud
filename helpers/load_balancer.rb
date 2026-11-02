@@ -15,7 +15,8 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project)
 
-    algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack].freeze)
+    algorithm, health_check_protocol = typecast_params.nonempty_str!(%w[algorithm health_check_protocol].freeze)
+    stack = typecast_params.nonempty_str("stack") || "dual"
     src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port].freeze)
     cert_enabled_param = typecast_params.bool("cert_enabled")
     cert_enabled = cert_enabled_param.nil? ? health_check_protocol == "https" : cert_enabled_param

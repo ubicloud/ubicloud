@@ -115,6 +115,20 @@ RSpec.describe Clover, "load-balancer" do
         expect(JSON.parse(last_response.body)["cert_enabled"]).to be false
       end
 
+      it "defaults stack to dual" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id).subject
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "8080",
+          algorithm: "round_robin",
+          health_check_protocol: "http",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["stack"]).to eq("dual")
+        expect(LoadBalancer[name: "lb1"].stack).to eq("dual")
+      end
+
       it "invalid private_subnet_id" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: "invalid",
@@ -238,6 +252,22 @@ RSpec.describe Clover, "load-balancer" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["vms"]).to eq([vm.ubid])
         expect(lb.reload.cert_enabled).to be_falsey
+      end
+
+      it "keeps cert_enabled when it is absent or null" do
+        lb.update(cert_enabled: true)
+        body = {src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: []}
+
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", body.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["cert_enabled"]).to be true
+        expect(lb.reload.cert_enabled).to be true
+
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", body.merge(cert_enabled: nil).to_json
+
+        expect(last_response.status).to eq(200)
+        expect(lb.reload.cert_enabled).to be true
       end
 
       it "detaches vms" do
