@@ -242,6 +242,63 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.target_storage_size_gib).to eq(256)
         expect(pg.reload.ha_type).to eq("async")
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("size", "storage_size")).to eq("size" => "standard-8", "storage_size" => 256)
+      end
+
+      describe "after storage auto-scale raised the targets" do
+        before do
+          allow(Util).to receive(:send_email)
+          expect(pg.representative_server).to receive(:disk_usage_percent).and_return(92)
+          pg.handle_storage_auto_scale
+          expect(pg.reload.values.slice(:target_vm_size, :target_storage_size_gib)).to eq(target_vm_size: "standard-2", target_storage_size_gib: 256)
+        end
+
+        it "leaves them raised when a PATCH resends the requested size" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-2",
+            storage_size: 128,
+            ha_type: "async",
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("size", "storage_size", "target_vm_size", "target_storage_size_gib", "ha_type")).to eq(
+            "size" => "standard-2", "storage_size" => 128, "target_vm_size" => "standard-2", "target_storage_size_gib" => 256, "ha_type" => "async",
+          )
+          expect(pg.reload.storage_auto_scale_action_performed_90_set?).to be true
+        end
+
+        it "moves them when a PATCH requests a new size" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-4",
+            storage_size: 512,
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("size", "storage_size", "target_vm_size", "target_storage_size_gib")).to eq(
+            "size" => "standard-4", "storage_size" => 512, "target_vm_size" => "standard-4", "target_storage_size_gib" => 512,
+          )
+          expect(pg.reload.storage_auto_scale_action_performed_90_set?).to be false
+        end
+
+        it "moves only the target whose request changes" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-4",
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(pg.reload.values.slice(:target_vm_size, :target_storage_size_gib)).to eq(target_vm_size: "standard-4", target_storage_size_gib: 256)
+        end
+      end
+
+      it "records the request of a database created before requests were recorded" do
+        pg.update(requested_vm_size: nil, requested_storage_size_gib: nil)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          ha_type: "async",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.values.slice(:requested_vm_size, :requested_storage_size_gib)).to eq(requested_vm_size: "standard-2", requested_storage_size_gib: 128)
       end
 
       it "logs scale and high availability changes" do
@@ -314,13 +371,13 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
-      it "clears storage auto-scale semaphores on update" do
+      it "clears storage auto-scale semaphores on a resize" do
         pg.incr_storage_auto_scale_action_performed_80
         pg.incr_storage_auto_scale_action_performed_85
         pg.incr_storage_auto_scale_action_performed_90
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          size: "standard-2",
+          size: "standard-4",
           storage_size: 128,
           ha_type: "none",
         }.to_json

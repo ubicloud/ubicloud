@@ -140,13 +140,9 @@ echo: createMachineImageVersion.destroy_source: echo it in the response, or mark
 echo: createMachineImageVersion.vm: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.private_subnet_name: echo it in the response, or mark it writeOnly
 echo: createPostgresDatabase.restrict_by_default: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabase.size: echo it in the response, or mark it writeOnly
-echo: createPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.access_key: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
-echo: patchPostgresDatabase.size: echo it in the response, or mark it writeOnly
-echo: patchPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
 echo: restorePostgresDatabase.restore_target: echo it in the response, or mark it writeOnly
 echo_agreement: PostgresPrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
 echo_agreement: PrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold

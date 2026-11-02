@@ -119,7 +119,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:, target_vm_size:,
-        target_storage_size_gib:, server_cert:, server_cert_key:, superuser_password:,
+        target_storage_size_gib:, requested_vm_size: (target_vm_size unless parent_id),
+        requested_storage_size_gib: (target_storage_size_gib unless parent_id), server_cert:, server_cert_key:, superuser_password:,
         ha_type:, target_version:, parent_id:, tags:, restore_target:,
         hostname_version:, user_config:, pgbouncer_user_config:, target_image_family:,
         preferred_availability_zone_id:, required_availability_zone_id:)
@@ -222,13 +223,17 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
 
       postgres_resource = strand.subject
-      # assemble omits these customer-config columns; restore from archive.
+      # assemble omits these customer-config columns, and sets the size
+      # request to the targets, which auto-scale may have raised; restore
+      # from archive.
       # Encrypted columns & metric/log destination secrets aren't archived,
       # and firewall rules are deliberately left at assemble's defaults.
       postgres_resource.update(
         maintenance_window_start_at: v["maintenance_window_start_at"],
         cert_auth_users: v["cert_auth_users"] || [],
         trusted_ca_certs: v["trusted_ca_certs"],
+        requested_vm_size: v["requested_vm_size"],
+        requested_storage_size_gib: v["requested_storage_size_gib"],
       )
 
       representative_server = postgres_resource.representative_server
