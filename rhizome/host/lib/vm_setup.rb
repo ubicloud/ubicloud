@@ -19,13 +19,20 @@ require_relative "csum_guard_setup"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil, append_serial_console: false)
+  RUNNER_METRICS_DISK_SIZE = 1024 * 1024
+  RUNNER_METRICS_DISK_SERIAL = "ubicloud-metrics"
+  # Pinned high so the NIC keeps its slot and its ens3 name.
+  RUNNER_METRICS_DISK_PCI_SLOT = 30
+  RUNNER_METRICS_AGENT_ROOT = "/opt/runner-metrics"
+
+  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil, append_serial_console: false, runner_metrics: false)
     @vm_name = vm_name
     @hugepages = hugepages
     @hypervisor = hypervisor
     @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
     @firmware_version = CloudHypervisor::Firmware[firmware_version] || no_valid_firmware_version
     @append_serial_console = append_serial_console
+    @runner_metrics = runner_metrics
   end
 
   private def no_valid_ch_version
@@ -174,6 +181,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     rm_if_exists(service)
     rm_if_exists(service + ".d")
     rm_if_exists(vp.dnsmasq_service)
+    rm_if_exists(vp.runner_metrics_service)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -744,6 +752,11 @@ DNSMASQ_SERVICE
     limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{(mem_gib * 1.25 * 1073741824).to_i}"
     cpu_quota = (cpu_percent_limit == 0) ? "" : "CPUQuota=#{cpu_percent_limit}%"
 
+    runner_metrics_wants = if runner_metrics?
+      install_runner_metrics_agent
+      "Wants=#{@vm_name}-metrics.service"
+    end
+
     vm_header = <<~VM_HEADER
       [Unit]
       Description=#{@vm_name}
@@ -754,6 +767,7 @@ DNSMASQ_SERVICE
       #{spdk_requires}
       #{vhost_user_block_requires}
       Wants=#{@vm_name}-dnsmasq.service
+      #{runner_metrics_wants}
     VM_HEADER
 
     vm_footer = <<~VM_FOOTER
@@ -794,6 +808,48 @@ DNSMASQ_SERVICE
     r "systemctl daemon-reload"
   end
 
+  # Cloud Hypervisor before 53 can't pin the metrics disk's PCI slot.
+  def runner_metrics?
+    @runner_metrics && @hypervisor == "ch" && Gem::Version.new(@ch_version.version) >= Gem::Version.new("53")
+  end
+
+  # The VM user can't read the rhizome home, so the agent runs from a copy.
+  def install_runner_metrics_agent
+    {"bin/runner-metrics-agent" => 0o755, "lib/runner_metrics_agent.rb" => 0o644}.each do |path, perm|
+      dest = File.join(RUNNER_METRICS_AGENT_ROOT, path)
+      FileUtils.mkdir_p(File.dirname(dest))
+      safe_write_to_file(dest, File.read(File.join(__dir__, "..", path)), perm: perm)
+    end
+
+    FileUtils.mkdir_p(vp.metrics)
+    FileUtils.chown(@vm_name, @vm_name, vp.metrics)
+
+    vp.write_runner_metrics_service <<RUNNER_METRICS_SERVICE
+[Unit]
+Description=Runner metrics agent for #{@vm_name}
+After=#{@vm_name}.service
+BindsTo=#{@vm_name}.service
+PartOf=#{@vm_name}.service
+
+[Service]
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+User=#{@vm_name}
+Group=#{@vm_name}
+ExecStart=#{RUNNER_METRICS_AGENT_ROOT}/bin/runner-metrics-agent #{vp.metrics_raw} #{vp.metrics}
+Restart=always
+RestartSec=5
+MemoryMax=64M
+CPUQuota=10%
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=#{vp.metrics}
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RUNNER_METRICS_SERVICE
+  end
+
   def enable_bursting(slice_name, cpu_burst_percent_limit)
     # Convert cpu_burst_percent limit to a usec value. This is the additional quota every
     # 100,000 use that the VM is occasionally allowed to burst to.
@@ -821,6 +877,16 @@ DNSMASQ_SERVICE
       end
     }
     disk_params << "path=#{vp.cloudinit_img}"
+
+    # Zeroed on start, so the guest can't leave an image header to be probed.
+    metrics_disk_lines = ""
+    if runner_metrics?
+      disk_params << "path=#{vp.metrics_raw},serial=#{RUNNER_METRICS_DISK_SERIAL},image_type=raw,pci_device_id=#{RUNNER_METRICS_DISK_PCI_SLOT}"
+      metrics_disk_lines = <<~METRICS_DISK
+        ExecStartPre=/usr/bin/truncate -s 0 #{vp.metrics_raw}
+        ExecStartPre=/usr/bin/truncate -s #{RUNNER_METRICS_DISK_SIZE} #{vp.metrics_raw}
+      METRICS_DISK
+    end
 
     disk_args =
       if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
@@ -864,7 +930,7 @@ DNSMASQ_SERVICE
   [Service]
   Slice=#{slice_name}
   NetworkNamespacePath=/var/run/netns/#{@vm_name}
-  #{serial_output}ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
+  #{serial_output}#{metrics_disk_lines}ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
   ExecStart=#{exec_start_cmd}
 

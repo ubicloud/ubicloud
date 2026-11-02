@@ -1,0 +1,12 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/runner_metrics_agent"
+
+unless ARGV.length == 2
+  warn "usage: runner-metrics-agent DISK_PATH OUT_DIR"
+  exit 1
+end
+
+$stdout.sync = true
+RunnerMetricsAgent.new(ARGV[0], ARGV[1]).run
