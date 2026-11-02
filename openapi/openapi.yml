@@ -464,7 +464,9 @@ paths:
                   description: CIDR or private subnet id or name to allow
                   type: string
                 firewall_id:
+                  description: Deprecated and ignored; the rule is added to the firewall in the path.
                   type: string
+                  deprecated: true
                 port_range:
                   description: Port range to allow
                   type: string
@@ -475,7 +477,9 @@ paths:
                   description: Description to use for the firewall rule
                   type: string
                 project_id:
+                  description: Deprecated and ignored; the project comes from the path.
                   type: string
+                  deprecated: true
               additionalProperties: false
               required:
                 - cidr
@@ -926,8 +930,9 @@ paths:
                   description: Algorithm of the Load Balancer
                   type: string
                 stack:
-                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+                  description: Deprecated and ignored; the stack is set when the Load Balancer is created.
                   type: string
+                  deprecated: true
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
@@ -5145,8 +5150,9 @@ components:
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
                   latest_restore_time:
-                    description: Latest restore time (if primary)
+                    description: Deprecated. Latest restore time (if primary), which is always the current time.
                     type: string
+                    deprecated: true
                   primary:
                     description: Is the database primary
                     type: boolean
