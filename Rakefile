@@ -279,6 +279,10 @@ terraform_check = lambda do |strict:|
   sh("terraform", "fmt", "-check", "-diff", "-recursive", "examples", chdir: "terraform/provider")
 end
 
+terraform_harness = lambda do
+  sh({"RUBYOPT" => "-w"}, "bundle", "exec", "rspec", *Dir["spec/terraform/**/*_harness.rb"])
+end
+
 namespace :terraform do
   desc "Write the terraform provider's generated files, keeping edited ones unless FORCE=1"
   task :generate do
@@ -299,21 +303,30 @@ namespace :terraform do
     terraform_preflight.call
     terraform_check.call(strict: true)
   end
+
+  desc "Run the examples in spec/terraform, which test the provider with terraform against the API in process"
+  task :harness do
+    terraform_preflight.call
+    terraform_harness.call
+  end
 end
 
-desc "Run the generator's specs and terraform:check, then report the Go engine's coverage, failing below 100%; CHECK=1 makes an edited or orphaned generated file fail"
+desc "Run the generator's specs, terraform:check and the harness, then report the Go engine's coverage, failing below 100%; CHECK=1 makes an edited or orphaned generated file fail"
 task :terraform do
   terraform_preflight.call
   sh({"COVERAGE" => "1", "RUBYOPT" => "-w"}, "bundle", "exec", "rspec", chdir: "terraform")
   terraform_check.call(strict: ENV["CHECK"] == "1")
+  terraform_harness.call
 
-  # Merge every directory under tmp/terraform/cover, not just go test's,
-  # since the harness will write its counters to another. The generated
-  # files are data, so they are not counted.
+  # Merge every directory under tmp/terraform/cover: go test writes its
+  # counters to one, and the provider binaries the harness runs to
+  # another. The generated files are data and are not counted. Neither is
+  # main.go, which only starts the server; no test reaches its call of
+  # log.Fatal, which runs only if serving fails.
   profile = "#{go_cover}.txt"
   sh(go_env, "go", "tool", "covdata", "textfmt", "-i=#{Dir["#{go_cover}/*"].join(",")}", "-o=#{profile}")
   prefix = "#{File.read("terraform/provider/go.mod")[/^module (\S+)/, 1]}/"
-  blocks = File.readlines(profile).drop(1).map(&:split).reject { it[0].include?("_gen.go:") }.group_by(&:first).map do |block, counts|
+  blocks = File.readlines(profile).drop(1).map(&:split).reject { it[0].include?("_gen.go:") || it[0].start_with?("#{prefix}main.go:") }.group_by(&:first).map do |block, counts|
     [block.delete_prefix(prefix), counts[0][1].to_i, counts.any? { it[2] != "0" }]
   end
   total = blocks.sum { it[1] }

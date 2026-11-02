@@ -316,22 +316,35 @@ ends it.
 
 ### 3.7 What tests the harness
 
-The examples that use the harness test it. `spec/terraform/examples_harness.rb` applies each
-generated resource example as the documentation shows it, checks that a plan then shows no change,
-and destroys it. That covers every type's create, read and delete against the API without a line
-written for the type, and is where a missing hook first shows. Every example that expects a failure
-fails if the harness stops raising terraform's errors. The one fault that could pass silently, an
-exception inside the API, is tested by an example in `ssh_public_key_harness.rb`, which stubs a
-serializer to raise and expects that exception.
+The examples that use the harness test it. `spec/terraform/examples_harness.rb` is one loop over
+every generated resource type. It applies the type's resource example as the documentation shows
+it, together with its datasource example, which refers to the resource's; checks that the
+datasource reads what the resource holds, but for write-only inputs, and keeps sensitive what the
+resource keeps sensitive, and that a plan then shows no change; and destroys it. Then, from the
+resource example, it runs each update verb alone, by changing one attribute that the verb owns and
+checking that only the verb's request went out and that the next plan is empty; plans a change of
+each input that forces replacement and expects a replacement; and removes the object from state,
+imports it by the id that its item path derives (by name where the identity accepts one), and
+expects no change to be sent and the next plan to be empty, which shows that write-only inputs are
+adopted. A second value comes from the spec: the next value of an enum, the other boolean, the next
+integer within its bounds, a string whose trailing number is incremented or whose last character is
+changed while it still matches its pattern, a map of the spec's example with each value changed so,
+or the spec's example where the current value is null. `spec/terraform/types.rb` reads the types in
+a separate process and prints what the loop needs. That covers every type's create, read, update,
+replace, import and delete against the API without a line written for the type, and is where a
+missing hook first shows. Every example that expects a failure fails if the harness stops raising
+terraform's errors. The one fault that could pass silently, an exception inside the API, is tested
+by an example in `ssh_public_key_harness.rb`, which stubs a serializer to raise and expects that
+exception.
 
 ## 4. What a failure prints
 
-RSpec prints its failure first. The harness removes its frames from the backtrace, so that
-`Failure/Error:` names the example's line rather than the harness's. Below the failure, through the
-example's `extra_failure_lines` metadata, it adds the last 40 requests the API received in the
-example and the directory where the run is kept. Each request takes one line: the command, the verb
-and the shown path, the status or the exception's class, the `state` an answer carries, and the
-error message of a 4xx or 5xx answer.
+RSpec prints its failure first. The harness leaves its frames out of the backtrace, and has RSpec
+quote the example's line after `Failure/Error:` rather than a line of the harness or of clover.
+Below the failure, through the example's `extra_failure_lines` metadata, it adds the last 40
+requests the API received in the example and the directory where the run is kept. Each request
+takes one line: the command, the verb and the shown path, the status or the exception's class, the
+`state` an answer carries, and the error message of a 4xx or 5xx answer.
 
 ```
   1) ubicloud_postgres plans no change after a storage auto-scale
@@ -362,9 +375,11 @@ each example's directory, with each request's method, path and status.
 ## 5. The examples each type brings
 
 The commit that adds a type adds a hook to `spec/terraform/settle.rb` if the API reports a new
-object of the type as pending, an example for each update verb, an import for a named type, and
-whatever behaviour examples the type needs. Each file starts with `# frozen_string_literal: true`
-and `require_relative "spec_helper"`, which the examples below leave out.
+object of the type as pending, and examples of the type's specific behaviours: an order of
+requests, adoption, drift, the adoption of a write-only input, or a customer's file. The examples
+harness covers each update verb, each replacement and the import (§3.7). Each file starts with
+`# frozen_string_literal: true` and `require_relative "spec_helper"`, which the examples below leave
+out.
 
 §2's example goes into `network_harness.rb`. Against the prototype's provider it failed at the
 second apply with "Update of firewall is not supported", and the ledger showed that no rename was
@@ -587,12 +602,13 @@ Measured in a four-CPU container shared with other work, without the provider's 
 A typical example of three or four commands takes about a second. The engineer's loop, `bundle
 exec rspec spec/terraform/postgres_harness.rb:42`, takes about six seconds: a second of loading,
 2.5 s of lazy loading in the first request, under a second to generate and build, and the example.
-For the first cut, the examples harness should take about a second for each of thirteen resource
-types, and forty to sixty behaviour examples about 1.2 s each: about a minute and a half in all, in
-one process.
+For the first cut, the examples harness runs two to nine examples for each of thirteen resource
+types, 57 in all: the datasource and import examples, one per update verb, and one for the inputs
+that force replacement, if any. They take one to two seconds each, and the behaviour examples about
+1.2 s each: a few minutes in all, in one process.
 
 The harness comes to about 300 lines in `spec/terraform/spec_helper.rb`, 5 to 20 lines per type in
-`settle.rb`, about 15 in `examples_harness.rb`, a 6-line `.rubocop.yml` that turns off
+`settle.rb`, about 120 in `examples_harness.rb` and 25 in `types.rb`, a 6-line `.rubocop.yml` that turns off
 `RSpec/SpecFilePathSuffix` and `RSpec/DescribeClass` for `*_harness.rb`, and about 5 lines in the
 `Rakefile`. The prototype's harness was 696 lines.
 
@@ -602,7 +618,7 @@ The harness comes to about 300 lines in `spec/terraform/spec_helper.rb`, 5 to 20
 |---|---|
 | Running progs: a stepper, a virtual clock, a data plane answering SSH, a world of hosts | The harness tests the provider against the states the API reports; hooks put objects at rest. Progs are not tested across labels and convergence, because of the combinatoric explosion under composition |
 | A manual mode, a step or age command, a second hook for deferred work | An example that needs an object left pending stubs its hook or edits rows; a hook does the deferred work too; `go test` covers the engine's wait loop |
-| A generic baseline over every type: each verb with alternate values, each replaced input, import, adoption, waits, and `ONLY=` | The examples harness, `go test`, and an example per update verb and import in each type's commit (§8, question 2) |
+| `ONLY=`, and generic adoption and wait checks | The examples harness covers each verb, replacement and import of every type (§3.7, §8 question 2); adoption and waits are each type's behaviour examples |
 | Fixture types behind a Go build tag | The harness is built with the first generated type |
 | Parallel workers, a database per worker, build and database locks | One process; parallel workers would save under a minute |
 | A stall detector over pending reads | The deadline names the last request and its state |
@@ -637,9 +653,11 @@ Each has a default that holds until Daniel Farina answers.
    examples?** A generic baseline came to about 150 lines with a table of alternate values, and it
    rewrote the generated examples to change one value at a time. Without it or hand-written
    examples, an API change that breaks a type's verb would pass the terraform workflow, since `go
-   test` covers the engine's generic code but not each type's routes. Default and recommendation:
-   no generic checks; each type's commit writes an example of about five lines for each update verb
-   and, for a named type, an import.
+   test` covers the engine's generic code but not each type's routes. Recommended: the examples
+   harness changes one attribute per verb and checks the right request went out, and re-imports by
+   the derived id and expects an empty plan, leaving only misbehaviour examples written by hand.
+   Daniel Farina answered on 6 Nov 2026: "Sure, let's follow the recommendation". So the examples
+   harness does that for every type, and checks each replacement too (§3.7).
 
 ## 9. Evidence
 
@@ -682,8 +700,6 @@ three hand-written types.
    still, which can differ from production.
 7. **A broken deadline shows as a hang** rather than a failure, since no example tests it; the
    workflow's timeout ends the run.
-8. **Not yet shown whole.** Most parts ran in the experiments, but the harness has not run as one
-   file, and these parts have not run at all: the trimmed backtrace, generation through `rake` when
-   the harness loads, the hooks for load balancers and kubernetes, destroying VMs and databases in
-   their hooks, the merged coverage report, and the examples harness over a child type whose
+8. **Not all shown yet.** These parts have not run: the hooks for load balancers and kubernetes,
+   destroying VMs and databases in their hooks, and the examples harness over a child type whose
    example creates its parent. The commit that builds each part will show that it works.

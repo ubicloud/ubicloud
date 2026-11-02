@@ -143,6 +143,7 @@ module ThawedMock
   allow_mocking(Serializers::LoadBalancer, :serialize_internal)
   allow_mocking(Serializers::Postgres, :serialize_internal)
   allow_mocking(Serializers::PrivateSubnet, :serialize_internal)
+  allow_mocking(Serializers::SshPublicKey, :serialize_internal)
   allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SemSnap, :new)
   allow_mocking(SshKey, :generate)
