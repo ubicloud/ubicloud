@@ -1,8 +1,12 @@
 openapi: 3.0.3
 info:
-  description: API for managing resources on Ubicloud
+  description: |-
+    API for managing resources on Ubicloud
+
+    To use version 2 of the API, send `Accept: application/vnd.ubicloud+json; version=2`. Version 2 refuses each deprecated operation and request property whose `x-deprecated` sets `removed-in` to 2. A request that does not name that media type gets version 1, which still accepts these, but reports their use in the `Deprecation` and `Warning` response headers and may refuse a share of the requests that use them. Responses are the same in both versions.
   title: Clover API
   version: 0.1.0
+  x-api-version: 2
   contact:
     url: https://www.ubicloud.com/
     email: support@ubicloud.com
@@ -467,6 +471,9 @@ paths:
                   description: Deprecated and ignored; the rule is added to the firewall in the path.
                   type: string
                   deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
                 port_range:
                   description: Port range to allow
                   type: string
@@ -480,6 +487,9 @@ paths:
                   description: Deprecated and ignored; the project comes from the path.
                   type: string
                   deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
               additionalProperties: false
               required:
                 - cidr
@@ -948,6 +958,9 @@ paths:
                   description: Deprecated and ignored; the stack is set when the Load Balancer is created.
                   type: string
                   deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
@@ -1383,6 +1396,9 @@ paths:
                   description: Deprecated and ignored.
                   type: string
                   deprecated: true
+                  x-deprecated:
+                    since: 2026-10-08
+                    removed-in: 2
                 ha_type:
                   description: High availability type
                   type: string
@@ -2046,6 +2062,11 @@ paths:
       deprecated: true
       tags:
         - Postgres Database
+      x-deprecated:
+        since: 2026-02-19
+        removed-in: 2
+        use:
+          - promoteReadReplicaPostgresDatabase
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3899,6 +3920,8 @@ components:
           description: Deprecated. Always standard.
           type: string
           deprecated: true
+          x-deprecated:
+            since: 2026-10-08
         ha_type:
           description: High availability type
           type: string
@@ -5112,6 +5135,8 @@ components:
                     description: Deprecated. Latest restore time (if primary), which is always the current time.
                     type: string
                     deprecated: true
+                    x-deprecated:
+                      since: 2026-11-02
                   primary:
                     description: Is the database primary
                     type: boolean

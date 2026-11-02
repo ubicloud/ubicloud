@@ -492,7 +492,11 @@ class UbiCli
   end
 
   def sdk
-    @sdk ||= Ubicloud.new(:rack, app: Clover, env: @env, project_id: project_ubid)
+    @sdk ||= begin
+      # Ask for the latest API version, so that the specs fail if the CLI sends a removed name.
+      env = @env.merge("HTTP_ACCEPT" => "#{Clover::API_MEDIA_TYPE}; version=#{Clover::API_VERSIONS.last}")
+      Ubicloud.new(:rack, app: Clover, env:, project_id: project_ubid)
+    end
   end
 
   def sdk_object

@@ -101,7 +101,7 @@ Optional keyword arguments for each type:
 
 * Firewall: `description`
 * LoadBalancer: `health_check_endpoint`
-* Postgres: size, `storage_size`, `ha_type`, `version`, `flavor`
+* Postgres: size, `storage_size`, `ha_type`, `version`
 * PrivateSubnet: `firewall_id`
 * Vm: `size`, `storage_size`, `unix_user`, `boot_image`, `enable_ip4`,
   `private_subnet_id`

@@ -23,6 +23,7 @@ class UbiCli
 
     run do |opts, cmd|
       params = underscore_keys(opts[:pg_create])
+      params.delete(:flavor)
       pg_tags_to_hash(params, cmd)
       params_to_hash(params, :pg_config, "config", cmd)
       params_to_hash(params, :pgbouncer_config, "pgbouncer config", cmd)

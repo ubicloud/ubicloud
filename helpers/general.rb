@@ -8,7 +8,7 @@ class Clover < Roda
 
   class RodaRequest
     def accepts_json?
-      env["HTTP_ACCEPT"]&.include?("application/json")
+      (accept = env["HTTP_ACCEPT"]) && (accept.include?("application/json") || accept.include?("application/vnd.ubicloud+json"))
     end
 
     # Accept PATCH for API, but POST for web, so web requests to the

@@ -1227,6 +1227,7 @@ class Clover < Roda
         if (operation = @schema_validator.operation_object)
           env["clover.api_operation"] = operation.original_path
         end
+        api_version
         @schema_validator.request_validate(r)
 
         unless @schema_validator.link_exist?
@@ -1239,6 +1240,8 @@ class Clover < Roda
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
       end
+
+      check_deprecations(operation)
     end
 
     before_authenticated_hash_branches
@@ -1250,6 +1253,10 @@ class Clover < Roda
     status, headers, body = res
     next unless api? && status && headers && body
 
+    # @schema_validator is set only if the route block's API branch ran, and
+    # only the responses of that branch depend on the requested API version.
+    headers["vary"] = [headers["vary"], "accept"].compact.join(", ") if @schema_validator
+    add_deprecation_headers(headers) if @deprecations_used
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
