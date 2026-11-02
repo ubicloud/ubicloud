@@ -6,10 +6,16 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
     check_cutoff
 
+    # The default nodepool is named after the cluster with "-np" appended,
+    # and that name is also limited to 40 characters.
+    if name && name.length > 37
+      fail Validation::ValidationFailed.new({name: "Kubernetes cluster name must have max length 37."})
+    end
+
     version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
     Validation.validate_kubernetes_version(version)
     node_count = typecast_params.pos_int("worker_nodes", 1)
-    cp_node_count = typecast_params.pos_int("cp_nodes", 1)
+    cp_node_count = typecast_params.pos_int("cp_node_count", 1)
     node_size = Validation.validate_vm_size(target_node_size, "x64")
 
     requested_kubernetes_vcpu_count = cp_node_count * 2 # since default control plane size is standard-2
@@ -122,7 +128,7 @@ class Clover
     options.add_option(name: "name")
     options.add_option(name: "location", values: Option.kubernetes_locations)
     options.add_option(name: "version", values: Option.selectable_kubernetes_versions)
-    options.add_option(name: "cp_nodes", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
+    options.add_option(name: "cp_node_count", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
     options.add_option(name: "worker_size", values: Option::VmSizes.select { it.visible && it.vcpus <= 16 }.map { it.display_name }, parent: "location") do |location, size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == "standard"

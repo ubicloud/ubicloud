@@ -574,7 +574,7 @@ class RegenScreenshots
     click_link "Kubernetes"
 
     fill_in "Cluster Name", with: "kubernetes-demo"
-    find('input[name="cp_nodes"][value="3"]:not([disabled])').trigger("click")
+    find('input[name="cp_node_count"][value="3"]:not([disabled])').trigger("click")
     find('select#worker_nodes option[value="5"]:not([disabled])').select_option
     resize(900)
     screenshot "managed-kubernetes/create-screenshot.png"
