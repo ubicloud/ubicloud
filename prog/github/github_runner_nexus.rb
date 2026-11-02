@@ -72,19 +72,28 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
     alternative_families = []
+    gcp = false
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
     if alien_allowed? && (github_runner.spill_over_set? || (support_alien? && rand < alien_ratio))
-      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
-      location_id = Config.github_runner_aws_location_id
-      # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
+      # Neither cloud has a 30 vCPU size, so 30 vCPU runners get a 32 vCPU
       # instance, but the customer is still billed for 30 vCPUs.
       vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
-      if x64?
-        size = Option.aws_instance_type_name("m8a", vcpus)
-        alternative_families = ["m8i", "m7a", "m7i", "m6a"]
+      if (gcp = github_runner.spill_over_set? && draw_gcp_spill?)
+        Clog.emit("spilled runner to gcp", {gcp_spilled_runner: {label: github_runner.label, repository_name: github_runner.repository_name}})
+        boot_image = Config.send(:"#{boot_image.tr("-", "_")}_x64_gce_image")
+        location_id = Config.github_runner_gcp_location_id
+        size = "n4d-standard-#{vcpus}"
+        alternative_families = ["c4-standard-lssd"]
       else
-        size = Option.aws_instance_type_name("m9g", vcpus)
-        alternative_families = ["m8g", "m7g"]
+        boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
+        location_id = Config.github_runner_aws_location_id
+        if x64?
+          size = Option.aws_instance_type_name("m8a", vcpus)
+          alternative_families = ["m8i", "m7a", "m7i", "m6a"]
+        else
+          size = Option.aws_instance_type_name("m9g", vcpus)
+          alternative_families = ["m8g", "m7g"]
+        end
       end
     end
 
@@ -92,7 +101,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ch_version = "53.0"
     end
 
-    if location_id != Location::GITHUB_RUNNERS_ID
+    if gcp
+      ps = PrivateSubnet.with_pk!(Config.github_runner_gcp_private_subnet_id)
+    elsif location_id != Location::GITHUB_RUNNERS_ID
       unless (ps = installation_private_subnet(location_id))
         # Only the first runner of the installation creates the subnet. FOR NO KEY UPDATE lets webhooks keep
         # inserting runners, and the lock lasts until the label commits, so keep network requests out of it.
@@ -399,6 +410,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     project.quota_available?(resource_type, 0)
   end
 
+  # A spilled runner goes to GCP instead of AWS with the project's ratio
+  # as its chance.
+  def draw_gcp_spill?
+    (ratio = project.get_ff_gcp_alien_runners_ratio) &&
+      x64? &&
+      [8, 16, 30].include?(label_data["vcpus"]) &&
+      Config.github_runner_gcp_location_id &&
+      Config.github_runner_gcp_private_subnet_id &&
+      rand < ratio
+  end
+
   def aws_spill_capacity_available?
     aws_spill_vpc_available? && GithubRunner.aws_vm_usage.first < Config.github_runner_aws_spill_vcpu_capacity
   end
@@ -425,7 +447,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def destroy_vm
-    subnets_ds = vm.private_subnets_dataset.exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
+    subnets_ds = vm.private_subnets_dataset
+      .exclude(Sequel[:private_subnet][:id] => installation.private_subnets_dataset.select(:id))
+      .exclude(Sequel[:private_subnet][:name] => PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, Sequel[:private_subnet][:project_id] => Config.github_runner_service_project_id)
     subnets_ds.all do |subnet|
       subnet.firewalls_dataset.destroy
     end

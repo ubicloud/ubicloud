@@ -28,6 +28,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   let(:gcp_location) { Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: vm.project_id, display_name: "gcp-europe-west3", ui_name: "GCP Frankfurt", visible: false) }
   let(:boot_bug_grep) { "sudo grep -qszE EXT4-fs\\ error.\\*ext4_mb_generate_buddy.\\*block\\ bitmap\\ and\\ bg\\ descriptor\\ inconsistent\\|kernel\\ BUG\\ at\\ arch/x86/kernel/alternative.c:\\[0-9\\]+\\|GRUB_FORCE_PARTUUID\\ set,\\ attempting\\ initrdless\\ boot\\\\.\\\\s\\*\\$\\|EFI\\ stub:\\ WARNING:\\ Decompression\\ failed:\\ ZSTD-compressed\\ data\\ is\\ corrupt\\|EFI\\ stub:\\ ERROR:\\ Failed\\ to\\ decompress\\ kernel /vm/#{vm.inhost_name}/serial.log && echo match || true" }
 
+  let(:gcp_runner_subnet) {
+    PrivateSubnet.create(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, location_id: gcp_location.id, net4: "10.20.0.0/16", net6: "fd30:1:2:3::/64", state: "waiting", project_id: vm.project_id)
+  }
+
+  def enable_gcp_spill
+    project.set_ff_gcp_alien_runners_ratio(0.05)
+    allow(Config).to receive_messages(
+      github_runner_gcp_location_id: gcp_location.id,
+      github_runner_gcp_private_subnet_id: gcp_runner_subnet.id,
+    )
+  end
+
   before do
     allow(Config).to receive(:github_runner_service_project_id).and_return(vm.project_id)
     allow(Github).to receive(:installation_client).and_return(client)
@@ -232,6 +244,61 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
     end
 
+    describe "for a spilled over premium runner whose GCP draw misses" do
+      before do
+        runner.update(label: "ubicloud-premium-8")
+        runner.incr_spill_over
+        enable_gcp_spill
+        location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+        LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+        LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+        expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      end
+
+      it "places it on AWS" do
+        expect(nx).to receive(:rand).and_return(0.05)
+        expect(nx.pick_vm.location.aws?).to be(true)
+      end
+    end
+
+    describe "for a spilled over runner drawn for gcp" do
+      before do
+        runner.update(label: "ubicloud-premium-8")
+        runner.incr_spill_over
+        enable_gcp_spill
+        project.set_ff_gcp_alien_runners_ratio(1.0)
+        LocationCredentialGcp.create_with_id(gcp_location, project_id: "runner-gcp", service_account_email: "runner@runner-gcp.iam.gserviceaccount.com", credentials_json: "{}")
+      end
+
+      it "places it on n4d in the shared GCP runner subnet" do
+        expect(Clog).to receive(:emit).with("spilled runner to gcp", {gcp_spilled_runner: {label: "ubicloud-premium-8", repository_name: "test-repo"}}).and_call_original
+        picked_vm = nx.pick_vm
+        expect(picked_vm.location_id).to eq(gcp_location.id)
+        expect(picked_vm.family).to eq("n4d-standard")
+        expect(picked_vm.vcpus).to eq(8)
+        expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_gce_image)
+        expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["c4-standard-lssd"])
+        expect(picked_vm.nics.map(&:private_subnet_id)).to eq([gcp_runner_subnet.id])
+        expect(picked_vm.user_nic.strand.stack.first["use_eip"]).to be(false)
+        expect(installation.private_subnets).to be_empty
+      end
+
+      it "places a 30 vCPU runner on a 32 vCPU n4d with the image of its Ubuntu version" do
+        runner.update(label: "ubicloud-premium-30-ubuntu-2204")
+        picked_vm = nx.pick_vm
+        expect(picked_vm.family).to eq("n4d-standard")
+        expect(picked_vm.vcpus).to eq(32)
+        expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_x64_gce_image)
+      end
+
+      it "keeps it on metal when alien runners are disabled for the project" do
+        project.set_ff_no_alien_runners(true)
+        picked_vm = nx.pick_vm
+        expect(picked_vm.location_id).to eq(Location::GITHUB_RUNNERS_ID)
+        expect(picked_vm.nics.map(&:private_subnet_id)).not_to include(gcp_runner_subnet.id)
+      end
+    end
+
     it "uses metal vms if alien runners are disabled for the project" do
       project.set_ff_no_alien_runners(true)
       project.set_ff_aws_alien_runners_ratio(1.0)
@@ -364,6 +431,45 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         ps = nx.pick_vm.private_subnets.first
         expect(ps.net4.netmask.prefix_len).to eq(28)
         expect(installation.private_subnets_dataset.select_map(Sequel[:private_subnet][:id])).to eq([installation_ps.id])
+      end
+    end
+  end
+
+  describe "#draw_gcp_spill?" do
+    before do
+      runner.update(label: "ubicloud-premium-8")
+      enable_gcp_spill
+    end
+
+    it "draws GCP for a premium label runner when the random number hits the ratio" do
+      expect(nx).to receive(:rand).and_return(0.049)
+      expect(nx.draw_gcp_spill?).to be(true)
+    end
+
+    it "draws AWS when the random number misses the ratio" do
+      expect(nx).to receive(:rand).and_return(0.05)
+      expect(nx.draw_gcp_spill?).to be(false)
+    end
+
+    it "draws for a standard label runner of an installation without premium" do
+      installation.update(allocator_preferences: {})
+      runner.update(label: "ubicloud-standard-16-ubuntu-2604")
+      expect(installation.premium_runner_enabled?).to be(false)
+      expect(nx).to receive(:rand).and_return(0)
+      expect(nx.draw_gcp_spill?).to be(true)
+    end
+
+    {
+      "an arm64 runner" => -> { runner.update(label: "ubicloud-standard-8-arm") },
+      "a runner below 8 vCPUs" => -> { runner.update(label: "ubicloud-premium-4") },
+      "a project without a GCP ratio" => -> { project.set_ff_gcp_alien_runners_ratio(nil) },
+      "a missing GCP runner location" => -> { allow(Config).to receive(:github_runner_gcp_location_id).and_return(nil) },
+      "a missing GCP runner subnet" => -> { allow(Config).to receive(:github_runner_gcp_private_subnet_id).and_return(nil) },
+    }.each do |label, setup|
+      it "does not draw for #{label}" do
+        instance_exec(&setup)
+        expect(nx).not_to receive(:rand)
+        expect(nx).not_to be_draw_gcp_spill
       end
     end
   end
@@ -2010,6 +2116,17 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to hop("wait_vm_destroy")
       expect(ps.destroy_set?).to be(false)
       expect(firewall).to exist
+      expect(vm.destroy_set?(cached: false)).to be(true)
+    end
+
+    it "keeps the GCP runner subnet all GCP runners share" do
+      runner.incr_skip_deregistration
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
+      Strand.create_with_id(gcp_runner_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+      Nic.create(private_subnet_id: gcp_runner_subnet.id, private_ipv4: "10.20.0.5/32", private_ipv6: "fd30:1:2:3::5/128", name: "runner-nic", state: "active", vm_id: vm.id)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(gcp_runner_subnet.destroy_set?).to be(false)
       expect(vm.destroy_set?(cached: false)).to be(true)
     end
 
