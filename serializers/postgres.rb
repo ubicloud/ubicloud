@@ -29,6 +29,7 @@ class Serializers::Postgres < Serializers::Base
     }
 
     if options[:detailed]
+      firewall = pg.customer_firewall
       base.merge!(
         connection_string: pg.connection_string,
         private_connection_string: pg.private_connection_string,
@@ -36,7 +37,9 @@ class Serializers::Postgres < Serializers::Base
         password: pg.superuser_password,
         hostname: pg.hostname,
         primary: pg.representative_server.primary?,
-        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
+        private_subnet_id: pg.private_subnet.ubid,
+        firewall_id: firewall&.ubid,
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules(firewall:)),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas),
         log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },

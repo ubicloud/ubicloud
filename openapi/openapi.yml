@@ -5418,6 +5418,20 @@ components:
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
+                  private_subnet_id:
+                    description: ID of the database's private subnet
+                    type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
+                    readOnly: true
+                    x-immutable: true
+                  firewall_id:
+                    description: ID of the firewall that holds the database's firewall rules, or null if it was deleted, renamed, or detached from the private subnet
+                    type: string
+                    example: fwfg7td83em22qfw9pq5xyfqb7
+                    nullable: true
+                    pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+                    readOnly: true
                   latest_restore_time:
                     description: Deprecated. Latest restore time (if primary), which is always the current time.
                     type: string
@@ -5491,6 +5505,8 @@ components:
                   - password
                   - hostname
                   - firewall_rules
+                  - private_subnet_id
+                  - firewall_id
                   - primary
                   - metric_destinations
                   - log_destinations

@@ -1275,6 +1275,24 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["private_connection_string"]).to eq(pg.private_connection_string)
       end
 
+      it "names the private subnet and firewall the database uses" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("private_subnet_id", "firewall_id")).to eq("private_subnet_id" => pg.private_subnet.ubid, "firewall_id" => pg.customer_firewall.ubid)
+      end
+
+      it "shows a null firewall_id once the firewall is detached from the private subnet" do
+        pg.customer_firewall.remove_all_private_subnets
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.slice("private_subnet_id", "firewall_id")).to eq("private_subnet_id" => pg.private_subnet.ubid, "firewall_id" => nil)
+        expect(body["firewall_rules"]).to eq([])
+      end
+
       it "success with destinations, a read replica and restore times" do
         md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
         ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
