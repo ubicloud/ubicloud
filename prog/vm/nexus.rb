@@ -14,7 +14,7 @@ class Prog::Vm::Nexus < Prog::Base
     exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
     use_separate_management_nic: false, use_eip: true, management_nic_use_eip: true, remote_storage_server_id: nil,
-    waiting_strand_id: nil, allocated_waiting_strand_id: nil)
+    waiting_strand_id: nil, allocated_waiting_strand_id: nil, runner_metrics: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -195,6 +195,7 @@ class Prog::Vm::Nexus < Prog::Base
           "hypervisor" => hypervisor,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
+          "runner_metrics" => runner_metrics,
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
           "waiting_strand_id" => waiting_strand_id,

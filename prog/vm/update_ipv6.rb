@@ -51,6 +51,6 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
   def write_params_json
     vm_host.sshable.cmd("sudo rm /vm/:inhost_name/prep.json", inhost_name:)
 
-    vm_host.sshable.cmd("sudo -u :inhost_name tee /vm/:inhost_name/prep.json", inhost_name:, stdin: vm.params_json(**vm.strand.stack.first.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
+    vm_host.sshable.cmd("sudo -u :inhost_name tee /vm/:inhost_name/prep.json", inhost_name:, stdin: vm.params_json(**vm.strand.stack.first.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version", "runner_metrics").transform_keys!(&:to_sym)))
   end
 end
