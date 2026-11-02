@@ -321,25 +321,26 @@ ends it.
 ### 3.7 What tests the harness
 
 The examples that use the harness test it. `spec/terraform/examples_harness.rb` is one loop over
-every generated resource type. It applies the type's resource example as the documentation shows
-it, together with its datasource example, which refers to the resource's; checks that the
-datasource reads what the resource holds, but for write-only inputs, and keeps sensitive what the
-resource keeps sensitive, and that a plan then shows no change; and destroys it. Then, from the
-resource example, it runs each update verb alone, by changing one attribute that the verb owns and
-checking that only the verb's request went out and that the next plan is empty; plans a change of
-each input that forces replacement and expects a replacement; and removes the object from state,
-imports it by the id that its item path derives (by name where the identity accepts one), and
-expects no change to be sent and the next plan to be empty, which shows that write-only inputs are
-adopted. A second value comes from the spec: the next value of an enum, the other boolean, the next
-integer within its bounds, a string whose trailing number is incremented or whose last character is
-changed while it still matches its pattern, a map of the spec's example with each value changed so,
-or the spec's example where the current value is null. `spec/terraform/types.rb` reads the types in
-a separate process and prints what the loop needs. That covers every type's create, read, update,
-replace, import and delete against the API without a line written for the type, and is where a
-missing hook first shows. Every example that expects a failure fails if the harness stops raising
-terraform's errors. The one fault that could pass silently, an exception inside the API, is tested
-by an example in `ssh_public_key_harness.rb`, which stubs a serializer to raise and expects that
-exception.
+every generated resource type. It applies the type's resource example as the documentation shows it,
+together with its datasource example, which refers to the resource's; checks that the datasource
+reads what the resource holds, but for write-only inputs, and keeps sensitive what the resource
+keeps sensitive, and that a plan then shows no change; and destroys it. Then, from the resource
+example, it runs each update verb alone, by changing one attribute that the verb owns and checking
+that only the verb's request went out and that the next plan is empty; plans a change of each input
+that forces replacement and expects a replacement; and removes the object from state, imports it by
+the id that its item path derives (by name where the identity accepts one), and expects no change to
+be sent and the next plan to be empty, which shows that write-only inputs are adopted. A second
+value comes from the spec: the next value of an enum, the other boolean, the next integer within its
+bounds, a string whose trailing number is incremented or whose last character is changed while it
+still matches its pattern, a map of the spec's example with each value changed so, or the spec's
+example where the current value is null. Only an object input without an example, such as a postgres
+destination's `options`, takes its value from a table, keyed by attribute name.
+`spec/terraform/types.rb` reads the types in a separate process and prints what the loop needs. That
+covers every type's create, read, update, replace, import and delete against the API without a line
+written for the type, and is where a missing hook first shows. Every example that expects a failure
+fails if the harness stops raising terraform's errors. The one fault that could pass silently, an
+exception inside the API, is tested by an example in `ssh_public_key_harness.rb`, which stubs a
+serializer to raise and expects that exception.
 
 ## 4. What a failure prints
 

@@ -1900,9 +1900,12 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  format: cidr
+                  example: 10.0.0.0/8
                 description:
                   description: Description of the firewall rule
                   type: string
+                  default: ''
                   nullable: true
               additionalProperties: false
               required:
@@ -1943,6 +1946,7 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  format: cidr
                   nullable: true
                 description:
                   description: Description of the firewall rule
@@ -4650,6 +4654,7 @@ components:
         cidr:
           description: CIDR of the firewall rule
           type: string
+          format: cidr
         description:
           description: Description of the firewall rule
           type: string

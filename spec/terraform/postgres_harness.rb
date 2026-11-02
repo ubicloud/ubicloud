@@ -126,3 +126,106 @@ RSpec.describe "ubicloud_postgres" do
     expect(tf.plan).to be_empty
   end
 end
+
+RSpec.describe "ubicloud_postgres_firewall_rule" do
+  # restrict_by_default leaves out the rules for 0.0.0.0/0 and ::/0 that a
+  # new database's firewall has otherwise.
+  def rule(cidr = "10.0.0.0/8", description = nil) = <<~HCL
+    resource "ubicloud_postgres" "db" {
+      location            = "eu-central-h1"
+      name                = "db"
+      size                = "standard-2"
+      storage_size        = 64
+      restrict_by_default = true
+    }
+
+    resource "ubicloud_postgres_firewall_rule" "office" {
+      location    = "eu-central-h1"
+      postgres_id = ubicloud_postgres.db.id
+      cidr        = "#{cidr}"
+      #{"description = \"#{description}\"" if description}
+    }
+  HCL
+
+  def db = PostgresResource.first(project_id: project.id)
+
+  def rows = db.pg_firewall_rules_dataset.map { [it.cidr.to_s, it.port_range.begin, it.description] }
+
+  # The rule is a row for each of ports 5432 and 6432, but the API lists
+  # it once, by the id its create returned.
+  it "is listed once in its database's firewall_rule_ids" do
+    tf.apply rule + <<~HCL
+      data "ubicloud_postgres" "db" {
+        location   = "eu-central-h1"
+        name       = ubicloud_postgres.db.name
+        depends_on = [ubicloud_postgres_firewall_rule.office]
+      }
+    HCL
+
+    expect(rows.map { it[1] }).to eq [5432, 6432]
+    expect(tf.state("data.ubicloud_postgres.db")["firewall_rule_ids"]).to eq [tf.state("ubicloud_postgres_firewall_rule.office")["id"]]
+  end
+
+  it "changes both ports of a rule in place" do
+    tf.apply rule
+
+    expect(tf.apply(rule("10.1.0.0/16", "office")).mutations).to match [%r{\APATCH postgres/@db/firewall-rule/fr\w+\z}]
+    expect(rows).to eq [["10.1.0.0/16", 5432, "office"], ["10.1.0.0/16", 6432, "office"]]
+    expect(tf.plan).to be_empty
+  end
+
+  # The API masks the host bits, but the provider compares canonical forms
+  # and keeps what was written.
+  it "plans no change for a CIDR with host bits" do
+    tf.apply rule("10.0.0.5/8")
+
+    expect(rows.map(&:first)).to eq ["10.0.0.0/8", "10.0.0.0/8"]
+    expect(tf.state("ubicloud_postgres_firewall_rule.office")["cidr"]).to eq "10.0.0.5/8"
+    expect(tf.plan).to be_empty
+  end
+
+  # The DELETE must remove the rule's 6432 row too, else the second
+  # create collides with it.
+  it "creates a rule again after destroying one for the same CIDR" do
+    tf.apply rule
+    tf.destroy "-target=ubicloud_postgres_firewall_rule.office"
+    expect(rows).to be_empty
+
+    expect(tf.apply(rule).mutations).to eq ["POST postgres/@db/firewall-rule"]
+    expect(rows).to eq [["10.0.0.0/8", 5432, ""], ["10.0.0.0/8", 6432, ""]]
+  end
+end
+
+RSpec.describe "ubicloud_postgres_log_destination" do
+  def destination(token) = <<~HCL
+    resource "ubicloud_postgres" "db" {
+      location     = "eu-central-h1"
+      name         = "db"
+      size         = "standard-2"
+      storage_size = 64
+    }
+
+    resource "ubicloud_postgres_log_destination" "logs" {
+      location    = "eu-central-h1"
+      postgres_id = ubicloud_postgres.db.id
+      name        = "graylog"
+      type        = "syslog"
+      url         = "tcp://logs.example.com:6514"
+      options     = {structured_data = {"token@41058" = {tag = "#{token}"}}}
+    }
+  HCL
+
+  def options = PostgresLogDestination.all.map(&:options)
+
+  # The API never returns options, so the provider keeps them in state.
+  it "keeps its options in state, and replaces the destination when they change" do
+    tf.apply destination("a")
+    expect(options).to eq [{"structured_data" => {"token@41058" => {"tag" => "a"}}}]
+    expect(tf.plan).to be_empty
+
+    expect(tf.plan(destination("b")).actions).to eq("ubicloud_postgres_log_destination.logs" => :replace)
+    expect(tf.apply.mutations).to eq ["DELETE postgres/@db/log-destination/@graylog", "POST postgres/@db/log-destination"]
+    expect(options).to eq [{"structured_data" => {"token@41058" => {"tag" => "b"}}}]
+    expect(tf.plan).to be_empty
+  end
+end

@@ -11,6 +11,12 @@ require_relative "spec_helper"
 RSpec.describe "the generated examples" do
   examples = "#{TerraformHarness::ROOT}/terraform/provider/examples"
 
+  # A second value for an input whose value the spec gives no other for:
+  # an object input without an example.
+  second_values = {"options" => {"headers" => {"x-example" => "1"}}}
+
+  define_method(:second_values) { second_values }
+
   # The kinds of attribute whose second value the spec gives.
   derived = %w[boolean i64 str string_of]
 
@@ -31,6 +37,7 @@ RSpec.describe "the generated examples" do
   # spec's example with each value changed so, or, where current is null,
   # the spec's example.
   def second(name, current)
+    return second_values[name] if second_values.key?(name)
     attr, example = attrs[name], type["examples"][name]
     return example if current.nil? && !example.nil? && attr["kind"] != "map_of"
     checks = attr["checks"]
