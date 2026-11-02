@@ -362,6 +362,7 @@ paths:
                 description:
                   description: Description of the firewall
                   type: string
+                  default: ''
               additionalProperties: false
       responses:
         '200':
@@ -383,6 +384,7 @@ paths:
                 description:
                   description: New description for firewall
                   type: string
+                  example: Allows HTTPS from anywhere
               additionalProperties: false
               required:
                 - description
@@ -409,8 +411,10 @@ paths:
               type: object
               properties:
                 private_subnet_id:
-                  description: Private subnet id to attach
+                  description: ID of the private subnet to attach
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  writeOnly: true
               additionalProperties: false
               required:
                 - private_subnet_id
@@ -437,8 +441,10 @@ paths:
               type: object
               properties:
                 private_subnet_id:
-                  description: Private subnet id to detach
+                  description: ID of the private subnet to detach
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  writeOnly: true
               additionalProperties: false
               required:
                 - private_subnet_id
@@ -467,6 +473,7 @@ paths:
                 cidr:
                   description: CIDR or private subnet id or name to allow
                   type: string
+                  example: 0.0.0.0/0
                 firewall_id:
                   description: Deprecated and ignored; the rule is added to the firewall in the path.
                   type: string
@@ -475,14 +482,19 @@ paths:
                     since: 2026-11-02
                     removed-in: 2
                 port_range:
-                  description: Port range to allow
+                  description: Port or port range to allow, such as 443 or 8000..8080
                   type: string
+                  format: port-range
+                  default: 0..65535
+                  pattern: ^\d+(\.\.\d+)?$
                 protocol:
-                  description: Protocol to allow (tcp or udp, default tcp)
+                  description: Protocol to allow (tcp or udp)
                   type: string
+                  default: tcp
                 description:
                   description: Description to use for the firewall rule
                   type: string
+                  default: ''
                 project_id:
                   description: Deprecated and ignored; the project comes from the path.
                   type: string
@@ -539,9 +551,12 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  format: cidr
                 port_range:
-                  description: Port range of the firewall rule
+                  description: Port or port range of the firewall rule, such as 443 or 8000..8080
                   type: string
+                  format: port-range
+                  pattern: ^\d+(\.\.\d+)?$
                 protocol:
                   description: Protocol of the firewall rule (tcp or udp)
                   type: string
@@ -575,6 +590,7 @@ paths:
                 name:
                   description: New name for firewall
                   type: string
+                  example: my-firewall
               additionalProperties: false
               required:
                 - name
@@ -954,6 +970,10 @@ paths:
                 algorithm:
                   description: Algorithm of the Load Balancer
                   type: string
+                  example: round_robin
+                  enum:
+                    - round_robin
+                    - hash_based
                 stack:
                   description: Deprecated and ignored; the stack is set when the Load Balancer is created.
                   type: string
@@ -964,17 +984,22 @@ paths:
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
+                  example: 8080
                 health_check_endpoint:
                   description: Health check endpoint URL
                   type: string
+                  example: /up
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                  example: 443
                 vms:
-                  description: List of VM apids for the Load Balancer
+                  description: IDs of the VMs to attach to the Load Balancer; any other attached VM is detached
                   type: array
                   items:
                     type: string
+                  example:
+                    - vmhfy8gff8c67hasb0eez2k1pd
                 cert_enabled:
                   description: Whether SSL certificates are enabled for the Load Balancer (if absent or null, the current setting is kept)
                   type: boolean
@@ -1006,25 +1031,43 @@ paths:
                 algorithm:
                   description: Algorithm of the Load Balancer
                   type: string
+                  example: round_robin
+                  enum:
+                    - round_robin
+                    - hash_based
                 stack:
-                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+                  description: Networking stack of the Load Balancer
                   type: string
                   default: dual
+                  enum:
+                    - ipv4
+                    - ipv6
+                    - dual
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
+                  example: 8080
                 health_check_endpoint:
                   description: Health check endpoint URL
                   type: string
+                  default: /up
                 health_check_protocol:
                   description: Health check endpoint protocol
                   type: string
+                  example: http
+                  enum:
+                    - http
+                    - https
+                    - tcp
                 private_subnet_id:
                   description: ID of Private Subnet
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                  example: 443
                 cert_enabled:
                   description: Whether SSL certificates are enabled for the Load Balancer
                   type: boolean
@@ -1058,8 +1101,10 @@ paths:
               type: object
               properties:
                 vm_id:
-                  description: Apid of VM to attach to Load Balancer
+                  description: ID of the VM to attach to the Load Balancer
                   type: string
+                  example: vmhfy8gff8c67hasb0eez2k1pd
+                  writeOnly: true
               additionalProperties: false
               required:
                 - vm_id
@@ -1086,8 +1131,10 @@ paths:
               type: object
               properties:
                 vm_id:
-                  description: Apid of VM to detach from Load Balancer
+                  description: ID of the VM to detach from the Load Balancer
                   type: string
+                  example: vmhfy8gff8c67hasb0eez2k1pd
+                  writeOnly: true
               additionalProperties: false
               required:
                 - vm_id
@@ -1116,6 +1163,7 @@ paths:
                 name:
                   description: New name for load balancer
                   type: string
+                  example: my-load-balancer
               additionalProperties: false
               required:
                 - name
@@ -1144,6 +1192,7 @@ paths:
                 cert_enabled:
                   description: Whether SSL certificates are enabled for the Load Balancer
                   type: boolean
+                  example: true
               additionalProperties: false
               required:
                 - cert_enabled
@@ -2482,7 +2531,11 @@ paths:
               type: object
               properties:
                 firewall_id:
+                  description: ID of a firewall in the same location to attach to the subnet; if absent, a new firewall that allows all TCP and UDP traffic is attached
                   type: string
+                  example: fwfg7td83em22qfw9pq5xyfqb7
+                  pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+                  writeOnly: true
               additionalProperties: false
       responses:
         '200':
@@ -2507,7 +2560,10 @@ paths:
               type: object
               properties:
                 connected-subnet-id:
+                  description: ID of the private subnet to connect to
                   type: string
+                  example: ps3dngttwvje2kmr2sn8x12x4r
+                  writeOnly: true
               additionalProperties: false
       responses:
         '200':
@@ -2550,6 +2606,7 @@ paths:
                 name:
                   description: New name for private subnet
                   type: string
+                  example: my-subnet
               additionalProperties: false
               required:
                 - name
@@ -3646,14 +3703,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FirewallRule'
+          readOnly: true
         id:
           description: ID of the firewall
           type: string
           example: fwfg7td83em22qfw9pq5xyfqb7
           pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the firewall
           type: string
+          readOnly: true
         name:
           description: Name of the firewall
           type: string
@@ -3661,6 +3721,7 @@ components:
           description: Path of the firewall, relative to the project
           type: string
           example: /location/eu-central-h1/firewall/my-firewall
+          readOnly: true
       additionalProperties: false
       required:
         - description
@@ -3675,14 +3736,17 @@ components:
         cidr:
           description: CIDR of the firewall rule
           type: string
+          format: cidr
         id:
           description: ID of the firewall rule
           type: string
           example: fraz0q3vbrpa7pkg7zbmah9csn
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         port_range:
-          description: Port range of the firewall rule
+          description: Port or port range of the firewall rule, such as 443 or 8000..8080
           type: string
+          format: port-range
         protocol:
           description: Protocol of the firewall rule (tcp or udp)
           type: string
@@ -3790,9 +3854,16 @@ components:
         algorithm:
           description: Algorithm of the Load Balancer
           type: string
+          enum:
+            - round_robin
+            - hash_based
         stack:
-          description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+          description: Networking stack of the Load Balancer
           type: string
+          enum:
+            - ipv4
+            - ipv6
+            - dual
         dst_port:
           description: Destination port for the Load Balancer
           type: integer
@@ -3803,17 +3874,24 @@ components:
         health_check_protocol:
           description: Health check endpoint protocol
           type: string
+          enum:
+            - http
+            - https
+            - tcp
         hostname:
           description: Hostname of the Load Balancer
           type: string
+          readOnly: true
         id:
           description: ID of the Load Balancer
           type: string
           example: 1bhw8r4pn73t1m5f7rn7a5pej2
           pattern: ^1b[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the Load Balancer
           type: string
+          readOnly: true
         name:
           description: Name of the Load Balancer
           type: string
@@ -4512,34 +4590,54 @@ components:
       type: object
       properties:
         firewalls:
+          description: Firewalls attached to the subnet
           type: array
           items:
             $ref: '#/components/schemas/Firewall'
+          readOnly: true
         id:
           description: ID of the subnet
           type: string
           example: ps3dngttwvje2kmr2sn8x12x4r
           pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the subnet
           type: string
+          readOnly: true
         name:
           description: Name of the subnet
           type: string
         net4:
           description: IPv4 CIDR of the subnet
           type: string
+          readOnly: true
+          x-immutable: true
         net6:
           description: IPv6 CIDR of the subnet
           type: string
+          readOnly: true
+          x-immutable: true
         nics:
           description: List of NICs
           type: array
           items:
             $ref: '#/components/schemas/Nic'
+          readOnly: true
         state:
           description: State of the subnet
           type: string
+          enum:
+            - creating
+            - available
+            - refreshing_keys
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - refreshing_keys
+              - deleting
       additionalProperties: false
       required:
         - firewalls
@@ -4908,6 +5006,7 @@ components:
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
+                    readOnly: true
                 additionalProperties: false
                 required:
                   - private_subnets
@@ -5108,6 +5207,7 @@ components:
                   subnet:
                     description: Name of the Load Balancer's private subnet
                     type: string
+                    readOnly: true
                   vms:
                     description: IDs of the VMs attached to the Load Balancer
                     type: array

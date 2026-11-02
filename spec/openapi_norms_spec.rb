@@ -86,6 +86,21 @@ RSpec.describe OpenapiNorms do
     ]
   end
 
+  it "reports x-lifecycle on a property that is not readOnly, with values outside its enum, or on more than one property" do
+    state = {"type" => "string", "description" => "State", "readOnly" => true, "enum" => %w[creating ready failed]}
+    marked = state.merge("x-lifecycle" => {"pending" => ["creating"], "failed" => ["failed"]})
+    expect(violations(create({}), schemas: thing("state" => marked), parameters: name)).to eq []
+    schemas = thing(
+      "a" => marked.merge("readOnly" => false), "b" => state.merge("x-lifecycle" => {"pending" => ["starting"]}),
+      "c" => state.merge("x-lifecycle" => ["creating"]), "d" => state.merge("x-lifecycle" => {"ready" => ["ready"]}),
+      "e" => state.merge("x-lifecycle" => {"failed" => "failed"}),
+    )
+    expect(violations(create({}), schemas:, parameters: name).grep(/\Alifecycle/)).to eq [
+      *%w[a b c d e].map { "lifecycle_enum: Thing.#{it}: mark it readOnly, and list only values of its enum under pending and failed" },
+      "lifecycle_enum: Thing.a, Thing.b, Thing.c, Thing.d, Thing.e: mark only one property of a response with x-lifecycle",
+    ]
+  end
+
   describe "deprecation" do
     def deprecated(**x) = size.merge("deprecated" => true, "x-deprecated" => {"since" => Date.new(2026, 11, 2), **x})
 

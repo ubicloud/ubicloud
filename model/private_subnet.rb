@@ -93,6 +93,10 @@ class PrivateSubnet < Sequel::Model
     ubid.to_s[0..7]
   end
 
+  # The values that display_state can return. The enum of PrivateSubnet.state
+  # in openapi.yml must list the same ones.
+  DISPLAY_STATES = %w[creating available refreshing_keys deleting].freeze
+
   def display_state
     return "deleting" if destroying_set? || destroy_set?
     (state == "waiting") ? "available" : state
