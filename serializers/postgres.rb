@@ -40,9 +40,9 @@ class Serializers::Postgres < Serializers::Base
         private_subnet_id: pg.private_subnet.ubid,
         firewall_id: firewall&.ubid,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules(firewall:)),
-        metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
+        metric_destinations: Serializers::PostgresMetricDestination.serialize(pg.metric_destinations),
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas),
-        log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
+        log_destinations: Serializers::PostgresLogDestination.serialize(pg.log_destinations),
         pg_config: pg.user_config.transform_values(&:to_s),
         pgbouncer_config: pg.pgbouncer_user_config.transform_values(&:to_s),
       )

@@ -231,10 +231,14 @@ class Clover
         end
 
         r.is :ubid_uuid do |id|
-          authorize("Postgres:edit", pg)
+          authorize(r.get? ? "Postgres:view" : "Postgres:edit", pg)
           firewall = postgres_require_customer_firewall!
           fwr = pg.pg_firewall_rule(id, firewall:)
           check_found_object(fwr)
+
+          r.get do
+            Serializers::PostgresFirewallRule.serialize(fwr)
+          end
 
           r.patch do
             current_cidr = fwr.cidr.to_s
@@ -314,6 +318,13 @@ class Clover
           end
         end
 
+        r.get api?, :ubid_uuid do |id|
+          authorize("Postgres:view", pg)
+          md = pg.metric_destinations_dataset[id:]
+          check_found_object(md)
+          Serializers::PostgresMetricDestination.serialize(md)
+        end
+
         r.delete :ubid_uuid do |id|
           authorize("Postgres:edit", pg)
 
@@ -384,11 +395,18 @@ class Clover
           end
 
           if api?
-            {id: ld.ubid, name: ld.name, type: ld.type, url: ld.url}
+            Serializers::PostgresLogDestination.serialize(ld)
           else
             flash["notice"] = "Log destination is created"
             r.redirect pg, "/logs"
           end
+        end
+
+        r.get api?, :ubid_uuid do |id|
+          authorize("Postgres:view", pg)
+          ld = pg.log_destinations_dataset[id:]
+          check_found_object(ld)
+          Serializers::PostgresLogDestination.serialize(ld)
         end
 
         r.delete :ubid_uuid do |id|

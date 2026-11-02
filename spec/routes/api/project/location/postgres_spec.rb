@@ -1459,6 +1459,48 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["items"][5]["description"]).to eq("")
         expect(JSON.parse(last_response.body)["count"]).to eq(6)
       end
+
+      it "firewall-rule" do
+        fwr = pg.pg_firewall_rules.first
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => fwr.ubid, "cidr" => "0.0.0.0/0", "port" => 5432, "description" => "")
+      end
+
+      it "firewall-rule not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/fr000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "metric-destination" do
+        md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/#{md.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "user", "url" => "https://metrics.example.com")
+      end
+
+      it "metric-destination not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/et000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "log-destination" do
+        ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination/#{ld.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => ld.ubid, "name" => "graylog", "type" => "syslog", "url" => "tcp://logs.example.com:6514")
+      end
+
+      it "log-destination not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination/1d000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
     end
 
     describe "rename" do
