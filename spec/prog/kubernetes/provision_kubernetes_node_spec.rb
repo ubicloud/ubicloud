@@ -198,6 +198,14 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
             ip6 daddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept
           }
         }
+
+        # pod netns keep net.mptcp.enabled=1, so strip MPTCP from incoming SYNs (CVE-2026-98432)
+        table inet strip_mptcp {
+          chain prerouting {
+            type filter hook prerouting priority raw; policy accept;
+            tcp flags syn tcp option mptcp exists reset tcp option mptcp
+          }
+        }
       NFT
     end
 
