@@ -447,6 +447,25 @@ integration.
 
 Assuredly, there is all this and more in other editor environments.
 
+### Working on the Terraform Provider
+
+The terraform provider in `terraform/provider/` is partly generated
+from `openapi/openapi.yml`, by a separate program in `terraform/` that
+[doc/terraform-generator-design.md](doc/terraform-generator-design.md)
+describes. `mise install` provides the Go and terraform that this work
+needs, and one command runs the whole loop:
+
+```sh
+$ bundle exec rake terraform
+```
+
+It runs the generator's specs, writes the provider's generated files,
+checks and tests the provider's Go, and fails unless the tests cover
+every statement of its hand-written part. `rake -T terraform` lists
+the steps that can be run alone. The tests above run none of this. CI
+runs it in the terraform workflow, with `CHECK=1` so that a generated
+file that has been edited fails it.
+
 ### Running Web Console
 
 Web Console is designed with Tailwind CSS. Tailwind CSS works by scanning

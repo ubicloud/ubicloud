@@ -109,8 +109,7 @@ the block's file and line, and a mistyped pattern cannot pass silently.
 Without it the provider reads rows the control plane has not finished with.
 
 `bundle exec rspec spec/terraform/postgres_harness.rb:42` runs one example with nothing set in the
-environment. `COVER=1` builds the provider for coverage. Terraform's variables, such as
-`TF_LOG_PROVIDER`, pass through to it.
+environment. Terraform's variables, such as `TF_LOG_PROVIDER`, pass through to it.
 
 ## 2. An example
 
@@ -254,8 +253,8 @@ The first harness file to load builds the provider, once per process:
 1. `rake terraform:generate`, in a separate process, writes the generated files into
    `terraform/provider/`, keeping any file the engineer has edited and printing its name.
 2. `go build -o tmp/terraform/bin/terraform-provider-ubicloud .` runs in `terraform/provider`, with
-   `GOTOOLCHAIN=local`, and with `-cover` under `COVER=1`. It runs every time the harness loads, so
-   the harness never tests a stale binary; with nothing changed it takes about 0.2 s.
+   `GOTOOLCHAIN=local` and `-cover`. It runs every time the harness loads, so the harness never
+   tests a stale binary; with nothing changed it takes about 0.2 s.
 3. `tmp/terraform/dev.tfrc` maps `registry.terraform.io/ubicloud/ubicloud` to that directory with
    `dev_overrides`, so that no command needs `terraform init`.
 
@@ -291,8 +290,8 @@ sets `TF_CLI_CONFIG_FILE`, `TF_IN_AUTOMATION`, `CHECKPOINT_DISABLE`, `TF_INPUT=0
 `UBICLOUD_API_ENDPOINT` and `UBICLOUD_PROJECT_ID`, so that an engineer's token cannot reach a
 provider block that the override does not cover. A plan runs with `-out=tfplan -detailed-exitcode`,
 and only a plan whose exit status says it changes something runs `terraform show -json tfplan` for
-its actions. Under `COVER=1` every command also gets `GOCOVERDIR=tmp/terraform/cover/harness`, and
-each provider process writes its counters there when terraform stops it.
+its actions. Every command also gets `GOCOVERDIR=tmp/terraform/cover/harness`, and each provider
+process writes its counters there when terraform stops it.
 
 ### 3.5 The ledger
 
