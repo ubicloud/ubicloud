@@ -141,6 +141,49 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
       end
+
+      it "refuses a private subnet in another location" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location::HETZNER_HEL1_ID).subject
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "8080",
+          algorithm: "round_robin",
+          health_check_protocol: "http",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet not found"})
+        expect(LoadBalancer[name: "lb1"]).to be_nil
+      end
+
+      it "refuses a name used by a load balancer on another subnet in the same location" do
+        lb
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-2", location_id: Location[display_name: TEST_LOCATION].id).subject
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb-1", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "8080",
+          algorithm: "round_robin",
+          health_check_protocol: "http",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Load balancer with this name already exists in this location"})
+        expect(LoadBalancer.where(name: "lb-1").count).to eq(1)
+      end
+
+      it "allows the name of a load balancer in another location" do
+        lb
+        location = Location[Location::HETZNER_HEL1_ID]
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-2", location_id: location.id).subject
+        post "/project/#{project.ubid}/location/#{location.display_name}/load-balancer/lb-1", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "8080",
+          algorithm: "round_robin",
+          health_check_protocol: "http",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["location"]).to eq(location.display_name)
+        expect(LoadBalancer.where(name: "lb-1").count).to eq(2)
+      end
     end
 
     describe "delete" do
