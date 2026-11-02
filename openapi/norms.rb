@@ -60,9 +60,15 @@ class OpenapiNorms
   end
 
   def norm_described
-    places = @operations.flat_map { [*it.request.values, *it.response&.values] } + parameters
+    places = body_properties + parameters
     places.filter_map do |s, at|
       "described: #{at}: describe it" unless resolve(s)["description"] || s["description"]
+    end
+  end
+
+  def norm_immutable_readonly
+    body_properties.filter_map do |s, at|
+      "immutable_readonly: #{at}: mark it readOnly, or drop x-immutable" if s["x-immutable"] && !s["readOnly"]
     end
   end
 
@@ -129,6 +135,8 @@ class OpenapiNorms
   def answers = @operations.select(&:response)
 
   def exchanges = answers.select { it.request.any? }
+
+  def body_properties = @operations.flat_map { [*it.request.values, *it.response&.values] }
 
   def parameters
     found = @operations.flat_map do |o|

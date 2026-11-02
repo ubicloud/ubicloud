@@ -11,10 +11,7 @@ described: PrivateLinkService.name: describe it
 described: PrivateLinkService.ports: describe it
 described: PrivateLinkService.state: describe it
 described: PrivateSubnet.firewalls: describe it
-described: Project.id: describe it
 described: ResourceMetrics.metrics: describe it
-described: SshPublicKeyCreate.name: describe it
-described: SshPublicKeyCreate.public_key: describe it
 described: connectPrivateSubnet.connected-subnet-id: describe it
 described: createPostgresDatabase.pg_config: describe it
 described: createPostgresDatabase.pgbouncer_config: describe it
@@ -35,8 +32,6 @@ described: setMaintenanceWindow.maintenance_window_days: describe it
 described: setMaintenanceWindow.maintenance_window_start_at: describe it
 described: setVMMaintenanceWindow.maintenance_window_start_at: describe it
 described: updateLocationPrivateLinkService.aws: describe it
-described: updateSshPublicKey.name: describe it
-described: updateSshPublicKey.public_key: describe it
 direction: CertAuthUserList.items: mark it readOnly, or accept it in a request
 direction: Firewall.firewall_rules: mark it readOnly, or accept it in a request
 direction: Firewall.id: mark it readOnly, or accept it in a request
@@ -56,8 +51,6 @@ direction: GithubInstallation.name: mark it readOnly, or accept it in a request
 direction: GithubRepository.id: mark it readOnly, or accept it in a request
 direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
 direction: GithubRepository.name: mark it readOnly, or accept it in a request
-direction: InferenceApiKey.id: mark it readOnly, or accept it in a request
-direction: InferenceApiKey.key: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.cp_node_count: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.cp_vms: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.display_state: mark it readOnly, or accept it in a request
@@ -129,13 +122,10 @@ direction: PrivateSubnet.net4: mark it readOnly, or accept it in a request
 direction: PrivateSubnet.net6: mark it readOnly, or accept it in a request
 direction: PrivateSubnet.nics: mark it readOnly, or accept it in a request
 direction: PrivateSubnet.state: mark it readOnly, or accept it in a request
-direction: Project.id: mark it readOnly, or accept it in a request
-direction: Project.name: mark it readOnly, or accept it in a request
 direction: ResourceMetrics.metrics: mark it readOnly, or accept it in a request
 direction: RunCommand.output: mark it readOnly, or accept it in a request
 direction: RunCommand.status: mark it readOnly, or accept it in a request
 direction: RunCommand.timestamp: mark it readOnly, or accept it in a request
-direction: SshPublicKey.id: mark it readOnly, or accept it in a request
 direction: Vm.id: mark it readOnly, or accept it in a request
 direction: Vm.ip4: mark it readOnly, or accept it in a request
 direction: Vm.ip6: mark it readOnly, or accept it in a request
@@ -216,8 +206,6 @@ examples: PrivateLinkService.id: give it an example
 examples: PrivateLinkServiceCreate.aws: give it an example
 examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
 examples: PrivateLocation.id: give it an example
-examples: SshPublicKeyCreate.name: give it an example
-examples: SshPublicKeyCreate.public_key: give it an example
 examples: actionLocationFirewallAttachSubnet.private_subnet_id: give it an example
 examples: actionLocationFirewallDetachSubnet.private_subnet_id: give it an example
 examples: attachVmLocationLoadBalancer.vm_id: give it an example

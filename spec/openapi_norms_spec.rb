@@ -77,6 +77,15 @@ RSpec.describe OpenapiNorms do
     expect(violations(create({}, parameter:), schemas: thing)).to eq ["described: createThing param name: describe it"]
   end
 
+  it "reports x-immutable on a property that is not readOnly" do
+    body = {"size" => size.merge("x-immutable" => true)}
+    schemas = thing("size" => size.merge("x-immutable" => true), "key" => size.merge("readOnly" => true, "x-immutable" => true))
+    expect(violations(create(body), schemas:, parameters: name)).to eq [
+      "immutable_readonly: createThing.size: mark it readOnly, or drop x-immutable",
+      "immutable_readonly: Thing.size: mark it readOnly, or drop x-immutable",
+    ]
+  end
+
   describe "deprecation" do
     def deprecated(**x) = size.merge("deprecated" => true, "x-deprecated" => {"since" => Date.new(2026, 11, 2), **x})
 

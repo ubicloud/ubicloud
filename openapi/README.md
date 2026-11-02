@@ -63,6 +63,38 @@ refused.
 The server looks only at operations and top-level request body properties; a deprecated query
 parameter or nested property is neither warned of nor refused.
 
+### `x-immutable`
+
+`x-immutable: true` marks a `readOnly` response property whose value never changes once the server
+has returned it, such as an inference API key's `key`. A client may keep the first value it reads;
+the terraform provider keeps it in plans, rather than showing it as unknown after each update.
+
+### `x-lifecycle`
+
+This goes on the `readOnly` response property, normally `state`, that says whether an object is
+ready, and names the values of its `enum` in which the server is still working on the object or the
+object has failed:
+
+```yaml
+state:
+  description: State of the object
+  type: string
+  readOnly: true
+  enum: [creating, running, deleting, failed]
+  x-lifecycle:
+    pending: [creating]
+    failed: [failed]
+```
+
+| Key | Meaning |
+|---|---|
+| `pending` | values in which the server is still creating or changing the object |
+| `failed` | values in which the object has failed and will not become ready |
+
+Either key may be left out, and at most one property of a response may carry `x-lifecycle`. After a
+create or an update, a client reads the object again while the property holds a pending value, and
+stops with an error at a failed one. The terraform provider does both.
+
 ## Deprecating a name
 
 1. Mark it `deprecated: true` and give it `x-deprecated` with `since`, the date of the commit, and,
