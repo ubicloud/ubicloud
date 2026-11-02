@@ -380,7 +380,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     {
       "ResourceExhaustedError" => [Google::Cloud::ResourceExhaustedError.new("zone capacity"), 5],
       "UnavailableError" => [Google::Cloud::UnavailableError.new("service unavailable"), 5],
-      "InvalidArgumentError for missing machine type" => [Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."), 5],
+      "InvalidArgumentError for missing machine type" => [Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."), 0],
     }.each do |label, (error, delay)|
       it "retries in a different zone on #{label} after #{delay} seconds" do
         nic.strand.update(label: "wait")
@@ -855,7 +855,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
           )
           expect(Clog).to receive(:emit).with("GCP service account created", anything).and_call_original
           expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-          expect { nx.start }.to nap(5)
+          expect { nx.start }.to nap(0)
         end
 
         it "naps on PermissionDeniedError mentioning the service account email" do

@@ -159,7 +159,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       # through GCP IAM; until then insert rejects it. Nap and retry.
       nap 10 if service_account_email && e.message.include?(service_account_email)
       raise unless e.message.include?("does not exist in zone")
-      retry_zone_capacity(e.message)
+      # The zone never offers this machine type, so try another one at once.
+      nap bump_excluded_zone(e.message, untried_delay: 0)
     rescue Google::Cloud::PermissionDeniedError => e
       raise unless service_account_email && e.message.include?(service_account_email)
       nap 10
@@ -494,10 +495,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap bump_excluded_zone(error_message)
   end
 
-  def bump_excluded_zone(error_message, zones_exhausted: false)
+  def bump_excluded_zone(error_message, zones_exhausted: false, untried_delay: 5)
     excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
     available = zones_exhausted ? [] : gcp_az_suffixes - excluded
-    delay = 5
+    delay = untried_delay
 
     if available.empty?
       if runner
