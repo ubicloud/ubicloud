@@ -132,6 +132,12 @@ RSpec.describe Clover, "firewall" do
       expect(rule.protocol).to eq "udp"
     end
 
+    it "fails to modify with an empty body" do
+      expect {
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}", {}.to_json
+      }.to raise_error(Committee::InvalidRequest, /less than minProperties/)
+    end
+
     it "fails with invalid protocol" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/0",
