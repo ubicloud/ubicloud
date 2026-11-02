@@ -2129,7 +2129,7 @@ paths:
                 - url
       responses:
         '200':
-          $ref: '#/components/responses/PostgresDatabase'
+          $ref: '#/components/responses/PostgresMetricDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:

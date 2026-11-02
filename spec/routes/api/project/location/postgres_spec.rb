@@ -741,6 +741,8 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(JSON.parse(last_response.body)).to eq({"id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "username", "url" => "https://example.com"})
       end
 
       it "metric-destination invalid url" do
