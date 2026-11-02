@@ -5,6 +5,8 @@
 # where that order matters.
 module TerraformGenerator::Definitions
   TYPES = {
+    firewall: {},
+    firewall_rule: {},
     inference_api_key: {},
     project: {},
     ssh_public_key: {},
