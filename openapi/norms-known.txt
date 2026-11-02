@@ -83,7 +83,6 @@ direction: PostgresDatabase.state: mark it readOnly, or accept it in a request
 direction: PostgresDatabase.storage_size_gib: mark it readOnly, or accept it in a request
 direction: PostgresDatabase.target_server_count: mark it readOnly, or accept it in a request
 direction: PostgresDatabase.target_storage_size_gib: mark it readOnly, or accept it in a request
-direction: PostgresDatabase.target_version: mark it readOnly, or accept it in a request
 direction: PostgresDatabase.target_vm_size: mark it readOnly, or accept it in a request
 direction: PostgresDatabase.vm_size: mark it readOnly, or accept it in a request
 direction: PostgresFirewallRule.id: mark it readOnly, or accept it in a request
@@ -119,7 +118,6 @@ direction: responses/PostgresDatabase/allOf/1.private_connection_string: mark it
 direction: responses/PostgresDatabase/allOf/1.read_replicas: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseLogs.logs: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.current_version: mark it readOnly, or accept it in a request
-direction: responses/PostgresDatabaseUpgradeStatus.target_version: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_status: mark it readOnly, or accept it in a request
 echo: CertAuthUserRequest.name: echo it in the response, or mark it writeOnly

@@ -986,10 +986,23 @@ class Clover
           authorize("Postgres:edit", pg.id)
           handle_validation_failure("postgres/show") { @page = "upgrade" }
 
+          # Check this before validating, so that a client can resend a
+          # request whose response it lost. Validation would refuse it,
+          # since the database is by then waiting for convergence.
+          target_version = typecast_params.nonempty_str("target_version") if api?
+          if target_version == pg.target_version
+            no_audit_log
+            next Serializers::PostgresUpgrade.serialize(pg)
+          end
+
           Validation.validate_postgres_upgrade(pg)
+          next_version = (pg.version.to_i + 1).to_s
+          if target_version && target_version != next_version
+            fail Validation::ValidationFailed.new({target_version: "Database can only be upgraded to the next version, #{next_version}"})
+          end
 
           read_replica_count = DB.transaction do
-            pg.update(target_version: pg.version.to_i + 1)
+            pg.update(target_version: next_version)
             audit_log(pg, "upgrade")
 
             pg.read_replicas_dataset.update(target_version: pg.target_version)
