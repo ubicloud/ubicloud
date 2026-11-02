@@ -424,7 +424,7 @@ GEM
     rexml (3.4.4)
     roda (3.109.0)
       rack
-    rodauth (2.48.0)
+    rodauth (2.50.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rodauth-omniauth (0.6.2)
