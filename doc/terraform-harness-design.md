@@ -578,9 +578,10 @@ it "raises an exception from inside the API as itself" do
 end
 ```
 
-A customer's file can be pasted whole, as `<<~'HCL'` so that Ruby leaves `${...}` to terraform,
-once its `backend` block is removed: terraform asks for `terraform init` when a configuration
-declares a backend, and the harness never runs it.
+A customer's file can be pasted whole into a heredoc once its `backend` block is removed: terraform
+asks for `terraform init` when a configuration declares a backend, and the harness never runs it. A
+plain heredoc leaves terraform's `${...}` alone but reads backslash escapes, so a file with a `\n`
+or `\"` in a string needs `<<~'HCL'`.
 
 ## 6. Cost
 
@@ -701,5 +702,5 @@ three hand-written types.
 7. **A broken deadline shows as a hang** rather than a failure, since no example tests it; the
    workflow's timeout ends the run.
 8. **Not all shown yet.** These parts have not run: the hooks for load balancers and kubernetes,
-   destroying VMs and databases in their hooks, and the examples harness over a child type whose
-   example creates its parent. The commit that builds each part will show that it works.
+   and destroying VMs and databases in their hooks. The commit that builds each part will show that
+   it works.

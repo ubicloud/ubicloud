@@ -356,8 +356,7 @@ class TerraformGenerator::Derive
   # The candidates are the PATCH on the item, and each POST or PATCH with a
   # body on a direct literal subroute. A subroute with paths beneath it is a
   # child type's collection, and is skipped. A candidate is a verb if its
-  # body holds only properties of the create body or the item response, or
-  # writeOnly ones.
+  # body holds only properties of the create body or the item response.
   def verb_candidates
     base = @item.path
     subroutes = @api.paths.keys.select { |path| path.match?(%r{\A#{Regexp.escape(base)}/[^/{}]+\z}) && @api.paths.keys.none? { it.start_with?("#{path}/") } }
@@ -371,7 +370,7 @@ class TerraformGenerator::Derive
     body = body(op)
     aside = if merge_subroute(path, method) then :merge_subroute
     elsif name_carrier(path, body) then :name_carrier
-    elsif body.any? { |n, prop| !(@create_body.key?(n) || @response.key?(n) || prop.schema["writeOnly"]) } then :verb_candidates
+    elsif body.keys.any? { !(@create_body.key?(it) || @response.key?(it)) } then :verb_candidates
     end
     origin = (path == @item.path && method == "post") ? :item_post_verb : :verb_candidates
     Candidate.new(path, method, id, body, [[aside || origin, id]], !aside)

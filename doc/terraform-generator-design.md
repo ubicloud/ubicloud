@@ -532,8 +532,9 @@ and write-only attributes are left out.
 literal subroute (`{item}/<word>`) that has a request body and no path beneath it; a subroute with
 paths beneath it is a child type's collection. Bodyless POSTs are actions, GET subroutes are reads,
 and deprecated operations are skipped. A candidate is a verb when every property of its body,
-`readOnly` ones aside, is in the create body or the item response, or is `writeOnly`. Three
-clauses:
+`readOnly` ones aside, is in the create body or the item response. A `writeOnly` property is no
+exception: if the create does not take it, as with the `private_subnet_id` of a firewall's
+attach-subnet, the provider can neither set it at create nor read it back. Three clauses:
 
 - `item_post_verb`: when the create is on the collection, the POST on the item is a candidate too.
 - `merge_subroute`: a PATCH on a subroute merges into a sub-document and cannot express a removed

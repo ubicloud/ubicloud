@@ -444,11 +444,11 @@ RSpec.describe TerraformGenerator::Derive do
       expect(statements(type, :Dropped)).to eq [TerraformGenerator::Dropped.new("renameThing", [[:verb_owner, "renameThing"]])]
     end
 
-    it "sets aside a candidate whose body carries a property that is neither an input nor in the response, but not a writeOnly one" do
-      paths = {"/thing/{thing_id}/attach" => {post: verb("attachThing", other: {type: "string"})}, "/thing/{thing_id}/seal" => {post: verb("sealThing", key: {type: "string", writeOnly: true})}}
+    it "sets aside a candidate whose body carries a property that is neither a create input nor in the response, writeOnly or not" do
+      paths = {"/thing/{thing_id}/attach" => {post: verb("attachThing", other: {type: "string", writeOnly: true})}, "/thing/{thing_id}/seal" => {post: verb("sealThing", key: {type: "string"})}}
       type = derive(create: {}, paths:)
-      expect(type.statements.grep(TerraformGenerator::Dropped).map(&:to_h) + statements(type, :Verb).map(&:path))
-        .to eq [{operation: "attachThing", why: [[:verb_candidates, "attachThing"]]}, "/seal"]
+      expect(type.statements.grep(TerraformGenerator::Dropped).map(&:to_h))
+        .to eq [{operation: "attachThing", why: [[:verb_candidates, "attachThing"]]}, {operation: "sealThing", why: [[:verb_candidates, "sealThing"]]}]
     end
   end
 
