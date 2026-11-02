@@ -57,16 +57,20 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "Read replicas cannot be modified directly! Please modify the parent database instead.")
         end
 
-        size = typecast_params.nonempty_str("size", pg.target_vm_size).gsub("burstable", "hobby")
-        target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
+        size = typecast_params.nonempty_str("size", pg.requested_vm_size).gsub("burstable", "hobby")
+        storage_size = typecast_params.pos_int("storage_size", pg.requested_storage_size_gib)
+        # Move a target only when its request changes, so that a client
+        # resending the same request does not undo a storage auto-scale.
+        target_vm_size = (size == pg.requested_vm_size) ? pg.target_vm_size : size
+        target_storage_size_gib = (storage_size == pg.requested_storage_size_gib) ? pg.target_storage_size_gib : storage_size
         ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
         init_script = typecast_params.nonempty_str("init_script") || pg.init_script&.init_script
 
         postgres_params = {
           "location" => pg.location,
-          "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
-          "size" => size,
+          "family" => Option::POSTGRES_SIZE_OPTIONS[target_vm_size]&.family,
+          "size" => target_vm_size,
           "storage_size" => target_storage_size_gib,
           "ha_type" => ha_type,
           "version" => pg.version,
@@ -97,17 +101,19 @@ class Clover
         current_storage_size_gib = pg.target_storage_size_gib
         current_ha_type = pg.ha_type
         current_standby_count = pg.target_standby_count
+        resizing = current_vm_size != target_vm_size || current_storage_size_gib != target_storage_size_gib
 
         DB.transaction do
-          pg.update_target_sizes_with_replicas(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
+          pg.update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:, ha_type:, tags:,
+            requested_vm_size: size, requested_storage_size_gib: storage_size)
 
-          # Updating target_vm_size and target_storage_size_gib might undo what
-          # we did in auto-scaling, so we are decrementing related semaphores
-          # here to give the system another chance to auto-scale if needed
-          # after this update.
-          pg.decr_storage_auto_scale_action_performed_80
-          pg.decr_storage_auto_scale_action_performed_85
-          pg.decr_storage_auto_scale_action_performed_90
+          if resizing
+            # Moving the targets might undo an auto-scale, so clear the
+            # auto-scale semaphores to let the next check act again if needed.
+            pg.decr_storage_auto_scale_action_performed_80
+            pg.decr_storage_auto_scale_action_performed_85
+            pg.decr_storage_auto_scale_action_performed_90
+          end
 
           if init_script
             if (pg_init_script = pg.init_script)
@@ -119,7 +125,7 @@ class Clover
           audit_log(pg, "update")
         end
 
-        if current_vm_size != pg.target_vm_size || current_storage_size_gib != pg.target_storage_size_gib
+        if resizing
           postgres_action_log(pg, :postgres_scale,
             current_vm_size:, target_vm_size: pg.target_vm_size,
             current_storage_size_gib:, target_storage_size_gib: pg.target_storage_size_gib,

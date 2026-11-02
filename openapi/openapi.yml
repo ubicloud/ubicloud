@@ -4092,7 +4092,13 @@ components:
           description: Storage size in GiB
           type: integer
         target_storage_size_gib:
-          description: Desired storage size in GiB
+          description: Storage size in GiB that the servers converge to, which is storage_size unless storage auto-scale raised it
+          type: integer
+        size:
+          description: Size of the underlying VM last requested by create or update
+          type: string
+        storage_size:
+          description: Storage size in GiB last requested by create or update
           type: integer
         version:
           description: Current Postgres version
@@ -4112,7 +4118,7 @@ components:
           description: Size of the underlying VM
           type: string
         target_vm_size:
-          description: Desired VM size
+          description: VM size that the servers converge to, which is size unless storage auto-scale raised it
           type: string
         ca_certificates:
           description: CA certificates of the root CA used to issue postgres server certificates
@@ -4156,6 +4162,8 @@ components:
         - name
         - state
         - storage_size_gib
+        - size
+        - storage_size
         - version
         - target_version
         - vm_size

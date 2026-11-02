@@ -68,6 +68,17 @@ class PostgresResource < Sequel::Model
     representative_server.storage_size_gib
   end
 
+  # If no size was requested, as for a read replica or restore (which takes
+  # its parent's size) or a row created before requests were recorded,
+  # report the target instead.
+  def requested_vm_size
+    super || target_vm_size
+  end
+
+  def requested_storage_size_gib
+    super || target_storage_size_gib
+  end
+
   def version
     representative_server.version
   end
@@ -952,6 +963,8 @@ end
 #  required_availability_zone_id   | text                     |
 #  target_image_family             | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
 #  target_storage_configuration    | jsonb                    |
+#  requested_vm_size               | text                     |
+#  requested_storage_size_gib      | bigint                   |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_id_private_subnet_id_uidx        | UNIQUE btree (id, private_subnet_id)

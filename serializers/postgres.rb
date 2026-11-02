@@ -11,6 +11,8 @@ class Serializers::Postgres < Serializers::Base
       target_vm_size: pg.target_vm_size,
       storage_size_gib: pg.storage_size_gib,
       target_storage_size_gib: pg.target_storage_size_gib,
+      size: pg.requested_vm_size,
+      storage_size: pg.requested_storage_size_gib,
       target_version: pg.target_version,
       version: pg.version,
       ha_type: pg.ha_type,
