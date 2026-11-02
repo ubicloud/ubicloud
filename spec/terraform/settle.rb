@@ -8,6 +8,12 @@
 module TerraformHarness::Settle
   module_function
 
+  # A DELETE leaves a load balancer in place until LoadBalancerNexus
+  # destroys it, together with its VM memberships and ports.
+  def settle_load_balancer(lb)
+    lb.destroy if lb.destroy_set?
+  end
+
   # The API creates a subnet at rest, and a DELETE leaves it deleting until
   # SubnetNexus destroys it.
   def settle_private_subnet(ps)
