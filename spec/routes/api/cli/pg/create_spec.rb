@@ -29,6 +29,11 @@ RSpec.describe Clover, "cli pg create" do
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
 
+  it "sends a legacy burstable size as the hobby size" do
+    cli(%w[pg eu-central-h1/test-pg create -s burstable-1 -S 64])
+    expect(PostgresResource.first.target_vm_size).to eq "hobby-1"
+  end
+
   it "creates PostgreSQL database with all options" do
     expect(PostgresResource.count).to eq 0
     body = cli(%w[pg eu-central-h1/test-pg create -s standard-4 -S 128 -h async -v 17 -c max_connections=100,wal_level=logical -u max_client_conn=100 -f standard -R -t foo=bar,baz=quux])
