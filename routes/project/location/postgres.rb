@@ -236,6 +236,9 @@ class Clover
           firewall = postgres_require_customer_firewall!
           fwr = pg.pg_firewall_rule(id, firewall:)
           check_found_object(fwr)
+          # The create inserts a row for each of ports 5432 and 6432, so a
+          # PATCH or DELETE must act on the other row too.
+          twins = pg.pg_firewall_rules_dataset(firewall:).where(cidr: fwr.cidr.to_s, protocol: fwr.protocol).exclude(port_range: fwr.port_range)
 
           r.get do
             Serializers::PostgresFirewallRule.serialize(fwr)
@@ -247,12 +250,13 @@ class Clover
             description = typecast_params.str("description")&.strip || fwr.description
 
             DB.transaction do
-              fwr.update(
-                cidr: new_cidr,
-                description:,
-              )
+              DB.ignore_duplicate_queries do
+                [fwr, *twins.all].each do |rule|
+                  rule.update(cidr: new_cidr, description:)
+                  audit_log(rule, "update")
+                end
+              end
               firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
-              audit_log(fwr, "update")
             end
 
             Serializers::PostgresFirewallRule.serialize(fwr)
@@ -260,9 +264,13 @@ class Clover
 
           r.delete do
             DB.transaction do
-              fwr.destroy
+              DB.ignore_duplicate_queries do
+                [fwr, *twins.all].each do |rule|
+                  rule.destroy
+                  audit_log(rule, "destroy")
+                end
+              end
               firewall.update_private_subnet_firewall_rules
-              audit_log(fwr, "destroy")
             end
 
             204

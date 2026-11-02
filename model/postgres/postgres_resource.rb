@@ -411,10 +411,14 @@ class PostgresResource < Sequel::Model
     servers.any? { it.vm.management_nic.nil? }
   end
 
+  # The create inserts a row for each port in PG_FIREWALL_RULE_PORT_RANGES,
+  # and the API shows each such pair as one rule, by its 5432 row. Rows are
+  # paired by CIDR and protocol, as the PATCH and DELETE find a row's twin,
+  # so a 6432 row whose twin was deleted alone is still shown.
   def pg_firewall_rules(firewall: customer_firewall)
     return [] unless firewall
 
-    pg_firewall_rules_dataset(firewall:).all
+    pg_firewall_rules_dataset(firewall:).distinct(:cidr, :protocol).order(:cidr, :protocol, :port_range).all
   end
 
   def pg_firewall_rule(id, firewall: customer_firewall)

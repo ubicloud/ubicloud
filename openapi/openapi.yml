@@ -4521,9 +4521,12 @@ components:
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
           readOnly: true
         port:
-          description: Port for the Postgres firewall rule
+          description: Deprecated. A rule opens port 5432 and pgbouncer's port 6432, and is listed by its 5432 row, so this is 5432 unless only the 6432 row is left or the request names that row's id.
           type: integer
+          deprecated: true
           readOnly: true
+          x-deprecated:
+            since: 2026-11-06
       additionalProperties: false
       required:
         - cidr

@@ -715,8 +715,22 @@ RSpec.describe Clover, "postgres" do
           description: "Updated rule",
         }.to_json
 
-        expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
         expect(last_response.status).to eq(200)
+        expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
+        expect(pg.pg_firewall_rules_dataset.all.select { it.cidr.to_s.start_with?("0.") }.map { [it.cidr.to_s, it.port_range.begin, it.description] })
+          .to eq([["0.0.0.0/1", 5432, "Updated rule"], ["0.0.0.0/1", 6432, "Updated rule"]])
+      end
+
+      it "firewall-rule edit changes neither row when the twin's new CIDR is taken" do
+        pg.customer_firewall.add_firewall_rule(cidr: "1.2.3.4/32", port_range: 6432..6432)
+        fwr = pg.pg_firewall_rules.first
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}", {
+          cidr: "1.2.3.4/32",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id and protocol is already taken")
+        expect(pg.pg_firewall_rules_dataset.all.map { [it.cidr.to_s, it.port_range.begin] })
+          .to eq([["0.0.0.0/0", 5432], ["0.0.0.0/0", 6432], ["1.2.3.4/32", 6432], ["::/0", 5432], ["::/0", 6432]])
       end
 
       it "metric-destination" do
@@ -1325,6 +1339,14 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body).slice("private_subnet_id", "firewall_id")).to eq("private_subnet_id" => pg.private_subnet.ubid, "firewall_id" => pg.customer_firewall.ubid)
       end
 
+      it "lists each firewall rule once, by its 5432 row" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        ids = pg.pg_firewall_rules_dataset.where(port_range: Sequel.pg_range(5432..5432)).map(&:ubid)
+        expect(JSON.parse(last_response.body)["firewall_rules"].map { it.values_at("id", "cidr", "port") }).to eq([[ids[0], "0.0.0.0/0", 5432], [ids[1], "::/0", 5432]])
+      end
+
       it "shows a null firewall_id once the firewall is detached from the private subnet" do
         pg.customer_firewall.remove_all_private_subnets
 
@@ -1454,23 +1476,14 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{pg.ubid}-subnet private subnet (id: #{pg.private_subnet.ubid})")
       end
 
-      it "show firewall" do
+      it "show firewall lists each rule once, by its 5432 row" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["count"]).to eq(4)
+        body = JSON.parse(last_response.body)
+        ids = pg.pg_firewall_rules_dataset.where(port_range: Sequel.pg_range(5432..5432)).map(&:ubid)
+        expect(body["items"].map { it.values_at("id", "cidr", "port", "description") }).to eq([[ids[0], "0.0.0.0/0", 5432, ""], [ids[1], "::/0", 5432, ""]])
+        expect(body["count"]).to eq(2)
       end
 
       it "does not include firewall rules for port ranges other than only 5432 or only 6432" do
@@ -1479,28 +1492,19 @@ RSpec.describe Clover, "postgres" do
         pg.customer_firewall.add_firewall_rule(cidr: "3.2.3.4/32", port_range: 6432..16432)
         pg.customer_firewall.add_firewall_rule(cidr: "4.2.3.4/32", port_range: 5432..5432, description: "my-host")
         pg.customer_firewall.add_firewall_rule(cidr: "5.2.3.4/32", port_range: 6432..6432)
+        pg.customer_firewall.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 6432..6432, protocol: "udp")
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("4.2.3.4/32")
-        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("5.2.3.4/32")
-        expect(JSON.parse(last_response.body)["items"][4]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][5]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][4]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][5]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("my-host")
-        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][4]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][5]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["count"]).to eq(6)
+        body = JSON.parse(last_response.body)
+        expect(body["items"].map { it.values_at("cidr", "port", "description") }).to eq([
+          ["0.0.0.0/0", 5432, ""],
+          ["0.0.0.0/0", 6432, ""],
+          ["4.2.3.4/32", 5432, "my-host"],
+          ["5.2.3.4/32", 6432, ""],
+          ["::/0", 5432, ""],
+        ])
+        expect(body["count"]).to eq(5)
       end
 
       it "firewall-rule" do
@@ -1509,6 +1513,14 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)).to eq("id" => fwr.ubid, "cidr" => "0.0.0.0/0", "port" => 5432, "description" => "")
+      end
+
+      it "firewall-rule by the id of its 6432 twin" do
+        twin = pg.pg_firewall_rules_dataset.first(cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432))
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{twin.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => twin.ubid, "cidr" => "0.0.0.0/0", "port" => 6432, "description" => "")
       end
 
       it "firewall-rule not exist" do
@@ -1703,6 +1715,22 @@ RSpec.describe Clover, "postgres" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule/#{pg.pg_firewall_rules.first.ubid}"
 
         expect(last_response.status).to eq(204)
+      end
+
+      it "firewall-rule deletes the twin, so the CIDR can be added again" do
+        pg.customer_firewall.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 5432..5432, protocol: "udp")
+        fwr = pg.pg_firewall_rules_dataset.all.find { it.cidr.to_s == "0.0.0.0/0" && it.port_range.begin == 6432 }
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}"
+
+        expect(last_response.status).to eq(204)
+        expect(pg.pg_firewall_rules_dataset.all.map { [it.cidr.to_s, it.protocol] }).to eq([["0.0.0.0/0", "udp"], ["::/0", "tcp"], ["::/0", "tcp"]])
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
+          cidr: "0.0.0.0/0",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.pg_firewall_rules_dataset.count).to eq(5)
       end
 
       it "firewall-rule not exist" do
