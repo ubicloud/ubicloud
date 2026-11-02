@@ -124,6 +124,26 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.strand.stack[0]["ch_version"]).to be_nil
     end
 
+    it "provisions a vm with runner metrics when the project enables runner metrics" do
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      create_vm(pool_id: pool.id, display_state: "running")
+      project.set_ff_github_runner_metrics(true)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.pool_id).to be_nil
+      expect(picked_vm.strand.stack[0]["runner_metrics"]).to be(true)
+    end
+
+    it "provisions alien vms without runner metrics" do
+      project.set_ff_github_runner_metrics(true)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.strand.stack[0]["runner_metrics"]).to be(false)
+    end
+
     it "provisions a new vm if pool is valid but there is no vm" do
       VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
       vm = nx.pick_vm
@@ -1520,6 +1540,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -fsSL -o /tmp/cache-proxy.tar.gz https://example.com/cache-proxy-x64.tar.gz
         sudo tar xzf /tmp/cache-proxy.tar.gz -C /usr/local/share/cache-proxy
         sudo systemctl start cache-proxy.service
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "installs the metrics writer when the project enables runner metrics" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      project.set_ff_github_runner_metrics(true)
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        set -ueo pipefail
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
+        #{GithubRunnerMetrics.install_command.chomp}
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
