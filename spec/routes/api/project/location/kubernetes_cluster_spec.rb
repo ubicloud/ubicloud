@@ -34,6 +34,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool"],
+        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/rename"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
@@ -349,6 +350,30 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(last_response).to have_api_error(400, "Validation failed for following fields: node_count")
           expect(JSON.parse(last_response.body)["error"]["details"]["node_count"]).to eq("Insufficient quota for requested size. Requested vCPU count: 12, currently used vCPU count: 10, maximum allowed vCPU count: 10, remaining vCPU count: 0")
           expect(kc.nodepools_dataset.count).to eq(1)
+        end
+      end
+
+      describe "show" do
+        it "shows a nodepool by name or ubid" do
+          kn.strand.update(label: "wait")
+
+          [kn.name, kn.ubid].each do |identifier|
+            get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}"
+
+            expect(last_response.status).to eq(200)
+            expect(JSON.parse(last_response.body).slice("id", "kubernetes_cluster_id", "name", "state", "vms")).to eq("id" => kn.ubid, "kubernetes_cluster_id" => kc.ubid, "name" => "np", "state" => "running", "vms" => [])
+          end
+        end
+
+        it "answers 404 for a nodepool the cluster does not have" do
+          other = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other", version: kc.version, project_id: project.id, location_id: Location::HETZNER_FSN1_ID).subject
+          other_kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "other-np", node_count: 1, kubernetes_cluster_id: other.id).subject
+
+          ["not-exists-nodepool", other_kn.name, other_kn.ubid].each do |identifier|
+            get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}"
+
+            expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+          end
         end
       end
 
