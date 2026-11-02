@@ -622,10 +622,11 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/kubernetes_cluster_reference'
     delete:
       operationId: deleteKubernetesCluster
       summary: Delete a kubernetes cluster
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_reference'
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -636,6 +637,8 @@ paths:
     get:
       operationId: getKubernetesClusterDetails
       summary: Get kubernetes cluster details
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_reference'
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -646,6 +649,8 @@ paths:
     post:
       operationId: createKubernetesCluster
       summary: Create a new kubernetes cluster
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_new_name'
       requestBody:
         required: true
         content:
@@ -660,6 +665,14 @@ paths:
                   description: Size of each worker VM
                   type: string
                 cp_nodes:
+                  description: Deprecated; send cp_node_count.
+                  type: integer
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    renamed-to: cp_node_count
+                cp_node_count:
                   description: Number of control plane nodes
                   type: integer
                 worker_nodes:
@@ -3435,6 +3448,15 @@ components:
         type: string
         example: akkkmx0f2vke4h36nk9cm8v8q0
         pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
+    kubernetes_cluster_new_name:
+      description: Name for a new kubernetes cluster, of at most 37 characters, since its default nodepool is named after it with "-np" appended and a nodepool's name may have at most 40
+      example: my-cluster
+      in: path
+      name: kubernetes_cluster_reference
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9](?:[a-z0-9\-]{0,35}[a-z0-9])?$
     kubernetes_cluster_reference:
       description: Kubernetes cluster ID or name
       examples:

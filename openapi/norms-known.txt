@@ -23,7 +23,6 @@ direction: GithubInstallation.name: mark it readOnly, or accept it in a request
 direction: GithubRepository.id: mark it readOnly, or accept it in a request
 direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
 direction: GithubRepository.name: mark it readOnly, or accept it in a request
-direction: KubernetesCluster.cp_node_count: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.id: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.location: mark it readOnly, or accept it in a request
 direction: KubernetesCluster.node_size: mark it readOnly, or accept it in a request
@@ -75,7 +74,6 @@ echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or
 echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.private_subnet_id: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
-echo: createKubernetesCluster.cp_nodes: echo it in the response, or mark it writeOnly
 echo: createKubernetesCluster.worker_nodes: echo it in the response, or mark it writeOnly
 echo: createKubernetesCluster.worker_size: echo it in the response, or mark it writeOnly
 echo: createMachineImage.destroy_source: echo it in the response, or mark it writeOnly

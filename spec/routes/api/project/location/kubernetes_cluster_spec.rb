@@ -143,7 +143,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version:,
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -152,12 +152,57 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(KubernetesCluster[name: "test-cluster"]).not_to be_nil
       end
 
+      def create_cluster(name: "test-cluster", **body)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/#{name}", {version: Option.selectable_kubernetes_versions.last, worker_size: "standard-2", **body}.to_json
+      end
+
+      it "creates the cluster with cp_node_count, in both API versions" do
+        ["application/json", "application/vnd.ubicloud+json; version=2"].each_with_index do |accept, i|
+          header "Accept", accept
+          create_cluster(name: "test-cluster-#{i}", cp_node_count: 3)
+
+          expect(last_response.status).to eq(200)
+          expect(last_response["deprecation"]).to be_nil
+          expect(JSON.parse(last_response.body)["cp_node_count"]).to eq(3)
+        end
+      end
+
+      it "takes the deprecated cp_nodes as cp_node_count in API version 1, with a warning" do
+        create_cluster(cp_nodes: 3)
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "cp_nodes is deprecated: use cp_node_count instead"')
+        expect(JSON.parse(last_response.body)["cp_node_count"]).to eq(3)
+      end
+
+      it "refuses cp_nodes together with cp_node_count" do
+        create_cluster(cp_nodes: 3, cp_node_count: 1)
+
+        expect(last_response).to have_api_error(400, "cp_nodes and cp_node_count name one value; send only cp_node_count", {"cp_nodes" => "send only cp_node_count"})
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses cp_nodes in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        create_cluster(cp_nodes: 3)
+
+        expect(last_response).to have_api_error(400, "cp_nodes was removed in API version 2: use cp_node_count instead")
+      end
+
+      it "accepts a name of 37 characters, and refuses a longer one" do
+        create_cluster(name: "a" * 37)
+        expect(last_response.status).to eq(200)
+        expect(KubernetesCluster[name: "a" * 37].nodepools.map(&:name)).to eq(["#{"a" * 37}-np"])
+
+        expect { create_cluster(name: "a" * 38) }.to raise_error(Committee::InvalidRequest, /pattern .* does not match value: "a{38}"/)
+      end
+
       it "returns 400 for invalid kubernetes version" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/test-cluster", {
           version: "v1.30",
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response.status).to eq(400)
@@ -173,7 +218,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version:,
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: version")
