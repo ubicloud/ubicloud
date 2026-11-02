@@ -3384,24 +3384,55 @@ RSpec.describe CloverAdmin do
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27% - gcp: vcpus 0, runners 0")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "400", "500",
+      "TOTAL", "", "400", "500", "",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
-      "test-installation", "true", "400", "500",
+      "0", "0", "0",
+      "test-installation", "true", "400", "500", "",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
+      "0", "0", "0",
     ]
 
     click_link "test-installation"
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{installation.ubid}"
+  end
+
+  it "shows GitHub runners on GCP in the x64 VM usage" do
+    gcp_location = Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "gcp-europe-west3", ui_name: "GCP Frankfurt", visible: false)
+    expect(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_location.id)
+    project = Project.create(name: "test-project")
+    project.set_ff_gcp_alien_runners_percentage(5)
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
+    vm = create_vm(vcpus: 32, family: "n4d-standard", location_id: gcp_location.id, allocated_at: Time.now)
+    GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-premium-30", allocated_at: Time.now, vm_id: vm.id, location_id: gcp_location.id)
+
+    click_link "GitHub Runner VM Usage"
+    expect(page).to have_css("p", exact_text: "standard: vcpu 0%, hugepage 0%, spilled vcpus 0, spilled runners 0 - premium: vcpu 0%, hugepage 0% - gcp: vcpus 32, runners 1")
+    expect(page.all("#content td").map(&:text)).to eq [
+      "TOTAL", "", "300", "0", "",
+      "0", "0", "0", "0", "1", "0",
+      "30 / 30", "32 / 32",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "1",
+      "test-installation", "true", "300", "", "5",
+      "0", "0", "0", "0", "1", "0",
+      "30 / 30", "32 / 32",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "1",
+    ]
   end
 
   it "shows GitHub runner arm64 VM usage" do
