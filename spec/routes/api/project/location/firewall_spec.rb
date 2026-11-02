@@ -92,6 +92,40 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
     end
 
+    it "updates the description" do
+      firewall.update(description: "old")
+
+      patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}", {
+        description: "new",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["description"]).to eq("new")
+      expect(firewall.reload.description).to eq("new")
+    end
+
+    it "updates the description to an empty string, as create accepts one" do
+      firewall.update(description: "old")
+
+      patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}", {
+        description: "",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["description"]).to eq("")
+      expect(firewall.reload.description).to eq("")
+    end
+
+    it "keeps surrounding whitespace in the description, as create does" do
+      patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}", {
+        description: " padded ",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["description"]).to eq(" padded ")
+      expect(firewall.reload.description).to eq(" padded ")
+    end
+
     it "success delete with underscore" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
 

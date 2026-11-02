@@ -90,8 +90,8 @@ class Clover
         algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint].freeze)
         src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port].freeze)
         vm_ids = typecast_params.array(:ubid_uuid, "vms")
-        cert_enabled = typecast_params.bool!("cert_enabled")
-        cert_enablement_changed = lb.cert_enabled != cert_enabled
+        cert_enabled = typecast_params.bool("cert_enabled")
+        cert_enablement_changed = !cert_enabled.nil? && lb.cert_enabled != cert_enabled
 
         DB.transaction do
           lb.update(algorithm:, health_check_endpoint:)

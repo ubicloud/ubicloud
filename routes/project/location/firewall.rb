@@ -25,7 +25,7 @@ class Clover
       r.patch true do
         authorize("Firewall:edit", firewall)
         handle_validation_failure("networking/firewall/show") { @page = "settings" }
-        description = typecast_body_params.nonempty_str!("description")
+        description = typecast_body_params.str!("description")
 
         if description == firewall.description
           notice = "Description unchanged"

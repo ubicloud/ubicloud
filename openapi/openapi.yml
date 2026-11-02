@@ -963,7 +963,7 @@ paths:
                   items:
                     type: string
                 cert_enabled:
-                  description: Whether SSL certificates are enabled for the Load Balancer
+                  description: Whether SSL certificates are enabled for the Load Balancer (if absent or null, the current setting is kept)
                   type: boolean
                   nullable: true
               additionalProperties: false
@@ -996,6 +996,7 @@ paths:
                 stack:
                   description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
                   type: string
+                  default: dual
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
