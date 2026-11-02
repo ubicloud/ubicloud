@@ -177,6 +177,9 @@ module Config
   optional :victoria_metrics_endpoint_override, string
   override :api_metrics_report_enabled, false, bool
   override :api_metrics_store_dir, File.join(Dir.pwd, "var", "api_metrics"), string
+  # For each API version, the share of requests to refuse for using a name that
+  # version removes, as comma-separated version:share pairs (e.g. "2:0.05").
+  override :api_deprecation_brownout, "", ->(v) { v.split(",").to_h { it.split(":").then { |version, share| [Integer(version), Float(share)] } }.freeze }
 
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string
