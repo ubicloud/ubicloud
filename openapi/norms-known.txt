@@ -27,7 +27,6 @@ described: restorePostgresDatabase.pg_config: describe it
 described: restorePostgresDatabase.pgbouncer_config: describe it
 described: setMaintenanceWindow.maintenance_window_days: describe it
 described: setMaintenanceWindow.maintenance_window_start_at: describe it
-described: setVMMaintenanceWindow.maintenance_window_start_at: describe it
 described: updateLocationPrivateLinkService.aws: describe it
 direction: CertAuthUserList.items: mark it readOnly, or accept it in a request
 direction: GithubCacheEntry.created_at: mark it readOnly, or accept it in a request
@@ -108,12 +107,6 @@ direction: ResourceMetrics.metrics: mark it readOnly, or accept it in a request
 direction: RunCommand.output: mark it readOnly, or accept it in a request
 direction: RunCommand.status: mark it readOnly, or accept it in a request
 direction: RunCommand.timestamp: mark it readOnly, or accept it in a request
-direction: Vm.id: mark it readOnly, or accept it in a request
-direction: Vm.ip4: mark it readOnly, or accept it in a request
-direction: Vm.ip6: mark it readOnly, or accept it in a request
-direction: Vm.location: mark it readOnly, or accept it in a request
-direction: Vm.state: mark it readOnly, or accept it in a request
-direction: Vm.storage_size_gib: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.location: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.name: mark it readOnly, or accept it in a request
 direction: responses/ObjectInfo.type: mark it readOnly, or accept it in a request
@@ -131,10 +124,6 @@ direction: responses/PostgresDatabaseUpgradeStatus.current_version: mark it read
 direction: responses/PostgresDatabaseUpgradeStatus.target_version: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_stage: mark it readOnly, or accept it in a request
 direction: responses/PostgresDatabaseUpgradeStatus.upgrade_status: mark it readOnly, or accept it in a request
-direction: responses/Vm/allOf/1.firewalls: mark it readOnly, or accept it in a request
-direction: responses/Vm/allOf/1.private_ipv4: mark it readOnly, or accept it in a request
-direction: responses/Vm/allOf/1.private_ipv6: mark it readOnly, or accept it in a request
-direction: responses/Vm/allOf/1.subnet: mark it readOnly, or accept it in a request
 echo: CertAuthUserRequest.name: echo it in the response, or mark it writeOnly
 echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
 echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
@@ -162,8 +151,6 @@ echo: createPostgresDatabaseReadReplica.pgbouncer_config: echo it in the respons
 echo: createPrivateLocation.access_key: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
 echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
-echo: createVM.init_script: echo it in the response, or mark it writeOnly
-echo: createVM.public_key: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.size: echo it in the response, or mark it writeOnly
 echo: patchPostgresDatabase.storage_size: echo it in the response, or mark it writeOnly
 echo: restorePostgresDatabase.pg_config: echo it in the response, or mark it writeOnly
@@ -199,17 +186,14 @@ examples: createPrivateLocation.access_key: give it an example
 examples: createPrivateLocation.name: give it an example
 examples: createPrivateLocation.provider_location_name: give it an example
 examples: createPrivateLocation.secret_key: give it an example
-examples: createVM.public_key: give it an example
 examples: parameters/private_location_name: give it an example
 examples: renameKubernetesCluster.name: give it an example
 examples: renameKubernetesNodepool.name: give it an example
 examples: renameMachineImage.name: give it an example
 examples: renamePostgres.name: give it an example
-examples: renameVM.name: give it an example
 examples: resetSuperuserPassword.password: give it an example
 examples: resizeKubernetesNodepool.node_count: give it an example
 examples: restorePostgresDatabase.name: give it an example
 examples: restorePostgresDatabase.restore_target: give it an example
-examples: setVMMaintenanceWindow.maintenance_window_start_at: give it an example
 examples: updateMachineImage.latest_version: give it an example
 examples: updatePrivateLocation.name: give it an example

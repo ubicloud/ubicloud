@@ -2670,11 +2670,14 @@ paths:
               type: object
               properties:
                 boot_image:
-                  description: Boot image of the VM
+                  description: Boot image of the VM, or a machine image as name@version or name@latest
                   type: string
+                  example: ubuntu-noble
                 init_script:
-                  description: VM init script
+                  description: Shell commands that the VM runs once, at its first boot
                   type: string
+                  format: password
+                  writeOnly: true
                 enable_ip4:
                   description: Deprecated; send ip4_enabled.
                   type: boolean
@@ -2686,15 +2689,20 @@ paths:
                 ip4_enabled:
                   description: Whether the VM has a public IPv4 address
                   type: boolean
+                  default: false
                 private_subnet_id:
-                  description: ID of the private subnet
+                  description: ID of the private subnet to put the VM in; if absent, the project's default subnet in the location
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
                 public_key:
-                  description: Public SSH key for the VM, or name of registered SSH public key
+                  description: SSH public key authorized to log in as unix_user, or the name of a registered SSH public key
                   type: string
+                  example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGkT3pVfM0a9ZsYbq7Qd1xWnRj5LcUe8HvBtKo2PyDmA user@my-laptop
+                  writeOnly: true
                 size:
                   description: Size of the VM
                   type: string
+                  default: standard-2
                 storage_size:
                   description: Requested size of each storage volume in GiB
                   type: integer
@@ -2718,6 +2726,7 @@ paths:
                 unix_user:
                   description: Unix user of the VM
                   type: string
+                  default: ubi
               additionalProperties: false
               required:
                 - public_key
@@ -2746,6 +2755,7 @@ paths:
                 name:
                   description: New name for VM
                   type: string
+                  example: my-vm-name
               additionalProperties: false
               required:
                 - name
@@ -2811,7 +2821,11 @@ paths:
               type: object
               properties:
                 maintenance_window_start_at:
+                  description: Hour of the day, in UTC, at which the daily maintenance window starts; null to unset it
                   type: integer
+                  example: 3
+                  maximum: 23
+                  minimum: 0
                   nullable: true
               additionalProperties: false
               required:
@@ -4681,26 +4695,34 @@ components:
           type: string
           example: vmhfy8gff8c67hasb0eez2k1pd
           pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         ip4:
-          description: IPv4 address
+          description: Public IPv4 address; null until the VM is placed on a host, or if it has none
           type: string
           format: ipv4
           nullable: true
+          readOnly: true
+          x-immutable: true
         ip4_enabled:
           description: Whether IPv4 is enabled
           type: boolean
         ip6:
-          description: IPv6 address
+          description: Public IPv6 address; null until the VM is placed on a host, or if it has none
           type: string
           format: ipv6
           nullable: true
+          readOnly: true
+          x-immutable: true
         location:
           description: Location of the VM
           type: string
           example: eu-central-h1
+          readOnly: true
         maintenance_window_start_at:
-          description: Maintenance window start time
+          description: Hour of the day, in UTC, at which the daily maintenance window starts; null if no window is set
           type: integer
+          maximum: 23
+          minimum: 0
           nullable: true
         name:
           description: Name of the VM
@@ -4712,6 +4734,31 @@ components:
         state:
           description: State of the VM
           type: string
+          enum:
+            - creating
+            - running
+            - rebooting
+            - starting
+            - deleting
+            - stopped by admin
+            - restarting
+            - stopping
+            - stopped
+            - unavailable
+            - waiting for capacity
+            - no capacity available
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - rebooting
+              - starting
+              - restarting
+              - stopping
+              - waiting for capacity
+              - deleting
+            failed:
+              - no capacity available
         storage_size:
           description: Size of each storage volume in GiB, as requested when the VM was created
           type: integer
@@ -4719,6 +4766,8 @@ components:
         storage_size_gib:
           description: Total size of the storage volumes in GiB
           type: integer
+          readOnly: true
+          x-immutable: true
         unix_user:
           description: Unix user of the VM
           type: string
@@ -5609,20 +5658,25 @@ components:
                 additionalProperties: false
                 properties:
                   firewalls:
-                    description: List of firewalls
+                    description: Firewalls that apply to the VM
                     type: array
                     items:
                       $ref: '#/components/schemas/Firewall'
+                    readOnly: true
                   private_ipv4:
                     description: Private IPv4 address
                     type: string
                     format: ipv4
                     nullable: true
+                    readOnly: true
+                    x-immutable: true
                   private_ipv6:
                     description: Private IPv6 address
                     type: string
                     format: ipv6
                     nullable: true
+                    readOnly: true
+                    x-immutable: true
                   private_subnet_id:
                     description: ID of the VM's private subnet
                     type: string
@@ -5633,10 +5687,12 @@ components:
                     description: Name of the VM's private subnet
                     type: string
                     nullable: true
+                    readOnly: true
                   gpu:
-                    description: GPU configuration
+                    description: Number and model of the GPUs attached to the VM, such as "1x NVIDIA A100 80GB PCIe"; null if it has none
                     type: string
                     nullable: true
+                    readOnly: true
                   gpu_count:
                     description: Number of GPUs attached to the VM; 0 until the VM is placed on a host
                     type: integer
