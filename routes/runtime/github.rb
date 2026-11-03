@@ -110,6 +110,10 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
+          if scope.start_with?("refs/pull/unknown-run-")
+            fail CloverError.new(400, "InvalidRequest", "This cache could not be used by another run")
+          end
+
           if size && size > GithubRepository.cache_size_limit
             fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
           end
