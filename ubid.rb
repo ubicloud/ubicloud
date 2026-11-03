@@ -119,6 +119,9 @@ class UBID
   TYPE_POSTGRES_LOG_DESTINATION = "1d"
   TYPE_RUN_COMMAND = "rc"
   TYPE_DETACHABLE_VOLUME = "dv"
+  # TYPE_POSTGRES_WAL_SHADOW = "pw"
+  # TYPE_POSTGRES_WAL_LISTENER = "w1"
+  # TYPE_POSTGRES_VPC_ENDPOINT = "ve"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
