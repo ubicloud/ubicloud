@@ -16,7 +16,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
-    runner = GithubRunner.create(installation_id:, vm_id:, location_id: Location::GITHUB_RUNNERS_ID, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, runner_id: 123, workflow_job: {"id" => 123})
+    runner = GithubRunner.create(installation_id:, vm_id:, location_id: Location::GITHUB_RUNNERS_ID, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, runner_id: 123, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:00:00Z"})
     Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
     runner
   end
@@ -375,6 +375,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
+    end
+
+    it "bills from the job start when the runner waited for a job" do
+      runner.update(ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:55:00Z"})
+      nx.update_billing_record
+
+      expect(BillingRecord[resource_id: installation.id].amount).to eq(5)
+    end
+
+    it "bills from ready_at when the job has no started_at" do
+      runner.update(ready_at: now - 10 * 60, workflow_job: {"id" => 123})
+      nx.update_billing_record
+
+      expect(BillingRecord[resource_id: installation.id].amount).to eq(10)
     end
 
     it "uses separate billing rate for arm64 runners" do

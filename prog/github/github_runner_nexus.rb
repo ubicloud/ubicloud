@@ -173,11 +173,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       [installation.id, installation.name]
     end
 
+    billed_from = github_runner.ready_at
+    if (started_at = github_runner.workflow_job["started_at"])
+      billed_from = [billed_from, Time.new(started_at)].max
+    end
+
     retries = 0
     begin
       begin_time = Time.now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
-      duration = Time.now - github_runner.ready_at
+      duration = Time.now - billed_from
       used_amount = (duration / 60).ceil
       github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
