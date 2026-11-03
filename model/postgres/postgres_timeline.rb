@@ -11,7 +11,7 @@ class PostgresTimeline < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :destroy, :take_backup_for_converge, :refresh_blob_storage_policy
+  plugin SemaphoreMethods, :destroy, :take_backup_for_converge, :refresh_blob_storage_policy, :refresh_lifecycle_policy
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
   SENTINEL_MAX_BYTES = 64 * 1024
@@ -138,10 +138,14 @@ class PostgresTimeline < Sequel::Model
     timeline.earliest_restore_time
   end
 
+  def backup_bucket_expiration_days
+    backup_retention_days + (backup_period_hours / 24.0).ceil
+  end
+
   def earliest_restore_time
     # Check if we have cached earliest backup time, if not, calculate it.
-    # The cached time is valid if its within BACKUP_BUCKET_EXPIRATION_DAYS.
-    time_limit = Time.now - BACKUP_BUCKET_EXPIRATION_DAYS * 24 * 60 * 60
+    # The cached time is valid if its within the bucket expiration days.
+    time_limit = Time.now - backup_bucket_expiration_days * 24 * 60 * 60
 
     if cached_earliest_backup_at.nil? || cached_earliest_backup_at <= time_limit
       earliest_backup = backups

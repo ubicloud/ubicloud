@@ -214,7 +214,7 @@ PGDATA=/dat/17/data
     describe "#set_lifecycle_policy" do
       let(:storage_client) { instance_double(Google::Cloud::Storage::Project) }
       let(:bucket) { instance_double(Google::Cloud::Storage::Bucket) }
-      let(:lifecycle) { instance_double(Google::Cloud::Storage::Bucket::Lifecycle) }
+      let(:lifecycle) { Google::Cloud::Storage::Bucket::Lifecycle.new.tap { it.add_delete_rule(age: 99) } }
 
       before do
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
@@ -222,14 +222,15 @@ PGDATA=/dat/17/data
         expect(bucket).to receive(:lifecycle).and_yield(lifecycle)
       end
 
-      it "sets delete lifecycle rule on the bucket" do
-        expect(lifecycle).to receive(:add_delete_rule).with(age: PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+      it "replaces existing lifecycle rules with a delete rule of backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
         postgres_timeline.set_lifecycle_policy
+        expect(lifecycle.map(&:age)).to eq([15])
       end
 
       it "honors expiration_days: override" do
-        expect(lifecycle).to receive(:add_delete_rule).with(age: 30)
         postgres_timeline.set_lifecycle_policy(expiration_days: 30)
+        expect(lifecycle.map(&:age)).to eq([30])
       end
     end
 

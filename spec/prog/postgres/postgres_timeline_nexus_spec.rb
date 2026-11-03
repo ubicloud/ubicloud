@@ -420,6 +420,35 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait }.to nap(20 * 60)
       expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_blob_storage_policy").count).to eq(0)
     end
+
+    it "decrements, reapplies the lifecycle policy and clears the cached earliest backup when refresh_lifecycle_policy is set" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now, cached_earliest_backup_at: Time.now - 3600)
+      nx.incr_refresh_lifecycle_policy
+
+      client = mock_minio_client
+      expect(client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_lifecycle_policy").count).to eq(0)
+      expect(postgres_timeline.reload.cached_earliest_backup_at).to be_nil
+    end
+
+    it "skips the lifecycle policy without blob storage when refresh_lifecycle_policy is set" do
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now, cached_earliest_backup_at: Time.now - 3600)
+      nx.incr_refresh_lifecycle_policy
+
+      expect(nx.postgres_timeline.blob_storage).to be_nil
+      expect(Minio::Client).not_to receive(:new)
+
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_lifecycle_policy").count).to eq(0)
+      expect(postgres_timeline.reload.cached_earliest_backup_at).to be_nil
+    end
   end
 
   describe "#before_run" do
