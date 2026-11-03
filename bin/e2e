@@ -194,43 +194,61 @@ def test_gcp(options, test_cases)
   Project[Config.postgres_service_project_id] ||
     Project.create_with_id(Config.postgres_service_project_id, name: "Postgres-Service-Project")
 
+  mgmt_subnets = ["gcp-us-east4", "gcp-us-central1"].map do |name|
+    location = Location[provider: "gcp", project_id: nil, name:]
+    Prog::Test::Base.ensure_gcp_e2e_credential(location)
+    Prog::Vnet::Gcp::SubnetNexus.assemble_management(location.id)
+  end
+  mgmt_subnets.each { wait_until(it, "wait") }
+
   tests_to_wait = []
   if options[:test_cases].include?("postgres_standard")
-    tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::PostgresResource.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4") }
   end
   if options[:test_cases].include?("postgres_z3")
-    # One transaction, so the flag is in place before the strand can run.
-    tests_to_wait << DB.transaction do
+    tests_to_wait << with_gcp_dual_nic do
       st = Prog::Test::PostgresResource.assemble(provider: "gcp", family: "z3-highlssd", gcp_location_name: "gcp-us-east4")
       Project[st.stack.first["postgres_test_project_id"]].set_ff_enable_z3_highlssd(true)
       st
     end
   end
   if options[:test_cases].include?("postgres_n2d")
-    tests_to_wait << DB.transaction do
+    tests_to_wait << with_gcp_dual_nic do
       st = Prog::Test::PostgresResource.assemble(provider: "gcp", family: "n2d-highmem", gcp_location_name: "gcp-us-east4")
       Project[st.stack.first["postgres_test_project_id"]].set_ff_enable_n2d_highmem(true)
       st
     end
   end
   if options[:test_cases].include?("postgres_ubuntu_2604")
-    tests_to_wait << Prog::Test::PostgresImageFamily.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::PostgresImageFamily.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4") }
   end
   if options[:test_cases].include?("postgres_ha")
-    tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "gcp")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::HaPostgresResource.assemble(provider: "gcp") }
   end
   if options[:test_cases].include?("postgres_upgrade")
-    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(provider: "gcp")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::UpgradePostgresResource.assemble(provider: "gcp") }
   end
   if options[:test_cases].include?("postgres_unarchive")
-    tests_to_wait << Prog::Test::UnarchivePostgresResource.assemble(provider: "gcp")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::UnarchivePostgresResource.assemble(provider: "gcp") }
   end
 
   if options[:test_cases].include?("postgres_firewall")
-    tests_to_wait << Prog::Test::PostgresFirewall.assemble(provider: "gcp")
+    tests_to_wait << with_gcp_dual_nic { Prog::Test::PostgresFirewall.assemble(provider: "gcp") }
   end
 
   tests_to_wait.each { |st| wait_until(st) }
+
+  Semaphore.incr(mgmt_subnets.map(&:id), :destroy)
+  mgmt_subnets.each { wait_until(it) }
+end
+
+# One transaction, so the flags are in place before the strand can run.
+def with_gcp_dual_nic
+  DB.transaction do
+    st = yield
+    Project[st.stack.first["postgres_test_project_id"]].set_ff_postgres_gcp_dual_nic(true)
+    st
+  end
 end
 
 def wait_until(st, label = nil)
