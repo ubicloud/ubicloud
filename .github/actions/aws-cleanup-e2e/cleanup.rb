@@ -87,6 +87,10 @@ module AwsCleanup
   # on or counted as live.
   LIVE_STATES = "pending,running,shutting-down,stopping,stopped"
 
+  # Peering connection states that are not final. DeleteVpc refuses a VPC that
+  # an active peering connection still holds.
+  PEERING_LIVE_STATES = "initiating-request,pending-acceptance,provisioning,active"
+
   # aws ec2 describe-* subcommand => the JSON key holding its resource list,
   # for the tag scan. describe-instances is absent because it nests its
   # results under Reservations and needs a state filter.
@@ -325,6 +329,7 @@ module AwsCleanup
     # inventory and to keep its listing order stable.
     ID_KEYS = {
       instances: "InstanceId",
+      peering_connections: "VpcPeeringConnectionId",
       vpc_endpoints: "VpcEndpointId",
       enis: "NetworkInterfaceId",
       eips: "AllocationId",
@@ -379,6 +384,7 @@ module AwsCleanup
       tag = "Name=tag:#{TAG_KEY},Values=#{@tag_value}"
       {
         instances: instances(@region, tag),
+        peering_connections: describe(@region, "describe-vpc-peering-connections", "VpcPeeringConnections", tag, "Name=status-code,Values=#{PEERING_LIVE_STATES}"),
         vpc_endpoints: describe(@region, "describe-vpc-endpoints", "VpcEndpoints", tag),
         enis: describe(@region, "describe-network-interfaces", "NetworkInterfaces", tag),
         eips: describe(@region, "describe-addresses", "Addresses", tag),
@@ -528,11 +534,16 @@ module AwsCleanup
       @occupied_vpcs.include?(vpc_id)
     end
 
-    # Everything left, in the order AWS requires: interfaces and addresses
-    # detach from instances, security groups and gateways from the VPC, then
-    # its subnets and route tables, then the VPC itself.
+    # Everything left, in the order AWS requires: peering connections, which
+    # pin both of their VPCs, then interfaces and addresses detach from
+    # instances, security groups and gateways from the VPC, then its subnets
+    # and route tables, then the VPC itself.
     def delete_jobs
       jobs = []
+      inventory[:peering_connections].each do |pcx|
+        id = pcx["VpcPeeringConnectionId"]
+        jobs << {desc: "Delete peering connection #{id} (#{AwsCleanup.resource_name(pcx)})", run: -> { cli.mutate(@region, "delete-vpc-peering-connection", "--vpc-peering-connection-id", id) }}
+      end
       inventory[:enis].each do |eni|
         id = eni["NetworkInterfaceId"]
         jobs << {desc: "Delete interface #{id} (#{AwsCleanup.resource_name(eni)})", run: -> { cli.mutate(@region, "delete-network-interface", "--network-interface-id", id) }}

@@ -10,6 +10,7 @@ class PrivateSubnet < Sequel::Model
   many_to_many :firewalls, remover: nil
   one_to_many :load_balancers, read_only: true
   one_to_many :private_link_services, read_only: true
+  one_to_many :vpc_peerings, read_only: true, order: [:created_at, :id]
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id, read_only: true
   one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc, read_only: true
@@ -229,3 +230,4 @@ end
 #  private_subnet_aws_resource        | private_subnet_aws_resource_id_fkey                       | (id) REFERENCES private_subnet(id)
 #  private_subnet_gcp_vpc             | private_subnet_gcp_vpc_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id) ON DELETE CASCADE
 #  victoria_metrics_resource          | victoria_metrics_resource_private_subnet_id_fkey          | (private_subnet_id) REFERENCES private_subnet(id)
+#  vpc_peering                        | vpc_peering_private_subnet_id_fkey                        | (private_subnet_id) REFERENCES private_subnet(id)
