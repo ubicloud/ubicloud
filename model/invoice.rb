@@ -168,6 +168,8 @@ class Invoice < Sequel::Model
     end
 
     Clog.emit("Invoice couldn't charged with any payment method.", {invoice_not_charged: {ubid:}})
+    (content["failed_charge_attempts"] ||= []) << Time.now.utc
+    save(columns: [:content])
     send_failure_email(errors)
     false
   end
