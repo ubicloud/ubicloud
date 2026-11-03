@@ -284,6 +284,14 @@ RSpec.describe Vm do
     expect(vm.errors[:name]).to be_nil
   end
 
+  it "can't share its in-host name with another VM on the same host" do
+    host = create_vm_host
+    create_vm(id: UBID.parse("vmp8bwtzgt5e1gj6hb7h6nwvvs").to_uuid, vm_host_id: host.id)
+    create_vm(id: UBID.parse("vm1w0bmm0j6j2gh248h248h248").to_uuid, name: "other-name", vm_host_id: host.id)
+    expect { create_vm(id: UBID.parse("vmp8bwtzgt5e2gfxq5tk1v58cg").to_uuid, name: "same-name", vm_host_id: host.id) }
+      .to raise_error(Sequel::UniqueConstraintViolation, /vm_vm_host_id_inhost_name_uidx/)
+  end
+
   describe "#check_pulse" do
     let(:vmh) { create_vm_host }
     let(:pulse_vm) {
