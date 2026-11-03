@@ -73,12 +73,13 @@ class PostgresResource < Sequel::Model
   end
 
   RUNNING_STRAND_LABELS = %w[wait refresh_certificates wait_refresh_public_cert refresh_dns_record].freeze
+  UNAVAILABLE_STRAND_LABELS = %w[unavailable lockout wait_lockout_attempt wait_locked_out].freeze
 
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
     server_strand_label = representative_server.strand.label
-    return "unavailable" if server_strand_label == "unavailable"
+    return "unavailable" if UNAVAILABLE_STRAND_LABELS.include?(server_strand_label)
     return "restoring_backup" if server_strand_label == "initialize_database_from_backup"
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
     return "finalizing_restore" if server_strand_label == "wait_recovery_completion"

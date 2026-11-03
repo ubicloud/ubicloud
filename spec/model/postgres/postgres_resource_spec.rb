@@ -1048,6 +1048,21 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("unavailable")
     end
 
+    it "returns 'unavailable' when representative server's strand label is 'lockout'" do
+      create_representative_server(strand_label: "lockout")
+      expect(postgres_resource.display_state).to eq("unavailable")
+    end
+
+    it "returns 'unavailable' when representative server's strand label is 'wait_lockout_attempt'" do
+      create_representative_server(strand_label: "wait_lockout_attempt")
+      expect(postgres_resource.display_state).to eq("unavailable")
+    end
+
+    it "returns 'unavailable' when representative server's strand label is 'wait_locked_out'" do
+      create_representative_server(strand_label: "wait_locked_out")
+      expect(postgres_resource.display_state).to eq("unavailable")
+    end
+
     it "returns 'restoring_backup' when representative server's strand label is 'initialize_database_from_backup'" do
       create_representative_server(strand_label: "initialize_database_from_backup")
       expect(postgres_resource.display_state).to eq("restoring_backup")
