@@ -4,11 +4,15 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   subject_is :github_installation
 
   def self.assemble(installation)
-    Strand.create(
-      prog: "Github::DestroyGithubInstallation",
-      label: "start",
-      stack: [{"subject_id" => installation.id}],
-    )
+    DB.transaction do
+      installation.this.update(created_at: Sequel::CURRENT_TIMESTAMP - Sequel.cast("1000 years", :interval))
+      Strand.create(
+        prog: "Github::DestroyGithubInstallation",
+        label: "start",
+        schedule: Time.now + 35,
+        stack: [{"subject_id" => installation.id}],
+      )
+    end
   end
 
   label def before_run

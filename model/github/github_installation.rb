@@ -17,8 +17,10 @@ class GithubInstallation < Sequel::Model
   plugin ResourceMethods
   dataset_module Pagination
 
+  CREATED_AT_CUTOFF = Time.utc(2000)
+
   def self.with_github_installation_id(installation_id)
-    first(installation_id:)
+    first(installation_id:) { created_at > CREATED_AT_CUTOFF }
   end
 
   def total_active_runner_vcpus

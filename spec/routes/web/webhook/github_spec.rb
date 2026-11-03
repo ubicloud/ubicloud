@@ -90,11 +90,29 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "Inactive project"}}.to_json)
     end
 
+    it "does not destroy the installation again if it is already being destroyed" do
+      installation.this.update(created_at: GithubInstallation::CREATED_AT_CUTOFF - 1)
+      send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+      expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(0)
+    end
+
     it "destroys installation when receive deleted action" do
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
+      expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(1)
+      expect(GithubInstallation.with_github_installation_id(installation.installation_id)).to be_nil
+    end
+
+    it "does not start a second destroy for a repeated deleted action" do
+      2.times { send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}}) }
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
       expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(1)
     end
   end
@@ -106,6 +124,18 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+    end
+
+    it "fails without creating a runner if the installation is being destroyed" do
+      installation.project.update(billing_info_id: BillingInfo.create(stripe_id: "0").id)
+      installation.this.update(created_at: GithubInstallation::CREATED_AT_CUTOFF - 1)
+      expect(Clog).to receive(:emit).with("Unregistered installation", instance_of(Hash)).and_call_original
+      send_webhook("workflow_job", workflow_job_payload(action: "queued"))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+      expect(GithubRunner.count).to eq(0)
+      expect(GithubRepository.count).to eq(0)
     end
 
     it "fails if installation is missing from the payload" do
@@ -246,6 +276,16 @@ RSpec.describe Clover, "github" do
       send_webhook("workflow_run", workflow_run_payload(action: "requested", installation_id: 789))
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+    end
+
+    it "returns error without creating a workflow run or repository if the installation is being destroyed" do
+      installation.this.update(created_at: GithubInstallation::CREATED_AT_CUTOFF - 1)
+      send_webhook("workflow_run", workflow_run_payload(action: "requested"))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+      expect(GithubActiveWorkflowRun.count).to eq(0)
+      expect(GithubRepository.count).to eq(0)
     end
 
     it "returns error if workflow_run is missing from the payload" do
