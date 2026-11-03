@@ -208,12 +208,15 @@ PGDATA=/dat/17/data
         expect(bucket).to receive(:lifecycle).and_yield(lifecycle)
       end
 
-      it "sets delete lifecycle rule on the bucket" do
-        expect(lifecycle).to receive(:add_delete_rule).with(age: PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+      it "replaces existing lifecycle rules with a delete rule of backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
+        expect(lifecycle).to receive(:clear).ordered
+        expect(lifecycle).to receive(:add_delete_rule).with(age: 15).ordered
         postgres_timeline.set_lifecycle_policy
       end
 
       it "honors expiration_days: override" do
+        expect(lifecycle).to receive(:clear)
         expect(lifecycle).to receive(:add_delete_rule).with(age: 30)
         postgres_timeline.set_lifecycle_policy(expiration_days: 30)
       end

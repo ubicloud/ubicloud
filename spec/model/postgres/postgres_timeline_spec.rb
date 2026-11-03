@@ -515,6 +515,25 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
   end
 
+  it "keeps objects for the retention window plus one backup period" do
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+    postgres_timeline.update(backup_period_hours: 12)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(8)
+    postgres_timeline.update(backup_period_hours: 25)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(9)
+    postgres_timeline.update(backup_period_hours: 168, backup_retention_days: 35)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(42)
+  end
+
+  it "ignores backups older than the bucket expiration days for earliest restore time" do
+    postgres_timeline.update(backup_retention_days: 5)
+    expect(postgres_timeline).to receive(:backups).and_return([
+      instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 6 - 60),
+      instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 5),
+    ])
+    expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
+  end
+
   describe "aws" do
     let(:s3_client) { Aws::S3::Client.new(stub_responses: true) }
 
@@ -582,8 +601,9 @@ PGDATA=/dat/17/data
         s3_client.stub_responses(:put_bucket_lifecycle_configuration)
       end
 
-      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
-        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)).and_return(true)
+      it "defaults to backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
+        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(15)).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy).to be(true)
       end
 
@@ -788,8 +808,9 @@ PGDATA=/dat/17/data
     end
 
     describe "#set_lifecycle_policy" do
-      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
-        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS).and_return(true)
+      it "defaults to backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
+        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 15).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy).to be(true)
       end
 
