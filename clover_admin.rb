@@ -823,10 +823,10 @@ class CloverAdmin < Roda
       action "charge_card", "Charge Card" do
         flash "Charged card and added prepaid credit"
         pass_request!
-        allow_if { Config.stripe_secret_key && !it.payment_methods_dataset.empty? }
+        allow_if { Config.stripe_secret_key && !it.get_ff_invoice_in_eur && !it.payment_methods_dataset.empty? }
         min_amount = Config.minimum_invoice_charge_threshold
         param :amount, typecast: :float!, type: "number", attr: {min: min_amount, step: 0.01}, value: ->(obj) { obj.current_invoice.content.then { (it["cost"] - (it.dig("vat_info", "amount") || 0)).round(2) } }
-        param :eur_rate, typecast: :float, label: "EUR Rate", type: "number", attr: {step: 0.0001}, required: nil
+        param :eur_rate, typecast: :float, label: "EUR Rate", type: "number", attr: {step: "any"}, required: nil, value: ->(obj) { EcbExchangeRate.usd_to_eur if InvoiceGenerator.eur_rate_required?(obj) }
         run do |obj, amount, eur_rate, request:|
           amount = amount.round(2)
           fail CloverError.new(400, "InvalidRequest", "Amount must be at least #{min_amount}") if amount < min_amount

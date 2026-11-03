@@ -307,11 +307,17 @@ class InvoiceGenerator
     "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
   end
 
+  def self.eur_rate_required?(project)
+    _, vat_info = billing_content(project, nil)
+    !!((vat_info && !vat_info[:reversed]) || project.get_ff_invoice_in_eur)
+  end
+
   def self.prepaid_credit_invoice(project, amount, eur_rate: nil)
-    content, vat_info = billing_content(project, eur_rate)
-    if !eur_rate && ((vat_info && !vat_info[:reversed]) || project.get_ff_invoice_in_eur)
+    if !eur_rate && eur_rate_required?(project)
       raise ArgumentError, "EUR rate must be provided for this project"
     end
+
+    content, vat_info = billing_content(project, eur_rate)
 
     now = Time.now.utc
     line_item = {resource_type: "PrepaidCredit", description: "Credit for future usage", amount: 1, duration: 0, cost: amount, begin_time: now, unit_price: amount}

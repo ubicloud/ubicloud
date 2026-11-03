@@ -2523,6 +2523,11 @@ RSpec.describe CloverAdmin do
     no_card_path = "/model/Project/#{Project.create(name: "NoCard").ubid}/charge_card"
     expect { visit no_card_path }.to raise_error(RuntimeError, "admin route not handled: #{no_card_path}")
 
+    # Action is unavailable when the project is invoiced in EUR
+    p.set_ff_invoice_in_eur(true)
+    expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
+    p.set_ff_invoice_in_eur(nil)
+
     BillingRecord.create(
       project_id: p.id,
       resource_id: GithubRunner.generate_uuid,
@@ -2560,6 +2565,7 @@ RSpec.describe CloverAdmin do
     visit "/model/Project/#{p.ubid}"
     click_link "Charge Card"
     expect(page).to have_field("amount", with: "12.49")
+    expect(find_field("EUR Rate").value).to be_nil
     created = Time.utc(2026, 11, 3, 12)
     expect(payment_intents_service).to receive(:create).with({amount: 1249, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_456", status: "succeeded", created: created.to_i))
     expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 12.49, cost: 12.49, intent_id: "pi_456", admin: "admin"}}).and_call_original
@@ -2615,15 +2621,20 @@ RSpec.describe CloverAdmin do
       amount: 11992,
     )
 
-    # Prefills the amount without the VAT of the current usage
-    visit "/model/Project/#{p.ubid}"
-    click_link "Charge Card"
-    expect(page).to have_field("amount", with: "12.49")
+    ecb_body = {dataSets: [{series: {"0:0:0:0:0" => {observations: {"0" => [1.1179, 0, 0, nil, nil]}}}}]}.to_json
+    stub_request(:get, EcbExchangeRate::URL).to_return(status: 503).then.to_return(status: 200, body: ecb_body)
 
+    # Leaves the EUR rate empty when the ECB API fails
+    visit "/model/Project/#{p.ubid}/charge_card"
+    expect(find_field("EUR Rate").value).to be_nil
     fill_in "amount", with: "100"
     expect { click_button "Charge Card" }.to raise_error(CloverError, "EUR rate must be provided for this project")
 
-    visit "/model/Project/#{p.ubid}/charge_card"
+    # Prefills the amount without the VAT of the current usage, and the EUR rate from the ECB
+    visit "/model/Project/#{p.ubid}"
+    click_link "Charge Card"
+    expect(page).to have_field("amount", with: "12.49")
+    expect(page).to have_field("EUR Rate", with: "0.894534")
     fill_in "amount", with: "100"
     fill_in "EUR Rate", with: "0.85"
     expect(payment_intents_service).to receive(:create).with(hash_including(amount: 12100, currency: "usd")).and_return(Stripe::PaymentIntent.construct_from(id: "pi_1", status: "succeeded", created: Time.now.to_i))
