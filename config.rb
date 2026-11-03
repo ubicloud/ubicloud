@@ -146,7 +146,7 @@ module Config
   optional :github_runner_aws_spot_instance_max_price_per_vcpu, float
   override :github_runner_aws_spill_threshold_seconds, 30, int
   override :github_runner_aws_spill_vcpu_capacity, 100, int
-  override :github_runner_aws_spill_runner_capacity, 50, int
+  override :github_runner_aws_spill_installation_capacity, 50, int
   # 0 disables the limit on unallocated runner VMs
   override :github_runner_allocation_slots, 1000, int
 

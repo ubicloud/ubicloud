@@ -400,8 +400,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def aws_spill_capacity_available?
-    spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
-    spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity && spilled_runners < Config.github_runner_aws_spill_runner_capacity
+    aws_spill_vpc_available? && GithubRunner.aws_vm_usage.first < Config.github_runner_aws_spill_vcpu_capacity
+  end
+
+  # Runners of an installation share one AWS VPC, so only the installations
+  # without one need a new VPC.
+  def aws_spill_vpc_available?
+    location_id = Config.github_runner_aws_location_id
+    installation_private_subnet(location_id) ||
+      DB[:github_installation_private_subnet].where(location_id:).count < Config.github_runner_aws_spill_installation_capacity
   end
 
   # Large runners may not fit on a fragmented metal fleet even at low
@@ -477,9 +484,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         aws_quota_available?
 
       if should_spill_over
-        spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
-        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity || spilled_runners >= Config.github_runner_aws_spill_runner_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, spilled_runners:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+        unless aws_spill_capacity_available?
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 
