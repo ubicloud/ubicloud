@@ -2425,6 +2425,7 @@ class CloverAdmin < Roda
             "Email" => invoice.content.dig("billing_info", "email"),
             "Amount" => table_cost(invoice.cost),
             "Unpaid Invoices" => invoice[:unpaid_count],
+            "Failed Charges" => invoice.content["failed_charge_attempts"]&.length || 0,
             "Charge" => table_form_button("Charge", action: "/model/Invoice/#{invoice.ubid}/charge", method: "post"),
           }
         end

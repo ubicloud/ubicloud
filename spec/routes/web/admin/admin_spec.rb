@@ -4384,27 +4384,27 @@ RSpec.describe CloverAdmin do
 
     acme = Project.create(name: "acme")
     other = Project.create(name: "other")
-    create_invoice = lambda do |project, number, month, cost, status: "unpaid", name: "ACME", email: "billing@acme.com"|
+    create_invoice = lambda do |project, number, month, cost, status: "unpaid", name: "ACME", email: "billing@acme.com", **extra|
       Invoice.create(project:, invoice_number: number, status:, begin_time: Time.utc(2026, month), end_time: Time.utc(2026, month + 1),
-        content: {cost:, subtotal: cost, credit: 0, discount: 0, resources: [], billing_info: {name:, email:, country: "NL"}})
+        content: {cost:, subtotal: cost, credit: 0, discount: 0, resources: [], billing_info: {name:, email:, country: "NL"}, **extra})
     end
     create_invoice.call(acme, "2609-acme", 9, 10.5)
     create_invoice.call(acme, "2608-acme", 8, 7)
     create_invoice.call(acme, "2607-acme", 7, 3, status: "paid")
-    other_sep = create_invoice.call(other, "2609-other", 9, 1250, name: "Other", email: "billing@other.com")
+    other_sep = create_invoice.call(other, "2609-other", 9, 1250, name: "Other", email: "billing@other.com", failed_charge_attempts: [Time.utc(2026, 10, 1), Time.utc(2026, 10, 3)])
     create_invoice.call(other, "2608-other", 8, 20, status: "paid")
 
     visit "/unpaid-invoices"
     expect(page.all("#unpaid-invoices-search option").map(&:text)).to eq ["2026-09", "2026-08"]
-    expect(page.all(".unpaid-invoice-table thead th").map(&:text)).to eq ["Invoice", "Name", "Email", "Amount", "Unpaid Invoices", "Charge"]
+    expect(page.all(".unpaid-invoice-table thead th").map(&:text)).to eq ["Invoice", "Name", "Email", "Amount", "Unpaid Invoices", "Failed Charges", "Charge"]
     expect(rows.call).to eq [
-      ["2609-other", "Other", "billing@other.com", "$1,250.00", "1", ""],
-      ["2609-acme", "ACME", "billing@acme.com", "$10.50", "2", ""],
+      ["2609-other", "Other", "billing@other.com", "$1,250.00", "1", "2", ""],
+      ["2609-acme", "ACME", "billing@acme.com", "$10.50", "2", "0", ""],
     ]
 
     select "2026-08", from: "Month"
     click_button "Search"
-    expect(rows.call).to eq [["2608-acme", "ACME", "billing@acme.com", "$7.00", "2", ""]]
+    expect(rows.call).to eq [["2608-acme", "ACME", "billing@acme.com", "$7.00", "2", "0", ""]]
 
     # A valid month without unpaid invoices shows no data
     visit "/unpaid-invoices?month=2026-07"
