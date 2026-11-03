@@ -337,11 +337,11 @@ RSpec.configure do |config|
       VmHost.create_with_id(id, **args)
     end
 
-    def create_vm(**args)
+    def create_vm(id: Vm.generate_uuid, **args)
       defaults = {unix_user: "ubi", public_key: "ssh-ed25519 key", name: "test-vm", family: "standard", cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64", location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: false, created_at: Time.now}
       args = defaults.merge(args)
       args[:project_id] ||= Project.create(name: "create-vm-project").id
-      Vm.create(**args)
+      Vm.create_with_id(id, **args)
     end
 
     def create_vhost_block_backend(version: "v0.4.1", **)
