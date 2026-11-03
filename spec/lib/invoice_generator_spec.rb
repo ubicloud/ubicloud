@@ -320,6 +320,17 @@ RSpec.describe InvoiceGenerator do
       invoice = described_class.new(begin_time, end_time).run.first
       expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud Inc.")
       expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud Inc.")
+      expect(invoice.content["vat_info"]).to be_nil
+    end
+
+    it "does not apply VAT for EU customers with a non-Dutch VAT number if billing info invoice_from is inc" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "DE123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", invoice_from: "inc", valid_vat: true).id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud Inc.")
+      expect(invoice.content["vat_info"]).to be_nil
     end
 
     it "uses B.V. as issuer and for bank info if billing info invoice_from is bv, even for non-EU customers" do

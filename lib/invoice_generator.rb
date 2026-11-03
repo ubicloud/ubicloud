@@ -113,7 +113,7 @@ class InvoiceGenerator
             postal_code: "94127",
           }
         end
-        vat_info = if is_eu
+        vat_info = if is_eu && invoice_from != "inc"
           if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL" && bi.valid_vat == true
             {rate: 0, reversed: true}
           else
