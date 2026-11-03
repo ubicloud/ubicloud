@@ -399,16 +399,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity && spilled_runners < Config.github_runner_aws_spill_runner_capacity
   end
 
-  # Large runners may not fit on a fragmented metal fleet even at low
-  # utilization, so spill them over to AWS once, after a short wait.
+  # Spill over to AWS if the VM is unallocated for more than 60 seconds
+  # and spilling is not explicitly disabled for the customer
   def spill_unallocated_vm?
-    ([8, 16, 30].include?(label_data["vcpus"]) || !x64?) &&
-      vm.location_id == Location::GITHUB_RUNNERS_ID &&
+    vm.location_id == Location::GITHUB_RUNNERS_ID &&
       !vm.allocated_at &&
-      vm.waiting_for_capacity_set? &&
       Time.now - vm.created_at > 60 &&
+      support_alien? &&
+      vm.waiting_for_capacity_set? &&
       alien_allowed? &&
-      project.get_ff_spill_to_alien_runners &&
       aws_quota_available? &&
       aws_spill_capacity_available?
   end
