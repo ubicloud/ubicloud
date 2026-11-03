@@ -37,6 +37,11 @@ class Clover
       return {error: {message: "Unregistered installation"}}
     end
 
+    unless installation.has_billing_info?
+      Clog.emit("Github workflow run webhook without billing info", {github_workflow_run_billing_info_missing: {installation_id: installation.id}})
+      return {error: {message: "Must setup payment method before using Ubicloud runners"}}
+    end
+
     if (run = data["workflow_run"])
       repository_name = run.dig("repository", "full_name")
       run_id = Integer(run["id"], exception: false)

@@ -272,6 +272,10 @@ RSpec.describe Clover, "github" do
   end
 
   context "when workflow_run event" do
+    before do
+      installation.project.update(billing_info_id: BillingInfo.create(stripe_id: "0").id)
+    end
+
     it "returns error if installation does not exist" do
       send_webhook("workflow_run", workflow_run_payload(action: "requested", installation_id: 789))
       expect(page.status_code).to eq(200)
@@ -284,6 +288,17 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+      expect(GithubActiveWorkflowRun.count).to eq(0)
+      expect(GithubRepository.count).to eq(0)
+    end
+
+    it "returns error without creating a workflow run or repository if the project has no billing info" do
+      installation.project.update(billing_info_id: nil)
+      expect(Clog).to receive(:emit).with("Github workflow run webhook without billing info", {github_workflow_run_billing_info_missing: {installation_id: installation.id}}).and_call_original
+      send_webhook("workflow_run", workflow_run_payload(action: "requested"))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Must setup payment method before using Ubicloud runners"}}.to_json)
       expect(GithubActiveWorkflowRun.count).to eq(0)
       expect(GithubRepository.count).to eq(0)
     end
