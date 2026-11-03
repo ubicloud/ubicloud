@@ -4,7 +4,6 @@ require_relative "../model"
 
 # Reached only through its service, so no ubid.
 class PrivateLinkServicePort < Sequel::Model
-  many_to_one :private_link_service
   one_to_one :private_link_service_port_aws_resource, key: :id, read_only: true
 
   plugin :association_dependencies, private_link_service_port_aws_resource: :destroy

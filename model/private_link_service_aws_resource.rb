@@ -6,7 +6,7 @@ require "aws-partitions"
 # AWS PrivateLink state of a PrivateLinkService, keyed by its id.
 class PrivateLinkServiceAwsResource < Sequel::Model
   many_to_one :private_link_service, key: :id, read_only: true
-  one_to_many :allowed_endpoints, class: :PrivateLinkServiceAwsAllowedEndpoint, order: :vpc_endpoint_id
+  one_to_many :allowed_endpoints, class: :PrivateLinkServiceAwsAllowedEndpoint, order: :vpc_endpoint_id, read_only: true
 
   plugin :association_dependencies, allowed_endpoints: :destroy
   plugin ResourceMethods, referencing: UBID::TYPE_PRIVATE_LINK_SERVICE

@@ -8,10 +8,10 @@ require_relative "../model"
 class PrivateLinkService < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
-  many_to_one :location
-  many_to_one :private_subnet
-  many_to_one :postgres_resource
-  one_to_many :ports, class: :PrivateLinkServicePort, order: :port
+  many_to_one :location, read_only: true
+  many_to_one :private_subnet, read_only: true
+  many_to_one :postgres_resource, read_only: true
+  one_to_many :ports, class: :PrivateLinkServicePort, order: :port, read_only: true
   one_to_one :private_link_service_aws_resource, key: :id, read_only: true
 
   plugin :association_dependencies, ports: :destroy, private_link_service_aws_resource: :destroy
