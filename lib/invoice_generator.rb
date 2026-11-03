@@ -41,85 +41,7 @@ class InvoiceGenerator
       all_resource_discounts, all_resource_credits = @discounts_and_credits_hashes || self.class.discounts_and_credits_hashes(@begin_time, @end_time, billing_record_project_ids)
 
       billing_records_by_project.each do |project, project_records|
-        project_content = {}
-        project_content[:project_id] = project.id
-        project_content[:project_name] = project.name
-        bi = project.billing_info
-        country = bi&.country
-        is_eu = country&.in_eu_vat?
-        project_content[:billing_info] = bi&.stripe_data&.merge({
-          "id" => bi.id,
-          "ubid" => bi.ubid,
-          "in_eu_vat" => !!is_eu,
-        })
-
-        if (convert_usd_to_eur = @eur_rate && project.get_ff_invoice_in_eur)
-          # This duplicates the setting in the VAT section, but this is for a different purpose.
-          # This controls whether the invoice itself is displayed in USD or EUR.
-          # The VAT section rate only affects the VAT calculation.
-          project_content[:usd_to_eur_rate] = @eur_rate
-        end
-
-        invoice_from = bi&.invoice_from || ((is_eu || convert_usd_to_eur) ? "bv" : "inc")
-
-        if bi && bi.payment_methods.empty?
-          project_content[:due_date] = (Date.today + 30).to_s
-          if invoice_from == "bv"
-            project_content[:bank_transfer_info] = {
-              "Beneficiary" => "Ubicloud B.V.",
-              "IBAN" => "NL30REVO6759811127",
-              "BIC" => "REVONL22",
-              "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
-              "Bank/Payment institution" => "Revolut Bank UAB",
-              "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands",
-            }
-            unless convert_usd_to_eur
-              project_content[:bank_transfer_info]["Intermediary BIC"] = "CHASGB2L"
-            end
-          else
-            project_content[:bank_transfer_info] = {
-              "Beneficiary" => "Ubicloud Inc.",
-              "Beneficiary address" => "310 Santa Ana Ave, San Francisco, CA 94127",
-              "ABA/Routing number" => "121145349",
-              "Account number" => "974842159957503",
-              "Bank/Payment institution" => "Column NA - Brex",
-              "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129",
-            }
-          end
-        end
-        # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
-        # Invoices are issued by Ubicloud B.V. for EU customers.
-        #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
-        #   - If the customer has provided a VAT number from another European country that we have validated, we include a reverse charge notice along with 0% VAT.
-        #   - If the customer hasn't provided a VAT number, or the one they provided has not been validated, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
-        project_content[:issuer_info] = if invoice_from == "bv"
-          {
-            name: "Ubicloud B.V.",
-            address: "Turfschip 267",
-            country: "NL",
-            city: "Amstelveen",
-            postal_code: "1186 XK",
-            tax_id: "NL864651442B01",
-            trade_id: "88492729",
-            in_eu_vat: true,
-          }
-        else
-          {
-            name: "Ubicloud Inc.",
-            address: "310 Santa Ana Avenue",
-            country: "US",
-            city: "San Francisco",
-            state: "CA",
-            postal_code: "94127",
-          }
-        end
-        vat_info = if is_eu
-          if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL" && bi.valid_vat == true
-            {rate: 0, reversed: true}
-          else
-            {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
-          end
-        end
+        project_content, vat_info = self.class.billing_content(project, @eur_rate)
         resource_discounts = all_resource_discounts[project.id] || []
         resource_credits = all_resource_credits[project.id] || []
         resource_credits.sort_by! do
@@ -258,23 +180,10 @@ class InvoiceGenerator
         project_content[:credits] = credits_by_name.map { |name, amount| {name:, amount: amount.round(3)} }
         project_content[:cost] = project_content[:cost].round(3)
 
-        if project_content[:cost] < Config.minimum_invoice_charge_threshold
-          vat_info = nil
-        end
-        project_content[:vat_info] = vat_info
-
-        if vat_info && !vat_info[:reversed]
-          project_content[:vat_info][:amount] = (project_content[:cost] * vat_info[:rate].fdiv(100)).round(3)
-          project_content[:cost] += project_content[:vat_info][:amount]
-        end
-        project_content[:cost] = project_content[:cost].round(3)
-        project_content[:invoice_version] = CURRENT_INVOICE_VERSION
+        self.class.apply_vat(project_content, vat_info)
 
         if @save_result
-          invoice_month = @begin_time.strftime("%y%m")
-          invoice_customer = project.id[-10..]
-          invoice_order = format("%04d", project.invoices.count + 1)
-          invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
+          invoice_number = self.class.invoice_number(project, @begin_time)
 
           invoice = Invoice.create(project_id: project.id, invoice_number:, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
@@ -292,6 +201,130 @@ class InvoiceGenerator
     end
 
     invoices
+  end
+
+  def self.billing_content(project, eur_rate)
+    project_content = {}
+    project_content[:project_id] = project.id
+    project_content[:project_name] = project.name
+    bi = project.billing_info
+    country = bi&.country
+    is_eu = country&.in_eu_vat?
+    project_content[:billing_info] = bi&.stripe_data&.merge({
+      "id" => bi.id,
+      "ubid" => bi.ubid,
+      "in_eu_vat" => !!is_eu,
+    })
+
+    if (convert_usd_to_eur = eur_rate && project.get_ff_invoice_in_eur)
+      # This duplicates the setting in the VAT section, but this is for a different purpose.
+      # This controls whether the invoice itself is displayed in USD or EUR.
+      # The VAT section rate only affects the VAT calculation.
+      project_content[:usd_to_eur_rate] = eur_rate
+    end
+
+    invoice_from = bi&.invoice_from || ((is_eu || convert_usd_to_eur) ? "bv" : "inc")
+
+    if bi && bi.payment_methods.empty?
+      project_content[:due_date] = (Date.today + 30).to_s
+      if invoice_from == "bv"
+        project_content[:bank_transfer_info] = {
+          "Beneficiary" => "Ubicloud B.V.",
+          "IBAN" => "NL30REVO6759811127",
+          "BIC" => "REVONL22",
+          "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
+          "Bank/Payment institution" => "Revolut Bank UAB",
+          "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands",
+        }
+        unless convert_usd_to_eur
+          project_content[:bank_transfer_info]["Intermediary BIC"] = "CHASGB2L"
+        end
+      else
+        project_content[:bank_transfer_info] = {
+          "Beneficiary" => "Ubicloud Inc.",
+          "Beneficiary address" => "310 Santa Ana Ave, San Francisco, CA 94127",
+          "ABA/Routing number" => "121145349",
+          "Account number" => "974842159957503",
+          "Bank/Payment institution" => "Column NA - Brex",
+          "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129",
+        }
+      end
+    end
+    # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
+    # Invoices are issued by Ubicloud B.V. for EU customers.
+    #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
+    #   - If the customer has provided a VAT number from another European country that we have validated, we include a reverse charge notice along with 0% VAT.
+    #   - If the customer hasn't provided a VAT number, or the one they provided has not been validated, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
+    project_content[:issuer_info] = if invoice_from == "bv"
+      {
+        name: "Ubicloud B.V.",
+        address: "Turfschip 267",
+        country: "NL",
+        city: "Amstelveen",
+        postal_code: "1186 XK",
+        tax_id: "NL864651442B01",
+        trade_id: "88492729",
+        in_eu_vat: true,
+      }
+    else
+      {
+        name: "Ubicloud Inc.",
+        address: "310 Santa Ana Avenue",
+        country: "US",
+        city: "San Francisco",
+        state: "CA",
+        postal_code: "94127",
+      }
+    end
+    vat_info = if is_eu
+      if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL" && bi.valid_vat == true
+        {rate: 0, reversed: true}
+      else
+        {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate:}
+      end
+    end
+    [project_content, vat_info]
+  end
+
+  def self.apply_vat(content, vat_info)
+    if content[:cost] < Config.minimum_invoice_charge_threshold
+      vat_info = nil
+    end
+    content[:vat_info] = vat_info
+
+    if vat_info && !vat_info[:reversed]
+      content[:vat_info][:amount] = (content[:cost] * vat_info[:rate].fdiv(100)).round(3)
+      content[:cost] += content[:vat_info][:amount]
+    end
+    content[:cost] = content[:cost].round(3)
+    content[:invoice_version] = CURRENT_INVOICE_VERSION
+  end
+
+  def self.invoice_number(project, time)
+    invoice_month = time.strftime("%y%m")
+    invoice_customer = project.id[-10..]
+    invoice_order = format("%04d", project.invoices.count + 1)
+    "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
+  end
+
+  def self.prepaid_credit_invoice(project, amount, eur_rate: nil)
+    content, vat_info = billing_content(project, eur_rate)
+    if !eur_rate && ((vat_info && !vat_info[:reversed]) || project.get_ff_invoice_in_eur)
+      raise ArgumentError, "EUR rate must be provided for this project"
+    end
+
+    now = Time.now.utc
+    line_item = {resource_type: "PrepaidCredit", description: "Credit for future usage", amount: 1, duration: 0, cost: amount, begin_time: now, unit_price: amount}
+    content[:resources] = [{resource_id: nil, resource_name: "Prepaid Credit", line_items: [line_item], cost: amount}]
+    content[:subtotal] = amount
+    content[:discount] = 0
+    content[:discounts] = []
+    content[:credit] = 0
+    content[:credits] = []
+    content[:cost] = amount
+    apply_vat(content, vat_info)
+
+    Invoice.new(project_id: project.id, kind: "prepaid_credit", invoice_number: invoice_number(project, now), content: JSON.parse(content.to_json), begin_time: now, end_time: now)
   end
 
   def active_billing_records

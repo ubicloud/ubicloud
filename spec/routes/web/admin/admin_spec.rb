@@ -2505,7 +2505,7 @@ RSpec.describe CloverAdmin do
     p = Project.create(name: "Default", billing_info_id: billing_info.id)
     path = "/model/Project/#{p.ubid}/charge_card"
     PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_old", created_at: Time.now - 60)
-    PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_new")
+    pm_new = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_new")
 
     # Action is unavailable when Stripe is not enabled
     expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
@@ -2513,9 +2513,11 @@ RSpec.describe CloverAdmin do
     expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
     customers_service = instance_double(Stripe::CustomerService)
     expect(StripeClient).to receive(:customers).and_return(customers_service).at_least(:once)
-    expect(customers_service).to receive(:retrieve).with("cus_123").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}}).at_least(:once)
+    expect(customers_service).to receive(:retrieve).with("cus_123").and_return({"name" => "ACME Inc.", "email" => "billing@example.com", "address" => {"country" => "US"}}).at_least(:once)
     payment_intents_service = instance_double(Stripe::PaymentIntentService)
     expect(StripeClient).to receive(:payment_intents).and_return(payment_intents_service).at_least(:once)
+    blob_storage_client = Aws::S3::Client.new(stub_responses: true)
+    allow(Invoice).to receive(:blob_storage_client).and_return(blob_storage_client)
 
     # Action is unavailable when the project has no payment method
     no_card_path = "/model/Project/#{Project.create(name: "NoCard").ubid}/charge_card"
@@ -2551,14 +2553,17 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_error("Payment intent pi_123 has status processing")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
     expect(ResourceCredit.all).to eq []
+    expect(Invoice.all).to eq []
     expect(p.reload.reputation).to eq "new"
 
     # Prefills the amount with the current usage
     visit "/model/Project/#{p.ubid}"
     click_link "Charge Card"
     expect(page).to have_field("amount", with: "12.49")
-    expect(payment_intents_service).to receive(:create).with({amount: 1249, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_456", status: "succeeded"))
-    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 12.49, intent_id: "pi_456", admin: "admin"}}).and_call_original
+    created = Time.utc(2026, 11, 3, 12)
+    expect(payment_intents_service).to receive(:create).with({amount: 1249, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_456", status: "succeeded", created: created.to_i))
+    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 12.49, cost: 12.49, intent_id: "pi_456", admin: "admin"}}).and_call_original
+    expect(blob_storage_client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, content_type: "application/pdf")).and_call_original.twice
     click_button "Charge Card"
     expect(page).to have_flash_notice("Charged card and added prepaid credit")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
@@ -2569,16 +2574,63 @@ RSpec.describe CloverAdmin do
     t = Time.now.utc
     expect(credit.active_from).to eq Time.utc(t.year, t.month)
     expect(p.reload.reputation).to eq "verified"
+    invoice = Invoice.first
+    expect(invoice.project_id).to eq p.id
+    expect(invoice.kind).to eq "prepaid_credit"
+    expect(invoice.status).to eq "paid"
+    expect(invoice.cost).to eq 12.49
+    expect(invoice.content.to_hash).to include("payment_intent" => "pi_456", "paid_at" => created.to_s, "payment_method" => {"id" => pm_new.id, "stripe_id" => "pm_new"})
+    expect(Mail::TestMailer.deliveries.last.subject).to eq "Ubicloud Prepaid Credit Invoice ##{invoice.invoice_number}"
 
     # Charges a custom amount
     click_link "Charge Card"
     expect(page).to have_field("amount", with: "0.0")
     fill_in "amount", with: "19.99"
-    expect(payment_intents_service).to receive(:create).with({amount: 1999, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_789", status: "succeeded"))
-    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 19.99, intent_id: "pi_789", admin: "admin"}}).and_call_original
+    expect(payment_intents_service).to receive(:create).with({amount: 1999, **intent_params}).and_return(Stripe::PaymentIntent.construct_from(id: "pi_789", status: "succeeded", created: created.to_i))
+    expect(Clog).to receive(:emit).with("Project card charged", {project_card_charged: {ubid: p.ubid, amount: 19.99, cost: 19.99, intent_id: "pi_789", admin: "admin"}}).and_call_original
     click_button "Charge Card"
     expect(page).to have_flash_notice("Charged card and added prepaid credit")
     expect(ResourceCredit.select_order_map(:amount)).to eq [12.49, 19.99]
+    expect(Invoice.select_order_map(:invoice_number).map { it[-4..] }).to eq %w[0001 0002]
+  end
+
+  it "charges VAT on top of the prepaid credit for EU customers" do
+    billing_info = BillingInfo.create(stripe_id: "cus_123")
+    p = Project.create(name: "Default", billing_info_id: billing_info.id)
+    PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1")
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    customers_service = instance_double(Stripe::CustomerService)
+    expect(StripeClient).to receive(:customers).and_return(customers_service).at_least(:once)
+    expect(customers_service).to receive(:retrieve).with("cus_123").and_return({"name" => "ACME B.V.", "email" => "billing@example.com", "address" => {"country" => "NL"}}).at_least(:once)
+    payment_intents_service = instance_double(Stripe::PaymentIntentService)
+    expect(StripeClient).to receive(:payment_intents).and_return(payment_intents_service).at_least(:once)
+    allow(Invoice).to receive(:blob_storage_client).and_return(Aws::S3::Client.new(stub_responses: true))
+
+    BillingRecord.create(
+      project_id: p.id,
+      resource_id: GithubRunner.generate_uuid,
+      resource_name: "runner",
+      span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
+      billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")["id"],
+      amount: 11992,
+    )
+
+    # Prefills the amount without the VAT of the current usage
+    visit "/model/Project/#{p.ubid}"
+    click_link "Charge Card"
+    expect(page).to have_field("amount", with: "12.49")
+
+    fill_in "amount", with: "100"
+    expect { click_button "Charge Card" }.to raise_error(CloverError, "EUR rate must be provided for this project")
+
+    visit "/model/Project/#{p.ubid}/charge_card"
+    fill_in "amount", with: "100"
+    fill_in "EUR Rate", with: "0.85"
+    expect(payment_intents_service).to receive(:create).with(hash_including(amount: 12100, currency: "usd")).and_return(Stripe::PaymentIntent.construct_from(id: "pi_1", status: "succeeded", created: Time.now.to_i))
+    click_button "Charge Card"
+    expect(page).to have_flash_notice("Charged card and added prepaid credit")
+    expect(ResourceCredit.first.amount).to eq 100
+    expect(Invoice.first.content["vat_info"]).to eq("rate" => 21, "reversed" => false, "eur_rate" => 0.85, "amount" => 21.0)
   end
 
   it "lists multiple info pages with proper links and content in table format" do

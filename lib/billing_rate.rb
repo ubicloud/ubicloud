@@ -98,6 +98,8 @@ class BillingRate
       "#{amount.to_i} minutes"
     when "InferenceTokens"
       "#{amount.to_i} tokens"
+    when "PrepaidCredit"
+      "-"
     else
       "#{duration} minutes"
     end

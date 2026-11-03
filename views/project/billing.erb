@@ -2,6 +2,7 @@
 
 if @project.billing_info
   @invoices = @project.invoices.prepend(@project.current_invoice)
+  last_month_invoice = @invoices.drop(1).find { it.kind == "usage" }
 end
 
 @usage_alerts = @project.usage_alerts_dataset.eager(:user).all %>
@@ -31,7 +32,7 @@ end
           <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
 
           <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
-            <%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %>
+            <%= last_month_invoice ? money(last_month_invoice.subtotal) : "-" %>
           </dd>
         </div>
 

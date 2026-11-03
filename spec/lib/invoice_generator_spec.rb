@@ -973,6 +973,60 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["cost"]).to eq((800000 - (free_inference_tokens - 100000)) * billing_rate2)
     expect(invoice["resources"].count).to eq(2)
   end
+
+  describe ".prepaid_credit_invoice" do
+    let(:customers_service) { instance_double(Stripe::CustomerService) }
+
+    before do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      allow(StripeClient).to receive(:customers).and_return(customers_service)
+    end
+
+    def billed_project(country, tax_id: nil, valid_vat: nil)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => tax_id}, "address" => {"country" => country}})
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", valid_vat:).id)
+      PaymentMethod.create(billing_info_id: p1.billing_info_id, stripe_id: "pm_1234567890")
+      p1
+    end
+
+    it "builds an unsaved invoice with one prepaid credit line item" do
+      Invoice.create(project_id: p1.id, invoice_number: "1", content: {}, begin_time: Time.now, end_time: Time.now)
+      invoice = described_class.prepaid_credit_invoice(billed_project("US"), 100.0)
+
+      expect(invoice).to be_new
+      expect(invoice.kind).to eq("prepaid_credit")
+      expect(invoice.name).to eq("Prepaid Credit")
+      expect(invoice.begin_time).to eq(invoice.end_time)
+      expect(invoice.invoice_number).to eq("#{invoice.begin_time.strftime("%y%m")}-#{p1.id[-10..]}-0002")
+      expect(invoice.content.to_hash).to include("subtotal" => 100.0, "cost" => 100.0, "credit" => 0, "discount" => 0, "vat_info" => nil, "invoice_version" => 2)
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud Inc.")
+      expect(invoice.content["resources"].first["line_items"].first).to include("resource_type" => "PrepaidCredit", "cost" => 100.0)
+    end
+
+    it "adds VAT for EU customers without a validated VAT number" do
+      invoice = described_class.prepaid_credit_invoice(billed_project("NL"), 100.0, eur_rate: 0.85)
+
+      expect(invoice.content["vat_info"]).to eq("rate" => 21, "reversed" => false, "eur_rate" => 0.85, "amount" => 21.0)
+      expect(invoice.content["cost"]).to eq(121.0)
+      expect(invoice.content["issuer_info"]["name"]).to eq("Ubicloud B.V.")
+    end
+
+    it "does not need a EUR rate for reverse charged VAT" do
+      invoice = described_class.prepaid_credit_invoice(billed_project("DE", tax_id: "DE123", valid_vat: true), 100.0)
+
+      expect(invoice.content["vat_info"]).to eq("rate" => 0, "reversed" => true)
+      expect(invoice.content["cost"]).to eq(100.0)
+    end
+
+    it "fails without a EUR rate when VAT applies" do
+      expect { described_class.prepaid_credit_invoice(billed_project("NL"), 100.0) }.to raise_error(ArgumentError, "EUR rate must be provided for this project")
+    end
+
+    it "fails without a EUR rate when the project is invoiced in EUR" do
+      billed_project("US").set_ff_invoice_in_eur(true)
+      expect { described_class.prepaid_credit_invoice(p1, 100.0) }.to raise_error(ArgumentError, "EUR rate must be provided for this project")
+    end
+  end
 end
 
 # rubocop:enable RSpec/NoExpectationExample

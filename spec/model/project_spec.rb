@@ -168,6 +168,15 @@ RSpec.describe Project do
       Invoice.create(project_id: project.id, content: {}, begin_time: t, end_time: t - 86400, status: "current", invoice_number: "1", created_at: t - 1)
       expect(project.current_invoice).to be_a Invoice
     end
+
+    it "starts from the last usage invoice and ignores prepaid credit invoices" do
+      project = described_class.create(name: "dummy-name")
+      t = Time.now.utc.floor(6)
+      last_usage_end = t - 3 * 86400
+      Invoice.create(project_id: project.id, content: {}, begin_time: last_usage_end - 86400, end_time: last_usage_end, invoice_number: "1", created_at: t - 2)
+      Invoice.create(project_id: project.id, kind: "prepaid_credit", content: {}, begin_time: t - 86400, end_time: t - 86400, invoice_number: "2", created_at: t - 1)
+      expect(project.current_invoice.begin_time).to eq last_usage_end
+    end
   end
 
   it "sets and gets feature flags" do

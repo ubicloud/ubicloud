@@ -825,20 +825,28 @@ class CloverAdmin < Roda
         pass_request!
         allow_if { Config.stripe_secret_key && !it.payment_methods_dataset.empty? }
         min_amount = Config.minimum_invoice_charge_threshold
-        param :amount, typecast: :float!, type: "number", attr: {min: min_amount, step: 0.01}, value: ->(obj) { obj.current_invoice.cost.round(2) }
-        run do |obj, amount, request:|
+        param :amount, typecast: :float!, type: "number", attr: {min: min_amount, step: 0.01}, value: ->(obj) { obj.current_invoice.content.then { (it["cost"] - (it.dig("vat_info", "amount") || 0)).round(2) } }
+        param :eur_rate, typecast: :float, label: "EUR Rate", type: "number", attr: {step: 0.0001}, required: nil
+        run do |obj, amount, eur_rate, request:|
           amount = amount.round(2)
           fail CloverError.new(400, "InvalidRequest", "Amount must be at least #{min_amount}") if amount < min_amount
 
+          begin
+            invoice = InvoiceGenerator.prepaid_credit_invoice(obj, amount, eur_rate:)
+          rescue ArgumentError => e
+            fail CloverError.new(400, "InvalidRequest", e.message)
+          end
+
           billing_info = obj.billing_info
+          payment_method = billing_info.payment_methods_dataset.first
           begin
             payment_intent = StripeClient.payment_intents.create({
-              amount: (amount * 100).round,
-              currency: "usd",
+              amount: invoice.charge_amount_cents,
+              currency: invoice.charge_currency,
               confirm: true,
               off_session: true,
               customer: billing_info.stripe_id,
-              payment_method: billing_info.payment_methods_dataset.get(:stripe_id),
+              payment_method: payment_method.stripe_id,
             })
           rescue Stripe::CardError, Stripe::InvalidRequestError => e
             error = "Charge failed: #{e.message}"
@@ -853,13 +861,21 @@ class CloverAdmin < Roda
             request.redirect("/model/Project/#{obj.ubid}")
           end
 
-          Clog.emit("Project card charged", {project_card_charged: {ubid: obj.ubid, amount:, intent_id: payment_intent.id, admin: request.scope.rodauth.account_from_session[:login]}})
+          Clog.emit("Project card charged", {project_card_charged: {ubid: obj.ubid, amount:, cost: invoice.cost, intent_id: payment_intent.id, admin: request.scope.rodauth.account_from_session[:login]}})
 
           now = Time.now.utc
           DB.transaction do
+            invoice.status = "paid"
+            invoice.content.merge!(
+              "payment_method" => {"id" => payment_method.id, "stripe_id" => payment_method.stripe_id},
+              "payment_intent" => payment_intent.id,
+              "paid_at" => Time.at(payment_intent.created).utc,
+            )
+            invoice.save_changes
             obj.add_active_resource_credit(name: "Prepaid Credit", amount:, active_from: Time.utc(now.year, now.month))
             obj.verify_by_payment(amount)
           end
+          invoice.send_success_email
         end
       end
     end

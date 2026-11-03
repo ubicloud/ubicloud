@@ -91,6 +91,7 @@ class Invoice < Sequel::Model
   end
 
   def name
+    return "Prepaid Credit" if kind == "prepaid_credit"
     begin_time.utc.strftime("%B %Y")
   end
 

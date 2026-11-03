@@ -73,6 +73,10 @@ RSpec.describe BillingRate do
       expect(described_class.line_item_usage("InferenceTokens", "test-model", 10, 1)).to eq("10 tokens")
     end
 
+    it "returns a dash for prepaid credit" do
+      expect(described_class.line_item_usage("PrepaidCredit", nil, 1, 0)).to eq("-")
+    end
+
     it "returns usage by duration for gpu" do
       expect(described_class.line_item_usage("gpu", "20b5", 10, 2)).to eq("2 minutes")
     end

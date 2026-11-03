@@ -646,6 +646,20 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "less than $0.001"
       end
 
+      it "shows last month usage from the last usage invoice, not a prepaid credit invoice" do
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).at_least(:once)
+        br_previous = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true, eur_rate: 1.1).run.first
+        InvoiceGenerator.prepaid_credit_invoice(project, 1234.56).save_changes
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "Prepaid Credit"
+        last_month = page.find("dt", text: "Last Month").find(:xpath, "following-sibling::dd")
+        expect(last_month.text).to eq "$%0.02f" % invoice_previous.content["subtotal"]
+      end
+
       it "show finalized invoice as PDF from US issuer without VAT" do
         expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123", "note" => "PO123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
