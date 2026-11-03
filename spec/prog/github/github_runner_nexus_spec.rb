@@ -3,6 +3,7 @@
 require_relative "../../model/spec_helper"
 require "netaddr"
 require "octokit"
+require "open3"
 
 RSpec.describe Prog::Github::GithubRunnerNexus do
   subject(:nx) {
