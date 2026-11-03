@@ -812,6 +812,26 @@ RSpec.describe CloverAdmin do
     expect { visit "/model/Invoice/#{invoice.ubid}/download_pdf" }.to raise_error(CloverError, "Action link is not available")
   end
 
+  it "supports regenerating invoice PDF" do
+    invoice = Invoice.create(
+      project: Project.create(name: "stuff"),
+      invoice_number: "2411-regenerate-01",
+      content: {cost: 10, subtotal: 10, credit: 0, discount: 0, resources: [], billing_info: {name: "ACME", email: "billing@example.com", country: "NL"}},
+      begin_time: "2024-11-01 00:00:00",
+      end_time: "2024-12-01 00:00:00",
+    )
+    client = instance_double(Aws::S3::Client)
+    expect(Invoice).to receive(:blob_storage_client).and_return(client).twice
+    expect(client).to receive(:delete_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key).ordered
+    expect(client).to receive(:put_object).with(hash_including(key: invoice.blob_key, content_type: "application/pdf")).ordered
+
+    visit "/model/Invoice/#{invoice.ubid}"
+    click_link "Regenerate PDF"
+    click_button "Regenerate PDF"
+    expect(page).to have_flash_notice("Invoice PDF regenerated")
+    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
+  end
+
   it "supports charging an unpaid invoice" do
     billing_info = BillingInfo.create(stripe_id: "cus_123")
     PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1")
