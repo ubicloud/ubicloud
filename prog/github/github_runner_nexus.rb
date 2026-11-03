@@ -24,6 +24,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "EFI stub: ERROR: Failed to decompress kernel",
   ].freeze
 
+  ERROR_NOTIFICATION_COOLDOWN = 7 * 24 * 60 * 60
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil, schedule: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -217,6 +219,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     @client ||= installation.client(auto_paginate: true)
   end
 
+  def clear_error_notifications
+    DB[:github_error_notification]
+      .where(installation_id: github_runner.installation_id)
+      .where(Sequel.|({repository_id: nil}, {repository_id: github_runner.repository_id}))
+      .delete
+  end
+
   def busy?
     return unless github_runner.runner_id
     rescue_common_github_api_errors do
@@ -239,11 +248,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     github_runner.incr_destroy unless destroying_set?
     nap 0
   rescue Octokit::Error => e
-    installation_ubid = github_runner.installation.ubid
-    page_args, email_body = case e.message
+    error, repository_id, email_body = case e.message
     when /Repository level self-hosted runners are disabled/
       [
-        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], github_runner.installation_id],
+        "self_hosted_runners_disabled",
+        github_runner.repository_id,
         [
           "\"Repository level self-hosted runners are disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable self-hosted runners for this repository in your GitHub organization settings.",
@@ -251,7 +260,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /GitHub Actions is disabled on this repository/
       [
-        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid], github_runner.installation_id],
+        "actions_disabled",
+        github_runner.repository_id,
         [
           "\"GitHub Actions is disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable GitHub Actions for this repository in your GitHub organization settings.",
@@ -259,16 +269,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /your IP address is not permitted to access this resource/
       [
-        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], github_runner.installation_id],
+        "ip_allowlist_enabled",
+        nil,
         [
           "\"Although you appear to have the correct authorization credentials, your organization has an IP allow list enabled, and our control plane's IP address is not permitted to access this resource.\"",
           "To use Ubicloud runners, you need to disable the IP allow list in your GitHub organization settings.",
         ],
       ]
     when /Resource not accessible by integration/
-      repository_ubid = github_runner.repository.ubid
       [
-        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], github_runner.repository_id],
+        "resource_not_accessible",
+        github_runner.repository_id,
         [
           "\"Resource not accessible by integration.\"",
           "This usually means this repository isn't included in the Ubicloud GitHub App's repository access. To use Ubicloud runners, you need to add this repository to the Ubicloud GitHub App's allowed repository list in your GitHub settings.",
@@ -276,12 +287,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     end
 
-    if page_args
+    if error
       Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
-      summary, tag_parts, resource_id = page_args
-      # Only notify when a new page is created, to avoid duplicate emails.
-      page = Prog::PageNexus.assemble(summary, tag_parts, installation_ubid, resource_id:, severity: "warning")
-      if page && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
+      # Notify once per error until runners register again, with a reminder
+      # after the cooldown. A nil repository_id records an installation-wide
+      # error. The upsert lets only one of the concurrent runners notify.
+      notify = !DB[:github_error_notification]
+        .returning(:error)
+        .insert_conflict(
+          target: [:installation_id, :repository_id, :error],
+          update: {notified_at: Sequel[:excluded][:notified_at]},
+          update_where: Sequel[:github_error_notification][:notified_at] < Time.now - ERROR_NOTIFICATION_COOLDOWN,
+        )
+        .insert(installation_id: github_runner.installation_id, repository_id:, error:, notified_at: Time.now)
+        .empty?
+      if notify && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
         repository_name = github_runner.repository_name
         Util.send_email(
           receivers,
@@ -314,6 +334,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if e.message.include?("API rate limit exceeded")
+      installation_ubid = github_runner.installation.ubid
       rate_limit = client.rate_limit
       Prog::PageNexus.assemble(
         "GitHub API rate limit exceeded for installation #{installation_ubid}",
@@ -660,6 +681,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     response = rescue_common_github_api_errors do
       client.post(runners_path("generate-jitconfig"), data)
     end
+    clear_error_notifications
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
     vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
@@ -721,6 +743,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     response = rescue_common_github_api_errors do
       client.post(runners_path("generate-jitconfig"), data)
     end
+    clear_error_notifications
     github_runner.update(runner_id: response[:runner][:id], encoded_jit_config: response[:encoded_jit_config])
     response[:encoded_jit_config]
   rescue Octokit::Conflict => e
