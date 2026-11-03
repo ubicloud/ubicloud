@@ -44,6 +44,7 @@ RSpec.describe Clover, "postgres" do
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-backup-schedule"],
       ].each do |method, path|
         send method, path
 
@@ -993,6 +994,71 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Maintenance window days are not enabled for this project.")
+      end
+
+      describe "set-backup-schedule" do
+        let(:path) { "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-backup-schedule" }
+
+        it "sets each field and leaves omitted ones unchanged" do
+          pg.timeline.update(latest_backup_started_at: Time.utc(2026, 11, 3, 3))
+          post path, {backup_period_hours: 12, backup_window_start_at: 3, backup_retention_days: 14}.to_json
+
+          expect(last_response.status).to eq(200)
+          body = JSON.parse(last_response.body)
+          expect(body).to include("backup_period_hours" => 12, "backup_window_start_at" => 3, "backup_retention_days" => 14, "latest_backup_started_at" => "2026-11-03T03:00:00Z")
+          expect(Time.parse(body["next_backup_at"])).to be > Time.now
+          timeline = pg.timeline.reload
+          expect([timeline.backup_period_hours, timeline.backup_window_start_at, timeline.backup_retention_days]).to eq([12, 3, 14])
+
+          post path, {backup_period_hours: 24}.to_json
+
+          expect(last_response.status).to eq(200)
+          timeline.reload
+          expect([timeline.backup_period_hours, timeline.backup_window_start_at, timeline.backup_retention_days]).to eq([24, 3, 14])
+        end
+
+        it "clears the start hour when it is null" do
+          pg.timeline.update(backup_window_start_at: 3)
+
+          post path, {backup_window_start_at: nil}.to_json
+          expect(last_response.status).to eq(200)
+          expect(pg.timeline.reload.backup_window_start_at).to be_nil
+        end
+
+        it "refreshes the lifecycle policy only when retention or period changes" do
+          semaphores = Semaphore.where(strand_id: pg.timeline.id, name: "refresh_lifecycle_policy")
+          post path, {backup_retention_days: 7, backup_period_hours: 24, backup_window_start_at: 5}.to_json
+          expect(last_response.status).to eq(200)
+          expect(semaphores.count).to eq(0)
+
+          post path, {backup_retention_days: 20}.to_json
+          expect(last_response.status).to eq(200)
+          expect(semaphores.count).to eq(1)
+        end
+
+        it "rejects invalid values" do
+          [
+            {backup_window_start_at: 24},
+            {backup_period_hours: 0},
+            {backup_period_hours: 169},
+            {backup_retention_days: 36},
+          ].each do |params|
+            post path, params.to_json
+
+            expect(last_response.status).to eq(400)
+            expect(JSON.parse(last_response.body)["error"]["type"]).to eq("InvalidRequest")
+          end
+          expect(pg.timeline.reload.backup_period_hours).to eq(24)
+        end
+
+        it "rejects databases that are not primary" do
+          pg.representative_server.update(timeline_access: "fetch")
+
+          post path, {backup_retention_days: 20}.to_json
+
+          expect(last_response).to have_api_error(400, "Backup schedule can only be set on the primary database.")
+          expect(pg.timeline.reload.backup_retention_days).to eq(7)
+        end
       end
 
       it "invalid payment" do

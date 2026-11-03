@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :private_connection_string, :primary, :firewall_rules, :metric_destinations, :log_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :private_connection_string, :primary, :firewall_rules, :metric_destinations, :log_destinations, :tags, :maintenance_window_start_at, :backup_period_hours, :backup_window_start_at, :backup_retention_days, :latest_backup_started_at, :next_backup_at, :read_replica, :parent, :read_replicas
 
     def self._convert_tags_in_params_from_hash_to_array(params)
       if params[:tags]
@@ -176,6 +176,18 @@ module Ubicloud
         params[:maintenance_window_days] = days
       end
       merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
+    end
+
+    # Set the backup schedule. period_hours is the number of hours between
+    # backups (1-168), start_hour is the UTC hour (0-23) a backup slot opens
+    # (nil for rolling backups), and retention_days is the point-in-time
+    # recovery window in days (1-35). Omitted arguments are left unchanged.
+    def set_backup_schedule(period_hours: nil, start_hour: :unchanged, retention_days: nil)
+      params = {}
+      params[:backup_period_hours] = period_hours if period_hours
+      params[:backup_window_start_at] = start_hour unless start_hour == :unchanged
+      params[:backup_retention_days] = retention_days if retention_days
+      merge_into_values(adapter.post(_path("/set-backup-schedule"), params))
     end
 
     # Request primary to be recycled.

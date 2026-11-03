@@ -588,7 +588,42 @@ class Clover
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
-          flash["notice"] = "Maintenance window is #{"un" unless pg.maintenance_window_start_at}set"
+          flash["notice"] = ["Maintenance window is #{"un" unless pg.maintenance_window_start_at}set", backup_maintenance_overlap_warning(pg)].compact.join(". ")
+          r.redirect pg, "/settings"
+        end
+      end
+
+      r.post "set-backup-schedule" do
+        authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "settings" }
+
+        unless pg.representative_server.primary?
+          raise CloverError.new(400, "InvalidRequest", "Backup schedule can only be set on the primary database.")
+        end
+
+        update_params = {}
+        %w[backup_period_hours backup_retention_days].each do |name|
+          if (value = typecast_params.int(name))
+            update_params[name.to_sym] = value
+          end
+        end
+        if r.POST.key?("backup_window_start_at")
+          update_params[:backup_window_start_at] = typecast_params.int("backup_window_start_at")
+        end
+
+        timeline = pg.timeline
+        # The bucket expiration depends on both the retention and the period.
+        expiration_changed = %i[backup_retention_days backup_period_hours].any? { update_params.fetch(it, timeline[it]) != timeline[it] }
+        DB.transaction do
+          timeline.update(update_params)
+          timeline.incr_refresh_lifecycle_policy if expiration_changed
+          audit_log(pg, "set_backup_schedule")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = ["Backup schedule is updated", backup_maintenance_overlap_warning(pg)].compact.join(". ")
           r.redirect pg, "/settings"
         end
       end
