@@ -109,5 +109,19 @@ RSpec.describe Prog::Postgres::PostgresLockout do
       expect(ec2_client).to receive(:detach_network_interface).with(attachment_id: "eni-attach-123", force: true).and_call_original
       expect { aws_nx.lockout_with_detach_nic }.not_to raise_error
     end
+
+    it "exits with lockout_succeeded without detaching an already detached ENI" do
+      refresh_frame(aws_nx, new_frame: {"mechanism" => "detach_nic"})
+      ec2_client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-abc"}])
+      expect(ec2_client).not_to receive(:detach_network_interface)
+      expect { aws_nx.start }.to exit({"msg" => "lockout_succeeded"})
+    end
+
+    it "exits with lockout_succeeded without detaching an ENI that is being detached" do
+      refresh_frame(aws_nx, new_frame: {"mechanism" => "detach_nic"})
+      ec2_client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-abc", attachment: {attachment_id: "eni-attach-123", status: "detaching"}}])
+      expect(ec2_client).not_to receive(:detach_network_interface)
+      expect { aws_nx.start }.to exit({"msg" => "lockout_succeeded"})
+    end
   end
 end

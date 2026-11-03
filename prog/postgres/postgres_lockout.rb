@@ -37,12 +37,11 @@ class Prog::Postgres::PostgresLockout < Prog::Base
 
   def lockout_with_detach_nic
     client = postgres_server.vm.location.location_credential_aws.client
-    network_interface = client.describe_network_interfaces(
+    attachment = client.describe_network_interfaces(
       network_interface_ids: [postgres_server.vm.user_nic.nic_aws_resource.network_interface_id],
-    ).network_interfaces.first
-    client.detach_network_interface(
-      attachment_id: network_interface.attachment.attachment_id,
-      force: true,
-    )
+    ).network_interfaces.first.attachment
+    return if attachment.nil? || %w[detaching detached].include?(attachment.status)
+
+    client.detach_network_interface(attachment_id: attachment.attachment_id, force: true)
   end
 end
