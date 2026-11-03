@@ -4,7 +4,6 @@ require_relative "../model"
 
 # Each port is its own target group and listener on the service's NLB.
 class PrivateLinkServicePortAwsResource < Sequel::Model
-  many_to_one :private_link_service_port, key: :id, read_only: true
 end
 
 # Table: private_link_service_port_aws_resource
