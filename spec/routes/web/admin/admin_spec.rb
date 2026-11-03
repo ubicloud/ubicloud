@@ -897,8 +897,8 @@ RSpec.describe CloverAdmin do
       ["VmVCpu", "32", "16"],
       ["GithubRunnerVCpu", "400", "0"],
       ["GithubRunnerVCpuArm", "100", "0"],
-      ["GithubRunnerVCpuAws", "500", "0"],
-      ["GithubRunnerVCpuArmAws", "500", "0"],
+      ["GithubRunnerVCpuAws", "128", "0"],
+      ["GithubRunnerVCpuArmAws", "128", "0"],
       ["PostgresVCpu", "128", "0"],
       ["KubernetesVCpu", "32", "0"],
       ["MachineImageVersion", "16", "0"],
@@ -3412,13 +3412,13 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link "Show arm64"
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "400", "500",
+      "TOTAL", "", "400", "128",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
-      "test-installation", "true", "400", "500",
+      "test-installation", "true", "400", "128",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",

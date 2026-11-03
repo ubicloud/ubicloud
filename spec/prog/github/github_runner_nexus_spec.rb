@@ -935,12 +935,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   describe "#wait_vm" do
     before { project.set_ff_early_jit_registration(true) }
 
-    context "when a large runner waits for metal capacity" do
+    context "when a runner waits for metal capacity" do
       before do
         project.set_ff_early_jit_registration(false)
-        project.set_ff_spill_to_alien_runners(true)
         runner.update(label: "ubicloud-standard-16")
-        vm.update(allocated_at: nil, provisioned_at: nil, created_at: now - 61)
+        vm.update(allocated_at: nil, provisioned_at: nil, created_at: now - 46)
         Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "start")
         vm.incr_waiting_for_capacity
       end
@@ -969,8 +968,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.reload.spill_over_set?).to be(true)
       end
 
-      it "does not spill over smaller runners" do
+      it "spills over small runners" do
         runner.update(label: "ubicloud-standard-2")
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.spill_over_set?).to be(true)
+      end
+
+      it "spills over small arm64 runners" do
+        runner.update(label: "ubicloud-standard-2-arm")
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.spill_over_set?).to be(true)
+      end
+
+      it "does not spill over 60 vCPU runners" do
+        runner.update(label: "ubicloud-standard-60")
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
       end
@@ -994,13 +1005,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "does not spill over if the vm has not waited enough" do
-        vm.update(created_at: now - 59)
-        expect { nx.wait_vm }.to nap(10)
-        expect(runner.spill_over_set?).to be(false)
-      end
-
-      it "does not spill over if the feature flag is disabled" do
-        project.set_ff_spill_to_alien_runners(false)
+        vm.update(created_at: now - 45)
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
       end
@@ -1016,7 +1021,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
         expect(Config).to receive(:github_runner_aws_location_id).at_least(:once).and_return(location.id)
         aws_vm = create_vm(location_id: location.id)
-        aws_runner = GithubRunner.create(installation_id: installation.id, vm_id: aws_vm.id, location_id: location.id, repository_name: "test-repo", label: "ubicloud-standard-2")
+        aws_runner = GithubRunner.create(installation_id: installation.id, vm_id: aws_vm.id, location_id: location.id, repository_name: "test-repo", label: "ubicloud-standard-30")
         Strand.create_with_id(aws_runner, prog: "Github::GithubRunnerNexus", label: "wait")
 
         expect { nx.wait_vm }.to nap(10)
