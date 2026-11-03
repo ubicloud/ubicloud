@@ -124,6 +124,31 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "No workflow job data available")
       end
 
+      it "fails without reserving if the cache scope is for a run with an unknown pull request" do
+        workflow_run.update(cache_scope: "refs/pull/unknown-run-111/merge")
+        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
+        expect(Github).not_to receive(:installation_client)
+        expect(blob_storage_client).not_to receive(:create_multipart_upload)
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(400, "This cache could not be used by another run")
+        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-111/merge")
+        expect(repository.cache_entries_dataset.count).to eq(0)
+      end
+
+      it "reserves cache if the cache scope is for a run with a known pull request" do
+        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
+        workflow_run
+        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
+        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response.status).to eq(200)
+        expect(repository.cache_entries_dataset.select_map(:scope)).to eq(["refs/pull/7/merge"])
+      end
+
       it "fails if cache is bigger than 10GB" do
         runner.update(cache_scope: runner.head_branch)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 11 * 1024 * 1024 * 1024}
@@ -241,32 +266,32 @@ RSpec.describe Clover, "github" do
         expect(repository.cache_entries.first.scope).to eq("refs/pull/42/merge")
       end
 
-      it "uses a pull-request scope when the head repository is a fork, even without an explicit pull_request event" do
+      it "uses an unknown-run pull-request scope and does not reserve cache when the head repository is a fork, even without an explicit pull_request event" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
         expect(client).to receive(:workflow_run).and_return({event: "workflow_run", head_repository: {full_name: "other/test"}, pull_requests: []})
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
+        expect(blob_storage_client).not_to receive(:create_multipart_upload)
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("refs/pull/unknown-run-555/merge")
+        expect(last_response).to have_runtime_error(400, "This cache could not be used by another run")
+        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-555/merge")
+        expect(repository.cache_entries_dataset.count).to eq(0)
       end
 
-      it "uses a pull-request scope based on the run id when the workflow run has no pull request information" do
+      it "uses an unknown-run pull-request scope and does not reserve cache when the workflow run has no pull request information" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
         expect(client).to receive(:workflow_run).and_return({event: "pull_request", head_repository: {full_name: "other/test"}})
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
+        expect(blob_storage_client).not_to receive(:create_multipart_upload)
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("refs/pull/unknown-run-555/merge")
+        expect(last_response).to have_runtime_error(400, "This cache could not be used by another run")
+        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-555/merge")
+        expect(repository.cache_entries_dataset.count).to eq(0)
       end
 
       it "keeps the head branch as scope for a same-repository, non pull_request run" do
