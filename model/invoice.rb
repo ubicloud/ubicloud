@@ -84,10 +84,12 @@ class Invoice < Sequel::Model
 
   def after_destroy
     super
-    begin
-      Invoice.blob_storage_client.delete_object(bucket: Config.invoices_bucket_name, key: blob_key)
-    rescue Aws::S3::Errors::NoSuchKey
-    end
+    delete_pdf
+  end
+
+  def delete_pdf
+    Invoice.blob_storage_client.delete_object(bucket: Config.invoices_bucket_name, key: blob_key)
+  rescue Aws::S3::Errors::NoSuchKey
   end
 
   def name

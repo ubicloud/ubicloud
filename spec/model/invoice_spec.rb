@@ -227,14 +227,23 @@ RSpec.describe Invoice do
   end
 
   describe ".after_destroy" do
-    it "deletes the invoice" do
+    it "deletes the invoice PDF" do
       expect(client).to receive(:delete_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key)
       invoice.destroy
+      expect(invoice).not_to exist
+    end
+  end
+
+  describe ".delete_pdf" do
+    it "deletes only the invoice PDF" do
+      expect(client).to receive(:delete_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key)
+      invoice.delete_pdf
+      expect(invoice).to exist
     end
 
-    it "ignores if the invoice already deleted" do
+    it "ignores if the invoice PDF already deleted" do
       expect(client).to receive(:delete_object).and_raise(Aws::S3::Errors::NoSuchKey.new(nil, nil))
-      invoice.destroy
+      invoice.delete_pdf
     end
   end
 
