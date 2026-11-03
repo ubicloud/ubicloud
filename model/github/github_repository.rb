@@ -231,4 +231,5 @@ end
 # Referenced By:
 #  github_active_workflow_run | github_active_workflow_run_repository_id_fkey | (repository_id) REFERENCES github_repository(id)
 #  github_cache_entry         | github_cache_entry_repository_id_fkey         | (repository_id) REFERENCES github_repository(id)
+#  github_error_notification  | github_error_notification_repository_id_fkey  | (repository_id) REFERENCES github_repository(id) ON DELETE CASCADE
 #  github_runner              | github_runner_repository_id_fkey              | (repository_id) REFERENCES github_repository(id)
