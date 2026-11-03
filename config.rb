@@ -182,7 +182,7 @@ module Config
   override :spdk_version, "v23.09-ubi-0.3", string
 
   # Vhost Block Backend
-  override :vhost_block_backend_version, "v0.4.2", string
+  override :vhost_block_backend_version, "v0.6.0", string
 
   # Rotate a storage volume's key-encryption key once it reaches this age.
   override :storage_kek_rotation_interval_days, 700, int
