@@ -636,6 +636,14 @@ class CloverAdmin < Roda
         end
       end
 
+      action "regenerate_pdf", "Regenerate PDF" do
+        flash "Invoice PDF regenerated"
+        run do |obj|
+          obj.delete_pdf
+          obj.persist(obj.generate_pdf)
+        end
+      end
+
       action "charge", "Charge" do
         flash "Invoice charged"
         pass_request!
