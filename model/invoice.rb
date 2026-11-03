@@ -418,7 +418,10 @@ end
 #  begin_time     | timestamp with time zone | NOT NULL
 #  end_time       | timestamp with time zone | NOT NULL
 #  status         | text                     | NOT NULL DEFAULT 'unpaid'::text
+#  kind           | text                     | NOT NULL DEFAULT 'usage'::text
 # Indexes:
 #  invoice_pkey             | PRIMARY KEY btree (id)
 #  invoice_project_id_index | btree (project_id)
 #  invoice_status_index     | btree (status)
+# Check constraints:
+#  invoice_kind_check | (kind = ANY (ARRAY['usage'::text, 'prepaid_credit'::text]))
