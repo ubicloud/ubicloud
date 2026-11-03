@@ -116,6 +116,7 @@ RSpec.describe Project do
         .and change(SubjectTag, :count).from(1).to(0)
         .and change(AccessControlEntry, :count).from(1).to(0)
         .and change { project.reload.visible }.from(true).to(false)
+        .and change { GithubInstallation.with_github_installation_id(123) }.from(github_installation).to(nil)
     end
   end
 

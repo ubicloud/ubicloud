@@ -61,8 +61,14 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
   end
 
   describe ".assemble" do
-    it "creates a strand" do
+    it "backdates the installation so webhooks no longer find it" do
+      github_installation
+      expect(GithubInstallation.with_github_installation_id(123)).to eq(github_installation)
       expect { described_class.assemble(github_installation) }.to change(Strand, :count).by(1)
+      expect(Strand.first(prog: "Github::DestroyGithubInstallation").schedule).to be_within(5).of(Time.now + 35)
+
+      expect(github_installation.reload.created_at).to be < GithubInstallation::CREATED_AT_CUTOFF
+      expect(GithubInstallation.with_github_installation_id(123)).to be_nil
     end
   end
 
