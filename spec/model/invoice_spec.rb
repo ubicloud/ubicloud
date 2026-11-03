@@ -139,6 +139,7 @@ RSpec.describe Invoice do
       expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.", instance_of(Hash)).and_call_original
       expect(invoice.charge).to be false
       expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(invoice.reload.content["failed_charge_attempts"].length).to eq 1
     end
 
     it "fails if PaymentIntent does not raise an exception in case of failure" do
@@ -147,11 +148,15 @@ RSpec.describe Invoice do
 
       # rubocop:disable RSpec/VerifiedDoubles
       expect(payment_intents_service).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method.stripe_id))
-        .and_return(double(Stripe::PaymentIntent, id: "payment-intent-id", status: "failed"))
+        .and_return(double(Stripe::PaymentIntent, id: "payment-intent-id", status: "failed")).twice
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(Clog).to receive(:emit).with("BUG: payment intent should succeed here", instance_of(Hash)).and_call_original
-      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("BUG: payment intent should succeed here", instance_of(Hash)).and_call_original.twice
+      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.", instance_of(Hash)).and_call_original.twice
       expect(invoice.charge).to be false
+      expect(invoice.charge).to be false
+      attempts = invoice.reload.content["failed_charge_attempts"]
+      expect(attempts.length).to eq 2
+      expect(attempts.map { Time.parse(it) }).to all(be_within(60).of(Time.now))
     end
 
     it "can charge from a correct payment method even some of them are not working" do
