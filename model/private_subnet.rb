@@ -196,7 +196,7 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  net6              | cidr                     | NOT NULL
-#  net4              | cidr                     | NOT NULL
+#  net4              | cidr                     |
 #  state             | text                     | NOT NULL DEFAULT 'creating'::text
 #  name              | text                     | NOT NULL
 #  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
