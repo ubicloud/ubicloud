@@ -40,6 +40,48 @@ RSpec.describe GithubRepository do
     end
   end
 
+  describe "#update_extra_cache_storage_gib" do
+    it "bills the extra storage" do
+      github_repository.update_extra_cache_storage_gib(300)
+      expect(github_repository.reload.extra_cache_storage_gib).to eq(300)
+      record = github_repository.active_billing_record
+      expect(record.project_id).to eq(github_repository.installation.project_id)
+      expect(record.resource_name).to eq("test-owner/test")
+      expect(record.billing_rate_id).to eq(BillingRate.from_resource_properties("GitHubCacheStorage", "standard", "global")["id"])
+      expect(record.amount).to eq(300)
+      expect(record.span.unbounded_end?).to be(true)
+    end
+
+    it "finalizes the previous billing record and opens a new one" do
+      other_repository = described_class.create(name: "test-owner/other", installation: github_repository.installation)
+      other_repository.update_extra_cache_storage_gib(50)
+      github_repository.update_extra_cache_storage_gib(300)
+      previous = github_repository.reload.active_billing_record
+      previous.update(span: Sequel.pg_range((Time.now - 60 * 60)..nil))
+      github_repository.reload.update_extra_cache_storage_gib(400)
+      expect(previous.reload.span.unbounded_end?).to be(false)
+      expect(github_repository.reload.active_billing_record.amount).to eq(400)
+      expect(other_repository.reload.active_billing_record.span.unbounded_end?).to be(true)
+    end
+
+    it "finalizes the billing record when the extra storage is removed" do
+      github_repository.update_extra_cache_storage_gib(300)
+      record = github_repository.reload.active_billing_record
+      record.update(span: Sequel.pg_range((Time.now - 60 * 60)..nil))
+      github_repository.reload.update_extra_cache_storage_gib(nil)
+      expect(github_repository.reload.extra_cache_storage_gib).to be_nil
+      expect(record.reload.span.unbounded_end?).to be(false)
+      expect(github_repository.active_billing_record).to be_nil
+    end
+
+    it "does not bill a non-billable project" do
+      github_repository.installation.project.update(billable: false)
+      github_repository.update_extra_cache_storage_gib(300)
+      expect(github_repository.reload.extra_cache_storage_gib).to eq(300)
+      expect(github_repository.active_billing_record).to be_nil
+    end
+  end
+
   describe ".destroy_blob_storage" do
     let(:uploads) { instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: [instance_double(Aws::S3::Types::MultipartUpload, key: "test-key", upload_id: "test-upload-id")]) }
 

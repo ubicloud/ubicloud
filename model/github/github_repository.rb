@@ -9,6 +9,7 @@ class GithubRepository < Sequel::Model
   many_to_one :installation, class: :GithubInstallation
   one_to_many :runners, key: :repository_id, class: :GithubRunner, read_only: true
   one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry, remover: nil, clearer: nil
+  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, read_only: true, &:active
 
   plugin :association_dependencies, cache_entries: :destroy
 
@@ -30,6 +31,26 @@ class GithubRepository < Sequel::Model
 
   def cache_storage_gib
     installation.cache_storage_gib + (extra_cache_storage_gib || 0)
+  end
+
+  def update_extra_cache_storage_gib(gib)
+    DB.transaction do
+      update(extra_cache_storage_gib: gib)
+
+      project = installation.project
+      if project.billable
+        active_billing_record&.finalize
+        if gib
+          BillingRecord.create(
+            project_id: project.id,
+            resource_id: id,
+            resource_name: name,
+            billing_rate_id: BillingRate.from_resource_properties("GitHubCacheStorage", "standard", "global")["id"],
+            amount: gib,
+          )
+        end
+      end
+    end
   end
 
   def blob_storage_client

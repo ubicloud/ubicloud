@@ -595,6 +595,21 @@ class CloverAdmin < Roda
         run(&github_page_run)
       end
 
+      action "set_extra_cache_storage", "Set Extra Cache Storage" do
+        flash "Set extra cache storage"
+        param :extra_cache_storage_gib,
+          typecast: :pos_int,
+          type: "number",
+          label: "Extra cache storage (GiB), billed in full",
+          placeholder: ->(obj) { "GiB on top of the #{obj.installation.cache_storage_gib} GiB default, blank for none" },
+          required: nil,
+          value: :extra_cache_storage_gib.to_proc,
+          attr: {min: 1}
+        run do |obj, extra_cache_storage_gib|
+          obj.update_extra_cache_storage_gib(extra_cache_storage_gib)
+        end
+      end
+
       action "show_job_log", "Show Job Log" do
         type :content
         param :job_ids, typecast: :nonempty_str!, label: "Job IDs (comma-separated)"

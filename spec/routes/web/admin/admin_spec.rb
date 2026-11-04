@@ -2045,6 +2045,29 @@ RSpec.describe CloverAdmin do
     expect(repository.reload.semaphores.map(&:name)).to eq ["reset_blob_storage"]
   end
 
+  it "supports setting extra cache storage for GithubRepository" do
+    project = Project.create(name: "test")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization", project_id: project.id)
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    visit "/model/GithubRepository/#{repo.ubid}"
+    click_link "Set Extra Cache Storage"
+    expect(page).to have_field("extra_cache_storage_gib", placeholder: "GiB on top of the 100 GiB default, blank for none")
+    fill_in "extra_cache_storage_gib", with: "300"
+    click_button "Set Extra Cache Storage"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+    expect(page).to have_flash_notice "Set extra cache storage"
+    expect(repo.reload.extra_cache_storage_gib).to eq 300
+    expect(repo.active_billing_record.amount).to eq 300
+
+    click_link "Set Extra Cache Storage"
+    expect(page).to have_field("extra_cache_storage_gib", with: "300")
+    fill_in "extra_cache_storage_gib", with: ""
+    click_button "Set Extra Cache Storage"
+    expect(page).to have_flash_notice "Set extra cache storage"
+    expect(repo.reload.extra_cache_storage_gib).to be_nil
+  end
+
   it "links to GitHub page for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
