@@ -218,6 +218,7 @@ module Config
   override :gcp_postgres_iam_access, false, bool
   override :gcp_postgres_dual_nic, false, bool
   override :gcp_postgres_mgmt_ipv6_only, false, bool
+  override :gcp_postgres_mgmt_ipv6_only_external, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
 
   # Logging
