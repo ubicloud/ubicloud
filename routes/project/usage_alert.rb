@@ -25,10 +25,22 @@ class Clover
 
         notice_action = action = nil
         DB.transaction do
-          ua = UsageAlert.find_or_new({project_id: @project.id, user_id: current_account_id, name: "-", cutoff: true}, limit:)
+          ua = UsageAlert.find_or_new(project_id: @project.id, user_id: current_account_id, name: "-", cutoff: true)
+          old_limit = ua.limit
+          ua.limit = limit
           is_new = ua.new?
 
           if limit
+            if !is_new && limit > old_limit && @project.cutoff?
+              now = Time.now.utc
+              content = @project.current_invoice(since: Time.utc(now.year, now.month)).content
+              cost = content["subtotal"] - content["discount"]
+              if cost < limit
+                @project.this.update(cutoff_at: nil)
+                ua.last_triggered_at = now - 60 * 60 * 24 * 42
+              end
+            end
+
             ua.save_changes
             action = is_new ? "create" : "update"
             notice_action = "#{action.capitalize}d"
@@ -38,6 +50,7 @@ class Clover
             action = "destroy"
             notice_action = "Removed"
             audit_log(ua, action)
+            @project.this.update(cutoff_at: nil) if @project.cutoff?
           else
             no_audit_log
             r.redirect billing_path
