@@ -60,6 +60,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         name: gcp_vpc.name,
         description: "Ubicloud VPC network for #{gcp_vpc.name} [Ubicloud=#{Config.provider_resource_tag_value}]",
         auto_create_subnetworks: false,
+        enable_ula_internal_ipv6: (true if gcp_vpc.is_management && gcp_vpc.dedicated_for_private_subnet.net4.nil?),
         routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
           routing_mode: "REGIONAL",
         ),
