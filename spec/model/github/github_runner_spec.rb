@@ -152,7 +152,30 @@ RSpec.describe GithubRunner do
     expect(spare_runner.installation_id).to eq(github_runner.installation_id)
     expect(spare_runner.repository_name).to eq(github_runner.repository_name)
     expect(spare_runner.label).to eq(github_runner.label)
+    expect(spare_runner.actual_label).to eq("ubicloud")
     expect(github_runner.spare_runner_provisioned_set?(cached: false)).to be(true)
+  end
+
+  [false, true].each do |force|
+    it "preserves the custom label when provisioning a spare with force=#{force}" do
+      custom_label = GithubCustomLabel.create(installation_id: github_runner.installation_id, name: "custom-build", alias_for: "ubicloud")
+      github_runner.update(actual_label: custom_label.name)
+      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+      github_runner.incr_spare_runner_provisioned if force
+
+      spare_runner = github_runner.provision_spare_runner(force:)
+
+      expect(spare_runner.label).to eq("ubicloud")
+      expect(spare_runner.actual_label).to eq("custom-build")
+      expect(spare_runner.custom_label).to eq(custom_label)
+    end
+  end
+
+  it "preserves a predefined label when provisioning a spare" do
+    github_runner.update(actual_label: "ubicloud")
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+
+    expect(github_runner.provision_spare_runner.actual_label).to eq("ubicloud")
   end
 
   it "does not provision another spare runner once one has been provisioned" do
