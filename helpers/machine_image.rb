@@ -80,6 +80,7 @@ class Clover
 
   def machine_image_version_post(mi, version)
     authorize("MachineImage:edit", mi)
+    check_cutoff
     if version && mi.versions_dataset.first(version:)
       raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
     end
@@ -125,6 +126,7 @@ class Clover
   def machine_image_post(name)
     check_visible_location
     authorize("MachineImage:create", @project)
+    check_cutoff
     Validation.validate_name(name)
 
     if @project.machine_images_dataset.first(location_id: @location.id, name:)

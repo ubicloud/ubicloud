@@ -151,6 +151,16 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
     end
 
+    it "does not create runner if project has hit spending cutoff" do
+      billing_info_id = BillingInfo.create(stripe_id: "0").id
+      installation.project.update(billing_info_id:, cutoff_at: Time.now)
+      send_webhook("workflow_job", workflow_job_payload(action: "queued"))
+
+      expect(page.status_code).to eq(200)
+      expect(GithubRunner.first(installation_id: installation.id)).to be_nil
+      expect(page.body).to eq({error: {code: 400, type: "InvalidRequest", message: "This project has been cut off from additional spending."}}.to_json)
+    end
+
     it "does not create runner if there is no billing info" do
       expect(Clog).to receive(:emit).with("Github runner queue request without billing info", {github_runner_billing_info_missing: {installation_id: installation.id}}).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))

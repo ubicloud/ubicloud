@@ -809,6 +809,22 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_flash_error("project_id and location_id and name is already taken")
       end
 
+      it "cannot create virtual machine if project has hit spending cutoff" do
+        cutoff_project(project)
+        visit "#{project.path}/vm/create"
+
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect_cutoff_redirect(project)
+        expect(Vm.count).to eq 0
+      end
+
       it "can not create virtual machine if project has no valid payment method" do
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).twice
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)

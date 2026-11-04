@@ -131,6 +131,21 @@ RSpec.describe Clover, "postgres" do
         expect(page.html).to include("$#{"%.2f" % (3000 * rate["unit_price"].to_f * 60 * 672)}/mo")
       end
 
+      it "cannot create new PostgreSQL database if project has hit spending cutoff" do
+        cutoff_project(project)
+        visit "#{project.path}/postgres/create"
+
+        fill_in "Name", with: "new-pg-db"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+
+        click_button "Create"
+
+        expect_cutoff_redirect(project)
+        expect(PostgresResource.count).to eq(0)
+      end
+
       it "can create new PostgreSQL database in a custom AWS region" do
         project.set_ff_private_locations(true)
         private_location = create_private_location(project:)
@@ -591,6 +606,17 @@ RSpec.describe Clover, "postgres" do
         POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
+      it "cannot update PostgreSQL instance size configuration if project has hit spending cutoff" do
+        visit "#{project.path}#{pg.path}/resize"
+        cutoff_project(project)
+
+        choose option: "standard-8"
+        click_button "Update"
+
+        expect_cutoff_redirect(project)
+        expect(pg.reload.target_vm_size).to eq("standard-2")
+      end
+
       it "disables the storage sizes that cannot hold the data in use" do
         POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 60, observed_at: Time.now)
         visit "#{project.path}#{pg.path}/resize"
@@ -679,6 +705,22 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'restored-server' will be ready in a few minutes")
       end
 
+      it "cannot restore PostgreSQL database if project has hit spending cutoff" do
+        create_minio_cluster_for_blob_storage
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
+        visit "#{project.path}#{pg.path}/backup-restore"
+        cutoff_project(project)
+        fill_in "#{pg.name}-fork", with: "restored-server"
+        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: :all
+        click_button "Fork"
+
+        expect_cutoff_redirect(project)
+        expect(PostgresResource[name: "restored-server"]).to be_nil
+      end
+
       it "shows proper message when there is no backups to restore" do
         create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
@@ -737,6 +779,18 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content("my-read-replica")
+      end
+
+      it "cannot create a read replica if project has hit spending cutoff" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
+        visit "#{project.path}#{pg.path}/read-replica"
+        cutoff_project(project)
+
+        fill_in "#{pg.name}-read-replica", with: "my-read-replica"
+        find(".pg-read-replica-create-btn").click
+
+        expect_cutoff_redirect(project)
+        expect(PostgresResource[name: "my-read-replica"]).to be_nil
       end
 
       it "cannot create a read replica if there is no backup, yet" do
