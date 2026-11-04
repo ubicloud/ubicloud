@@ -15,14 +15,14 @@ RSpec.describe VmStorageVolume do
     end
 
     it "is true for a github image that joins the layers itself" do
-      expect(volume_for("github-ubuntu-2404", "20261103.1.0").two_layer_boot?).to be(true)
+      expect(volume_for("github-ubuntu-2404", "20261108.1.2").two_layer_boot?).to be(true)
       expect(volume_for("github-ubuntu-2404", "20261201.1.0").two_layer_boot?).to be(true)
     end
 
     it "is false for older images, other images and data volumes" do
       expect(volume_for("github-ubuntu-2404", "20261021.1.0").two_layer_boot?).to be(false)
-      expect(volume_for("ubuntu-noble", "20261103.1.0").two_layer_boot?).to be(false)
-      expect(volume_for("github-ubuntu-2404", "20261103.1.0", boot: false).two_layer_boot?).to be(false)
+      expect(volume_for("ubuntu-noble", "20261108.1.2").two_layer_boot?).to be(false)
+      expect(volume_for("github-ubuntu-2404", "20261108.1.2", boot: false).two_layer_boot?).to be(false)
       expect(described_class.new(boot: true)).not_to be_two_layer_boot
     end
   end

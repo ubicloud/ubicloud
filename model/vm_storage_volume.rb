@@ -16,7 +16,7 @@ class VmStorageVolume < Sequel::Model
 
   # From this version the GitHub runner images carry an init that mounts the
   # image read-only and joins it with a blank device.
-  TWO_LAYER_IMAGE_VERSION = "20261103.1.0"
+  TWO_LAYER_IMAGE_VERSION = "20261108.1.2"
 
   def two_layer_boot?
     boot && boot_image&.name&.start_with?("github-") && boot_image.version >= TWO_LAYER_IMAGE_VERSION
