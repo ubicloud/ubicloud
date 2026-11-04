@@ -161,4 +161,104 @@ RSpec.describe Prog::Vnet::VpcPeeringNexus do
         .and not_change { peering_rows }
     end
   end
+
+  describe ".assemble in a GCP location" do
+    let(:location) { Location[name: "gcp-us-central1"] }
+    let(:ps) { gcp_subnet("test-ps") }
+
+    before { gcp_credential(location, "ubicloud-test") }
+
+    def gcp_credential(location, project_id)
+      LocationCredentialGcp.create_with_id(location, project_id:, service_account_email: "test@#{project_id}.iam.gserviceaccount.com", credentials_json: "{}")
+    end
+
+    def gcp_subnet(name, location: self.location, project_id: project.id, dedicated: true, is_management: false)
+      Prog::Vnet::SubnetNexus.assemble(project_id, name:, location_id: location.id).subject.tap {
+        Prog::Vnet::Gcp::VpcNexus.assemble(project_id, location.id, dedicated_for_subnet_id: (it.id if dedicated), is_management:).subject.add_private_subnet(it)
+      }
+    end
+
+    def gcp_assemble(network, peer_project: "customer-project", private_subnet: ps)
+      described_class.assemble(private_subnet, peer_account_id: peer_project, peer_vpc_id: "projects/#{peer_project}/global/networks/#{network}")
+    end
+
+    def gcp_peering_rows
+      [VpcPeering.count, VpcPeeringGcpResource.count, Strand.where(prog: "Vnet::Gcp::VpcPeeringNexus").count]
+    end
+
+    it "creates the peering, its GCP row named after it and a strand at start, and returns the strand" do
+      st = gcp_assemble("customer-vpc")
+      expect(st).to have_attributes(prog: "Vnet::Gcp::VpcPeeringNexus", label: "start")
+      vp = VpcPeering[st.id]
+      expect(vp).to have_attributes(private_subnet_id: ps.id, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/customer-vpc", state: "creating", state_message: nil, peer_cidrs: [])
+      expect(vp.vpc_peering_gcp_resource.peering_name).to eq "ubicloud-#{vp.ubid}"
+    end
+
+    it "refuses a private subnet without a VPC network of its own" do
+      subnets = [
+        gcp_subnet("shared-ps", dedicated: false),
+        gcp_subnet("mgmt-ps", is_management: true),
+        Prog::Vnet::SubnetNexus.assemble(project.id, name: "new-ps", location_id: location.id).subject,
+      ]
+      subnets.each do |subnet|
+        expect { gcp_assemble("customer-vpc", private_subnet: subnet) }.to raise_error(CloverError, "Private subnet '#{subnet.name}' does not have its own VPC network, so it cannot be peered.")
+          .and not_change { gcp_peering_rows }
+      end
+    end
+
+    it "refuses a network path outside the peer project, and a bare network name" do
+      %w[projects/other-project/global/networks/customer-vpc customer-vpc].each do |peer_vpc_id|
+        expect { described_class.assemble(ps, peer_account_id: "customer-project", peer_vpc_id:) }.to raise_error(Validation::ValidationFailed) { |ex|
+          expect(ex.details).to eq(peer_vpc_id: "#{peer_vpc_id} is not a VPC network in GCP project customer-project.")
+        }.and not_change { gcp_peering_rows }
+      end
+    end
+
+    it "refuses the GCP project of any Ubicloud-managed location" do
+      gcp_credential(Location[name: "gcp-us-east4"], "ubicloud-other")
+      %w[ubicloud-test ubicloud-other].each do |peer_project|
+        expect { gcp_assemble("default", peer_project:) }.to raise_error(Validation::ValidationFailed) { |ex|
+          expect(ex.details).to eq(peer_account_id: "#{peer_project} is Ubicloud's GCP project. Enter the ID of the GCP project that owns your VPC network.")
+        }.and not_change { gcp_peering_rows }
+      end
+    end
+
+    it "allows the location's own GCP project when a project owns the location" do
+      owned = Location.create(name: "gcp-us-west1", provider: "gcp", project_id: project.id, display_name: "gcp-us-west1", ui_name: "gcp-us-west1", visible: true)
+      gcp_credential(owned, "owned-project")
+      owned_ps = gcp_subnet("owned-ps", location: owned)
+      expect { gcp_assemble("customer-vpc", peer_project: "owned-project", private_subnet: owned_ps) }.to change { owned_ps.vpc_peerings_dataset.count }.from(0).to(1)
+    end
+
+    it "refuses a Ubicloud VPC network in any location backed by the peer project, and allows other networks" do
+      other_project = Project.create(name: "other-prj")
+      other_location = Location.create(name: "gcp-us-east4", provider: "gcp", project_id: other_project.id, display_name: "gcp-us-east4", ui_name: "gcp-us-east4", visible: true)
+      gcp_credential(other_location, "byoc-project")
+      vpc_name = Prog::Vnet::Gcp::VpcNexus.assemble(other_project.id, other_location.id).subject.name
+      expect { gcp_assemble(vpc_name, peer_project: "byoc-project") }.to raise_error(Validation::ValidationFailed) { |ex|
+        expect(ex.details).to eq(peer_vpc_id: "projects/byoc-project/global/networks/#{vpc_name} is a Ubicloud VPC network. Enter a VPC network in your own GCP project.")
+      }.and not_change { gcp_peering_rows }
+
+      expect {
+        gcp_assemble("customer-vpc", peer_project: "byoc-project")
+        gcp_assemble(vpc_name)
+      }.to change { ps.vpc_peerings_dataset.count }.from(0).to(2)
+    end
+
+    it "applies no location ceiling" do
+      other_ps = gcp_subnet("other-ps", project_id: Project.create(name: "other-prj").id)
+      20.times { VpcPeering.create(private_subnet_id: other_ps.id, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/vpc-#{it}", state: "waiting_for_peer") }
+      expect { gcp_assemble("customer-vpc") }.to change { ps.vpc_peerings_dataset.count }.from(0).to(1)
+    end
+
+    it "refuses a 6th peering that is not connected in a project and location, counting one whose customer side went missing" do
+      peerings = Array.new(5) { gcp_assemble("vpc-#{it}").subject }
+      peerings.first.update(state: "waiting_for_peer", state_message: "Your side of the peering in project customer-project is missing or inactive, so traffic does not flow.")
+      expect { gcp_assemble("customer-vpc") }.to raise_error(CloverError, "This project already has 5 VPC peerings that are not connected in us-central1. Create your side of one, or delete one first. If you just deleted one, wait until it disappears.")
+        .and not_change { gcp_peering_rows }
+
+      peerings[1].update(state: "active")
+      expect { gcp_assemble("customer-vpc") }.to change { ps.vpc_peerings_dataset.count }.from(5).to(6)
+    end
+  end
 end
