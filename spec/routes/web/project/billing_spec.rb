@@ -984,6 +984,71 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_no_content "The spending cutoff is checked every 5-10 minutes."
       end
 
+      it "clears project cutoff when increasing spending cutoff above current usage" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 100, cutoff: true, last_triggered_at: Time.now)
+        project.update(cutoff_at: Time.now)
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 200
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 200
+        now = Time.now.utc
+        expect(cutoff_alert.last_triggered_at).to be < Time.utc(now.year, now.month)
+        expect(project.reload.cutoff_at).to be_nil
+      end
+
+      it "does not clear project cutoff when current usage still exceeds limit after increase" do
+        last_triggered_at = Time.now.round
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 1, cutoff: true, last_triggered_at:)
+        cutoff_at = Time.now.round
+        project.update(cutoff_at:)
+        now = Time.now.utc
+        vm = create_vm(project_id: project.id)
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: vm.name,
+          span: Sequel::Postgres::PGRange.new(Time.utc(now.year, now.month), nil),
+          billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false)["id"],
+          amount: 10000,
+        )
+        content = project.current_invoice(since: Time.utc(now.year, now.month)).content
+        expect(content["subtotal"] - content["discount"]).to be >= 2
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 2
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 2
+        expect(cutoff_alert.last_triggered_at).to eq last_triggered_at
+        expect(project.reload.cutoff_at).to eq cutoff_at
+      end
+
+      it "does not clear project cutoff when decreasing spending cutoff" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 200, cutoff: true)
+        cutoff_at = Time.now.round
+        project.update(cutoff_at:)
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 100
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 100
+        expect(project.reload.cutoff_at).to eq cutoff_at
+      end
+
+      it "clears project cutoff when removing spending cutoff" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 100, cutoff: true)
+        project.update(cutoff_at: Time.now)
+
+        visit "#{project.path}/billing"
+        click_button "Remove Cutoff"
+        expect(page).to have_flash_notice "Removed spending cutoff"
+        expect(cutoff_alert.exists?).to be false
+        expect(project.reload.cutoff_at).to be_nil
+      end
+
       it "does nothing when submitting spending cutoff without limit if there is no current cutoff" do
         visit "#{project.path}/billing"
         fill_in "Cutoff Limit", with: ""
