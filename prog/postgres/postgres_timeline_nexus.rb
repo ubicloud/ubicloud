@@ -5,7 +5,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   BACKUP_CPU_WEIGHT = 25
 
-  def self.assemble(location_id:, parent_id: nil)
+  def self.assemble(location_id:, parent_id: nil, backup_schedule: nil)
     if parent_id && (parent = PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
@@ -15,7 +15,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
 
     DB.transaction do
-      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, backup_period_hours: parent&.backup_period_hours || 24)
+      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, **(backup_schedule || parent&.backup_schedule || {}))
       if postgres_timeline.generate_blob_storage_credentials?
         postgres_timeline.update(access_key: SecureRandom.hex(16), secret_key: SecureRandom.hex(32))
       end
@@ -28,9 +28,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
     return if postgres_timeline.created_at > Time.now - 6 * 60 * 60
 
+    warning_after = (postgres_timeline.backup_period_hours + 24) * 60 * 60
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
-    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
-      severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - 3 * 24 * 60 * 60) ? "error" : "warning"
+    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - warning_after)
+      severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - warning_after - 24 * 60 * 60) ? "error" : "warning"
       Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, resource_id: postgres_timeline.id, severity:)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
@@ -83,12 +84,23 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     hop_wait unless postgres_timeline.leader
 
     sshable = postgres_timeline.leader.vm.sshable
-    case sshable.d_check("take_postgres_backup")
+    status = sshable.d_check("take_postgres_backup")
+
+    if status == "Failed" && postgres_timeline.backup_window_start_at
+      Clog.emit("Backup failed, waiting for the next backup slot", postgres_timeline)
+      sshable.d_clean("take_postgres_backup")
+      hop_wait
+    end
+
+    case status
     when "Succeeded"
       sshable.d_clean("take_postgres_backup")
       decr_take_backup_for_converge
       hop_wait
     when "InProgress"
+      if postgres_timeline.latest_backup_started_at < Time.now - 90 * 60 * postgres_timeline.backup_period_hours
+        Clog.emit("Backup is taking longer than expected", postgres_timeline)
+      end
       nap 60
     else # "Failed", "NotStarted"
       size_gib = postgres_timeline.leader.data_disk_usage(raise_on_error: true).fdiv(1024 * 1024).ceil

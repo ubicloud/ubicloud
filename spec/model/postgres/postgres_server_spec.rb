@@ -1292,6 +1292,17 @@ RSpec.describe PostgresServer do
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
     end
 
+    it "carries the backup schedule over to the new timeline with or without a parent" do
+      timeline.update(backup_window_start_at: 4, backup_retention_days: 14, backup_period_hours: 12)
+      [timeline.id, nil].each do |parent_id|
+        postgres_server.switch_to_new_timeline(parent_id:)
+        expect(postgres_server.timeline).to have_attributes(backup_window_start_at: 4, backup_retention_days: 14, backup_period_hours: 12)
+        expect(postgres_server.timeline.parent_id).to eq(parent_id)
+        timeline.update(parent_id: nil)
+        postgres_server.update(timeline_id: timeline.id)
+      end
+    end
+
     it "detaches the blob storage policy from the timeline it leaves behind" do
       previous_timeline = postgres_server.timeline
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
