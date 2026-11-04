@@ -1050,7 +1050,7 @@ class CloverAdmin < Roda
         flash "Spare runners provisioned for GitHub runners on this host"
         run do |obj|
           DB.ignore_duplicate_queries do
-            GithubRunner.where(vm_id: obj.vms_dataset.select(:id)).eager(:semaphores, :installation).all(&:provision_spare_runner)
+            GithubRunner.where(vm_id: obj.vms_dataset.select(:id)).eager(:semaphores, installation: :project).all(&:provision_spare_runner)
           end
         end
       end

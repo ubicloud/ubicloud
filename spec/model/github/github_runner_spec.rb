@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe GithubRunner do
   subject(:github_runner) {
-    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: Project.create(name: "test").id)
     vm = create_vm(vm_host: create_vm_host, boot_image: "github-ubuntu-2204")
     Sshable.create_with_id(vm)
     described_class.create(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, location_id: vm.location_id, installation_id: ins.id)
@@ -162,6 +162,26 @@ RSpec.describe GithubRunner do
     expect {
       expect(github_runner.provision_spare_runner).to be_nil
     }.not_to change(described_class, :count)
+  end
+
+  it "does not provision a spare runner if the project has hit spending cutoff" do
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+    github_runner.project.update(cutoff_at: Time.now)
+
+    expect {
+      expect(github_runner.provision_spare_runner).to be_nil
+    }.not_to change(described_class, :count)
+    expect(github_runner.spare_runner_provisioned_set?(cached: false)).to be(false)
+  end
+
+  it "provisions a spare runner when force is true even if the project has hit spending cutoff" do
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+    github_runner.project.update(cutoff_at: Time.now)
+
+    expect {
+      expect(github_runner.provision_spare_runner(force: true)).to be_a(described_class)
+    }.to change(described_class, :count).from(1).to(2)
+    expect(github_runner.spare_runner_provisioned_set?(cached: false)).to be(true)
   end
 
   it "provisions a spare runner regardless of the semaphore when force is true" do
