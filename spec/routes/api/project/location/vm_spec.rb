@@ -84,6 +84,19 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be false
       end
 
+      it "fails if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(Vm.count).to eq 0
+      end
+
       it "rejects the web-only machine_image field" do
         expect {
           post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {

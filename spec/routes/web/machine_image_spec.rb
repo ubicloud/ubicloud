@@ -105,6 +105,21 @@ RSpec.describe Clover, "machine-image" do
         expect(new_mi.versions.first.strand.prog).to eq("MachineImage::VersionMetalNexus")
       end
 
+      it "cannot create a machine image if project has hit spending cutoff" do
+        MachineImageStore.create(project_id: project.id, location_id:, provider: "r2", region: "auto",
+          endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
+        source_vm
+        visit "#{project.path}/machine-image/create"
+        cutoff_project(project)
+        fill_in "Name", with: "new-mi"
+        choose option: Location::HETZNER_FSN1_UBID
+        select source_vm.name, from: "vm"
+        click_button "Create"
+
+        expect_cutoff_redirect(project)
+        expect(MachineImage[name: "new-mi"]).to be_nil
+      end
+
       it "allows a view-only user to see a machine image but not create one" do
         mi_version_metal
         click_button "Log out"
@@ -253,6 +268,19 @@ RSpec.describe Clover, "machine-image" do
         miv = mi.versions_dataset.first(version: "v2")
         expect(miv).not_to be_nil
         expect(miv.strand.stack.first["destroy_source_after"]).to be false
+      end
+
+      it "cannot create a new version if project has hit spending cutoff" do
+        mi_version_metal
+        source_vm
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/create-version"
+        cutoff_project(project)
+        fill_in "Version Label", with: "v2"
+        select source_vm.name, from: "vm"
+        click_button "Create"
+
+        expect_cutoff_redirect(project)
+        expect(mi.versions_dataset.first(version: "v2")).to be_nil
       end
 
       it "excludes VMs whose arch differs from the machine image from the source VM dropdown" do

@@ -121,6 +121,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(KubernetesCluster[name: "test-cluster"]).not_to be_nil
       end
 
+      it "fails if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/test-cluster", {
+          version: Option.selectable_kubernetes_versions.last,
+          worker_size: "standard-2",
+          worker_nodes: 2,
+          cp_nodes: 1,
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
       it "returns 400 for invalid kubernetes version" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/test-cluster", {
           version: "v1.30",
@@ -224,6 +237,17 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(body["node_size"]).to eq("standard-2")
           expect(body["version"]).to eq(kc.version)
           expect(kc.nodepools_dataset.first(name: "np2").start_bootstrapping_set?).to be true
+        end
+
+        it "fails if project has hit spending cutoff" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          project.update(cutoff_at: Time.now)
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 2}.to_json
+
+          expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+          expect(kc.nodepools_dataset.first(name: "np2")).to be_nil
         end
 
         it "returns an error while the cluster is not in wait" do
@@ -340,6 +364,18 @@ RSpec.describe Clover, "kubernetes-cluster" do
             expect(kn.reload.node_count).to eq(new_count)
             expect(kn.scale_worker_count_set?).to be true
           end
+        end
+
+        it "fails if project has hit spending cutoff" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          project.update(cutoff_at: Time.now)
+          node_count = kn.node_count
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: node_count + 1}.to_json
+
+          expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+          expect(kn.reload.node_count).to eq(node_count)
         end
 
         it "returns validation error for bad input" do

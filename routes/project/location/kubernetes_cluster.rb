@@ -151,6 +151,7 @@ class Clover
 
         r.post "resize" do
           authorize("KubernetesCluster:edit", kc.id)
+          check_cutoff
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
           unless kn.idle?

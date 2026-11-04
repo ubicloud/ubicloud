@@ -83,5 +83,16 @@ RSpec.configure do |config|
 
       expect(page.title).to end_with(title_end_with)
     end
+
+    def cutoff_project(project)
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Full discount")
+      project.update(cutoff_at: Time.now)
+    end
+
+    def expect_cutoff_redirect(project)
+      expect(page).to have_current_path("#{project.path}/billing")
+      expect(page).to have_flash_error("This project has been cut off from additional spending.")
+    end
   end)
 end

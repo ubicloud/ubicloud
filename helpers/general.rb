@@ -222,6 +222,19 @@ class Clover < Roda
     rodauth.session["pat_id"]
   end
 
+  def check_cutoff(project: @project, web: web?, status: 400)
+    if project.cutoff?
+      if web
+        flash["error"] = "This project has been cut off from additional spending."
+        request.redirect billing_path
+      else
+        response.status = status
+        response.write({error: {code: 400, type: "InvalidRequest", message: "This project has been cut off from additional spending."}}.to_json)
+        request.halt
+      end
+    end
+  end
+
   def check_found_object(obj)
     unless obj
       response.status = if request.delete? && request.remaining_path.empty?
