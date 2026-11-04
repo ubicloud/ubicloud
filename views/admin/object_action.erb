@@ -2,10 +2,13 @@
 
 <% form(method: :post, id: "action-form", class: "form-vertical") do |f| %>
   <% @params.each do |name, value| %>
-    <% options = value[:options].is_a?(Proc) ? {options: value[:options].call(@obj)} : nil %>
-    <% prefill = value[:value].is_a?(Proc) ? {value: value[:value].call(@obj)} : nil %>
+    <% computed = {} %>
 
-    <%== f.input(value.fetch(:type, "text"), key: name, label: name, required: true, **value, **options, **prefill) %>
+    <% [:options, :value, :placeholder].each do |key| %>
+      <% computed[key] = value[key].call(@obj) if value[key].is_a?(Proc) %>
+    <% end %>
+
+    <%== f.input(value.fetch(:type, "text"), key: name, label: name, required: true, **value, **computed) %>
   <% end %>
 
   <%== f.button(@label) %>
