@@ -1723,7 +1723,7 @@ RSpec.describe CloverAdmin do
 
   it "supports provisioning spare GitHubRunners for all runners on a VmHost" do
     vmh = create_vm_host
-    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: Project.create(name: "test").id)
     create_vm(vm_host_id: vmh.id, name: "customer-vm")
     2.times do |i|
       runner_vm = create_vm(vm_host_id: vmh.id, name: "runner-vm-#{i}")
@@ -1962,7 +1962,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports provisioning spare GitHubRunner" do
-    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: Project.create(name: "test").id)
     ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)
 
     fill_in "UBID, UUID, or prefix:term", with: ghr.ubid

@@ -96,7 +96,9 @@ class GithubRunner < Sequel::Model
   end
 
   def provision_spare_runner(force: false)
-    return if !force && spare_runner_provisioned_set?
+    unless force
+      return if spare_runner_provisioned_set? || project.cutoff?
+    end
     incr_spare_runner_provisioned
     Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
   end
