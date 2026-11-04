@@ -42,7 +42,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     DB.transaction do
       PrivateSubnet.dataset.insert_conflict(target: key.keys).insert(
         id: PrivateSubnet.generate_uuid,
-        net4: MANAGEMENT_NET4,
+        net4: (MANAGEMENT_NET4 unless Config.gcp_postgres_mgmt_ipv6_only),
         net6: Prog::Vnet::SubnetNexus.random_private_ipv6(location, project).to_s,
         state: "waiting",
         **key,
@@ -82,17 +82,20 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_subnet
+    stack = if private_subnet.net4
+      {ip_cidr_range: private_subnet.net4.to_s, stack_type: "IPV4_IPV6", ipv6_access_type: "EXTERNAL"}
+    else
+      {stack_type: "IPV6_ONLY", ipv6_access_type: "INTERNAL"}
+    end
     op = credential.subnetworks_client.insert(
       project: gcp_project_id,
       region: gcp_region,
       subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
         name: subnet_name,
         description: "Ubicloud subnet for #{private_subnet.ubid} [Ubicloud=#{Config.provider_resource_tag_value}]",
-        ip_cidr_range: private_subnet.net4.to_s,
         network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
         private_ip_google_access: !private_subnet.gcp_management?,
-        stack_type: "IPV4_IPV6",
-        ipv6_access_type: "EXTERNAL",
+        **stack,
       ),
     )
     save_gcp_op("create_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)

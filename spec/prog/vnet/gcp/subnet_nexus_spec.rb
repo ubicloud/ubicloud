@@ -68,6 +68,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(mgmt_ps.firewalls).to be_empty
     end
 
+    it "creates the management subnet without an IPv4 range under gcp_postgres_mgmt_ipv6_only" do
+      expect(Config).to receive(:gcp_postgres_mgmt_ipv6_only).and_return(true)
+
+      mgmt_ps = described_class.assemble_management(location.id).subject
+      expect(mgmt_ps.gcp_management?).to be true
+      expect(mgmt_ps.net4).to be_nil
+    end
+
     it "returns the existing strand when the management subnet exists" do
       st = described_class.assemble_management(location.id)
 
@@ -239,6 +247,21 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(subnetworks_client).to receive(:insert) do |args|
         expect(args[:subnetwork_resource].private_ip_google_access).to be(false)
         instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-mgmt")
+      end
+
+      expect { nx.create_subnet }.to hop("wait_create_subnet")
+    end
+
+    it "creates an IPv6-only subnet with internal IPv6 when the subnet has no IPv4 range" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      nx.private_subnet.update(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, net4: nil)
+      expect(subnetworks_client).to receive(:insert) do |args|
+        sr = args[:subnetwork_resource]
+        expect(sr.has_ip_cidr_range?).to be(false)
+        expect(sr.stack_type).to eq("IPV6_ONLY")
+        expect(sr.ipv6_access_type).to eq("INTERNAL")
+        expect(sr.private_ip_google_access).to be(false)
+        instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-mgmt-v6")
       end
 
       expect { nx.create_subnet }.to hop("wait_create_subnet")
