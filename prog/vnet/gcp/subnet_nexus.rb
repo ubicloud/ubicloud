@@ -85,7 +85,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     stack = if private_subnet.net4
       {ip_cidr_range: private_subnet.net4.to_s, stack_type: "IPV4_IPV6", ipv6_access_type: "EXTERNAL"}
     else
-      {stack_type: "IPV6_ONLY", ipv6_access_type: "INTERNAL"}
+      {stack_type: "IPV6_ONLY", ipv6_access_type: Config.gcp_postgres_mgmt_ipv6_only_external ? "EXTERNAL" : "INTERNAL"}
     end
     op = credential.subnetworks_client.insert(
       project: gcp_project_id,

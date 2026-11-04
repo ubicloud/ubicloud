@@ -205,10 +205,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
     public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
-    ssh_host = if mgmt_nic && mgmt_nic.private_ipv4.nil?
-      ssh_ni.ipv6_address
-    elsif mgmt_nic && management_ipv6?(mgmt_nic)
-      ssh_ni.ipv6_access_configs.first.external_ipv6
+    ssh_host = if mgmt_nic && management_ipv6?(mgmt_nic)
+      ssh_ni.ipv6_access_configs.first&.external_ipv6 || ssh_ni.ipv6_address
     else
       ssh_ni&.access_configs&.first&.nat_i_p
     end
@@ -361,7 +359,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         nat_i_p: gcp_res.static_ip.to_s,
       )
     end
-    if stack_type == "IPV4_IPV6"
+    if stack_type == "IPV4_IPV6" || (stack_type == "IPV6_ONLY" && external_ipv6_subnet?(gcp_res))
       interface.ipv6_access_configs << Google::Cloud::Compute::V1::AccessConfig.new(
         name: "External IPv6",
         type: "DIRECT_IPV6",
@@ -386,6 +384,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def management_ipv6?(mgmt_nic)
     mgmt_nic.nic_gcp_resource.static_ip.nil?
+  end
+
+  def external_ipv6_subnet?(gcp_res)
+    credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: gcp_res.subnet_name).ipv6_access_type == "EXTERNAL"
   end
 
   def user_nic_default_routes?
