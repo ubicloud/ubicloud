@@ -130,16 +130,29 @@ RSpec.describe BootImage do
   end
 
   describe "#htcat_image" do
-    it "can htcat image with sha256 checksum" do
-      expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
-      end.and_yield
+    let(:tmp_path) { "/var/storage/images/ubuntu-jammy-20240110.img.tmp" }
+
+    it "runs htcat without a pipe and digests the finished file" do
+      expect(File).to receive(:open).with(tmp_path, File::RDWR | File::CREAT | File::EXCL, 0o644).and_yield
 
       expect(bi).to receive(:_run_command).with(
-        "bash -c htcat\\ -parallelism\\=12\\ -max-fragment-size\\=32\\ URL\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
-      ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
+        "bash -c htcat\\ -parallelism\\=12\\ -max-fragment-size\\=32\\ URL\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
+      ).and_return("")
+      expect(bi).to receive(:_run_command).with("openssl", "dgst", "-sha256", tmp_path)
+        .and_return("SHA2-256(#{tmp_path})= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
-      bi.htcat_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp")
+      expect(bi.htcat_image("URL", tmp_path)).to eq("81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455")
+    end
+
+    it "raises htcat's own failure instead of reaching the digest" do
+      expect(File).to receive(:open).with(tmp_path, File::RDWR | File::CREAT | File::EXCL, 0o644).and_yield
+
+      expect(bi).to receive(:_run_command).with(
+        "bash -c htcat\\ -parallelism\\=12\\ -max-fragment-size\\=32\\ URL\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
+      ).and_raise(CommandFail.new("command failed", "", "htcat: fragment 7: unexpected EOF"))
+      expect(bi).not_to receive(:_run_command).with("openssl", "dgst", "-sha256", tmp_path)
+
+      expect { bi.htcat_image("URL", tmp_path) }.to raise_error(CommandFail, /htcat: fragment 7: unexpected EOF/)
     end
   end
 
