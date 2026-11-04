@@ -103,7 +103,11 @@ class Clover
         conclusion: run["conclusion"],
       )
 
-      return {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}
+      if workflow_run
+        return {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}
+      else
+        return {error: {message: "Already completed workflow_run"}}
+      end
     end
 
     if action == "completed"

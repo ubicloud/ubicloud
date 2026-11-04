@@ -10,6 +10,7 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
       unless (repository_id = GithubRepository.where(installation_id: installation.id, name: repository_name).get(:id))
         repository_id = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch, update_last_job_at: false).id
       end
+      return unless GithubCompletedWorkflowRun.where(repository_id:, create_date:, run_id:, run_attempt:).empty?
 
       workflow_run = GithubActiveWorkflowRun.new(installation_id: installation.id, repository_id:, repository_name:, create_date:, run_id:, run_attempt:, **)
       workflow_run.skip_auto_validations(:unique) do

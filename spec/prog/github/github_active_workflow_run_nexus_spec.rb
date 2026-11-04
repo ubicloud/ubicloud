@@ -63,6 +63,20 @@ RSpec.describe Prog::Github::GithubActiveWorkflowRunNexus do
       expect(strands.count).to eq(1)
       expect(strands.first.schedule).to be_within(10).of(Time.now + 60 * 60)
     end
+
+    it "does not create the workflow run or a strand if the workflow run attempt has already completed" do
+      create_date = workflow_run_args[:create_date]
+      GithubCompletedWorkflowRun.create_partition(create_date) unless GithubCompletedWorkflowRun.partition_days.include?(create_date)
+      GithubCompletedWorkflowRun.insert(repository_id: repository.id, installation_id: installation.id, create_date:, created_at: Time.now, run_id: 111, run_attempt: 1, event: "push", status: "completed", conclusion: "success", display_title: "CI", actor_login: "al")
+
+      expect(described_class.assemble(installation:, default_branch: "main", **workflow_run_args)).to be_nil
+      expect(GithubActiveWorkflowRun.count).to eq(0)
+      expect(Strand.where(prog: "Github::GithubActiveWorkflowRunNexus").count).to eq(0)
+
+      expect(described_class.assemble(installation:, default_branch: "main", **workflow_run_args, run_attempt: 2)).not_to be_nil
+      expect(GithubActiveWorkflowRun.select_map([:run_id, :run_attempt])).to eq([[111, 2]])
+      expect(Strand.where(prog: "Github::GithubActiveWorkflowRunNexus").count).to eq(1)
+    end
   end
 
   describe "#start" do
