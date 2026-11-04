@@ -168,6 +168,8 @@ end
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  latest_backup_size_in_gib | bigint                   |
 #  latest_backup_lsn         | pg_lsn                   |
+#  backup_window_start_at    | smallint                 |
+#  backup_retention_days     | smallint                 | NOT NULL DEFAULT 7
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
