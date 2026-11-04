@@ -431,6 +431,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(repository).not_to exist
     end
 
+    it "finalizes the cache storage billing record" do
+      repository.update_extra_cache_storage_gib(300)
+      record = repository.reload.active_billing_record
+      record.update(span: Sequel.pg_range((now - 60 * 60)..nil))
+      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect(record.reload.span.unbounded_end?).to be(false)
+      expect(repository).not_to exist
+    end
+
     it "deletes blob storage outside of the transaction and destroys records inside the transaction" do
       entry = GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
       st = nx.strand

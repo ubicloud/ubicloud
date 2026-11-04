@@ -218,6 +218,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     github_repository.destroy_blob_storage if github_repository.access_key
 
     start_transaction do
+      github_repository.active_billing_record&.finalize
       github_repository.destroy
       pop "github repository destroyed"
     end
