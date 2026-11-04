@@ -411,7 +411,7 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page).to have_content "3 cache entries"
-      expect(page).to have_content "21.4 KB used"
+      expect(page).to have_content "21.4 KB used of 100 GB"
       expect(page).to have_content "created just now"
       expect(page).to have_content "Never used"
       expect(page).to have_content "800 B"
@@ -420,6 +420,17 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "20.6 KB"
       expect(page).to have_content "created 4 days ago"
       expect(page).to have_content "3 hours ago"
+    end
+
+    it "shows the cache storage limit of each repository" do
+      repository2 = GithubRepository.create(name: "test-user/test-repo2", installation_id: installation.id, extra_cache_storage_gib: 300)
+      create_cache_entry(size: 800)
+      create_cache_entry(size: 900, repository_id: repository2.id)
+
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+
+      expect(page).to have_content "800 B used of 100 GB"
+      expect(page).to have_content "900 B used of 400 GB"
     end
 
     it "can delete a cache entry" do

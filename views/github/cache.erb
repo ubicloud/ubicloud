@@ -47,7 +47,7 @@
                     group-[.active]:bg-gray-50
                   "
                 >
-                  <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= @quota_per_repo %>
+                  <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= repository.cache_storage_gib %> GB
                 </th>
 
                 <th

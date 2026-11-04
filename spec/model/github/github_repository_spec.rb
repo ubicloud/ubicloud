@@ -29,6 +29,17 @@ RSpec.describe GithubRepository do
     end
   end
 
+  describe "#cache_storage_gib" do
+    it "returns the installation cache storage without extra storage" do
+      expect(github_repository.cache_storage_gib).to eq(100)
+    end
+
+    it "adds the extra storage to the installation cache storage" do
+      github_repository.update(extra_cache_storage_gib: 300)
+      expect(github_repository.cache_storage_gib).to eq(400)
+    end
+  end
+
   describe ".destroy_blob_storage" do
     let(:uploads) { instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: [instance_double(Aws::S3::Types::MultipartUpload, key: "test-key", upload_id: "test-upload-id")]) }
 

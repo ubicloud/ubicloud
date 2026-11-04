@@ -54,7 +54,7 @@ class GithubInstallation < Sequel::Model
   end
 
   def cache_storage_gib
-    [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
+    @cache_storage_gib ||= [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
   end
 
   def us_only?
