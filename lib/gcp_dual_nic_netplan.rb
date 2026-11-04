@@ -11,6 +11,8 @@ class GcpDualNicNetplan
   NETPLAN_PATH = "/etc/netplan/61-ubicloud.yaml"
 
   MGMT_MAC = "@MGMT_MAC@"
+  MGMT_IP = "@MGMT_IP@"
+  MGMT_GATEWAY = "@MGMT_GATEWAY@"
   MGMT_IPV6 = "@MGMT_IPV6@"
   MGMT_GATEWAY_IPV6 = "@MGMT_GATEWAY_IPV6@"
   USER_MAC = "@USER_MAC@"
@@ -41,12 +43,17 @@ class GcpDualNicNetplan
       sed -i "s/$1/$value/g" "$netplan.new"
     }
     mac='[0-9a-f]{2}(:[0-9a-f]{2}){5}'
+    ipv4='[0-9]{1,3}([.][0-9]{1,3}){3}'
     ipv6='[0-9a-f]*:[0-9a-f:]*'
     install -m 600 "$netplan.template" "$netplan.new"
     fill #{MGMT_MAC} network-interfaces/0/mac "$mac"
     fill #{USER_MAC} vlan-network-interfaces/0/#{VLAN}/mac "$mac"
     fill #{USER_IPV6} vlan-network-interfaces/0/#{VLAN}/ipv6s "$ipv6"
     fill #{USER_GATEWAY_IPV6} vlan-network-interfaces/0/#{VLAN}/gateway-ipv6 "$ipv6"
+    if grep -q #{MGMT_IP} "$netplan.new"; then
+      fill #{MGMT_IP} network-interfaces/0/ip "$ipv4"
+      fill #{MGMT_GATEWAY} network-interfaces/0/gateway "$ipv4"
+    fi
     if grep -q #{MGMT_IPV6} "$netplan.new"; then
       fill #{MGMT_IPV6} network-interfaces/0/ipv6s "$ipv6"
       fill #{MGMT_GATEWAY_IPV6} network-interfaces/0/gateway-ipv6 "$ipv6"
@@ -81,15 +88,17 @@ class GcpDualNicNetplan
   private
 
   def mgmt_ethernet
+    ip = mgmt_ip || MGMT_IP
+    gateway = mgmt_gateway || MGMT_GATEWAY
     ethernet = {
       "match" => {"macaddress" => MGMT_MAC},
       "dhcp4" => true,
       "dhcp4-overrides" => {"use-routes" => false},
       "routes" => [
-        {"to" => "#{METADATA_SERVER}/32", "via" => mgmt_gateway, "on-link" => true},
-        {"to" => "0.0.0.0/0", "via" => mgmt_gateway, "on-link" => true, "table" => MGMT_TABLE},
+        {"to" => "#{METADATA_SERVER}/32", "via" => gateway, "on-link" => true},
+        {"to" => "0.0.0.0/0", "via" => gateway, "on-link" => true, "table" => MGMT_TABLE},
       ],
-      "routing-policy" => [{"from" => "#{mgmt_ip}/32", "table" => MGMT_TABLE}],
+      "routing-policy" => [{"from" => "#{ip}/32", "table" => MGMT_TABLE}],
     }
     return ethernet unless mgmt_ipv6
 
