@@ -133,12 +133,11 @@ class Clover
         @entries_by_repo = @installation
           .cache_entries_dataset
           .exclude(committed_at: nil)
-          .eager(:repository)
+          .eager(repository: :installation)
           .reverse(:created_at)
           .all
           .group_by(&:repository)
 
-        @quota_per_repo = "#{@installation.cache_storage_gib} GB"
         view "github/cache"
       end
 

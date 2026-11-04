@@ -28,6 +28,10 @@ class GithubRepository < Sequel::Model
     name.split("/", 2).last
   end
 
+  def cache_storage_gib
+    installation.cache_storage_gib + (extra_cache_storage_gib || 0)
+  end
+
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)
   end

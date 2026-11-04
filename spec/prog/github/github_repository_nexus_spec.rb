@@ -212,6 +212,16 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.cleanup_cache }.to nap(5 * 60)
     end
 
+    it "deletes oldest cache entries if the total usage exceeds the limit with extra storage" do
+      repository.update(extra_cache_storage_gib: 20)
+      hundred_nineteen_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 119 * 1024 * 1024 * 1024)
+      two_gib_cache = create_cache_entry(created_at: now - 11 * 60, size: 2 * 1024 * 1024 * 1024)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: two_gib_cache.blob_key)
+      expect { nx.cleanup_cache }.to nap(5 * 60)
+      expect(hundred_nineteen_gib_cache).to exist
+      expect(two_gib_cache).not_to exist
+    end
+
     it "sets no_cache_since when cache entries become empty" do
       expect { nx.cleanup_cache }.to nap(5 * 60)
       expect(repository.reload.no_cache_since).to eq(now)
