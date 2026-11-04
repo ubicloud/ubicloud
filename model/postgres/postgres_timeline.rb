@@ -41,9 +41,72 @@ class PostgresTimeline < Sequel::Model
     return false if blob_storage.nil?
     return false if leader.nil?
     return true if take_backup_for_converge_set?
-    return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+
+    if backup_window_start_at.nil?
+      return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+    elsif backup_in_slot?
+      return false if backup_started_in_current_slot?
+    elsif !backup_overdue?
+      return false
+    end
 
     leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+  end
+
+  # Backup slots are aligned to UTC epoch hours: one opens every
+  # backup_period_hours hours, starting at backup_window_start_at.
+  def backup_window_hours
+    self.class.backup_window_hours_for(backup_period_hours)
+  end
+
+  def self.backup_window_hours_for(period_hours)
+    (period_hours / 2).clamp(1, 4)
+  end
+
+  def backup_slot_offset_hours
+    ((Time.now.to_i / 3600) - backup_window_start_at) % backup_period_hours
+  end
+
+  def backup_slot_open_at
+    Time.at((Time.now.to_i / 3600 - backup_slot_offset_hours) * 3600)
+  end
+
+  def backup_in_slot?
+    backup_slot_offset_hours < backup_window_hours
+  end
+
+  def backup_started_in_current_slot?
+    latest_backup_started_at ? latest_backup_started_at >= backup_slot_open_at : false
+  end
+
+  # The open slot while it still waits for its backup, otherwise the next slot.
+  def next_backup_slot_at
+    return unless backup_window_start_at
+
+    if backup_in_slot? && !backup_started_in_current_slot?
+      backup_slot_open_at
+    else
+      backup_slot_open_at + 60 * 60 * backup_period_hours
+    end
+  end
+
+  def backup_overdue?
+    latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * (backup_period_hours + 24)
+  end
+
+  def backup_schedule
+    values.slice(:backup_window_start_at, :backup_retention_days, :backup_period_hours)
+  end
+
+  def validate
+    super
+    validates_includes(0..23, :backup_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_includes(1..168, :backup_period_hours, allow_nil: true, message: "must be between 1 and 168")
+    validates_includes(1..35, :backup_retention_days, allow_nil: true, message: "must be between 1 and 35")
+    # Otherwise the slots open at a different hour every day.
+    if backup_window_start_at && backup_period_hours.to_i.positive? && 24 % backup_period_hours != 0 && backup_period_hours % 24 != 0
+      errors.add(:backup_period_hours, "must divide 24 or be a multiple of 24 when a start hour is set")
+    end
   end
 
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
