@@ -1,0 +1,32 @@
+<%# locals: (vp:, ps:) %>
+<% peer_project = vp.peer_account_id
+peer_network = vp.peer_vpc_id.split("/").last
+local_cidr = ps.net4.to_s
+command = "gcloud compute networks peerings create #{vp.vpc_peering_gcp_resource.peering_name} --project=#{peer_project} --network=#{peer_network} --peer-project=#{ps.location.location_credential_gcp.project_id} --peer-network=#{ps.gcp_vpc.name} --stack-type=IPV4_ONLY --no-import-custom-routes --no-export-custom-routes --no-import-subnet-routes-with-public-ip --no-export-subnet-routes-with-public-ip" %>
+
+<p>
+  <strong>1. Create your side.</strong> Create the matching peering in project <strong><%= peer_project %></strong>:
+</p>
+
+<%== part("components/copyable_content", content: command, classes: "font-mono text-xs break-all") %>
+
+<p>
+  You need compute.networks.addPeering on network <%= peer_network %> (the Compute Network Admin role has it), and no
+  access to Ubicloud's project. Keep the default independent update strategy. GCP pairs the two sides by network, not by
+  name.
+</p>
+
+<p>
+  <strong>2. Allow the traffic.</strong> GCP's implied rules allow all egress from your network, so this matters only if
+  you added egress deny rules: allow TCP to <%= local_cidr %> on the ports you use (5432 and 6432 for PostgreSQL). This
+  subnet's firewall rules also apply to traffic from your network. If they restrict sources (for example, a PostgreSQL
+  database created with <em>Network access</em> set to <em>No access yet</em>), add your subnet ranges on the needed
+  ports.
+</p>
+
+<p>
+  <strong>3. Connect over the peering.</strong> Use private IPv4 addresses, because GCP's internal DNS names do not
+  resolve across peerings. A PostgreSQL database's hostname resolves to its public address, so use its private
+  connection string: turn on <em>Use Private DNS?</em> on the database's Connection tab, which shows it once a peering
+  of its subnet is active.
+</p>
