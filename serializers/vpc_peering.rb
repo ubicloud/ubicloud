@@ -24,6 +24,13 @@ class Serializers::VpcPeering < Serializers::Base
         expires_at: aws.expires_at&.utc&.iso8601,
       }
     end
+    if (gcp = vp.vpc_peering_gcp_resource)
+      base[:gcp] = {
+        local_project_id: ps.location.location_credential_gcp.project_id,
+        local_network_name: ps.gcp_vpc.name,
+        peering_name: gcp.peering_name,
+      }
+    end
     base
   end
 end
