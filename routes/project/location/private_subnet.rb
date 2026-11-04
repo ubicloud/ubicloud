@@ -21,7 +21,7 @@ class Clover
       filter[:location_id] = @location.id
       ps = @ps = @project.private_subnets_dataset.first(filter)
       check_found_object(ps)
-      peering_enabled = vpc_peering_enabled?(@location)
+      peering_enabled = vpc_peering_enabled?(ps)
 
       r.post "connect" do
         private_subnet_connection_action("connect", typecast_params.ubid_uuid!("connected-subnet-id"))
@@ -85,12 +85,21 @@ class Clover
           r.post do
             authorize("PrivateSubnet:edit", ps)
             handle_validation_failure("networking/private_subnet/show") { @page = "vpc-peering" }
-            peer_account_id = typecast_params.nonempty_str!("peer_account_id").delete("- ")
+            peer_account_id = typecast_params.nonempty_str!("peer_account_id")
             peer_vpc_id = typecast_params.nonempty_str!("peer_vpc_id").strip.downcase
-            peer_region = typecast_params.dig(:nonempty_str, "aws", "peer_region")&.strip&.downcase || @location.name
-            Validation.validate_aws_vpc_peering(peer_account_id:, peer_vpc_id:, peer_region:)
+            if @location.aws?
+              peer_account_id = peer_account_id.delete("- ")
+              peer_region = typecast_params.dig(:nonempty_str, "aws", "peer_region")&.strip&.downcase || @location.name
+              Validation.validate_aws_vpc_peering(peer_account_id:, peer_vpc_id:, peer_region:)
+              provider_args = {aws: {peer_region:}}
+            else
+              fail Validation::ValidationFailed.new({aws: "Only valid in AWS locations."}) if typecast_params.present?("aws")
+              peer_account_id = peer_account_id.strip.downcase
+              peer_vpc_id = Validation.validate_gcp_vpc_peering(peer_account_id:, peer_vpc_id:)
+              provider_args = {}
+            end
             vp = DB.transaction do
-              peering = Prog::Vnet::VpcPeeringNexus.assemble(ps, peer_account_id:, peer_vpc_id:, aws: {peer_region:}).subject
+              peering = Prog::Vnet::VpcPeeringNexus.assemble(ps, peer_account_id:, peer_vpc_id:, **provider_args).subject
               audit_log(peering, "create", ps)
               peering
             end
@@ -98,7 +107,11 @@ class Clover
             if api?
               Serializers::VpcPeering.serialize(vp)
             else
-              flash["notice"] = "Ubicloud is requesting the peering. Accept it in AWS account #{vp.peer_account_id} when it appears below."
+              flash["notice"] = if @location.aws?
+                "Ubicloud is requesting the peering. Accept it in AWS account #{vp.peer_account_id} when it appears below."
+              else
+                "Ubicloud is adding its side of the peering. Then create your side in GCP project #{vp.peer_account_id} with the command that appears below."
+              end
               r.redirect ps, "/vpc-peering"
             end
           end

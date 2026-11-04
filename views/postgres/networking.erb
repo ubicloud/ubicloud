@@ -19,7 +19,7 @@
   </div>
 </div>
 
-<% if vpc_peering_enabled?(@pg.location) %>
+<% if vpc_peering_enabled?(@pg.private_subnet) %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
@@ -28,8 +28,16 @@
         </h3>
 
         <p class="text-gray-500 mt-2">
-          Reach this database from your own AWS VPC over private addresses. Your connection string does not change.
-          <a class="text-orange-600" href="<%= path(@pg.private_subnet) %>/vpc-peering">Manage VPC peering</a>
+          <% if @pg.location.gcp? %>
+            Reach this database from your own GCP VPC network over private addresses. Once a peering is active, use the
+            private connection string on the Connection tab.
+          <% else %>
+            Reach this database from your own AWS VPC over private addresses. Your connection string does not change.
+          <% end %>
+
+          <% if has_permission?("PrivateSubnet:view", @pg.private_subnet) %>
+            <a class="text-orange-600" href="<%= path(@pg.private_subnet) %>/vpc-peering">Manage VPC peering</a>
+          <% end %>
         </p>
 
         <% if @pg.read_replica? %>

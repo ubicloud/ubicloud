@@ -2520,7 +2520,7 @@ paths:
     post:
       operationId: createPrivateSubnetVpcPeering
       summary: Request a VPC peering between a private subnet and a VPC in your account
-      description: A PostgreSQL database's private subnet is named "<database id>-subnet" unless private_subnet_name was given at creation, and each read replica has its own "<replica id>-subnet".
+      description: A PostgreSQL database's private subnet is named "<database id>-subnet" unless private_subnet_name was given at creation, and each read replica has its own "<replica id>-subnet". On GCP, Ubicloud adds its side of the peering and you create the matching side in your project; connections can be opened only from your network into the private subnet.
       requestBody:
         required: true
         content:
@@ -2529,6 +2529,7 @@ paths:
               type: object
               properties:
                 aws:
+                  description: AWS only; refused in other locations
                   type: object
                   additionalProperties: false
                   properties:
@@ -2536,10 +2537,10 @@ paths:
                       description: Region of the peer VPC, defaults to the region of the location
                       type: string
                 peer_account_id:
-                  description: Account that owns the peer VPC; for AWS, the 12-digit account ID, with dashes and spaces ignored
+                  description: 'Account that owns the peer VPC: for AWS, the 12-digit account ID, with dashes and spaces ignored; for GCP, the project ID (not the project number)'
                   type: string
                 peer_vpc_id:
-                  description: ID of the peer VPC
+                  description: For AWS, the VPC ID. For GCP, the VPC network name, its path projects/PROJECT/global/networks/NETWORK, or its self link; it is stored and returned as the path.
                   type: string
               additionalProperties: false
               required:
@@ -4720,6 +4721,8 @@ components:
           description: Time the VPC peering was created
           type: string
           format: date-time
+        gcp:
+          $ref: '#/components/schemas/VpcPeeringGcp'
         id:
           description: ID of the VPC peering
           type: string
@@ -4732,21 +4735,21 @@ components:
           description: Location of the private subnet
           type: string
         peer_account_id:
-          description: Account that owns the peer VPC
+          description: 'Account that owns the peer VPC: the AWS account ID, or the GCP project ID'
           type: string
         peer_cidrs:
-          description: CIDR blocks of the peer VPC that are routed over the peering
+          description: CIDR blocks of the peer VPC that are routed over the peering; for GCP, the subnet ranges imported from the peer network
           type: array
           items:
             type: string
         peer_vpc_id:
-          description: ID of the peer VPC
+          description: 'ID of the peer VPC: for AWS the VPC ID, for GCP the network path projects/PROJECT/global/networks/NETWORK'
           type: string
         private_subnet_id:
           description: ID of the private subnet
           type: string
         state:
-          description: 'State of the VPC peering: creating, waiting_for_peer, configuring, active, failed or deleting'
+          description: 'State of the VPC peering: creating, waiting_for_peer, configuring (AWS only), active, failed or deleting'
           type: string
         state_message:
           description: Failure reason, a notice while the peering request is delayed, or warnings about the VPC peering
@@ -4795,6 +4798,23 @@ components:
         - peering_connection_id
         - requester_account_id
         - requester_vpc_id
+    VpcPeeringGcp:
+      type: object
+      properties:
+        local_network_name:
+          description: Name of the Ubicloud VPC network; use it as --peer-network
+          type: string
+        local_project_id:
+          description: ID of the Ubicloud GCP project; use it as --peer-project
+          type: string
+        peering_name:
+          description: Name of Ubicloud's side of the peering
+          type: string
+      additionalProperties: false
+      required:
+        - local_network_name
+        - local_project_id
+        - peering_name
     RunCommand:
       type: object
       properties:
