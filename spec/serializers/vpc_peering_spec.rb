@@ -23,5 +23,24 @@ RSpec.describe Serializers::VpcPeering do
         created_at: vp.created_at.utc.iso8601,
       )
     end
+
+    it "adds the GCP block of a GCP peering" do
+      location = Location[name: "gcp-us-central1"]
+      LocationCredentialGcp.create_with_id(location, project_id: "ubicloud-test", service_account_email: "test@ubicloud-test.iam.gserviceaccount.com", credentials_json: "{}")
+      ps.update(location_id: location.id)
+      vpc = Prog::Vnet::Gcp::VpcNexus.assemble(project.id, location.id, dedicated_for_subnet_id: ps.id).subject
+      vpc.add_private_subnet(ps)
+      vp = VpcPeering.create(private_subnet_id: ps.id, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/customer-vpc")
+      VpcPeeringGcpResource.create_with_id(vp, peering_name: "ubicloud-#{vp.ubid}")
+
+      serialized = described_class.serialize_internal(vp)
+      expect(serialized).to include(
+        location: "us-central1",
+        peer_account_id: "customer-project",
+        peer_vpc_id: "projects/customer-project/global/networks/customer-vpc",
+        gcp: {local_project_id: "ubicloud-test", local_network_name: vpc.name, peering_name: "ubicloud-#{vp.ubid}"},
+      )
+      expect(serialized).not_to have_key(:aws)
+    end
   end
 end

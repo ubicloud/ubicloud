@@ -4,31 +4,7 @@ provider = @location.provider
 max_peerings = Prog::Vnet::VpcPeeringNexus::MAX_PER_PRIVATE_SUBNET %>
 
 <div class="p-6 space-y-6">
-  <div>
-    <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-      VPC Peering
-    </h3>
-
-    <p class="text-gray-500 mt-2">
-      Connect this subnet's VPC to a VPC in your own AWS account so your applications reach it over private addresses.
-      Ubicloud sends the peering request; you accept it in AWS.
-    </p>
-  </div>
-
-  <%== part(
-    "components/kv_data_card",
-    data: [
-      ["Ubicloud VPC", @ps.private_subnet_aws_resource.vpc_id, {copyable: true}],
-      ["CIDR", @ps.net4.to_s, {copyable: true}],
-      ["Region", @location.name]
-    ]
-  ) %>
-
-  <p class="text-sm text-gray-500">
-    Your VPC's CIDR blocks must not overlap <%= @ps.net4.to_s %>. Ubicloud routes only private (RFC 1918) CIDR blocks of
-    your VPC. Each Ubicloud private subnet, and each PostgreSQL database or read replica, is its own VPC and needs its
-    own peering. IPv4 only.
-  </p>
+  <%== part("networking/vpc_peering/#{provider}/header", ps: @ps) %>
 
   <div id="vpc-peerings" class="space-y-6">
     <% if peerings.empty? %>

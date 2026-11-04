@@ -465,6 +465,54 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_gcp_vpc_peering" do
+    project_message = "GCP project ID must be 6 to 30 lowercase letters, digits or hyphens, start with a letter and not end with a hyphen, such as my-project-123. Use the project ID, not the project number."
+    network_message = "VPC network name must be 1 to 63 lowercase letters, digits or hyphens, start with a letter and not end with a hyphen."
+
+    def validate(peer_account_id: "my-project", peer_vpc_id: "my-network")
+      described_class.validate_gcp_vpc_peering(peer_account_id:, peer_vpc_id:)
+    end
+
+    it "returns the network path for a network name, path or self link" do
+      ["my-network", "projects/my-project/global/networks/my-network", "https://www.googleapis.com/compute/v1/projects/my-project/global/networks/my-network"].each do |peer_vpc_id|
+        expect(validate(peer_vpc_id:)).to eq "projects/my-project/global/networks/my-network"
+      end
+      expect(validate(peer_account_id: "a#{"b" * 28}9", peer_vpc_id: "n")).to eq "projects/a#{"b" * 28}9/global/networks/n"
+      expect(validate(peer_vpc_id: "n#{"-" * 61}1")).to eq "projects/my-project/global/networks/n#{"-" * 61}1"
+    end
+
+    it "rejects a project ID of another shape" do
+      ["123456789012", "short", "a#{"b" * 29}9", "my-project-", "example.com:my-project", "My-Project"].each do |peer_account_id|
+        expect { validate(peer_account_id:) }.to raise_error(described_class::ValidationFailed) { |e|
+          expect(e.details).to eq("peer_account_id" => project_message)
+        }
+      end
+    end
+
+    it "rejects a network name of another shape" do
+      ["1network", "network-", "bad;network", "n#{"-" * 62}1", "projects/my-project/global/networks/my-network/extra", "https://compute.googleapis.com/compute/v1/projects/my-project/global/networks/my-network"].each do |peer_vpc_id|
+        expect { validate(peer_vpc_id:) }.to raise_error(described_class::ValidationFailed) { |e|
+          expect(e.details).to eq("peer_vpc_id" => network_message)
+        }
+      end
+    end
+
+    it "rejects a network path that names another project" do
+      expect { validate(peer_vpc_id: "projects/other-project/global/networks/my-network") }.to raise_error(described_class::ValidationFailed) { |e|
+        expect(e.details).to eq("peer_vpc_id" => "The network path names project other-project, not my-project.")
+      }
+    end
+
+    it "reports both invalid fields at once" do
+      expect { validate(peer_account_id: "1", peer_vpc_id: "bad;network") }.to raise_error(described_class::ValidationFailed) { |e|
+        expect(e.details).to eq("peer_account_id" => project_message, "peer_vpc_id" => network_message)
+      }
+      expect { validate(peer_account_id: "1", peer_vpc_id: "projects/other-project/global/networks/bad;network") }.to raise_error(described_class::ValidationFailed) { |e|
+        expect(e.details).to eq("peer_vpc_id" => "The network path names project other-project, not 1.", "peer_account_id" => project_message)
+      }
+    end
+  end
+
   describe "#validate_syslog_url" do
     it "valid urls" do
       [

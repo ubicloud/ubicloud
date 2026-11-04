@@ -1,0 +1,34 @@
+<%# locals: (ps:) %>
+
+<div>
+  <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+    VPC Peering
+  </h3>
+
+  <p class="text-gray-500 mt-2">
+    Connect this subnet's VPC network to a VPC network in your own GCP project so your applications reach it over
+    private addresses. Ubicloud adds its side of the peering; you create the matching side in your project.
+  </p>
+</div>
+
+<%== part(
+  "components/kv_data_card",
+  data: [
+    ["Ubicloud project", ps.location.location_credential_gcp.project_id, {copyable: true}],
+    ["Ubicloud VPC network", ps.gcp_vpc.name, {copyable: true}],
+    ["CIDR", ps.net4.to_s, {copyable: true}]
+  ]
+) %>
+
+<p class="text-sm text-gray-500">
+  No subnet range of your network may overlap <%= ps.net4.to_s %>, the imported subnet routes of this subnet's other
+  peerings (listed below), or the subnets of any network peered with yours. GCP exchanges only private IPv4 subnet
+  routes: no custom routes, no IPv6 and no transit through other peerings. Only private subnets with their own VPC
+  network can be peered, and each one needs its own peering, so this peering does not reach your other private subnets
+  or PostgreSQL databases.
+</p>
+
+<p class="text-sm text-gray-500">
+  Connections can be opened only from your network into this subnet. Machines in this subnet cannot open connections to
+  your network.
+</p>
