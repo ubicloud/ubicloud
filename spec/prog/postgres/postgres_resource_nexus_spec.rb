@@ -625,6 +625,31 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         expect { nx.refresh_dns_record }.to hop("wait")
       end
 
+      it "publishes only the private A record for GCP and moves it to a new representative server" do
+        standby = create_postgres_server(resource: postgres_resource, is_representative: false)
+        primary_ip = postgres_server.vm.private_ipv4_string
+        standby_ip = standby.vm.private_ipv4_string
+        expect(standby_ip).not_to eq primary_ip
+        postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        dns_zone.insert_record(record_name: private_hostname, type: "AAAA", ttl: 10, data: "fd00::2")
+
+        expect { nx.refresh_dns_record }.to hop("wait")
+        records = DnsRecord.where(dns_zone_id: dns_zone.id, name: private_hostname)
+        expect(records.select_order_map([:type, :data, :tombstoned])).to eq [
+          ["A", primary_ip, false],
+          ["AAAA", "fd00::2", false],
+          ["AAAA", "fd00::2", true],
+        ]
+
+        postgres_server.update(is_representative: false)
+        standby.update(is_representative: true)
+        expect { described_class.new(st).refresh_dns_record }.to hop("wait")
+        expect(records.where(type: "A").select_map([:data, :tombstoned])).to contain_exactly(
+          [primary_ip, false], [primary_ip, true], [standby_ip, false],
+        )
+      end
+
       it "hops to wait if initial_provisioning is not set even with dns zone" do
         postgres_server
         DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
