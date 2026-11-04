@@ -266,6 +266,21 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect { nx.create_subnet }.to hop("wait_create_subnet")
     end
+
+    it "creates an IPv6-only subnet with external IPv6 under gcp_postgres_mgmt_ipv6_only_external" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      expect(Config).to receive(:gcp_postgres_mgmt_ipv6_only_external).and_return(true)
+      nx.private_subnet.update(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, net4: nil)
+      expect(subnetworks_client).to receive(:insert) do |args|
+        sr = args[:subnetwork_resource]
+        expect(sr.has_ip_cidr_range?).to be(false)
+        expect(sr.stack_type).to eq("IPV6_ONLY")
+        expect(sr.ipv6_access_type).to eq("EXTERNAL")
+        instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-mgmt-v6-external")
+      end
+
+      expect { nx.create_subnet }.to hop("wait_create_subnet")
+    end
   end
 
   describe "#wait_create_subnet" do
