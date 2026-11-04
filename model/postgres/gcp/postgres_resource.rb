@@ -26,6 +26,10 @@ class PostgresResource < Sequel::Model
 
     private
 
+    def gcp_private_dns_records
+      {A: representative_server.vm.private_ipv4_string}
+    end
+
     def gcp_boot_image(pg_version, arch, family)
       location.pg_gce_image(arch, pg_version, family, target_version:)
     end
