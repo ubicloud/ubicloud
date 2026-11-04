@@ -50,6 +50,7 @@ class Clover
 
       r.patch true do
         authorize("Postgres:edit", pg)
+        check_cutoff
         handle_validation_failure("postgres/show") { @page = "resize" }
 
         if pg.read_replica?
@@ -409,6 +410,7 @@ class Clover
 
       r.post "read-replica" do
         authorize("Postgres:edit", pg)
+        check_cutoff
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
@@ -484,6 +486,7 @@ class Clover
       r.post "restore" do
         authorize("Postgres:create", @project)
         authorize("Postgres:view", pg)
+        check_cutoff
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])

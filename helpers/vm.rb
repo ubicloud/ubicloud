@@ -51,6 +51,7 @@ class Clover
     project = @project
     authorize("Vm:create", project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
+    check_cutoff
 
     if api?
       public_key = typecast_params.nonempty_str!("public_key")

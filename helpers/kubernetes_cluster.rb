@@ -4,6 +4,7 @@ class Clover
   def kubernetes_cluster_post(name)
     authorize("KubernetesCluster:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
+    check_cutoff
 
     version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
     Validation.validate_kubernetes_version(version)
@@ -47,6 +48,7 @@ class Clover
 
   def kubernetes_nodepool_post(name)
     authorize("KubernetesCluster:edit", @kc.id)
+    check_cutoff
 
     unless @kc.idle?
       fail_kubernetes_unprocessable("Cluster is not ready to add a nodepool")

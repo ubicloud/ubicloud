@@ -190,6 +190,19 @@ RSpec.describe Clover, "Kubernetes" do
         expect(new_kc.private_subnet.name).to eq("#{new_kc.ubid}-subnet")
       end
 
+      it "cannot create kubernetes cluster if project has hit spending cutoff" do
+        cutoff_project(project)
+        fill_in "Cluster Name", with: "k8stest"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: 3
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
+
+        click_button "Create"
+
+        expect_cutoff_redirect(project)
+        expect(KubernetesCluster[name: "k8stest"]).to be_nil
+      end
+
       it "can not create kubernetes cluster with invalid name" do
         fill_in "Cluster Name", with: "invalid name"
         choose option: Location::HETZNER_FSN1_UBID
@@ -422,6 +435,20 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_flash_notice("myk8s node pool kn will be resized")
         expect(page).to have_current_path("#{project.path}#{kn.path}/settings")
         expect(kn.reload.node_count).to eq(4)
+      end
+
+      it "cannot resize a nodepool if project has hit spending cutoff" do
+        kn = kc.nodepools.first
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+        node_count = kn.node_count
+        visit "#{project.path}#{kn.path}/settings"
+        cutoff_project(project)
+        find('select#node_count option[value="4"]:not([disabled])').select_option
+        click_button "Resize"
+
+        expect_cutoff_redirect(project)
+        expect(kn.reload.node_count).to eq(node_count)
       end
 
       it "shows a message instead of the resize form while the nodepool is busy" do
