@@ -10,7 +10,7 @@ class Prog::CheckUsageAlerts < Prog::Base
   end
 
   label def process_alerts
-    now = Time.now
+    now = Time.now.utc
     begin_time = Time.utc(now.year, now.month)
 
     alerts = UsageAlert
@@ -23,7 +23,7 @@ class Prog::CheckUsageAlerts < Prog::Base
 
     alerts_by_project = alerts.group_by(&:project)
     project_ids = alerts_by_project.keys.map!(&:id)
-    discounts_and_credits_hashes = InvoiceGenerator.discounts_and_credits_hashes(begin_time, Time.now.utc, project_ids)
+    discounts_and_credits_hashes = InvoiceGenerator.discounts_and_credits_hashes(begin_time, now, project_ids)
 
     alerts_by_project.each do |project, project_alerts|
       content = project.current_invoice(since: begin_time, discounts_and_credits_hashes:).content
