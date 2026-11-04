@@ -858,7 +858,21 @@ RSpec.describe Clover, "postgres" do
 
           expect(page).to have_flash_notice("The AAAA DNS record will be added in a few seconds")
           expect(pg.reload.semaphores_dataset.where(name: "refresh_dns_record").count).to eq(1)
-          expect(pg.dns_zone.records_dataset.where(type: "AAAA").select_order_map(:name)).to eq([pg.hostname + ".", pg.private_hostname + "."])
+          vm = pg.representative_server.vm
+          expect(pg.dns_zone.records_dataset.where(type: "AAAA").select_map([:name, :data])).to contain_exactly(
+            [pg.hostname + ".", vm.ip6_string], [pg.private_hostname + ".", vm.private_ipv6_string],
+          )
+        end
+
+        it "adds only the public AAAA record for GCP databases" do
+          pg.update(location_id: Location[name: "gcp-us-central1"].id)
+          visit "#{project.path}#{pg.path}/settings"
+          click_button "Add AAAA Record"
+
+          expect(page).to have_flash_notice("The AAAA DNS record will be added in a few seconds")
+          expect(pg.dns_zone.records_dataset.where(type: "AAAA").select_map([:name, :data])).to eq [
+            [pg.hostname + ".", pg.representative_server.vm.ip6_string],
+          ]
         end
 
         it "does not show button if AAAA record already exists" do
