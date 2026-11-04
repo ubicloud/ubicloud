@@ -35,10 +35,12 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   def check_queued_jobs(nap_seconds:)
-    unless github_repository.installation.project.active?
+    project = github_repository.installation.project
+    unless project.active?
       @polling_interval = 24 * 60 * 60
       return
     end
+    return if project.cutoff?
     deadline = clock_time + 80
     client = github_repository.installation.client(auto_paginate: true)
     created_after = (Time.now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d")
