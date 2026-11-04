@@ -412,6 +412,39 @@ RSpec.describe Vm do
       end
     end
 
+    it "sends a two-layer image as a read-only disk and a writable one" do
+      image = BootImage.create(name: "github-ubuntu-2404", version: "20261103.1.0", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 75)
+      vm.vm_storage_volumes_dataset.where(boot: true).update(boot_image_id: image.id, size_gib: 80)
+      volumes = vm.reload.storage_volumes
+      expect(volumes.size).to eq(3)
+      base, writable, data = volumes
+
+      expect(base["read_only"]).to be(true)
+      expect(base["size_gib"]).to eq(0)
+      expect(base["encrypted"]).to be(false)
+      expect(base["image"]).to eq("github-ubuntu-2404")
+      expect(base["image_version"]).to eq("20261103.1.0")
+
+      expect(writable["read_only"]).to be(false)
+      expect(writable["size_gib"]).to eq(80)
+      expect(writable["encrypted"]).to be(true)
+      expect(writable["image"]).to be_nil
+      expect(writable["image_version"]).to be_nil
+
+      # the host tells the two apart by read_only alone, and maps the image
+      # first so the guest boots it
+      expect(base["device_id"]).to eq(writable["device_id"])
+      expect(base["disk_index"]).to eq(writable["disk_index"])
+
+      expect(data["disk_index"]).to eq(1)
+    end
+
+    it "sends one disk for an image that cannot join the layers itself" do
+      image = BootImage.create(name: "github-ubuntu-2404", version: "20261021.1.0", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 75)
+      vm.vm_storage_volumes_dataset.where(boot: true).update(boot_image_id: image.id)
+      expect(vm.reload.storage_volumes.size).to eq(2)
+    end
+
     it "returns storage volumes hash list" do
       expected_device_id_0 = "#{vm.inhost_name}_0"
       expected_device_id_1 = "#{vm.inhost_name}_1"

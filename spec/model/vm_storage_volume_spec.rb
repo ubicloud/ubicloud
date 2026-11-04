@@ -7,6 +7,26 @@ RSpec.describe VmStorageVolume do
   let(:vm) { create_vm(vm_host_id: vm_host.id) }
   let(:default_storage_device) { StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100) }
 
+  describe "#two_layer_boot?" do
+    def volume_for(name, version, boot: true)
+      @disk_index = (@disk_index || -1) + 1
+      image = BootImage.create(name:, version:, vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1)
+      described_class.create(vm_id: vm.id, disk_index: @disk_index, size_gib: 1, boot:, boot_image_id: image.id, storage_device_id: default_storage_device.id, use_bdev_ubi: false)
+    end
+
+    it "is true for a github image that joins the layers itself" do
+      expect(volume_for("github-ubuntu-2404", "20261103.1.0").two_layer_boot?).to be(true)
+      expect(volume_for("github-ubuntu-2404", "20261201.1.0").two_layer_boot?).to be(true)
+    end
+
+    it "is false for older images, other images and data volumes" do
+      expect(volume_for("github-ubuntu-2404", "20261021.1.0").two_layer_boot?).to be(false)
+      expect(volume_for("ubuntu-noble", "20261103.1.0").two_layer_boot?).to be(false)
+      expect(volume_for("github-ubuntu-2404", "20261103.1.0", boot: false).two_layer_boot?).to be(false)
+      expect(described_class.new(boot: true)).not_to be_two_layer_boot
+    end
+  end
+
   it "can render a device_path" do
     vm = Vm.new(location: Location[Location::HETZNER_FSN1_ID]).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
     expect(described_class.new(disk_index: 7, vm:).device_path).to eq("/dev/disk/by-id/virtio-vmxcyvsc_7")
