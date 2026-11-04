@@ -78,9 +78,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     network_interfaces = if mgmt_nic
-      mgmt_ipv6 = management_ipv6?(mgmt_nic)
+      mgmt_stack_type = if mgmt_nic.private_ipv4.nil?
+        "IPV6_ONLY"
+      elsif management_ipv6?(mgmt_nic)
+        "IPV4_IPV6"
+      else
+        "IPV4_ONLY"
+      end
       [
-        network_interface(mgmt_nic, stack_type: mgmt_ipv6 ? "IPV4_IPV6" : "IPV4_ONLY", ipv4_nat: !mgmt_ipv6),
+        network_interface(mgmt_nic, stack_type: mgmt_stack_type, ipv4_nat: mgmt_stack_type == "IPV4_ONLY"),
         network_interface(user_nic, stack_type: "IPV4_IPV6", vlan: GcpDualNicNetplan::VLAN),
       ]
     else
@@ -199,7 +205,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
     public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
-    ssh_host = if mgmt_nic && management_ipv6?(mgmt_nic)
+    ssh_host = if mgmt_nic && mgmt_nic.private_ipv4.nil?
+      ssh_ni.ipv6_address
+    elsif mgmt_nic && management_ipv6?(mgmt_nic)
       ssh_ni.ipv6_access_configs.first.external_ipv6
     else
       ssh_ni&.access_configs&.first&.nat_i_p
@@ -341,7 +349,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     interface = Google::Cloud::Compute::V1::NetworkInterface.new(
       network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
       subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
-      network_i_p: nic.private_ipv4.network.to_s,
+      network_i_p: (nic.private_ipv4.network.to_s if nic.private_ipv4),
       stack_type:,
       vlan:,
     )
@@ -364,9 +372,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def dual_nic_netplan(mgmt_nic)
+    mgmt_ip, mgmt_gateway = if mgmt_nic.private_ipv4
+      [mgmt_nic.private_ipv4.network.to_s, mgmt_nic.private_subnet.net4.nth(1).to_s]
+    end
     GcpDualNicNetplan.new(
-      mgmt_ip: mgmt_nic.private_ipv4.network.to_s,
-      mgmt_gateway: mgmt_nic.private_subnet.net4.nth(1).to_s,
+      mgmt_ip:,
+      mgmt_gateway:,
       user_ip: user_nic.private_ipv4.network.to_s,
       user_gateway: user_nic.private_subnet.net4.nth(1).to_s,
       mgmt_ipv6: management_ipv6?(mgmt_nic),
@@ -489,8 +500,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def reallocate_private_ipv4(error_message)
-    nics = vm.nics.select { error_message.include?("'#{it.private_ipv4.network}'") }
-    nics = vm.nics if nics.empty?
+    ipv4_nics = vm.nics.select(&:private_ipv4)
+    nics = ipv4_nics.select { error_message.include?("'#{it.private_ipv4.network}'") }
+    nics = ipv4_nics if nics.empty?
     nics.each do |nic|
       subnet = nic.private_subnet
       new_ip = subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4

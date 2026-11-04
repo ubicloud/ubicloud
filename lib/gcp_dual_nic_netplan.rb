@@ -11,6 +11,8 @@ class GcpDualNicNetplan
   NETPLAN_PATH = "/etc/netplan/61-ubicloud.yaml"
 
   MGMT_MAC = "@MGMT_MAC@"
+  MGMT_IP = "@MGMT_IP@"
+  MGMT_GATEWAY = "@MGMT_GATEWAY@"
   MGMT_IPV6 = "@MGMT_IPV6@"
   MGMT_GATEWAY_IPV6 = "@MGMT_GATEWAY_IPV6@"
   USER_MAC = "@USER_MAC@"
@@ -43,6 +45,9 @@ class GcpDualNicNetplan
         "#{USER_IPV6}": str(ipaddress.IPv6Address(user["ipv6s"][0])),
         "#{USER_GATEWAY_IPV6}": str(ipaddress.IPv6Address(user["gatewayIpv6"])),
     }
+    if "#{MGMT_IP}" in text:
+        values["#{MGMT_IP}"] = str(ipaddress.IPv4Address(nic0["ip"]))
+        values["#{MGMT_GATEWAY}"] = str(ipaddress.IPv4Address(nic0["gateway"]))
     if "#{MGMT_IPV6}" in text:
         values["#{MGMT_IPV6}"] = str(ipaddress.IPv6Address(nic0["ipv6s"][0]))
         values["#{MGMT_GATEWAY_IPV6}"] = str(ipaddress.IPv6Address(nic0["gatewayIpv6"]))
@@ -85,15 +90,17 @@ class GcpDualNicNetplan
   private
 
   def mgmt_ethernet
+    ip = mgmt_ip || MGMT_IP
+    gateway = mgmt_gateway || MGMT_GATEWAY
     ethernet = {
       "match" => {"macaddress" => MGMT_MAC},
       "dhcp4" => true,
       "dhcp4-overrides" => {"use-routes" => false},
       "routes" => [
-        {"to" => "#{METADATA_SERVER}/32", "via" => mgmt_gateway, "on-link" => true},
-        {"to" => "0.0.0.0/0", "via" => mgmt_gateway, "on-link" => true, "table" => MGMT_TABLE},
+        {"to" => "#{METADATA_SERVER}/32", "via" => gateway, "on-link" => true},
+        {"to" => "0.0.0.0/0", "via" => gateway, "on-link" => true, "table" => MGMT_TABLE},
       ],
-      "routing-policy" => [{"from" => "#{mgmt_ip}/32", "table" => MGMT_TABLE}],
+      "routing-policy" => [{"from" => "#{ip}/32", "table" => MGMT_TABLE}],
     }
     return ethernet unless mgmt_ipv6
 

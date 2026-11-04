@@ -145,7 +145,7 @@ class Prog::Vm::Nexus < Prog::Base
           subnet
         end
         Prog::Vnet::NicNexus.assemble(
-          mgmt_subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, is_management: true, use_eip: management_nic_use_eip,
+          mgmt_subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, is_management: true, use_eip: management_nic_use_eip && !mgmt_subnet.net4.nil?,
         ).subject.update(vm_id: vm.id)
       end
 

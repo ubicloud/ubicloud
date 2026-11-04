@@ -10,12 +10,13 @@ RSpec.describe GcpDualNicNetplan do
 
   let(:network) { YAML.safe_load(netplan.to_yaml)["network"] }
   let(:ipv6_netplan) { netplan.with(mgmt_ipv6: true) }
+  let(:ipv6_only_netplan) { netplan.with(mgmt_ip: nil, mgmt_gateway: nil, mgmt_ipv6: true) }
 
   def fill(netplan, dir)
     path = File.join(dir, "61-ubicloud.yaml")
     File.write("#{path}.template", netplan.to_yaml)
     metadata = {
-      "network-interfaces/0" => {"mac" => "42:01:64:40:00:05", "ipv6s" => ["2600:1900:4000:7::"], "gatewayIpv6" => "fe80::1"},
+      "network-interfaces/0" => {"mac" => "42:01:64:40:00:05", "ip" => "169.254.1.2", "gateway" => "169.254.1.1", "ipv6s" => ["2600:1900:4000:7::"], "gatewayIpv6" => "fe80::1"},
       "vlan-network-interfaces/0/2" => {"mac" => "42:01:0a:00:00:05", "ipv6s" => ["2600:1900:4000:9:0:1::"], "gatewayIpv6" => "fe80::2"},
     }
     harness = <<~PYTHON
@@ -89,9 +90,19 @@ RSpec.describe GcpDualNicNetplan do
     expect(YAML.safe_load(ipv6_netplan.to_yaml)["network"]["vlans"]).to eq(network["vlans"])
   end
 
+  it "takes the IPv4 address and gateway of nic0 from metadata when it has none of its own" do
+    mgmt = YAML.safe_load(ipv6_only_netplan.to_yaml)["network"]["ethernets"]["mgmt-nic"]
+    expect(mgmt["routes"].first(2)).to eq([
+      {"to" => "169.254.169.254/32", "via" => "@MGMT_GATEWAY@", "on-link" => true},
+      {"to" => "0.0.0.0/0", "via" => "@MGMT_GATEWAY@", "on-link" => true, "table" => 100},
+    ])
+    expect(mgmt["routing-policy"].first).to eq("from" => "@MGMT_IP@/32", "table" => 100)
+    expect(mgmt["addresses"]).to eq(["@MGMT_IPV6@/128"])
+  end
+
   it "quotes every placeholder, so the filled values stay strings" do
-    yaml = ipv6_netplan.to_yaml
-    %w[@MGMT_MAC@ @MGMT_IPV6@ @MGMT_GATEWAY_IPV6@ @USER_MAC@ @USER_IPV6@ @USER_GATEWAY_IPV6@].each do |placeholder|
+    yaml = ipv6_only_netplan.to_yaml
+    %w[@MGMT_MAC@ @MGMT_IP@ @MGMT_GATEWAY@ @MGMT_IPV6@ @MGMT_GATEWAY_IPV6@ @USER_MAC@ @USER_IPV6@ @USER_GATEWAY_IPV6@].each do |placeholder|
       expect(yaml.scan(placeholder).size).to be > 0
       expect(yaml.scan(placeholder).size).to eq(yaml.scan(/["']#{placeholder}/).size)
     end
@@ -119,6 +130,16 @@ RSpec.describe GcpDualNicNetplan do
       expect(mgmt["addresses"]).to eq(["2600:1900:4000:7::/128"])
       expect(mgmt["routes"].last).to eq("to" => "::/0", "via" => "fe80::1", "table" => 100)
       expect(mgmt["routing-policy"].last).to eq("from" => "2600:1900:4000:7::/128", "table" => 100)
+    end
+  end
+
+  it "fills the link-local IPv4 address and gateway of an IPv6-only nic0" do
+    Dir.mktmpdir do |dir|
+      filled = fill(ipv6_only_netplan, dir)
+      expect(filled).not_to include("@")
+      mgmt = YAML.safe_load(filled)["network"]["ethernets"]["mgmt-nic"]
+      expect(mgmt["routes"].map { it["via"] }).to eq(["169.254.1.1", "169.254.1.1", "fe80::1"])
+      expect(mgmt["routing-policy"].map { it["from"] }).to eq(["169.254.1.2/32", "2600:1900:4000:7::/128"])
     end
   end
 
