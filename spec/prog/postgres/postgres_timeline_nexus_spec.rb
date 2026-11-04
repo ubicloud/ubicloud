@@ -120,6 +120,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(st_child.subject.backup_period_hours).to eq(6)
     end
 
+    it "inherits the backup schedule from parent" do
+      parent = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
+      parent.update(backup_window_start_at: 5, backup_retention_days: 12, backup_period_hours: 6)
+      child = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: parent.id).subject
+      expect(child).to have_attributes(backup_window_start_at: 5, backup_retention_days: 12, backup_period_hours: 6)
+    end
+
+    it "prefers an explicit backup schedule over the parent's" do
+      parent = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
+      child = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: parent.id, backup_schedule: {backup_window_start_at: 2, backup_retention_days: 9}).subject
+      expect(child).to have_attributes(backup_window_start_at: 2, backup_retention_days: 9, backup_period_hours: 24)
+    end
+
     it "does not generate access_key/secret_key for GCP locations" do
       gcp_location = create_gcp_location
       tl = described_class.assemble(location_id: gcp_location.id).subject
@@ -433,6 +446,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       page = Page.first
       expect(page.severity).to eq("warning")
       expect(page.resource_id).to eq(postgres_timeline.id)
+    end
+
+    [[7.5, nil], [8.5, "warning"], [9.5, "error"]].each do |days_ago, severity|
+      it "pages #{severity.inspect} for a 7 day period when the last backup is #{days_ago} days old" do
+        create_minio_cluster
+        resource = create_postgres_resource(project:, location_id:)
+        create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+        postgres_timeline.update(created_at: Time.now - 20 * 24 * 60 * 60, backup_period_hours: 168, backup_retention_days: 15)
+        mock_minio_client(list_objects: [backup_fixture(days_ago:)])
+
+        nx.before_run
+        expect(Page.select_map(:severity)).to eq(severity ? [severity] : [])
+      end
     end
 
     it "escalates to an error missing backup page if last completed backup is older than 3 days" do

@@ -15,6 +15,7 @@ class PostgresTimeline < Sequel::Model
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
   SENTINEL_MAX_BYTES = 64 * 1024
+  BACKUP_PERIOD_HOURS_OPTIONS = [6, 12, 24, 48, 72, 168].freeze
   DOWNLOAD_CREDENTIALS_DURATION_SECONDS = 60 * 60 * 36
 
   def bucket_name
@@ -42,9 +43,43 @@ class PostgresTimeline < Sequel::Model
     return false if blob_storage.nil?
     return false if leader.nil?
     return true if take_backup_for_converge_set?
-    return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+
+    if backup_window_start_at.nil?
+      return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+    elsif !backup_due?
+      return false
+    end
 
     leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+  end
+
+  def backup_slot_open_at
+    current_hour = Time.now.to_i / 3600
+    offset_hours = (current_hour - backup_window_start_at) % backup_period_hours
+    Time.at((current_hour - offset_hours) * 3600)
+  end
+
+  def backup_due?
+    latest_backup_started_at.nil? || latest_backup_started_at < backup_slot_open_at
+  end
+
+  def next_backup_slot_at
+    return unless backup_window_start_at
+
+    backup_due? ? backup_slot_open_at : backup_slot_open_at + 60 * 60 * backup_period_hours
+  end
+
+  def backup_schedule
+    values.slice(:backup_window_start_at, :backup_retention_days, :backup_period_hours)
+  end
+
+  def validate
+    super
+    validates_includes(0..23, :backup_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_includes(1..35, :backup_retention_days, allow_nil: true, message: "must be between 1 and 35")
+    if !new? && changed_columns.include?(:backup_period_hours)
+      validates_includes(BACKUP_PERIOD_HOURS_OPTIONS, :backup_period_hours, message: "must be one of #{BACKUP_PERIOD_HOURS_OPTIONS.join(", ")}")
+    end
   end
 
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
