@@ -133,8 +133,8 @@ class Vm < Sequel::Model
           vm_host.cpus.filter_map { |cpu| cpu.cpu_number if cpu.io }).sort!.uniq
       end
 
-      vm_storage_volumes.map { |s|
-        {
+      vm_storage_volumes.flat_map { |s|
+        volume = {
           "boot" => s.boot,
           "image" => s.boot_image&.name,
           "image_version" => s.boot_image&.version,
@@ -162,6 +162,13 @@ class Vm < Sequel::Model
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id
           v["boost_io_until_caught_up"] = true if s.boost_io_until_caught_up?
         }
+
+        if s.two_layer_boot?
+          [volume.merge("size_gib" => 0, "read_only" => true, "encrypted" => false),
+            volume.merge("image" => nil, "image_version" => nil)]
+        else
+          [volume]
+        end
       }
     end
 
