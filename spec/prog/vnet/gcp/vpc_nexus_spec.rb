@@ -115,12 +115,41 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         nr = args[:network_resource]
         expect(nr.name).to eq(vpc_name)
         expect(nr.auto_create_subnetworks).to be(false)
+        expect(nr.has_enable_ula_internal_ipv6?).to be(false)
         expect(nr.description).to include("[Ubicloud=17]")
         op
       end
 
       expect { nx.create_vpc }.to hop("wait_create_vpc")
       expect(st.stack.first.dig("create_vpc", "name")).to eq("op-vpc-123")
+    end
+
+    context "with a management subnet" do
+      let(:mgmt_ps) {
+        PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id, project_id: project.id,
+          net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "100.64.0.0/20", state: "waiting")
+      }
+
+      before { gcp_vpc.update(is_management: true, dedicated_for_subnet_id: mgmt_ps.id) }
+
+      it "enables internal ULA IPv6 when the subnet has no IPv4 range" do
+        mgmt_ps.update(net4: nil)
+        expect(networks_client).to receive(:insert) do |args|
+          expect(args[:network_resource].enable_ula_internal_ipv6).to be(true)
+          instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-mgmt-v6")
+        end
+
+        expect { nx.create_vpc }.to hop("wait_create_vpc")
+      end
+
+      it "leaves internal ULA IPv6 unset when the subnet has an IPv4 range" do
+        expect(networks_client).to receive(:insert) do |args|
+          expect(args[:network_resource].has_enable_ula_internal_ipv6?).to be(false)
+          instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-mgmt-v4")
+        end
+
+        expect { nx.create_vpc }.to hop("wait_create_vpc")
+      end
     end
 
     it "handles AlreadyExistsError on INSERT and caches network_self_link" do

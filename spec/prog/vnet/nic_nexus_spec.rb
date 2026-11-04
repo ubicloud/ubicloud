@@ -123,6 +123,20 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(nic.private_ipv4.netmask.prefix_len).to eq(32)
       expect(mgmt_ps.net4.contains(nic.private_ipv4.network)).to be true
     end
+
+    it "gives a NIC in an IPv6-only GCP management subnet no IPv4 address" do
+      service_project = Project.create(name: "pg-service")
+      allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
+      gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: service_project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      mgmt_ps = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: gcp_location.id,
+        project_id: service_project.id, net6: "fd1b:9793:dcef:cd0d::/64", net4: nil, state: "waiting")
+
+      nic = described_class.assemble(mgmt_ps.id, name: "mgmt-nic", is_management: true).subject
+
+      expect(nic.private_ipv4).to be_nil
+      expect(nic.strand.stack.first["ipv4_addr"]).to be_nil
+    end
   end
 
   describe ".select_aws_subnet" do
