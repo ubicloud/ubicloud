@@ -151,8 +151,14 @@ end
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  latest_backup_size_in_gib | bigint                   |
+#  backup_window_start_at    | smallint                 |
+#  backup_retention_days     | smallint                 | NOT NULL DEFAULT 7
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  valid_backup_period_hours    | (backup_period_hours >= 1 AND backup_period_hours <= 168)
+#  valid_backup_retention_days  | (backup_retention_days >= 1 AND backup_retention_days <= 35)
+#  valid_backup_window_start_at | (backup_window_start_at >= 0 AND backup_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
