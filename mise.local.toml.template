@@ -1,2 +1,5 @@
 [tools]
 postgres = "17"
+
+[env]
+PGDATA="$HOME/.local/share/mise/installs/postgres/17/data"
