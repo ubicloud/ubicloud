@@ -74,6 +74,11 @@ class PrivateSubnet < Sequel::Model
     name == GCP_MANAGEMENT_SUBNET_NAME && project_id == Config.postgres_service_project_id
   end
 
+  def dedicated_gcp_vpc?
+    vpc = gcp_vpc
+    !vpc.nil? && vpc.dedicated_for_subnet_id == id && !vpc.is_management
+  end
+
   def before_destroy
     PrivateSubnetFirewall.where(private_subnet_id: id).destroy
     super
