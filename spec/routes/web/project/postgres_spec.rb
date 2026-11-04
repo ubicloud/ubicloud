@@ -804,7 +804,7 @@ RSpec.describe Clover, "postgres" do
 
           expect(page).to have_flash_notice("The AAAA DNS record will be added in a few seconds")
           expect(pg.reload.semaphores_dataset.where(name: "refresh_dns_record").count).to eq(1)
-          expect(pg.dns_zone.records_dataset.where(type: "AAAA").get(:name)).to eq(pg.hostname + ".")
+          expect(pg.dns_zone.records_dataset.where(type: "AAAA").select_order_map(:name)).to eq([pg.hostname + ".", pg.private_hostname + "."])
         end
 
         it "does not show button if AAAA record already exists" do
