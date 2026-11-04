@@ -81,7 +81,7 @@ RSpec.describe Prog::Test::VpcPeering do
     it "creates a BYOC location with the E2E credential and a PostgreSQL resource in it" do
       start_test
       location = Location[vp_test.location_id]
-      expect(location).to have_attributes(name: "us-west-2", provider: "aws", project_id: vp_test.postgres_test_project_id, byoc: true, display_name: "vpc-peering-e2e")
+      expect(location).to have_attributes(name: "us-west-2", provider: "aws", project_id: vp_test.postgres_test_project_id, byoc: true, display_name: "vpc-peering-e2e-#{st.ubid}", ui_name: "vpc-peering-e2e-#{st.ubid}")
       expect(Strand[location.id]).to have_attributes(prog: "LocationNexus", label: "wait")
       expect(location.location_credential_aws).to have_attributes(access_key: "stubbed-akid", secret_key: "stubbed-secret")
       expect(location.location_azs.map(&:zone_id)).to eq ["usw2-az1"]

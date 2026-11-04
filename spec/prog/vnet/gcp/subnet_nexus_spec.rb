@@ -806,6 +806,70 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect { nx.destroy }.to hop("wait_delete_subnet")
     end
+
+    describe "with VPC peerings" do
+      let(:waiting_msg) { "Cannot destroy subnet with VPC peerings, waiting for them to be destroyed" }
+
+      before { gcp_vpc.update(dedicated_for_subnet_id: ps.id) }
+
+      def peering(network, subnet = ps)
+        Prog::Vnet::VpcPeeringNexus.assemble(subnet, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/#{network}").subject
+      end
+
+      def semaphore_names(model)
+        Semaphore.where(strand_id: model.id).select_order_map(:name)
+      end
+
+      it "sets destroy on its VPC peerings once and naps until they are gone" do
+        vp = peering("customer-vpc")
+        other_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "other-ps", location_id: location.id).subject
+        Prog::Vnet::Gcp::VpcNexus.assemble(project.id, location.id, dedicated_for_subnet_id: other_ps.id).subject.add_private_subnet(other_ps)
+        other_vp = peering("customer-vpc", other_ps)
+        expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).twice.and_call_original
+
+        expect { nx.destroy }.to nap(5)
+          .and change { semaphore_names(vp) }.from([]).to(["destroy"])
+        expect { nx.destroy }.to nap(5)
+          .and not_change { semaphore_names(vp) }
+        expect(frame_value(nx, "deadline_at")).to be_nil
+
+        vp.destroy
+        expect(nfp_client).to receive(:get_rule).twice.and_raise(Google::Cloud::NotFoundError.new("not found"))
+        expect(subnetworks_client).to receive(:delete)
+          .with(project: "test-gcp-project", region: "us-central1", subnetwork: "ubicloud-#{ps.ubid}")
+          .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet"))
+        expect { nx.destroy }.to hop("wait_delete_subnet")
+        expect(semaphore_names(other_vp)).to eq []
+      end
+
+      it "does not set destroy on a VPC peering already being destroyed" do
+        destroying = peering("customer-vpc")
+        destroying.incr_destroying
+        vp = peering("other-vpc")
+        expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).and_call_original
+
+        expect { nx.destroy }.to nap(5)
+          .and change { semaphore_names(vp) }.from([]).to(["destroy"])
+        expect(semaphore_names(destroying)).to eq ["destroying"]
+      end
+
+      it "reaches the peerings from a destroy request and keeps it set while it waits" do
+        vp = peering("customer-vpc")
+        st.update(label: "wait")
+        ps.incr_destroy
+        expect(Clog).to receive(:emit).with("hopped", {strand_hopped: hash_including(from: "Vnet::Gcp::SubnetNexus.wait", to: "Vnet::Gcp::SubnetNexus.destroy")}).and_call_original
+        expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).twice.and_call_original
+
+        expect(st.run).to be_a(Prog::Base::Hop)
+        2.times do
+          expect(st.run).to be_a(Prog::Base::Nap)
+          expect(st.label).to eq "destroy"
+          expect(semaphore_names(ps)).to eq %w[destroy destroying]
+        end
+        expect(semaphore_names(vp)).to eq ["destroy"]
+        expect(semaphore_names(gcp_vpc)).to eq []
+      end
+    end
   end
 
   describe "#wait_delete_subnet" do

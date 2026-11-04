@@ -78,6 +78,42 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "#dedicated_gcp_vpc?" do
+    let(:location) { Location[name: "gcp-us-central1"] }
+    let(:gcp_ps) {
+      described_class.create(name: "gcp-ps", location_id: location.id, net6: "fd1b:9793:dcef:cd0c::/64",
+        net4: "10.9.41.0/26", state: "waiting", project_id: private_subnet.project_id)
+    }
+
+    def join_vpc(**)
+      GcpVpc.create(project_id: gcp_ps.project_id, location_id: location.id, name: "ubicloud-vpc-test", **).add_private_subnet(gcp_ps)
+    end
+
+    it "is false without a VPC network" do
+      expect(gcp_ps.dedicated_gcp_vpc?).to be false
+    end
+
+    it "is false for the project's shared VPC network" do
+      join_vpc
+      expect(gcp_ps.dedicated_gcp_vpc?).to be false
+    end
+
+    it "is false for another subnet's dedicated VPC network" do
+      join_vpc(dedicated_for_subnet_id: private_subnet.id)
+      expect(gcp_ps.dedicated_gcp_vpc?).to be false
+    end
+
+    it "is false for the management VPC network" do
+      join_vpc(dedicated_for_subnet_id: gcp_ps.id, is_management: true)
+      expect(gcp_ps.dedicated_gcp_vpc?).to be false
+    end
+
+    it "is true for its own dedicated VPC network" do
+      join_vpc(dedicated_for_subnet_id: gcp_ps.id)
+      expect(gcp_ps.dedicated_gcp_vpc?).to be true
+    end
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet

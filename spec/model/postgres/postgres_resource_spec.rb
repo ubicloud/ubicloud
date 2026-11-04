@@ -1297,6 +1297,13 @@ RSpec.describe PostgresResource do
           expect(postgres_resource.check_all_dns_records).to eq []
         end
 
+        it "resolves A records but no private AAAA record for GCP databases" do
+          postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
+          expect(checker).to receive(:check).with(:A, postgres_resource.hostname, "10.1.2.3")
+          expect(checker).to receive(:check).with(:A, postgres_resource.private_hostname, postgres_resource.representative_server.vm.private_ipv4_string)
+          expect(postgres_resource.check_all_dns_records).to eq []
+        end
+
         it "does not attempt to resolve AAAA public record for old metal databases lacking one" do
           postgres_resource.update(created_at: Time.utc(2025))
           expect(checker).to receive(:check).with(:A, postgres_resource.hostname, "10.1.2.3")

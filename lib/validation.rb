@@ -75,6 +75,9 @@ module Validation
 
   AWS_ACCOUNT_ID_PATTERN = %r{\A\d{12}\z}
   AWS_VPC_ID_PATTERN = %r{\Avpc-(?:[0-9a-f]{8}|[0-9a-f]{17})\z}
+  GCP_PROJECT_ID_PATTERN = %r{\A[a-z][a-z0-9-]{4,28}[a-z0-9]\z}
+  GCP_NETWORK_NAME_PATTERN = %r{\A[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?\z}
+  GCP_NETWORK_PATH_PATTERN = %r{\Aprojects/([^/]+)/global/networks/([^/]+)\z}
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
@@ -410,6 +413,19 @@ module Validation
     details["peer_vpc_id"] = "VPC ID must look like vpc-0123456789abcdef0. It is under Your VPCs in the AWS VPC console." unless peer_vpc_id.match?(AWS_VPC_ID_PATTERN)
     details["aws.peer_region"] = "\"#{peer_region}\" is not an AWS region. Use a region code such as us-east-1." unless Option::AWS_REGIONS.key?(peer_region)
     fail ValidationFailed.new(details) unless details.empty?
+  end
+
+  def self.validate_gcp_vpc_peering(peer_account_id:, peer_vpc_id:)
+    details = {}
+    network = peer_vpc_id.delete_prefix("https://www.googleapis.com/compute/v1/")
+    if (m = GCP_NETWORK_PATH_PATTERN.match(network))
+      path_project, network = m.captures
+      details["peer_vpc_id"] = "The network path names project #{path_project}, not #{peer_account_id}." unless path_project == peer_account_id
+    end
+    details["peer_account_id"] = "GCP project ID must be 6 to 30 lowercase letters, digits or hyphens, start with a letter and not end with a hyphen, such as my-project-123. Use the project ID, not the project number." unless peer_account_id.match?(GCP_PROJECT_ID_PATTERN)
+    details["peer_vpc_id"] ||= "VPC network name must be 1 to 63 lowercase letters, digits or hyphens, start with a letter and not end with a hyphen." unless network.match?(GCP_NETWORK_NAME_PATTERN)
+    fail ValidationFailed.new(details) unless details.empty?
+    "projects/#{peer_account_id}/global/networks/#{network}"
   end
 
   def self.validate_syslog_url(url)
