@@ -1080,6 +1080,101 @@ RSpec.describe Clover, "postgres" do
         page.refresh
         expect(page).to have_no_content delete_note
       end
+
+      it "hides the link to the VPC peering tab from a user who cannot view the private subnet" do
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        visit "#{project.path}#{aws_pg.path}/networking"
+
+        expect(page).to have_content intro
+        expect(page).to have_no_link "Manage VPC peering"
+      end
+
+      it "does not offer the private connection string for an active VPC peering" do
+        Prog::Vnet::VpcPeeringNexus.assemble(aws_pg.private_subnet, peer_account_id: "111122223333", peer_vpc_id: "vpc-0bbbbbbbbbbbbbbbb", aws: {peer_region: "us-west-2"}).subject.update(state: "active")
+        aws_pg.strand.update(label: "wait")
+        visit "#{project.path}#{aws_pg.path}/connection"
+
+        expect(page).to have_no_content "No connection information available"
+        expect(page).to have_no_content "Use Private DNS?"
+      end
+    end
+
+    describe "vpc peering in GCP" do
+      let(:gcp_location) { Location[name: "gcp-us-central1"] }
+
+      let(:gcp_pg) {
+        Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: gcp_location.id,
+          name: "pg-gcp",
+          target_vm_size: "c4a-standard-4",
+          target_storage_size_gib: 375,
+          target_version: "16",
+        ).subject.tap {
+          Prog::Vnet::Gcp::VpcNexus.assemble(project.id, gcp_location.id, dedicated_for_subnet_id: it.private_subnet_id).subject.add_private_subnet(it.private_subnet)
+        }
+      }
+
+      let(:intro) { "Reach this database from your own GCP VPC network over private addresses. Once a peering is active, use the private connection string on the Connection tab." }
+
+      before do
+        LocationCredentialGcp.create_with_id(gcp_location, project_id: "ubicloud-test", service_account_email: "test@ubicloud-test.iam.gserviceaccount.com", credentials_json: "{}")
+        allow(Config).to receive(:vpc_peering_enabled).and_return(true)
+        project.set_ff_vpc_peering_gcp(true)
+      end
+
+      def assemble_peering
+        Prog::Vnet::VpcPeeringNexus.assemble(gcp_pg.private_subnet, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/customer-vpc").subject
+      end
+
+      it "links the networking tab to the VPC peering tab of the database's private subnet for users who can view it" do
+        visit "#{project.path}#{gcp_pg.path}/networking"
+        expect(page).to have_content intro
+        expect(page).to have_no_content "Your connection string does not change."
+
+        click_link "Manage VPC peering"
+        expect(page.title).to eq "Ubicloud - #{gcp_pg.ubid}-subnet"
+        expect(page).to have_current_path "#{project.path}#{gcp_pg.private_subnet.path}/vpc-peering"
+        expect(page).to have_content "Ubicloud VPC network #{gcp_pg.private_subnet.gcp_vpc.name}", normalize_ws: true
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        visit "#{project.path}#{gcp_pg.path}/networking"
+        expect(page).to have_content intro
+        expect(page).to have_no_link "Manage VPC peering"
+      end
+
+      it "offers the private connection string only while a VPC peering of the database's private subnet is active" do
+        DnsZone.create(project_id: postgres_project.id, name: gcp_pg.hostname_suffix)
+        gcp_pg.strand.update(label: "wait")
+        visit "#{project.path}#{gcp_pg.path}/connection"
+        expect(page).to have_no_content "No connection information available"
+        expect(page).to have_no_content "Use Private DNS?"
+
+        vp = assemble_peering
+        page.refresh
+        expect(page).to have_no_content "Use Private DNS?"
+
+        vp.update(state: "active")
+        page.refresh
+        expect(page).to have_content "Use Private DNS?"
+        expect(page.find(".connection-info-box-url-5432-private .copyable-content")["data-content"]).to start_with "postgresql://postgres:#{gcp_pg.superuser_password}@#{gcp_pg.private_hostname}:5432/postgres?"
+
+        vp.incr_destroy
+        page.refresh
+        expect(page).to have_no_content "Use Private DNS?"
+      end
+
+      it "warns in the delete card when the database's private subnet has VPC peerings" do
+        visit "#{project.path}#{gcp_pg.path}/settings"
+        expect(page).to have_content "This action will permanently delete this PostgreSQL database."
+        expect(page).to have_no_content "The database will no longer be reachable over the VPC peerings of its private subnet."
+
+        assemble_peering
+        page.refresh
+        expect(page).to have_content "The database will no longer be reachable over the VPC peerings of its private subnet."
+      end
     end
 
     describe "metric-destination" do
