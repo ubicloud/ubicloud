@@ -75,6 +75,7 @@ module Validation
 
   AWS_ACCOUNT_ID_PATTERN = %r{\A\d{12}\z}
   AWS_VPC_ID_PATTERN = %r{\Avpc-(?:[0-9a-f]{8}|[0-9a-f]{17})\z}
+  GCP_NETWORK_PATH_PATTERN = %r{\Aprojects/([^/]+)/global/networks/([^/]+)\z}
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
