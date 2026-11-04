@@ -16,6 +16,11 @@ class PostgresResource < Sequel::Model
 
     private
 
+    def metal_private_dns_records
+      vm = representative_server.vm
+      {A: vm.private_ipv4_string, AAAA: vm.private_ipv6_string}
+    end
+
     def metal_boot_image(pg_version, arch, family)
       "postgres-#{family}"
     end
