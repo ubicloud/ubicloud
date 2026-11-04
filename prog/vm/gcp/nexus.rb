@@ -25,8 +25,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # honour the value already set by retry_zone_capacity on later entries.
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = (exclude_zones || [].freeze) + (unsupported_azs || [].freeze)
-      available = gcp_az_suffixes - excluded
-      location_az = location_az_for(available.sample || gcp_az_suffixes.sample)
+      zones = family_az_suffixes
+      available = zones - excluded
+      location_az = location_az_for(available.sample || zones.sample)
       VmGcpResource.create_with_id(vm, location_az_id: location_az.id) unless vm.vm_gcp_resource
       self.gcp_zone_suffix = location_az.az
     end
@@ -397,7 +398,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   undef_method :gcp_zone_suffix
   def gcp_zone_suffix
-    strand.stack.dig(0, "gcp_zone_suffix") || gcp_az_suffixes.sample
+    strand.stack.dig(0, "gcp_zone_suffix") || family_az_suffixes.sample
   end
 
   def gcp_region
@@ -497,7 +498,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def bump_excluded_zone(error_message, zones_exhausted: false, untried_delay: 5)
     excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
-    available = zones_exhausted ? [] : gcp_az_suffixes - excluded
+    available = zones_exhausted ? [] : family_az_suffixes - excluded
     delay = untried_delay
 
     if available.empty?
@@ -511,7 +512,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         delay = 5 * 60
       end
       excluded = []
-      available = gcp_az_suffixes
+      available = family_az_suffixes
     else
       Clog.emit("GCE zone retry",
         {zone_retry: {failed_zone: gcp_zone, excluded:,
@@ -545,6 +546,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def gcp_az_suffixes
     @gcp_az_suffixes ||= vm.location.azs.map(&:az)
+  end
+
+  # Not memoized: a runner switching families changes vm.family.
+  def family_az_suffixes
+    missing = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:missing_zones] || [].freeze
+    gcp_az_suffixes.reject { missing.include?("#{gcp_region}-#{it}") }
   end
 
   def location_az_for(suffix)

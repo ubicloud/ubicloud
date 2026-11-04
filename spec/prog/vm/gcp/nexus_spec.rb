@@ -472,6 +472,64 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       end
     end
 
+    describe "for a family GCE does not offer in every zone" do
+      let(:location) {
+        Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: project.id,
+          display_name: "gcp-europe-west3", ui_name: "GCP Europe West 3", visible: true)
+      }
+
+      let(:vm) {
+        location_credential
+        gcp_vpc
+        v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+          location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+          name: "testvm", size: "n4d-standard-8", arch: "x64").subject
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+        v
+      }
+
+      before do
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+      end
+
+      it "picks its first zone among the zones offering the family" do
+        expect(nx.send(:family_az_suffixes)).to eq(%w[a b])
+        refresh_frame(nx, new_values: {"exclude_zones" => ["a"]})
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
+        expect(compute_client).to receive(:insert) do |args|
+          expect(args[:zone]).to eq("europe-west3-b")
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(st.stack.first["gcp_zone_suffix"]).to eq("b")
+      end
+
+      it "retries only the zones offering the family" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+        ensure_vm_gcp_resource(vm, "a")
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE zone retry", {zone_retry: {failed_zone: "europe-west3-a", excluded: ["a"], remaining: ["b"], error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(st.stack.first["gcp_zone_suffix"]).to eq("b")
+      end
+
+      it "moves a runner to the next family, with every zone, once the zones offering its family are exhausted" do
+        create_runner_for(vm)
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "b", "exclude_zones" => ["a"], "alternative_families" => ["c4-standard"]})
+        ensure_vm_gcp_resource(vm, "b")
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: "n4d-standard", next_family: "c4-standard", error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(vm.reload.family).to eq("c4-standard")
+        expect(st.stack.first["exclude_zones"]).to eq([])
+        expect(nx.send(:family_az_suffixes)).to eq(%w[a b c])
+      end
+    end
+
     it "excludes failed zones on successive retries" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)

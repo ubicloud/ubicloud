@@ -166,7 +166,8 @@ module Option
                       shapes: {8 => 1, 16 => 2, 22 => 3, 32 => 4, 44 => 6, 88 => 12}},
     "n2d-standard" => {gce_prefix: "n2d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n2d_shapes.merge(128 => [24], 224 => [24]), boot_disk_type: "pd-balanced"},
     "n2d-highmem" => {gce_prefix: "n2d-highmem", gce_suffix: nil, arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: n2d_shapes, boot_disk_type: "pd-balanced"},
-    "n4d-standard" => {gce_prefix: "n4d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n4d_shapes, boot_disk_type: "hyperdisk-balanced", runner_only: true},
+    "n4d-standard" => {gce_prefix: "n4d-standard", gce_suffix: nil, arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: n4d_shapes, boot_disk_type: "hyperdisk-balanced", runner_only: true,
+                       missing_zones: ["europe-west3-c"]},
   }.freeze
 
   # GCE can live migrate a VM with at most this much attached local SSD.
