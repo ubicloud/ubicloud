@@ -16,8 +16,8 @@
       <table id="cache-entries" class="min-w-full divide-y divide-gray-300">
         <tbody class="divide-y divide-gray-200 bg-white">
           <% if @entries_by_repo.count > 0 %>
-            <% @entries_by_repo.each do |repository_id, entries| %>
-              <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">
+            <% @entries_by_repo.each do |repository, entries| %>
+              <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository.ubid %>">
                 <th
                   scope="colgroup"
                   class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50"
@@ -25,7 +25,7 @@
                 >
                   <div class="flex">
                     <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
-                    <%= entries.first.repository.name %>
+                    <%= repository.name %>
                   </div>
                 </th>
 
@@ -59,9 +59,9 @@
                 >
                   <%== part(
                   "components/delete_button",
-                  url: "#{path(@installation)}/repository/#{repository_id}/cache",
+                  url: "#{path(@installation)}/repository/#{repository.ubid}/cache",
                   text: "Delete All",
-                  attributes: {id: "delete-all-#{repository_id}"},
+                  attributes: {id: "delete-all-#{repository.ubid}"},
                   confirmation: "delete all",
                   confirmation_message: "Are you sure you want to delete all cache entries for this repository?"
                 ) %>
@@ -69,7 +69,7 @@
               </tr>
 
               <% entries.each do |entry| %>
-                <tr id="entry-<%= entry.ubid %>" class="hidden cache-group cache-group-<%= repository_id %>">
+                <tr id="entry-<%= entry.ubid %>" class="hidden cache-group cache-group-<%= repository.ubid %>">
                   <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
                     <input
                       type="checkbox"
