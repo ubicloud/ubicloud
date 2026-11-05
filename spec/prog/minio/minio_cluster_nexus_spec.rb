@@ -95,7 +95,10 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(stack["initial_cert_id"]).to eq stack["current_cert_id"]
       cert = Cert.with_pk!(stack["initial_cert_id"])
       expect(cert.hostname).to eq "minio2.#{Config.minio_host_name}"
-      expect(cert.strand.stack[0]["waiting_strand_id"]).to eq cluster.id
+      cert_frame = cert.strand.stack[0]
+      expect(cert_frame["waiting_strand_id"]).to eq cluster.id
+      expect(cert_frame["remaining_auto_restarts"]).to eq 100
+      expect(cert_frame["wakeup_semaphore"]).to be_nil
     end
   end
 
@@ -165,6 +168,44 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     it "hops to switch_to_public_certs if the semaphore is set" do
       nx.incr_switch_to_public_certs
       expect { nx.wait }.to hop("switch_to_public_certs")
+    end
+
+    context "when cert_renewed is set" do
+      let(:cert) do
+        Prog::Vnet::CertNexus.assemble(nx.minio_cluster.hostname, nx.minio_cluster.dns_zone.id).subject
+      end
+
+      before do
+        make_publicly_signed(nx.minio_cluster)
+        refresh_frame(nx, new_values: {"refresh_cert_id" => cert.id, "current_cert_id" => cert.id})
+        nx.incr_cert_renewed
+      end
+
+      it "stores the cert, reconfigures the servers (no restart), and decrements the semaphore" do
+        server_cert, server_cert_key = Util.create_certificate(subject: "/CN=minio", duration: 60 * 60 * 24 * 29)
+        cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
+        server_ids = nx.minio_cluster.servers.map(&:id)
+
+        expect { nx.wait }.to nap(0)
+        expect(nx.minio_cluster.reload.server_cert).to eq server_cert.to_pem
+        expect(nx.minio_cluster.server_cert_key).to eq server_cert_key.to_pem
+        server_ids.each do |id|
+          expect(Semaphore.where(strand_id: id, name: "reconfigure").count).to eq(1)
+          expect(Semaphore.where(strand_id: id, name: "restart").count).to eq(0)
+        end
+        expect(Semaphore.where(strand_id: nx.strand.id, name: "cert_renewed")).to be_empty
+        expect(nx.strand.stack[0]).not_to have_key("refresh_cert_id")
+        expect(nx.strand.stack[0]["current_cert_id"]).to eq cert.id
+      end
+
+      it "pages and decrements the semaphore if the cert is not available" do
+        server_ids = nx.minio_cluster.servers.map(&:id)
+
+        expect { nx.wait }.to nap(0)
+        expect(Page.first.summary).to eq "Cert not available after cert_renewed semaphore set for #{nx.minio_cluster.ubid}"
+        expect(Semaphore.where(strand_id: nx.strand.id, name: "cert_renewed")).to be_empty
+        expect(Semaphore.where(strand_id: server_ids, name: "reconfigure")).to be_empty
+      end
     end
   end
 
@@ -275,16 +316,32 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(nx.minio_cluster.certificate_last_checked_at).to be > certificate_last_checked_at
     end
 
-    it "starts a new CertNexus strand and hops to wait_refresh_public_cert if close to expiration" do
+    it "starts a new CertNexus strand and hops to wait if close to expiration" do
       cert, key = Util.create_certificate(subject: "/CN=minio", duration: 60 * 60 * 24 * 12)
       nx.minio_cluster.update(server_cert: cert.to_pem, server_cert_key: key.to_pem)
 
-      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      expect { nx.refresh_certificates }.to hop("wait")
       stack = nx.strand.stack[0]
       expect(stack["refresh_cert_id"]).to eq stack["current_cert_id"]
       new_cert = Cert.with_pk!(stack["refresh_cert_id"])
       expect(new_cert.hostname).to eq nx.minio_cluster.hostname
-      expect(new_cert.strand.stack[0]["waiting_strand_id"]).to eq nx.minio_cluster.id
+      cert_frame = new_cert.strand.stack[0]
+      expect(cert_frame["waiting_strand_id"]).to eq nx.minio_cluster.id
+      expect(cert_frame["wakeup_semaphore"]).to eq "cert_renewed"
+      expect(cert_frame["remaining_auto_restarts"]).to eq 100
+    end
+
+    it "does not start a new CertNexus strand if a refresh cert is already being provisioned" do
+      cert, key = Util.create_certificate(subject: "/CN=minio", duration: 60 * 60 * 24 * 12)
+      nx.minio_cluster.update(server_cert: cert.to_pem, server_cert_key: key.to_pem)
+      pending_cert_id = Prog::Vnet::CertNexus.assemble(nx.minio_cluster.hostname, nx.minio_cluster.dns_zone.id).id
+      refresh_frame(nx, new_values: {"refresh_cert_id" => pending_cert_id, "current_cert_id" => pending_cert_id})
+
+      expect { nx.refresh_certificates }.to hop("wait")
+        .and not_change { Strand.where(prog: "Vnet::CertNexus").count }
+      stack = nx.strand.stack[0]
+      expect(stack["refresh_cert_id"]).to eq pending_cert_id
+      expect(stack["current_cert_id"]).to eq pending_cert_id
     end
   end
 
