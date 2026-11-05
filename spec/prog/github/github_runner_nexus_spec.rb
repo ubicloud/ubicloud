@@ -33,6 +33,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     allow(Time).to receive(:now).and_return(now)
   end
 
+  def add_aws_vpc(installation)
+    location = Location.first(provider: "aws", name: "eu-central-1") || Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+    allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+    ps = PrivateSubnet.create(name: "installation-subnet-#{installation.installation_id}", location_id: location.id, net4: "10.0.0.0/17", net6: "fd10::/64", project_id: vm.project_id)
+    installation.add_private_subnet(ps)
+  end
+
   describe ".assemble" do
     it "creates github runner and vm with sshable" do
       runner = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud").subject
@@ -644,16 +651,28 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(false)
       end
 
-      it "waits if utilization is high, spill over enabled, and waited enough but spill runner limit exceeded" do
+      it "waits if utilization is high, spill over enabled, and waited enough but spill installation limit exceeded" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
-        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(1)
-        create_vm(vcpus: 2, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+        expect(Config).to receive(:github_runner_aws_spill_installation_capacity).and_return(1)
+        add_aws_vpc(GithubInstallation.create(installation_id: 456, project_id: project.id, name: "other", type: "Organization"))
 
         expect { nx.wait_concurrency_limit }.to nap
         expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "allocates if utilization is high, spill over enabled, waited enough, and the installation already has an AWS VPC" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
+        allow(Config).to receive(:github_runner_aws_spill_installation_capacity).and_return(1)
+        add_aws_vpc(installation)
+
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.spill_over_set?).to be(true)
       end
 
       it "waits if utilization is high, spill over enabled, and waited enough but customer's own alien quota is exceeded" do
@@ -999,11 +1018,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(false)
       end
 
-      it "does not spill over if the spill runner limit is exceeded" do
-        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(1)
-        create_vm(vcpus: 2, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+      it "does not spill over if the spill installation limit is exceeded" do
+        expect(Config).to receive(:github_runner_aws_spill_installation_capacity).and_return(1)
+        add_aws_vpc(GithubInstallation.create(installation_id: 456, project_id: project.id, name: "other", type: "Organization"))
         expect { nx.wait_vm }.to nap(10)
         expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "spills over if the spill installation limit is reached but the installation already has an AWS VPC" do
+        allow(Config).to receive(:github_runner_aws_spill_installation_capacity).and_return(1)
+        add_aws_vpc(installation)
+        expect { nx.wait_vm }.to hop("allocate_vm")
+        expect(runner.reload.spill_over_set?).to be(true)
       end
     end
 
