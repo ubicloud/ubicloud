@@ -150,20 +150,23 @@ end
 
 # Table: github_repository
 # Columns:
-#  id              | uuid                     | PRIMARY KEY
-#  installation_id | uuid                     |
-#  name            | text                     | NOT NULL
-#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_job_at     | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_check_at   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  default_branch  | text                     |
-#  access_key      | text                     |
-#  secret_key      | text                     |
-#  no_cache_since  | timestamp with time zone |
-#  bucket_name     | text                     |
+#  id                      | uuid                     | PRIMARY KEY
+#  installation_id         | uuid                     |
+#  name                    | text                     | NOT NULL
+#  created_at              | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_job_at             | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_check_at           | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  default_branch          | text                     |
+#  access_key              | text                     |
+#  secret_key              | text                     |
+#  no_cache_since          | timestamp with time zone |
+#  bucket_name             | text                     |
+#  extra_cache_storage_gib | integer                  |
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)
+# Check constraints:
+#  github_repository_extra_cache_storage_gib_positive | (extra_cache_storage_gib > 0)
 # Foreign key constraints:
 #  github_repository_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
 # Referenced By:
