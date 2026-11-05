@@ -75,12 +75,16 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait
-    when_refresh_cert_set? do
-      hop_create_new_cert
-    end
+    self.cert = nil if cert && !Cert[cert]
 
-    if load_balancer.need_certificates?
-      load_balancer.incr_refresh_cert
+    if cert
+      when_cert_renewed_set? do
+        load_balancer.vms.each do |vm|
+          bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :reshare_certificate
+        end
+        hop_wait_cert_broadcast
+      end
+    elsif refresh_cert_set? || load_balancer.need_certificates?
       hop_create_new_cert
     end
 
@@ -98,12 +102,16 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def create_new_cert
     cert = Prog::Vnet::CertNexus.assemble(load_balancer.cert_hostname, load_balancer.dns_zone&.id,
       private_hostname: load_balancer.cert_private_hostname,
+      num_auto_restarts: 100,
+      wakeup_semaphore: "cert_renewed",
       waiting_strand_id: strand.id).subject
     load_balancer.add_cert(cert)
     self.cert = cert.id
-    hop_wait_cert_provisioning
+    decr_refresh_cert
+    hop_wait
   end
 
+  # Can be removed after no strands at label
   label def wait_cert_provisioning
     # Wait until the cert we created in create_new_cert actually has a cert
     if cert ? Cert[cert].cert.nil? : load_balancer.need_certificates?
@@ -122,7 +130,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait_cert_broadcast
     reap(nap: 1) do
-      decr_refresh_cert
+      if cert_renewed_set?
+        decr_cert_renewed
+      else
+        # Remove branch after no strands at label with semaphore set
+        decr_refresh_cert
+      end
       self.cert = nil
       load_balancer.certs_dataset.exclude(id: load_balancer.active_cert&.id).all do |cert|
         LoadBalancerCert[cert_id: cert.id].destroy

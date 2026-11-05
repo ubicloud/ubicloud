@@ -19,7 +19,7 @@ class LoadBalancer < Sequel::Model
   plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, load_balancer_certs: :destroy
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
+  plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert, :cert_renewed
   include ObjectTag::Cleanup
 
   dataset_module Pagination
