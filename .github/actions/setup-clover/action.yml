@@ -13,7 +13,8 @@ runs:
     - name: Start PostgreSQL setup in the background
       shell: bash
       run: |
-        (PS4='+ $(date +%T.%3N) ' "$GITHUB_ACTION_PATH/setup-postgres.sh" > "$RUNNER_TEMP/setup-postgres.log" 2>&1; echo $? > "$RUNNER_TEMP/setup-postgres.status") &
+        # Write the status atomically, so the wait step never reads an empty file
+        (PS4='+ $(date +%T.%3N) ' "$GITHUB_ACTION_PATH/setup-postgres.sh" > "$RUNNER_TEMP/setup-postgres.log" 2>&1; echo $? > "$RUNNER_TEMP/setup-postgres.status.tmp"; mv "$RUNNER_TEMP/setup-postgres.status.tmp" "$RUNNER_TEMP/setup-postgres.status") &
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
@@ -40,8 +41,23 @@ runs:
     - name: Wait for PostgreSQL setup
       shell: bash
       run: |
-        until [ -f "$RUNNER_TEMP/setup-postgres.status" ]; do sleep 1; done
+        # The setup usually takes less than a minute. If it hangs, fail with
+        # enough state to see where, instead of waiting for the job timeout.
+        for _ in $(seq 300); do
+          [ -f "$RUNNER_TEMP/setup-postgres.status" ] && break
+          sleep 1
+        done
         cat "$RUNNER_TEMP/setup-postgres.log"
+        if [ ! -f "$RUNNER_TEMP/setup-postgres.status" ]; then
+          echo "::error::PostgreSQL setup did not finish in 5 minutes"
+          set -x
+          ps -eo pid,ppid,etime,stat,args --forest
+          systemctl is-system-running || true
+          systemctl list-jobs --no-pager
+          systemctl status 'postgresql*' --no-pager || true
+          sudo journalctl -b --no-pager -u 'postgresql*' -u apt-daily.service -u apt-daily-upgrade.service -u unattended-upgrades.service | tail -n 200
+          exit 1
+        fi
         exit "$(cat "$RUNNER_TEMP/setup-postgres.status")"
 
     - name: Setup clover database
