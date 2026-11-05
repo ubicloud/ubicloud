@@ -207,6 +207,13 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.destroy }.to hop("finalize_destroy")
     end
 
+    it "skips the static IP release of a NIC assembled with use_eip false" do
+      refresh_frame(nx, new_values: {"use_eip" => false})
+      expect(addresses_client).not_to receive(:delete)
+
+      expect { nx.destroy }.to hop("finalize_destroy")
+    end
+
     it "still issues the IP delete with the deterministic name when NicGcpResource is missing" do
       expect(addresses_client).to receive(:delete)
         .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
