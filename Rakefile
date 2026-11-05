@@ -233,6 +233,44 @@ task "update_svg_golden_files" do
   sh "mv spec/lib/svg_chart-spec-output-files/*.svg spec/lib/svg_chart-golden-files/"
 end
 
+# Terraform provider
+
+namespace :terraform do
+  generator = lambda do
+    require_relative "terraform/lib/terraform_generator"
+    TerraformGenerator
+  end
+
+  generate = lambda do |force: false|
+    tg = generator.call
+    statuses = tg::Tree.new(tg::MODULE).write(tg.files, force:)
+    statuses.each { |path, status| puts "#{status.to_s.ljust(9)} terraform/provider/#{path}" unless status == :unchanged }
+    puts "rake terraform:diff shows what is left to carry back from the edited files" if statuses.value?(:edited) && !force
+    statuses
+  end
+
+  desc "Write the terraform provider's generated files, keeping edited ones unless FORCE=1"
+  task :generate do
+    generate.call(force: ENV["FORCE"] == "1")
+  end
+
+  desc "Show what is left to carry back from edits to the terraform provider's generated files"
+  task :diff do
+    tg = generator.call
+    tg::Tree.new(tg::MODULE).edits(tg.files).each do |path, render|
+      IO.popen(["diff", "-u", "--label", "render/#{path}", "--label", "terraform/provider/#{path}", "-", File.join(tg::MODULE, path)], "w") { it.write(render) }
+      raise "diff failed on terraform/provider/#{path}" if Process.last_status.exitstatus > 1
+    end
+  end
+
+  desc "Write the terraform provider's generated files, failing on an edited or orphaned one"
+  task :check do
+    statuses = generate.call
+    generator.call.special_cases.each { |name, types| puts "special case #{name}: #{types.join(", ")}" }
+    abort "terraform:check failed: a generated file is edited, or no definition renders it" if statuses.values.intersect?(%i[edited orphan])
+  end
+end
+
 # Other
 
 desc "Create admin account in production environment"

@@ -16,6 +16,11 @@
 /svg-chart-golden-files.diff
 /cache-text-*
 
+# Written by rake terraform:generate
+/terraform/provider/examples/data-sources/
+/terraform/provider/examples/resources/
+/terraform/provider/internal/provider/*_gen.go
+
 # Used by rake by
 /bin/by
 
