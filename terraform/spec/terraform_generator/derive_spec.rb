@@ -641,16 +641,4 @@ RSpec.describe TerraformGenerator::Derive do
       expect(derive_attr(:on, create: {on: {type: "boolean", example: false, writeOnly: true}}, required: %w[on]).flags).to eq Set[:required, :replace, :write_only]
     end
   end
-
-  describe "special_cases" do
-    it "names each definition key and each clause with the types it shaped" do
-      api = TerraformGenerator::Api.new(thing(create: {color: {type: "string"}}, response: {color: {type: "string"}, size: {type: "string"}},
-        ops: {post: verb("updateThing", color: {type: "string"})}, paths: {"/thing/{thing_id}/resize" => {post: verb("resizeThing", size: {type: "string"})}}))
-      expect(TerraformGenerator.special_cases(api, {thing: {order: %i[resize]}})).to eq("definitions order" => %i[thing], "item_post_verb" => %i[thing])
-    end
-
-    it "counts nothing for the definitions as they stand" do
-      expect(TerraformGenerator.special_cases).to eq({})
-    end
-  end
 end

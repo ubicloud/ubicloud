@@ -4,6 +4,7 @@ require "digest"
 
 module TerraformGenerator
   SPEC = File.expand_path("../../openapi/openapi.yml", __dir__)
+  MODULE = File.expand_path("../provider", __dir__)
   SpecError = Class.new(StandardError)
 
   # One terraform type: its name, its item path written in attribute names,
@@ -41,10 +42,20 @@ module TerraformGenerator
 
   def self.types(api = Api.load, definitions = Definitions::TYPES) = definitions.map { |name, facts| Derive.new(api, name, facts).type }
 
+  # The text of each generated file, keyed by its path in the module. Hcl
+  # takes all the types at once, because one type's example can include
+  # another's.
+  def self.files(api = Api.load, definitions = Definitions::TYPES)
+    types = types(api, definitions)
+    [*types.map { Go.file(it) }, *Hcl.files(types)].to_h
+  end
+
   # The header ends in a stamp, the start of the body's SHA-256, by which
   # the generator can tell a file whose body was edited from one it may
   # overwrite.
-  def self.stamped(comment, body) = "#{comment} #{HEADER}; sha256:#{Digest::SHA256.hexdigest(body)[0, 16]}\n#{body}"
+  def self.stamped(comment, body) = "#{comment} #{HEADER}; sha256:#{stamp(body)}\n#{body}"
+
+  def self.stamp(body) = Digest::SHA256.hexdigest(body)[0, 16]
 
   # Each definition key and each rule clause that shaped a type, with the
   # types it shaped, so that review sees every special case by name.
@@ -62,3 +73,4 @@ require_relative "terraform_generator/definitions"
 require_relative "terraform_generator/derive"
 require_relative "terraform_generator/go"
 require_relative "terraform_generator/hcl"
+require_relative "terraform_generator/tree"
