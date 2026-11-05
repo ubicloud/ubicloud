@@ -115,6 +115,14 @@ RSpec.describe Prog::Vm::RunCommandNexus do
       expect { nx.start }.to nap(described_class::RETRY_NAP_SECONDS)
       expect(run_command.reload.status).to eq "created"
     end
+
+    it "pops if the run command has been destroyed" do
+      nx
+      run_command.destroy
+      expect(vm.vm_host.sshable).not_to receive(:_cmd)
+
+      expect { nx.start }.to exit({"msg" => "run command destroyed"})
+    end
   end
 
   describe "#start with an unrecognized command" do
