@@ -500,8 +500,17 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.total_cpus).to eq 5
       expect(vm_host.total_dies).to eq 3
       expect(vm_host.total_sockets).to eq 2
-      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :io, :numa_node, :core_number])).to eq [[0, true, 0, 0], [1, true, 0, 1], [2, false, 1, 2], [3, false, 1, 3], [4, false, nil, 0]]
+      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :io, :numa_node, :core_number])).to eq [[0, true, 0, 0], [1, false, 0, 1], [2, false, 1, 2], [3, false, 1, 3], [4, true, nil, 0]]
       expect(vm_host.used_cores).to eq 1
+    end
+
+    it "makes the io cpus whole cores when a core's hyperthreads are not numbered next to each other" do
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", exitval: {"arch" => "x64", "total_sockets" => 1, "total_dies" => 1, "total_cores" => 4, "total_cpus" => 8, "cpu_numa_nodes" => [0] * 8, "cpu_cores" => [0, 1, 2, 3, 0, 1, 2, 3]})
+
+      expect { nx.wait_prep }.to hop("setup_hugepages")
+
+      expect(VmHostCpu.where(vm_host_id: vm_host.id, io: true).select_order_map(:cpu_number)).to eq [0, 4]
+      expect(vm_host.reload.used_cores).to eq 1
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
