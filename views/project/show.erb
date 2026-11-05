@@ -1,5 +1,8 @@
 <% @page_title = @project.name
-@quotas = ["VmVCpu", "PostgresVCpu", "KubernetesVCpu", "MachineImageVersion"].map {
+hard_runner_limit = @project.reputation == "limited" || @project.get_ff_hard_runner_concurrency_limit
+resource_types = ["VmVCpu", "PostgresVCpu", "KubernetesVCpu", "MachineImageVersion"]
+resource_types.push("GithubRunnerVCpu", "GithubRunnerVCpuArm") if hard_runner_limit
+@quotas = resource_types.map {
   {
     resource_type: it,
     current_resource_usage: @project.current_resource_usage(it),
@@ -73,6 +76,17 @@
         </p>
       </div>
     </div>
+
+    <% unless hard_runner_limit %>
+      <div class="px-4 py-5 sm:p-6">
+        <h4 class="text-sm font-semibold leading-6 text-gray-900">GitHub Runners</h4>
+
+        <p class="mt-2 text-sm text-gray-500">
+          GitHub Actions runners do not count toward your VmVCpu quota. You can think of our runner concurrency limits
+          as soft limits. When we have spare capacity in the fleet, your jobs can run well past the limit.
+        </p>
+      </div>
+    <% end %>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <% @quotas.each do |quota| %>
