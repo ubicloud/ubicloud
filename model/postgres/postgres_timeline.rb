@@ -41,9 +41,53 @@ class PostgresTimeline < Sequel::Model
     return false if blob_storage.nil?
     return false if leader.nil?
     return true if take_backup_for_converge_set?
-    return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+
+    if backup_window_start_at.nil?
+      return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
+    elsif backup_slot_offset_hours < backup_window_hours
+      return false if latest_backup_started_at && latest_backup_started_at >= backup_slot_open_at
+    elsif !backup_overdue?
+      Clog.emit("Backup skipped: outside backup window", self)
+      return false
+    end
 
     leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+  end
+
+  # Backup slots are aligned to UTC epoch hours: one opens every
+  # backup_period_hours hours, starting at backup_window_start_at.
+  def backup_window_hours
+    (backup_period_hours / 2).clamp(1, 4)
+  end
+
+  def backup_slot_offset_hours
+    ((Time.now.to_i / 3600) - backup_window_start_at) % backup_period_hours
+  end
+
+  def backup_slot_open_at
+    Time.at((Time.now.to_i / 3600 - backup_slot_offset_hours) * 3600)
+  end
+
+  # Time the next slot opens, or nil if no backup window is configured.
+  def next_backup_slot_at
+    backup_slot_open_at + 60 * 60 * backup_period_hours if backup_window_start_at
+  end
+
+  # A backup is overdue if none was ever started, or the last one started
+  # more than a day later than the period allows.
+  def backup_overdue?
+    latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * (backup_period_hours + 24)
+  end
+
+  def backup_schedule
+    values.slice(:backup_window_start_at, :backup_retention_days, :backup_period_hours)
+  end
+
+  def validate
+    super
+    validates_includes(0..23, :backup_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_includes(1..168, :backup_period_hours, allow_nil: true, message: "must be between 1 and 168")
+    validates_includes(1..35, :backup_retention_days, allow_nil: true, message: "must be between 1 and 35")
   end
 
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
@@ -151,8 +195,14 @@ end
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  latest_backup_size_in_gib | bigint                   |
+#  backup_window_start_at    | smallint                 |
+#  backup_retention_days     | smallint                 | NOT NULL DEFAULT 7
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  valid_backup_period_hours    | (backup_period_hours >= 1 AND backup_period_hours <= 168)
+#  valid_backup_retention_days  | (backup_retention_days >= 1 AND backup_retention_days <= 35)
+#  valid_backup_window_start_at | (backup_window_start_at >= 0 AND backup_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
