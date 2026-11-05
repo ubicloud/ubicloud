@@ -425,6 +425,26 @@ RSpec.describe Clover, "project" do
         %w[VmVCpu PostgresVCpu KubernetesVCpu MachineImageVersion].freeze.each do |resource_type|
           expect(page).to have_content(resource_type)
         end
+        expect(page).to have_no_content "GithubRunnerVCpu"
+        expect(page).to have_content "You can think of our runner concurrency limits as soft limits."
+      end
+
+      it "shows runner quotas when project has limited reputation" do
+        project.update(reputation: "limited")
+        visit project.path
+
+        expect(page).to have_content "GithubRunnerVCpu"
+        expect(page).to have_content "GithubRunnerVCpuArm"
+        expect(page).to have_no_content "soft limits"
+      end
+
+      it "shows runner quotas when project has hard runner concurrency limit" do
+        project.set_ff_hard_runner_concurrency_limit(true)
+        visit project.path
+
+        expect(page).to have_content "GithubRunnerVCpu"
+        expect(page).to have_content "GithubRunnerVCpuArm"
+        expect(page).to have_no_content "soft limits"
       end
 
       it "raises forbidden when does not have permissions" do
