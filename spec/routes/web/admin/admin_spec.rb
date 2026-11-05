@@ -3400,9 +3400,12 @@ RSpec.describe CloverAdmin do
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30", allocated_at: Time.now, vm_id: vm30.id, location_id: vm30.location_id)
     create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
     create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
-    create_vm(boot_image: Config.github_ubuntu_2204_x64_aws_ami_version, vcpus: 4)
-    create_vm(boot_image: Config.github_ubuntu_2404_x64_aws_ami_version, vcpus: 8)
-    create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2404_arm64_aws_ami_version, vcpus: 16)
+    service_project = Project.create(name: "runner-service")
+    aws_location = Location.create(name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+    allow(Config).to receive_messages(github_runner_service_project_id: service_project.id, github_runner_aws_location_id: aws_location.id)
+    create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-1", vcpus: 4)
+    create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-2", vcpus: 8)
+    create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-3", arch: "arm64", vcpus: 16)
 
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
@@ -3436,7 +3439,10 @@ RSpec.describe CloverAdmin do
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
     create_vm_host(arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 6, total_cores: 24)
-    create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2204_arm64_aws_ami_version, vcpus: 8)
+    service_project = Project.create(name: "runner-service")
+    aws_location = Location.create(name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+    allow(Config).to receive_messages(github_runner_service_project_id: service_project.id, github_runner_aws_location_id: aws_location.id)
+    create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm", arch: "arm64", vcpus: 8)
 
     click_link "Show arm64"
 
