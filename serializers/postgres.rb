@@ -50,6 +50,11 @@ class Serializers::Postgres < Serializers::Base
           Clog.emit("Failed to get earliest restore time", Util.exception_to_hash(ex))
         end
         base[:latest_restore_time] = pg.timeline.latest_restore_time.utc.iso8601
+        base[:backup_period_hours] = pg.timeline.backup_period_hours
+        base[:backup_window_start_at] = pg.timeline.backup_window_start_at
+        base[:backup_retention_days] = pg.timeline.backup_retention_days
+        base[:latest_backup_started_at] = pg.timeline.latest_backup_started_at&.utc&.iso8601
+        base[:next_backup_at] = pg.timeline.next_backup_slot_at&.iso8601
       end
     end
 

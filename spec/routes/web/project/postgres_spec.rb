@@ -1369,6 +1369,15 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice "Maintenance window is unset"
       end
 
+      it "warns when the maintenance window overlaps the backup window" do
+        pg.timeline.update(backup_window_start_at: 4)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "03:00 - 05:00 (UTC)", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is set. Warning: backups may run during the maintenance window."
+      end
+
       it "sets maintenance window to 0 when 0 is passed" do
         pg.update(maintenance_window_start_at: 9)
         visit "#{project.path}#{pg.path}/settings"
@@ -1406,6 +1415,57 @@ RSpec.describe Clover, "postgres" do
 
         pg.reload
         expect(pg.maintenance_window_days_bitmask).to eq(0)
+      end
+    end
+
+    describe "set-backup-schedule" do
+      it "sets the backup schedule" do
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "03:00 (UTC)", from: "backup_window_start_at"
+        select "12 hours", from: "backup_period_hours"
+        fill_in "backup_retention_days", with: "14"
+        click_button "Save"
+        expect(page).to have_flash_notice "Backup schedule is updated"
+
+        timeline = pg.timeline.reload
+        expect([timeline.backup_window_start_at, timeline.backup_period_hours, timeline.backup_retention_days]).to eq([3, 12, 14])
+      end
+
+      it "unsets the start hour" do
+        pg.timeline.update(backup_window_start_at: 3)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "Any time", from: "backup_window_start_at"
+        click_button "Save"
+        expect(page).to have_flash_notice "Backup schedule is updated"
+        expect(pg.timeline.reload.backup_window_start_at).to be_nil
+      end
+
+      it "shows a custom period and warns when backups overlap the maintenance window" do
+        pg.update(maintenance_window_start_at: 3)
+        pg.timeline.update(backup_period_hours: 36, backup_retention_days: 10)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "03:00 (UTC)", from: "backup_window_start_at"
+        expect(page).to have_select("backup_period_hours", selected: "36 hours")
+        click_button "Save"
+        expect(page).to have_flash_notice "Backup schedule is updated. Warning: backups may run during the maintenance window."
+      end
+
+      it "reports validation errors" do
+        visit "#{project.path}#{pg.path}/settings"
+
+        fill_in "backup_retention_days", with: "40"
+        click_button "Save"
+        expect(page).to have_flash_error(/backup_retention_days/)
+      end
+
+      it "does not show the card for databases that are not primary" do
+        pg.representative_server.update(timeline_access: "fetch")
+        visit "#{project.path}#{pg.path}/settings"
+
+        expect(page).to have_no_content "Backup Schedule"
       end
     end
 

@@ -2218,6 +2218,39 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-backup-schedule:
+    post:
+      operationId: setBackupSchedule
+      summary: Set backup schedule for the PostgreSQL database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_period_hours:
+                  description: Hours between base backups (1-168)
+                  type: integer
+                backup_window_start_at:
+                  description: UTC hour (0-23) a backup slot opens, or null for rolling backups
+                  type: integer
+                  nullable: true
+                backup_retention_days:
+                  description: Point-in-time recovery window in days (1-35)
+                  type: integer
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window:
     post:
       operationId: setMaintenanceWindow
@@ -5150,6 +5183,26 @@ components:
                   primary:
                     description: Is the database primary
                     type: boolean
+                  backup_period_hours:
+                    description: Hours between base backups (if primary)
+                    type: integer
+                  backup_window_start_at:
+                    description: UTC hour a backup slot opens, or null for rolling backups (if primary)
+                    type: integer
+                    nullable: true
+                  backup_retention_days:
+                    description: Point-in-time recovery window in days (if primary)
+                    type: integer
+                  latest_backup_started_at:
+                    description: Start time of the latest base backup (if primary)
+                    type: string
+                    format: date-time
+                    nullable: true
+                  next_backup_at:
+                    description: Start time of the next backup slot, or null for rolling backups (if primary)
+                    type: string
+                    format: date-time
+                    nullable: true
                   maintenance_window_start_at:
                     description: Maintenance window start time
                     type: integer

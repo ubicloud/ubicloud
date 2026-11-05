@@ -725,6 +725,7 @@ Post Commands:
     reset-superuser-password           Reset the superuser password for a PostgreSQL database
     restart                            Restart a PostgreSQL database cluster
     restore                            Restore a PostgreSQL database backup to a new database
+    set-backup-schedule                Set the backup schedule for a PostgreSQL database
     set-maintenance-window             Set the maintenance window for a PostgreSQL database
     show                               Show details for a PostgreSQL database
     show-config                        Show configuration for a PostgreSQL database
@@ -1136,6 +1137,22 @@ Options:
     -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+
+
+Set the backup schedule for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) set-backup-schedule [options]
+
+Examples:
+    ubi pg pg-id set-backup-schedule -s 3          # backup slot opens at 3 am UTC
+    ubi pg pg-id set-backup-schedule -s ""         # backups start at any time
+    ubi pg pg-id set-backup-schedule -p 12 -r 14   # every 12 hours, restore up to 14 days back
+
+Options:
+    -p, --period=hours               hours between backups (1-168)
+    -s, --start=hour                 UTC hour a backup slot opens (0-23), or empty for any time
+    -r, --retention=days             point-in-time recovery window in days (1-35)
 
 
 Set the maintenance window for a PostgreSQL database

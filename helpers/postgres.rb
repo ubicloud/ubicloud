@@ -103,6 +103,10 @@ class Clover
     end
   end
 
+  def backup_maintenance_overlap_warning(pg)
+    "Warning: backups may run during the maintenance window." if pg.backup_window_overlaps_maintenance_window?
+  end
+
   # Middle step of the resize and upgrade timelines. It names the maintenance
   # window if there is one, and offers to set one if there is not. subject is
   # what waits for the window, such as "Failover" or "The upgrade".
