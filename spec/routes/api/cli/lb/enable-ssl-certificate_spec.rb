@@ -13,5 +13,6 @@ RSpec.describe Clover, "cli lb enable-ssl-certificate" do
   it "enables SSL certificates" do
     expect(cli(%W[lb eu-central-h1/test-lb enable-ssl-certificate])).to eq "Enabled SSL certificate for load balancer with id #{@lb.ubid}\n"
     expect(@lb.reload.cert_enabled).to be true
+    expect(@lb.refresh_cert_set?).to be true
   end
 end
