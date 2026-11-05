@@ -776,6 +776,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           nap 0
         end
       end
+      check_workflow_job
       raise
     end
 
@@ -790,6 +791,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap 0
     end
 
+    check_workflow_job
+    nap 60
+  end
+
+  def check_workflow_job
     # JIT tokens are valid for 5 minutes. If the runner doesn't pick a job
     # within that time, the job may have been cancelled prior to assignment,
     # so we destroy the runner. We check if the runner is busy or not with
@@ -801,8 +807,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.incr_destroy
       nap 0
     end
-
-    nap 60
   end
 
   def collect_final_telemetry
