@@ -474,6 +474,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "toggle-ssl-certificate" do
       it "can enable cert" do
+        Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
         lb.update(cert_enabled: false)
         visit "#{project.path}#{lb.path}/settings"
         within("form#cert_enabled_toggle") do
@@ -483,9 +484,11 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.status_code).to eq(302)
         expect(lb.reload.cert_enabled).to be true
+        expect(lb.refresh_cert_set?).to be true
       end
 
       it "can disable cert" do
+        Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
         lb.update(cert_enabled: true)
         visit "#{project.path}#{lb.path}/settings"
         within("form#cert_enabled_toggle") do
@@ -495,6 +498,7 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.status_code).to eq(302)
         expect(lb.reload.cert_enabled).to be false
+        expect(lb.refresh_cert_set?).to be false
       end
     end
 

@@ -142,6 +142,7 @@ class Clover
           DB.transaction do
             if cert_enabled
               lb.enable_cert_server
+              lb.incr_refresh_cert
               audit_log(lb, "enable_ssl")
             else
               lb.disable_cert_server
