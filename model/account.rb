@@ -21,7 +21,7 @@ class Account < Sequel::Model(:accounts)
 
   alias_method :admin_label, :email
 
-  FREE_MAIL_DOMAINS = %w[gmail.com outlook.com hotmail.com yahoo.com icloud.com protonmail.com proton.me].freeze
+  FREE_EMAIL_SUFFIXES = %w[@gmail.com @outlook.com @hotmail.com @yahoo.com @icloud.com @protonmail.com @proton.me].freeze
 
   def self.open_with_email(email)
     exclude(status_id: 3)[email:]
@@ -31,8 +31,12 @@ class Account < Sequel::Model(:accounts)
     identities.map(&:provider).join(", ")
   end
 
+  def free_email?
+    email.downcase.end_with?(*FREE_EMAIL_SUFFIXES)
+  end
+
   def create_project_with_default_policy(name, reputation: "new", default_policy: true)
-    reputation = "limited" if FREE_MAIL_DOMAINS.any? { email.end_with?("@#{it}") } && projects.none? { it.reputation == "verified" }
+    reputation = "limited" if free_email? && projects.none? { it.reputation == "verified" }
     project = Project.create(name:, reputation:)
     add_project(project)
 
