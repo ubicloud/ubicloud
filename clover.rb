@@ -776,6 +776,8 @@ class Clover < Roda
     end
     after_verify_login_change do
       remove_all_active_sessions_except_current
+      user = Account[account_id]
+      user.lift_limited_reputation unless user.free_email?
     end
 
     close_account_redirect "/login"
