@@ -134,6 +134,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.check_queued_jobs(nap_seconds: 0) }.to nap(0)
     end
 
+    it "does not poll jobs if the project has hit spending cutoff" do
+      project.update(cutoff_at: Time.now)
+      expect(client).not_to receive(:repository_workflow_runs)
+      expect {
+        expect(nx.check_queued_jobs(nap_seconds: nil)).to be_nil
+      }.not_to change(GithubRunner, :count)
+      expect(nx.polling_interval).to eq(5 * 60)
+    end
+
     it "does not poll jobs if the project is not active" do
       project.update(visible: false)
       expect(nx.check_queued_jobs(nap_seconds: nil)).to be_nil

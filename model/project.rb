@@ -201,6 +201,12 @@ class Project < Sequel::Model
     visible && accounts_dataset.exclude(suspended_at: nil).empty?
   end
 
+  def cutoff?
+    return false unless cutoff_at
+    now = Time.now.utc
+    cutoff_at > Time.utc(now.year, now.month)
+  end
+
   def current_invoice(since: nil, discounts_and_credits_hashes: nil)
     end_time = Time.now.utc
     begin_time = since || invoices_dataset.where(Sequel[:end_time] < end_time).get(:end_time) || Time.utc(end_time.year, end_time.month)
@@ -372,6 +378,7 @@ end
 #  billable                  | boolean                  | NOT NULL DEFAULT true
 #  reputation                | text                     | NOT NULL DEFAULT 'new'::text
 #  gcp_dedicated_subnet_vpcs | boolean                  | NOT NULL DEFAULT false
+#  cutoff_at                 | timestamp with time zone |
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))

@@ -44,7 +44,7 @@ RSpec.describe CloverAdmin do
     project = account.projects.first
     click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
-    expect(object_data).to eq(billable: "true", billing_info_id: "", feature_flags: "{}", gcp_dedicated_subnet_vpcs: "false", name: "Default", reputation: "new", visible: "true")
+    expect(object_data).to eq(billable: "true", billing_info_id: "", cutoff_at: "", feature_flags: "{}", gcp_dedicated_subnet_vpcs: "false", name: "Default", reputation: "new", visible: "true")
 
     subject_tag = project.subject_tags.first
     click_link subject_tag.name
@@ -1723,7 +1723,7 @@ RSpec.describe CloverAdmin do
 
   it "supports provisioning spare GitHubRunners for all runners on a VmHost" do
     vmh = create_vm_host
-    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: Project.create(name: "test").id)
     create_vm(vm_host_id: vmh.id, name: "customer-vm")
     2.times do |i|
       runner_vm = create_vm(vm_host_id: vmh.id, name: "runner-vm-#{i}")
@@ -1962,7 +1962,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports provisioning spare GitHubRunner" do
-    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: Project.create(name: "test").id)
     ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)
 
     fill_in "UBID, UUID, or prefix:term", with: ghr.ubid

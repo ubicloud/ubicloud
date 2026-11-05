@@ -221,6 +221,49 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["tags"]).to eq([{"key" => "env", "value" => "prod"}, {"key" => "team", "value" => "devops"}])
       end
 
+      it "fails to create if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
+          size: "standard-2",
+          storage_size: 64,
+          ha_type: "none",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(PostgresResource[name: "test-postgres-no-ha"]).to be_nil
+      end
+
+      it "fails to update database properties if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(pg.reload.target_vm_size).to eq("standard-2")
+      end
+
+      it "fails to create read-replica if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(PostgresResource[name: "my-read-replica"]).to be_nil
+      end
+
+      it "fails to restore if project has hit spending cutoff" do
+        project.update(cutoff_at: Time.now)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg",
+          restore_target: Time.now.utc.to_datetime.rfc3339,
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+        expect(PostgresResource[name: "restored-pg"]).to be_nil
+      end
+
       it "can update database properties" do
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-8",

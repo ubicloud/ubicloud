@@ -76,6 +76,15 @@ RSpec.describe Clover, "machine-image" do
       expect(strand.stack.first).to eq("source_vm_id" => source_vm.id, "vm_host_id" => source_vm.vm_host_id, "destroy_source_after" => true, "set_as_latest" => true)
     end
 
+    it "fails if project has hit spending cutoff" do
+      store
+      project.update(cutoff_at: Time.now)
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+        {vm: source_vm.ubid, version: "v1.0"}.to_json
+      expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+      expect(MachineImage[name: "new-mi"]).to be_nil
+    end
+
     it "creates with default version when not provided" do
       store
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi2",
@@ -411,6 +420,15 @@ RSpec.describe Clover, "machine-image" do
       strand = miv.strand
       expect(strand.prog).to eq("MachineImage::VersionMetalNexus")
       expect(strand.stack.first).to eq("source_vm_id" => source_vm.id, "vm_host_id" => source_vm.vm_host_id, "destroy_source_after" => true, "set_as_latest" => true)
+    end
+
+    it "fails if project has hit spending cutoff" do
+      mi_version_metal
+      project.update(cutoff_at: Time.now)
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "This project has been cut off from additional spending.")
+      expect(mi.versions_dataset.first(version: "v2")).to be_nil
     end
 
     it "returns 400 when source VM is not found" do

@@ -899,6 +899,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
     end
+
+    it "destroys the runner without allocating a vm if the project has hit spending cutoff" do
+      project.update(cutoff_at: now)
+      expect { nx.allocate_vm }.to nap(0)
+      expect(runner.reload.destroy_set?).to be(true)
+    end
   end
 
   describe "#wait_vm" do

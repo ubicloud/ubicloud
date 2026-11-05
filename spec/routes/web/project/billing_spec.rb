@@ -904,7 +904,7 @@ RSpec.describe Clover, "billing" do
       it "can create usage alert" do
         visit "#{project.path}/billing"
         fill_in "alert_name", with: "alert-3"
-        fill_in "limit", with: 200
+        fill_in "limit", with: 200, id: "limit"
         click_button "Add"
 
         expect(page).to have_content "alert-3"
@@ -916,7 +916,7 @@ RSpec.describe Clover, "billing" do
         click_button "Add"
         expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
 
-        fill_in "limit", with: 0
+        fill_in "limit", with: 0, id: "limit"
         click_button "Add"
         expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
       end
@@ -944,6 +944,118 @@ RSpec.describe Clover, "billing" do
         end
 
         expect(page.status_code).to eq(404)
+      end
+
+      it "can create, update, and remove spending cutoff" do
+        visit "#{project.path}/billing"
+        expect(page).to have_no_button "Remove Cutoff"
+        fill_in "Cutoff Limit", with: 300
+        click_button "Add Cutoff"
+        expect(page).to have_flash_notice "Created spending cutoff"
+        cutoff_alert = project.usage_alerts_dataset.first(cutoff: true)
+        expect(cutoff_alert.limit).to eq 300
+        expect(page).to have_no_css "#alert-#{cutoff_alert.ubid}"
+        expect(page).to have_css "#alert-#{@alert1.ubid}"
+        expect(find_by_id("cutoff_limit").value).to eq "300"
+
+        fill_in "Cutoff Limit", with: 400
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 400
+        expect(project.usage_alerts_dataset.where(cutoff: true).count).to eq 1
+        expect(find_by_id("cutoff_limit").value).to eq "400"
+
+        click_button "Remove Cutoff"
+        expect(page).to have_flash_notice "Removed spending cutoff"
+        expect(cutoff_alert.exists?).to be false
+        expect(@alert1.exists?).to be true
+        expect(page).to have_button "Add Cutoff"
+      end
+
+      it "shows when the project hit the spending cutoff" do
+        visit "#{project.path}/billing"
+        expect(page).to have_content "The spending cutoff is checked every 5-10 minutes."
+        expect(page).to have_no_content "This project hit the spending cutoff"
+
+        cutoff_at = Time.now.utc.round
+        project.update(cutoff_at:)
+        visit "#{project.path}/billing"
+        expect(page).to have_content "This project hit the spending cutoff at #{cutoff_at}."
+        expect(page).to have_no_content "The spending cutoff is checked every 5-10 minutes."
+      end
+
+      it "clears project cutoff when increasing spending cutoff above current usage" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 100, cutoff: true, last_triggered_at: Time.now)
+        project.update(cutoff_at: Time.now)
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 200
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 200
+        now = Time.now.utc
+        expect(cutoff_alert.last_triggered_at).to be < Time.utc(now.year, now.month)
+        expect(project.reload.cutoff_at).to be_nil
+      end
+
+      it "does not clear project cutoff when current usage still exceeds limit after increase" do
+        last_triggered_at = Time.now.round
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 1, cutoff: true, last_triggered_at:)
+        cutoff_at = Time.now.round
+        project.update(cutoff_at:)
+        now = Time.now.utc
+        vm = create_vm(project_id: project.id)
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: vm.name,
+          span: Sequel::Postgres::PGRange.new(Time.utc(now.year, now.month), nil),
+          billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false)["id"],
+          amount: 10000,
+        )
+        content = project.current_invoice(since: Time.utc(now.year, now.month)).content
+        expect(content["subtotal"] - content["discount"]).to be >= 2
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 2
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 2
+        expect(cutoff_alert.last_triggered_at).to eq last_triggered_at
+        expect(project.reload.cutoff_at).to eq cutoff_at
+      end
+
+      it "does not clear project cutoff when decreasing spending cutoff" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 200, cutoff: true)
+        cutoff_at = Time.now.round
+        project.update(cutoff_at:)
+
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: 100
+        click_button "Update Cutoff"
+        expect(page).to have_flash_notice "Updated spending cutoff"
+        expect(cutoff_alert.reload.limit).to eq 100
+        expect(project.reload.cutoff_at).to eq cutoff_at
+      end
+
+      it "clears project cutoff when removing spending cutoff" do
+        cutoff_alert = UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 100, cutoff: true)
+        project.update(cutoff_at: Time.now)
+
+        visit "#{project.path}/billing"
+        click_button "Remove Cutoff"
+        expect(page).to have_flash_notice "Removed spending cutoff"
+        expect(cutoff_alert.exists?).to be false
+        expect(project.reload.cutoff_at).to be_nil
+      end
+
+      it "does nothing when submitting spending cutoff without limit if there is no current cutoff" do
+        visit "#{project.path}/billing"
+        fill_in "Cutoff Limit", with: ""
+        click_button "Add Cutoff"
+        expect(page).to have_current_path "#{project.path}/billing"
+        expect(page).to have_no_css "#flash-notice"
+        expect(project.usage_alerts_dataset.where(cutoff: true).count).to eq 0
       end
     end
   end
