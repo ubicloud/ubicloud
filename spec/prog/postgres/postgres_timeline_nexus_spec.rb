@@ -120,6 +120,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(st_child.subject.backup_period_hours).to eq(6)
     end
 
+    it "inherits the backup schedule from parent" do
+      parent = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
+      parent.update(backup_window_start_at: 5, backup_retention_days: 12, backup_period_hours: 6)
+      child = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: parent.id).subject
+      expect(child).to have_attributes(backup_window_start_at: 5, backup_retention_days: 12, backup_period_hours: 6)
+    end
+
+    it "prefers an explicit backup schedule over the parent's" do
+      parent = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
+      child = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: parent.id, backup_schedule: {backup_window_start_at: 2, backup_retention_days: 9}).subject
+      expect(child).to have_attributes(backup_window_start_at: 2, backup_retention_days: 9, backup_period_hours: 24)
+    end
+
     it "does not generate access_key/secret_key for GCP locations" do
       gcp_location = create_gcp_location
       tl = described_class.assemble(location_id: gcp_location.id).subject
@@ -407,6 +420,34 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait }.to nap(20 * 60)
       expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_blob_storage_policy").count).to eq(0)
     end
+
+    it "decrements, reapplies the lifecycle policy and clears the cached earliest backup when refresh_lifecycle_policy is set" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now, cached_earliest_backup_at: Time.now - 3600)
+      nx.incr_refresh_lifecycle_policy
+
+      expect(nx.postgres_timeline).to receive(:set_lifecycle_policy)
+
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_lifecycle_policy").count).to eq(0)
+      expect(postgres_timeline.reload.cached_earliest_backup_at).to be_nil
+    end
+
+    it "skips the lifecycle policy without blob storage when refresh_lifecycle_policy is set" do
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now, cached_earliest_backup_at: Time.now - 3600)
+      nx.incr_refresh_lifecycle_policy
+
+      expect(nx.postgres_timeline.blob_storage).to be_nil
+      expect(nx.postgres_timeline).not_to receive(:set_lifecycle_policy)
+
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_lifecycle_policy").count).to eq(0)
+      expect(postgres_timeline.reload.cached_earliest_backup_at).to be_nil
+    end
   end
 
   describe "#before_run" do
@@ -433,6 +474,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       page = Page.first
       expect(page.severity).to eq("warning")
       expect(page.resource_id).to eq(postgres_timeline.id)
+    end
+
+    [[7.5, nil], [8.5, "warning"], [9.5, "error"]].each do |days_ago, severity|
+      it "pages #{severity.inspect} for a 7 day period when the last backup is #{days_ago} days old" do
+        create_minio_cluster
+        resource = create_postgres_resource(project:, location_id:)
+        create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+        postgres_timeline.update(created_at: Time.now - 20 * 24 * 60 * 60, backup_period_hours: 168, backup_retention_days: 15)
+        mock_minio_client(list_objects: [backup_fixture(days_ago:)])
+
+        nx.before_run
+        expect(Page.select_map(:severity)).to eq(severity ? [severity] : [])
+      end
     end
 
     it "escalates to an error missing backup page if last completed backup is older than 3 days" do
@@ -501,10 +555,30 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "naps if a backup is already in progress" do
+      postgres_timeline.update(latest_backup_started_at: Time.now)
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("InProgress")
 
       expect { nx.take_backup }.to nap(60)
+    end
+
+    it "logs when a backup is running longer than 1.5 periods" do
+      postgres_timeline.update(latest_backup_started_at: Time.now - 37 * 60 * 60)
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("InProgress")
+      expect(Clog).to receive(:emit).with("Backup is taking longer than expected", postgres_timeline).and_call_original
+
+      expect { nx.take_backup }.to nap(60)
+    end
+
+    it "cleans up and waits for the next slot when the backup failed and a window is set" do
+      postgres_timeline.update(backup_window_start_at: 3)
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+      expect(Clog).to receive(:emit).with("Backup failed, waiting for the next backup slot", postgres_timeline).and_call_original
+
+      expect { nx.take_backup }.to hop("wait")
     end
 
     it "starts the backup, records its size, and naps when the unit has not started" do

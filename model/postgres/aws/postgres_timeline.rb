@@ -97,7 +97,7 @@ PGDATA=/dat/#{version}/data
       blob_storage_client.put_bucket_policy(bucket: ubid, policy: policy.to_json)
     end
 
-    def aws_set_lifecycle_policy(expiration_days: BACKUP_BUCKET_EXPIRATION_DAYS)
+    def aws_set_lifecycle_policy(expiration_days: backup_bucket_expiration_days)
       blob_storage_client.put_bucket_lifecycle_configuration({
         bucket: ubid,
         lifecycle_configuration: {
