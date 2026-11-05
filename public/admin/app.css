@@ -324,6 +324,10 @@ code {
 
 #model-class-list {
   columns: 200px 5;
+  li {
+    word-break: break-word;
+    padding-right: 2px;
+  }
 }
 
 #object-list {
