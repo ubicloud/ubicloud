@@ -536,7 +536,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             **frame_update,
           )
         end
-        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/, log: :on_error})
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ timeout\\ --kill-after\\=60\\ 300\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/, log: :on_error})
 
         expect { nx.prep }.to nap(1)
       end
