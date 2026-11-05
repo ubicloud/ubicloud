@@ -48,6 +48,7 @@ class Prog::Vm::RunCommandNexus < Prog::Base
   end
 
   label def start
+    pop "run command destroyed" unless run_command
     output = send(run_command.command)
     run_command.update(status: "succeeded", output:, run_at: Time.now)
     pop "run command succeeded"
