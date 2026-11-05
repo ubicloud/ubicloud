@@ -121,7 +121,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       minio_cluster.certificate_last_checked_at = Time.now
       minio_cluster.save_changes
 
-      if OpenSSL::X509::Certificate.new(minio_cluster.server_cert).not_after < Time.now + 60 * 60 * 24 * 21
+      if OpenSSL::X509::Certificate.new(minio_cluster.server_cert).not_after < Time.now + 60 * 60 * 24 * 21 || Cert.reissue_requested?(current_cert_id)
         self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
           minio_cluster.hostname,
           minio_cluster.dns_zone.id,

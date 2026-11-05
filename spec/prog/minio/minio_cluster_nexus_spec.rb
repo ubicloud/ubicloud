@@ -288,6 +288,24 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
   end
 
+  describe "#refresh_certificates", "with a reissue request" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      nx.minio_cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil)
+    end
+
+    it "starts a new CertNexus strand when the current certificate has a reissue request" do
+      cert, key = Util.create_certificate(subject: "/CN=minio", duration: 60 * 60 * 24 * 30)
+      nx.minio_cluster.update(server_cert: cert.to_pem, server_cert_key: key.to_pem)
+      stamped = Cert.create(hostname: nx.minio_cluster.hostname, reissue_requested_at: Time.now)
+      refresh_frame(nx, new_values: {"current_cert_id" => stamped.id})
+
+      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      expect(nx.strand.stack[0]["current_cert_id"]).not_to eq stamped.id
+    end
+  end
+
   describe "#wait_refresh_public_cert" do
     let(:cert) do
       Prog::Vnet::CertNexus.assemble(nx.minio_cluster.hostname, nx.minio_cluster.dns_zone.id).subject

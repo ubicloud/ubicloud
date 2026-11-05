@@ -52,6 +52,20 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
     end
   end
 
+  describe "#wait", "with reissue requests" do
+    it "destroys presigned certs that have a reissue request" do
+      stamped = Cert.create(hostname: "a.lb2.ubicloud.com", reissue_requested_at: Time.now)
+      kept = Cert.create(hostname: "b.lb2.ubicloud.com")
+      Strand.dataset.insert([:id, :prog, :label], Cert.select(:id, "Vnet::CertNexus", "wait"))
+      DB[:presigned_load_balancer_cert].import([:load_balancer_id, :cert_id], [stamped, kept].map { [LoadBalancer.generate_uuid, it.id] })
+
+      expect { prog.wait }.to hop("request_cert")
+      expect(DB[:presigned_load_balancer_cert].select_map(:cert_id)).to eq [kept.id]
+      expect(stamped.destroy_set?(cached: false)).to be true
+      expect(kept.destroy_set?(cached: false)).to be false
+    end
+  end
+
   describe "#request_cert" do
     it "creates a cert, sets deadline and hops" do
       dns_zone

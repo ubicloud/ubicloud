@@ -806,6 +806,19 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
 
+    it "requests a new publicly signed certificate when the current one has a reissue request" do
+      DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+      postgres_server
+      postgres_resource.update(hostname_version: "v3")
+      stamped = Cert.create(hostname: "old.pg.ubicloud.app", reissue_requested_at: Time.now)
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "current_cert_id" => stamped.id})
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      frame = postgres_resource.strand.stack[0]
+      expect(frame["current_cert_id"]).not_to eq stamped.id
+      expect(frame["refresh_cert_id"]).to eq frame["current_cert_id"]
+    end
+
     it "works when using publicly signed certificates" do
       DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
       postgres_server

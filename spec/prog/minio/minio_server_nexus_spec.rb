@@ -353,6 +353,11 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait }.to hop("wait_reconfigure")
     end
 
+    it "hops to refresh_certificates if refresh_certificates is set" do
+      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+
     it "pushes minio_restart if restart is set" do
       expect(nx).to receive(:when_restart_set?).and_yield
       expect(nx).to receive(:push).with(described_class, {}, "minio_restart").and_call_original
@@ -486,6 +491,24 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       new_cert = Cert.with_pk!(stack["refresh_cert_id"])
       expect(new_cert.hostname).to eq nx.minio_server.hostname
       expect(new_cert.strand.stack[0]["waiting_strand_id"]).to eq nx.minio_server.id
+    end
+  end
+
+  describe "#refresh_certificates", "with a reissue request" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
+    end
+
+    it "starts a CertNexus strand when the current certificate has a reissue request" do
+      cert, key = Util.create_certificate(subject: "/CN=peer", duration: 60 * 60 * 24 * 30)
+      nx.minio_server.update(cert: cert.to_pem, cert_key: key.to_pem)
+      stamped = Cert.create(hostname: nx.minio_server.hostname, reissue_requested_at: Time.now)
+      refresh_frame(nx, new_values: {"current_cert_id" => stamped.id})
+
+      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      expect(nx.strand.stack[0]["current_cert_id"]).not_to eq stamped.id
     end
   end
 

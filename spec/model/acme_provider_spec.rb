@@ -193,6 +193,7 @@ RSpec.describe AcmeProvider do
       starting = Prog::Vnet::CertNexus.assemble("starting.z.com", dns_zone.id).subject
       starting.update(acme_provider_id: provider.id)
       expect(Cert.fresh.where(id: issued.id).count).to eq 1
+      expect(Cert).to receive(:request_replacement).with([issued.id]).and_call_original
 
       provider.evacuate!
 

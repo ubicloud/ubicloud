@@ -74,4 +74,40 @@ RSpec.describe Cert do
       expect(described_class.active.all).to eq [cert]
     end
   end
+
+  describe ".reissue_requested?" do
+    it "is true only for an existing certificate with a reissue request" do
+      stamped = described_class.create(hostname: "a.example.com", reissue_requested_at: Time.now)
+      plain = described_class.create(hostname: "b.example.com")
+      expect(described_class.reissue_requested?(stamped.id)).to be true
+      expect(described_class.reissue_requested?(plain.id)).to be false
+      expect(described_class.reissue_requested?(nil)).to be false
+    end
+  end
+
+  describe ".request_replacement" do
+    it "wakes the load balancers and the strands that hold the certificates" do
+      project = Project.create(name: "test-prj")
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps")
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https", cert_enabled: true).subject
+      held = described_class.create(hostname: "held.example.com")
+      other = described_class.create(hostname: "other.example.com")
+      lb.add_cert(held)
+      certless = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "certless-lb", src_port: 81, dst_port: 8081, health_check_protocol: "https", cert_enabled: false).subject
+      certless.add_cert(held)
+      holder = Strand.create(prog: "Minio::MinioServerNexus", label: "minio_restart",
+        stack: [{"link" => ["Minio::MinioServerNexus", "wait"]}, {"current_cert_id" => held.id}])
+      other_holder = Strand.create(prog: "Postgres::PostgresResourceNexus", label: "wait", stack: [{"current_cert_id" => other.id}])
+      unrelated = Strand.create(prog: "Vnet::CertNexus", label: "wait", stack: [{"current_cert_id" => held.id}])
+      expect(Prog::Vnet::MaintainPresignedLoadBalancerCerts).to receive(:schedule_strand)
+      expect(Prog::Vnet::MaintainPresignedPostgresCerts).to receive(:schedule_strand)
+
+      described_class.request_replacement([held.id])
+
+      expect(lb.refresh_cert_set?(cached: false)).to be true
+      expect(certless.refresh_cert_set?(cached: false)).to be false
+      expect(Semaphore.where(name: "refresh_certificates").select_map(:strand_id)).to eq [holder.id]
+      expect([other_holder, unrelated].map { Semaphore.where(strand_id: it.id).count }).to eq [0, 0]
+    end
+  end
 end

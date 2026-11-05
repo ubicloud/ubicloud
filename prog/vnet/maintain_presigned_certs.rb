@@ -16,10 +16,11 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     nap_time = last_cert_created + MIN_WAIT_BETWEEN_CERTS_SECONDS - now
     nap(nap_time) if nap_time > 0
 
-    # Destroy presigned certs created over 30 days ago, and remove row from presigned table.
+    # Destroy presigned certs created over 30 days ago or requested for
+    # reissue, and remove their rows from the presigned table.
     old_cert_ids = DB[:t]
       .with(:t, ds
-        .where(OLD_CERTS_COND)
+        .where(OLD_CERTS_COND | Sequel[cert_id: Cert.exclude(reissue_requested_at: nil).select(:id)])
         .returning(:cert_id)
         .with_sql(:delete_sql))
       .select_map(:cert_id)

@@ -381,7 +381,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
 
-    if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
+    if use_publicly_signed_certificates? && (OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13 || Cert.reissue_requested?(current_cert_id))
       self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
         postgres_resource.cert_hostname,
         postgres_resource.dns_zone.id,

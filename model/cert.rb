@@ -42,6 +42,30 @@ class Cert < Sequel::Model
     reverse(:by_most_recent, :created_at)
   end
 
+  # Programs that keep their certificate's id in a current_cert_id frame
+  # key and replace the certificate when refresh_certificates is set.
+  CURRENT_CERT_HOLDERS = ["Postgres::PostgresResourceNexus", "Minio::MinioClusterNexus", "Minio::MinioServerNexus"].freeze
+
+  # Whether the certificate with this id, if there is one, has a reissue
+  # request.
+  def self.reissue_requested?(id)
+    !where(id:).exclude(reissue_requested_at: nil).empty?
+  end
+
+  # Ask every holder of these certificates to replace them now, rather
+  # than at its next periodic check, which can be a day or a week away.
+  def self.request_replacement(ids)
+    # refresh_cert makes a load balancer create a certificate even when
+    # certificates are turned off for it, so wake only those that use them.
+    holding = DB[:certs_load_balancers].where(cert_id: ids).select(:load_balancer_id)
+    LoadBalancer.incr_refresh_cert(LoadBalancer.where(id: holding, cert_enabled: true).select(:id))
+    frames = DB.from(Sequel.function(:jsonb_array_elements, Sequel[:strand][:stack]).as(:frame))
+      .where(Sequel.cast(Sequel.pg_jsonb_op(:frame).get_text("current_cert_id"), :uuid) => ids)
+    Semaphore.incr(Strand.where(prog: CURRENT_CERT_HOLDERS).where(frames.exists).select(:id), :refresh_certificates)
+    Prog::Vnet::MaintainPresignedLoadBalancerCerts.schedule_strand
+    Prog::Vnet::MaintainPresignedPostgresCerts.schedule_strand
+  end
+
   def hostnames
     private_hostname ? [hostname, private_hostname] : [hostname]
   end

@@ -188,16 +188,19 @@ class AcmeProvider < Sequel::Model
   end
 
   # Disable the provider and request early replacement of every
-  # certificate it issued. The certificates leave Cert.fresh at once and
-  # keep serving until their owners replace them through the normal
-  # refresh. Destroying them skips revocation, as the provider is
-  # disabled. Orders still in progress at this CA are restarted, so that
-  # they move to another provider now rather than at an auto restart,
-  # which not every certificate has.
+  # certificate it issued. The certificates keep serving until their
+  # holders, woken by Cert.request_replacement, replace them. Destroying
+  # them skips revocation, as the provider is disabled. Orders still in
+  # progress at this CA are restarted, so that they move to another
+  # provider now rather than at an auto restart, which not every
+  # certificate has.
   def evacuate!
     DB.transaction do
       update(enabled: false)
-      certs_dataset.exclude(cert: nil).where(reissue_requested_at: nil).update(reissue_requested_at: Sequel::CURRENT_TIMESTAMP)
+      unstamped = certs_dataset.exclude(cert: nil).where(reissue_requested_at: nil)
+      stamped_ids = unstamped.select_map(:id)
+      unstamped.update(reissue_requested_at: Sequel::CURRENT_TIMESTAMP)
+      Cert.request_replacement(stamped_ids)
       ordering = Strand.where(prog: "Vnet::CertNexus", label: Prog::Vnet::CertNexus::ACME_ORDER_LABELS).select(:id)
       Cert.incr_restarted(certs_dataset.where(cert: nil, id: ordering).select(:id))
     end

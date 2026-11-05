@@ -146,6 +146,11 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       vm.vm_host.sshable.cmd("sudo host/bin/pin-vm-net-threads install :vm_name :cpus :thread_count", vm_name: vm.inhost_name, cpus: net_pin_allowed_cpus, thread_count: net_pin_thread_count.to_s)
     end
 
+    when_refresh_certificates_set? do
+      register_deadline("wait", 30 * 60)
+      hop_refresh_certificates
+    end
+
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
     if minio_server.certificate_last_checked_at < Time.now - refresh_after
       register_deadline("wait", 30 * 60)
@@ -156,10 +161,12 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def refresh_certificates
+    decr_refresh_certificates
+
     if cluster.uses_publicly_signed_certificates?
       minio_server.update(certificate_last_checked_at: Time.now)
 
-      if OpenSSL::X509::Certificate.new(minio_server.cert).not_after < Time.now + 60 * 60 * 24 * 21
+      if OpenSSL::X509::Certificate.new(minio_server.cert).not_after < Time.now + 60 * 60 * 24 * 21 || Cert.reissue_requested?(current_cert_id)
         self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
           minio_server.hostname,
           cluster.dns_zone.id,
