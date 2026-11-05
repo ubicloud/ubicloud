@@ -530,6 +530,32 @@ RSpec.describe Clover, "auth" do
       end
     end
 
+    [
+      ["new@example.com", "new", "changes limited project reputation to new"],
+      ["new@gmail.com", "limited", "does not change project reputation"],
+    ].each do |new_email, reputation, description|
+      it "#{description} after changing email to #{new_email}" do
+        project = Account[email: TEST_USER_EMAIL].projects.first
+        project.update(reputation: "limited")
+        visit "/clear-last-password-entry"
+        visit "/account/change-login"
+        fill_in "New Email Address", with: new_email
+        fill_in "Password", with: TEST_USER_PASSWORD
+        click_button "Change Email"
+
+        visit Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+        click_button "Click to Verify New Email"
+
+        expect(page).to have_flash_notice "Your login change has been verified"
+        expect(project.reload.reputation).to eq(reputation)
+        expect(audit_log_hash).to eq({
+          "change_login" => ip_hash,
+          "verify_login_change" => ip_hash("new_login" => new_email, "previous_login" => TEST_USER_EMAIL),
+          "verify_login_change_email" => ip_hash,
+        })
+      end
+    end
+
     it "can create password for accounts that do not have a password" do
       DB[:account_password_hashes].delete
       visit "/account/change-password"

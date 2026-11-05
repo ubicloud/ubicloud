@@ -35,6 +35,10 @@ class Account < Sequel::Model(:accounts)
     email.downcase.end_with?(*FREE_EMAIL_SUFFIXES)
   end
 
+  def lift_limited_reputation
+    Project.where(id: projects_dataset.select(:id), reputation: "limited").update(reputation: "new")
+  end
+
   def create_project_with_default_policy(name, reputation: "new", default_policy: true)
     reputation = "limited" if free_email? && projects.none? { it.reputation == "verified" }
     project = Project.create(name:, reputation:)
