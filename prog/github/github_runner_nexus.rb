@@ -530,6 +530,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def allocate_vm
+    if project.cutoff?
+      github_runner.incr_destroy
+      nap 0
+    end
+
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
