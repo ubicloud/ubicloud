@@ -1,12 +1,17 @@
 # frozen_string_literal: true
 
+require "digest"
+
 module TerraformGenerator
   SPEC = File.expand_path("../../openapi/openapi.yml", __dir__)
   SpecError = Class.new(StandardError)
 
   # One terraform type: its name, its item path written in attribute names,
-  # its description, and its statements.
-  Type = Data.define(:name, :item, :doc, :statements, :why)
+  # its description, and its statements. examples gives the example value
+  # of each attribute that has one, example_inputs names the attributes
+  # that a resource's example sets, and references gives, for each of those
+  # that holds another type's id, the name of that type.
+  Type = Data.define(:name, :item, :doc, :statements, :examples, :example_inputs, :references, :why)
 
   # Each statement but Dropped renders as one builder call in the generated
   # Go: the call is named after the record's class, and its members other
@@ -30,7 +35,16 @@ module TerraformGenerator
   # The order in which an attribute's flags are written.
   FLAGS = %i[required optional computed sensitive replace stable write_only nullable].freeze
 
+  # A generated file's one header line names the command that writes it
+  # and the one that shows what is left to carry back of an edit.
+  HEADER = "rake terraform:generate; rake terraform:diff"
+
   def self.types(api = Api.load, definitions = Definitions::TYPES) = definitions.map { |name, facts| Derive.new(api, name, facts).type }
+
+  # The header ends in a stamp, the start of the body's SHA-256, by which
+  # the generator can tell a file whose body was edited from one it may
+  # overwrite.
+  def self.stamped(comment, body) = "#{comment} #{HEADER}; sha256:#{Digest::SHA256.hexdigest(body)[0, 16]}\n#{body}"
 
   # Each definition key and each rule clause that shaped a type, with the
   # types it shaped, so that review sees every special case by name.
@@ -46,3 +60,5 @@ end
 require_relative "terraform_generator/api"
 require_relative "terraform_generator/definitions"
 require_relative "terraform_generator/derive"
+require_relative "terraform_generator/go"
+require_relative "terraform_generator/hcl"

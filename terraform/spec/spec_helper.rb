@@ -38,14 +38,14 @@ RSpec.configure do |config|
     # A spec with the scope and one type, thing, whose item GET returns a
     # readOnly id. An example adds what it needs: a create body, response
     # properties, operations on the item, and paths under the scope.
-    def thing(create: nil, required: [], on_item: false, response: {}, item: "/thing/{thing_id}", ops: {}, paths: {}, schemas: {}, responses: {})
+    def thing(create: nil, required: [], example: nil, on_item: false, response: {}, item: "/thing/{thing_id}", ops: {}, paths: {}, schemas: {}, responses: {})
       item = "/project/{project_id}#{item}"
       all = {
         "/project/{project_id}" => path_item("/project/{project_id}", get: op("getScope", response: "Scope")),
         item => path_item(item, get: op("getThing"), delete: {operationId: "deleteThing", responses: {"204": {description: "Deleted"}}}, **ops),
         **paths.transform_keys { "/project/{project_id}#{it}" },
       }
-      (all[on_item ? item : item.sub(%r{/\{\w+\}\z}, "")] ||= {})[:post] = op("createThing", create, required:) if create
+      (all[on_item ? item : item.sub(%r{/\{\w+\}\z}, "")] ||= {})[:post] = op("createThing", create, required:, example:) if create
       openapi(
         paths: all,
         schemas: {Reference: {description: "ID or name", type: "string", pattern: "^[a-z0-9-]+$"}, **schemas},
@@ -68,8 +68,8 @@ RSpec.configure do |config|
 
     def json(schema) = {content: {"application/json": {schema:}}}
 
-    def op(id, body = nil, required: [], response: "Thing")
-      {operationId: id, **(body ? {requestBody: json(object(body, required:))} : {}), responses: {"200": {"$ref": "#/components/responses/#{response}"}}}
+    def op(id, body = nil, required: [], example: nil, response: "Thing")
+      {operationId: id, **(body ? {requestBody: json(object(body, required:, **{example:}.compact))} : {}), responses: {"200": {"$ref": "#/components/responses/#{response}"}}}
     end
 
     # A path item with a parameter for each placeholder in its path. A

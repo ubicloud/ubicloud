@@ -56,12 +56,15 @@ class TerraformGenerator::Derive
     attrs = [identity, *attribute_set.map { attribute(it) }].sort_by(&:name)
     response_direction
     input_echo
-    examples
+    body = body_example
+    values = example(body)
+    examples(values)
+    inputs = attrs.select { it.flags.include?(:required) || body.key?(it.name) }
     statements = [create, kinds, *lifecycle, *attrs, *@verbs.map { statement(it) }].compact
     item = in_attributes(@item.path, scope? ? identity_name : "id")
     at = response_name(@get)
     doc = success(@get)["description"] || described(at)
-    Type.new(name: @name, item:, doc:, statements:, why: [[:type_name, @get["operationId"]], [:doc, at]])
+    Type.new(name: @name, item:, doc:, statements:, examples: values, example_inputs: inputs.map(&:name), references: references(inputs), why: [[:type_name, @get["operationId"]], [:doc, at]])
   end
 
   private
@@ -116,9 +119,11 @@ class TerraformGenerator::Derive
   # The provider addresses an object by id, so a rename never moves its address.
   def identity
     id = @response["id"] or refuse @get["operationId"], "the response has no id, by which the provider addresses the object; add it"
-    doc = doc(Source.new("id", nil, nil, id)).schema["description"]
+    doc = doc(id_source).schema["description"]
     Attr.new(name: "id", type: closed_types(id), flags: Set[:computed, :stable], doc:, default: nil, checks: [], why: [[:identity, "{#{identity_name}}"], [:stable, id.at]])
   end
+
+  def id_source = Source.new("id", nil, nil, @response["id"])
 
   # A path with each placeholder named after the attribute it fills. The
   # engine reads an import id as the attributes after the scope.
@@ -465,12 +470,48 @@ class TerraformGenerator::Derive
       %w[items additionalProperties].all? { |k| !(req[k].is_a?(Hash) && resp[k].is_a?(Hash)) || accepts?(req[k], resp[k]) }
   end
 
-  # The generated examples need a value for each required create input,
-  # path parameter and id.
-  def examples
-    needed = [*@item.params.map { [param_prop(it)] }, [@response["id"]], *attribute_set.select { required(it) }.map { [it.req, it.key&.check, it.resp].compact }]
-    missing = needed.reject { |props| props.any? { it.schema.slice("example", "examples").compact.any? } }
-    refuse missing.map { it.first.at }.join(", "), "no example; add one to each" if missing.any?
+  # An attribute's example comes from its request property, else its path
+  # parameter (or, for a parent key, the parent's id), else its response
+  # property. Each of these may give an example, or else an examples entry
+  # named after the attribute: a reference parameter has no example, only
+  # examples named id and name. The create body's example, where the spec
+  # gives one, comes before all of these.
+  def example(body) = [id_source, *attribute_set].to_h { [it.name, example_of(it)] }.compact.merge(body)
+
+  # A resource's example sets the required inputs, and the properties that
+  # the create body's example sets. That example is a whole body the API
+  # accepts, where the property examples may not be: a body can need one of
+  # several optional inputs. A property of that example that the body does
+  # not offer as an input, such as a deprecated one, is left out.
+  def body_example = (@create&.dig("requestBody", "content", "application/json", "schema", "example") || {}).slice(*@create_body.keys).compact
+
+  def example_of(a) = candidates(a).flat_map { [it.schema["example"], it.schema.dig("examples", a.name, "value")] }.compact.first
+
+  def candidates(a) = [a.req, a.key&.check, a.resp].compact
+
+  # A parent key holds its parent's id, and an input whose pattern is the
+  # id pattern of exactly one other type holds that type's id. A resource's
+  # example sets such an attribute to the id of that type's example.
+  def references(inputs) = inputs.to_h { [it.name, reference(it)] }.compact
+
+  def reference(attr)
+    return attr.name.delete_suffix("_id") if @keys[attr.name]&.rule == :parent_key
+    pattern = attr.checks.find { it.name == :matches }&.args&.first or return
+    types = @api.items.except(@name).select { |_, item| id_pattern(item) == pattern }.keys
+    types.first if types.one?
+  end
+
+  # The other type need not be defined, so its spec is read without the
+  # invariants, which hold for defined types only.
+  def id_pattern(item) = content(success(@api.paths[item.path]["get"] || {}))&.dig("properties", "id", "pattern")
+
+  # The generated examples need a value for each path parameter, required
+  # attribute and id.
+  def examples(values)
+    params = @item.params.map { param_prop(it) }.reject { it.schema.slice("example", "examples").compact.any? }
+    attrs = [id_source, *attribute_set.select { required(it) }].reject { values.key?(it.name) }.map { candidates(it).first }
+    missing = [*params, *attrs]
+    refuse missing.map(&:at).join(", "), "no example; add one to each" if missing.any?
   end
 
   def response_props(op)

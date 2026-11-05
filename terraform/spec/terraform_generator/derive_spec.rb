@@ -12,10 +12,13 @@ RSpec.describe TerraformGenerator::Derive do
 
   def verb(id, body) = op(id, body)
 
+  # An item path's parameters, with examples in place of the identity's example.
+  def identity_examples(item, **examples) = path_item("/project/{project_id}#{item}")[:parameters].then { [*it[...-1], it.last.except(:example).merge(examples:)] }
+
   describe "type_name" do
     it "names the type, writes its item path in attribute names, and takes its description from the item response" do
       type = derive(create: {})
-      expect(type.to_h.except(:statements)).to eq(
+      expect(type.to_h.except(:statements, :examples, :example_inputs, :references)).to eq(
         name: "thing",
         item: "/project/{project_id}/thing/{id}",
         doc: "A thing",
@@ -580,11 +583,54 @@ RSpec.describe TerraformGenerator::Derive do
     end
   end
 
+  describe "example" do
+    it "takes each attribute's example from the request property, else the key, else the response property" do
+      create = {color: {type: "string", example: "red"}, size: {type: "string", example: nil}, note: {type: "string", example: nil, writeOnly: true}, location: {type: "string", example: "here"}}
+      response = {color: {type: "string", example: "blue"}, size: {type: "string", example: "big"}, state: {type: "string", readOnly: true, example: false}, location: {type: "string", example: "elsewhere"}}
+      type = derive(create:, response:, item: "/location/{location}/thing/{thing_id}")
+      expect(type.examples).to eq("color" => "red", "id" => "x", "location" => "here", "size" => "big", "state" => false)
+    end
+
+    it "takes a parent key's example from the parent's id, and the name an identity fills from its examples entry named name, ahead of the response property" do
+      id = {type: "string", readOnly: true, example: "pa1", description: "ID of the parent"}
+      paths = {"/parent/{parent_reference}" => path_item("/project/{project_id}/parent/{parent_reference}", get: {operationId: "getParent", responses: {"200": {description: "A parent", **json(object({id:}))}}})}
+      item = "/parent/{parent_reference}/thing/{thing_reference}"
+      response = {name: {type: "string", example: "other"}}
+      type = derive(name: :parent_thing, create: {}, on_item: true, item:, paths:, response:, ops: {parameters: identity_examples(item, id: {value: "th1"}, name: {value: "my-thing"})})
+      expect([type.examples, type.references]).to eq [{"id" => "x", "name" => "my-thing", "parent_id" => "pa1"}, {"parent_id" => "parent"}]
+    end
+
+    it "takes the inputs the create body's example sets, and their values, ahead of the property examples" do
+      create = {color: {type: "string", example: "red"}, size: {type: "string", example: "big"}, echo: {type: "string", readOnly: true}, part: object({name: {type: "string"}}, writeOnly: true)}
+      body = {color: "blue", echo: "e", part: {name: "p"}, state: "up", size: nil}
+      type = derive(create:, example: body, required: %w[color], response: create.except(:part), item: "/location/{location}/thing/{thing_id}")
+      expect([type.example_inputs, type.examples.except("id")]).to eq [%w[color location part], {"color" => "blue", "echo" => "x", "location" => "x", "part" => {"name" => "p"}, "size" => "big"}]
+    end
+
+    it "sets only the required inputs where the create body has no example" do
+      expect(derive(create: {color: {type: "string"}, size: {type: "string"}}, required: %w[color], response: {color: {type: "string"}, size: {type: "string"}}).example_inputs).to eq %w[color]
+    end
+
+    it "refers an input the example sets to the one other type whose id pattern is its pattern" do
+      responses = {one: "^on$", two: "^tw$", three: "^tw$"}.to_h { |name, pattern| [name, {description: name, **json(object({id: {type: "string", readOnly: true, pattern:}}))}] }
+      paths = %w[one two three].to_h { ["/#{it}/{#{it}_id}", path_item("/project/{project_id}/#{it}/{#{it}_id}", get: op("get#{it}", response: it))] }
+      paths["/gone/{gone_id}"] = path_item("/project/{project_id}/gone/{gone_id}", delete: op("deleteGone"))
+      create = {one_id: {type: "string", pattern: "^on$"}, twin_id: {type: "string", pattern: "^tw$"}, spare_id: {type: "string", pattern: "^on$"}, set_id: {type: "string", pattern: "^on$"}, plain: {type: "string"}}
+      type = derive(create:, required: %w[one_id twin_id plain], example: {set_id: "on"}, response: create, paths:, responses:)
+      expect(type.references).to eq("one_id" => "one", "set_id" => "one")
+    end
+  end
+
   describe "examples" do
     it "refuses a required create input or an id without an example" do
       expect_refusal("createThing.color: no example; add one to each", create: {color: {type: "string", writeOnly: true, example: nil}}, required: %w[color])
       responses = {Thing: {description: "A thing", **json(type: "object", properties: {id: {type: "string", readOnly: true, description: "ID"}})}}
       expect_refusal("Thing.id: no example; add one to each", create: {}, responses:)
+    end
+
+    it "refuses a name the identity fills whose examples have no entry named name" do
+      params = identity_examples("/thing/{thing_reference}", id: {value: "th1"})
+      expect_refusal("{thing_reference}: no example; add one to each", create: {}, on_item: true, item: "/thing/{thing_reference}", ops: {parameters: params})
     end
 
     it "takes the response property's example where the request property has none" do
