@@ -58,6 +58,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
           minio_cluster.hostname,
           dns_zone.id,
           waiting_strand_id: minio_cluster.id,
+          num_auto_restarts: 100,
         )
         strand_args = {stack: [{"initial_cert_id" => cert_st.id, "current_cert_id" => cert_st.id}]}
       end
@@ -111,6 +112,14 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       hop_reconfigure
     end
 
+    when_cert_renewed_set? do
+      wait_for_public_cert("refresh_cert_id")
+      minio_cluster.save_changes
+      MinioServer.incr_reconfigure(server_ids_dataset)
+      decr_cert_renewed
+      nap 0
+    end
+
     nap 60 * 60 * 24
   end
 
@@ -121,13 +130,14 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       minio_cluster.certificate_last_checked_at = Time.now
       minio_cluster.save_changes
 
-      if OpenSSL::X509::Certificate.new(minio_cluster.server_cert).not_after < Time.now + 60 * 60 * 24 * 21
+      if OpenSSL::X509::Certificate.new(minio_cluster.server_cert).not_after < Time.now + 60 * 60 * 24 * 21 && !refresh_cert_id
         self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
           minio_cluster.hostname,
           minio_cluster.dns_zone.id,
           waiting_strand_id: minio_cluster.id,
+          num_auto_restarts: 100,
+          wakeup_semaphore: "cert_renewed",
         ).id
-        hop_wait_refresh_public_cert
       end
 
       hop_wait
@@ -145,6 +155,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     hop_wait
   end
 
+  # Remove after no strands at label
   label def wait_refresh_public_cert
     wait_for_public_cert("refresh_cert_id")
     minio_cluster.save_changes
@@ -208,7 +219,20 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   def wait_public_cert(cert_id)
     cert = Cert.with_pk!(cert_id)
-    nap(10 * 60) unless cert.cert
+    unless cert.cert
+      when_cert_renewed_set? do
+        Prog::PageNexus.assemble("Cert not available after cert_renewed semaphore set for #{minio_cluster.ubid}",
+          ["CertRenewal", minio_cluster.id],
+          minio_cluster.ubid,
+          resource_id: minio_cluster.id)
+        # Something is majorly wrong at this point. However, there isn't a point of
+        # continuing to retry this code, so after sending the page, decrement the semaphore.
+        decr_cert_renewed
+        nap(0)
+      end
+
+      nap(10 * 60)
+    end
 
     minio_cluster.server_cert = cert.cert
     minio_cluster.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
