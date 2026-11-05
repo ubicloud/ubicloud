@@ -72,6 +72,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       minio_server.hostname,
       cluster.dns_zone.id,
       waiting_strand_id: minio_server.id,
+      num_auto_restarts: 100,
     ).id
     hop_wait_certificates
   end
@@ -152,6 +153,13 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       hop_refresh_certificates
     end
 
+    when_cert_renewed_set? do
+      wait_for_public_cert("refresh_cert_id")
+      incr_reconfigure
+      decr_cert_renewed
+      nap 0
+    end
+
     nap 10
   end
 
@@ -159,13 +167,14 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     if cluster.uses_publicly_signed_certificates?
       minio_server.update(certificate_last_checked_at: Time.now)
 
-      if OpenSSL::X509::Certificate.new(minio_server.cert).not_after < Time.now + 60 * 60 * 24 * 21
+      if OpenSSL::X509::Certificate.new(minio_server.cert).not_after < Time.now + 60 * 60 * 24 * 21 && !refresh_cert_id
         self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
           minio_server.hostname,
           cluster.dns_zone.id,
           waiting_strand_id: minio_server.id,
+          wakeup_semaphore: "cert_renewed",
+          num_auto_restarts: 100,
         ).id
-        hop_wait_refresh_public_cert
       end
 
       hop_wait
@@ -178,6 +187,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     hop_wait
   end
 
+  # Remove after no strands at label
   label def wait_refresh_public_cert
     wait_for_public_cert("refresh_cert_id")
     incr_reconfigure
@@ -269,7 +279,20 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def wait_public_cert(cert_id)
     cert = Cert.with_pk!(cert_id)
-    nap(10 * 60) unless cert.cert
+    unless cert.cert
+      when_cert_renewed_set? do
+        Prog::PageNexus.assemble("Cert not available after cert_renewed semaphore set for #{minio_server.ubid}",
+          ["CertRenewal", minio_server.id],
+          minio_server.ubid,
+          resource_id: minio_server.id)
+        # Something is majorly wrong at this point. However, there isn't a point of
+        # continuing to retry this code, so after sending the page, decrement the semaphore.
+        decr_cert_renewed
+        nap(0)
+      end
+
+      nap(10 * 60)
+    end
 
     minio_server.update(cert: cert.cert, cert_key: OpenSSL::PKey::EC.new(cert.csr_key).to_pem)
   end
