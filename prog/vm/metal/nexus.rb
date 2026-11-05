@@ -208,7 +208,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       write_params_json
 
-      d_command = NetSsh.command("sudo host/bin/setup-vm prep :vm_name", vm_name:)
+      d_command = NetSsh.command("sudo timeout --kill-after=60 300 host/bin/setup-vm prep :vm_name", vm_name:)
       host.sshable.cmd("common/bin/daemonizer :d_command prep_:vm_name", d_command:, vm_name:, stdin: secrets_json, log: :on_error)
     end
 
