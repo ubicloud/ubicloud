@@ -43,6 +43,29 @@ RSpec.describe Prog::Vnet::CertNexus do
     order
   end
 
+  def create_shared_provider
+    AcmeProvider.create(
+      name: "shared-ca",
+      directory_url: "https://shared.example/directory",
+      email: "ops@example.com",
+      kid: "test-kid",
+      key: account_key.to_der,
+      priority: 1,
+    )
+  end
+
+  def create_per_cert_provider
+    AcmeProvider.create(
+      name: "per-cert-ca",
+      directory_url: "https://per-cert.example/directory",
+      priority: 1,
+      per_cert_accounts: true,
+      email: "ops@example.com",
+      kid: "eab-kid",
+      key: "eab-hmac",
+    )
+  end
+
   def use_add_private(identifiers: [])
     private_hostname = "private.#{cert.hostname}"
     cert.update(private_hostname:)
@@ -197,6 +220,75 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
+  describe "#handle_rate_limit" do
+    def rate_limited(retry_after)
+      Acme::Client::Error::RateLimited.new("too many requests", retry_after)
+    end
+
+    it "returns the result of the block when not rate limited" do
+      expect(nx.handle_rate_limit { :result }).to eq :result
+    end
+
+    it "naps for the Retry-After time and logs the rate limit" do
+      provider = create_shared_provider
+      expect(Clog).to receive(:emit).with("ACME provider rate limited request", hash_including(acme_rate_limited: hash_including(ubid: cert.ubid, label: "start", acme_provider: "shared-ca", retry_after: 60))).and_call_original
+      expect { nx.handle_rate_limit(provider:) { raise rate_limited("60") } }.to nap(55..65)
+    end
+
+    it "defaults to the certificate's provider" do
+      cert.update(acme_provider_id: create_shared_provider.id)
+      expect(Clog).to receive(:emit).with("ACME provider rate limited request", hash_including(acme_rate_limited: hash_including(acme_provider: "shared-ca"))).and_call_original
+      expect { nx.handle_rate_limit { raise rate_limited("60") } }.to nap(55..65)
+    end
+
+    it "naps for the Retry-After time when it is over RATE_LIMIT_MAX_NAP and no auto restarts remain" do
+      expect { nx.handle_rate_limit { raise rate_limited("3600") } }.to nap(3595..3605)
+    end
+
+    it "restarts when Retry-After is over RATE_LIMIT_MAX_NAP and auto restarts remain" do
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100})
+      expect { nx.handle_rate_limit { raise rate_limited("3600") } }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 1
+      expect(st.stack[0]["deadline_target"]).to eq "wait"
+    end
+
+    it "naps instead of restarting when restart: false, even if Retry-After is over RATE_LIMIT_MAX_NAP and auto restarts remain" do
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+      expect { nx.handle_rate_limit(restart: false) { raise rate_limited("3600") } }.to nap(3595..3605)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
+    end
+
+    it "does not handle other ACME errors" do
+      expect { nx.handle_rate_limit { raise Acme::Client::Error::ServerInternal, "boom" } }.to raise_error Acme::Client::Error::ServerInternal
+    end
+
+    described_class::ACME_ORDER_LABELS.each do |label|
+      it "is used by #{label}" do
+        refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100})
+        expect(nx).to receive(:acme_order).and_raise(rate_limited("3600"))
+        expect { nx.public_send(label) }.to hop("restart")
+      end
+    end
+
+    it "is used by destroy without restarting" do
+      st.update(label: "destroy")
+      cert.update(cert: "test-cert", account_key: account_key.to_der, kid: "x")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+      client = instance_double(Acme::Client)
+      expect(nx).to receive(:acme_client).and_return(client)
+      expect(client).to receive(:revoke).and_raise(rate_limited("3600"))
+      expect { nx.destroy }.to nap(3595..3605)
+      expect(cert).to exist
+    end
+
+    it "is used by destroy when cleaning up DNS challenge records" do
+      st.update(label: "destroy")
+      expect(nx).to receive(:acme_order).and_raise(rate_limited("60"))
+      expect { nx.destroy }.to nap(55..65)
+      expect(cert).to exist
+    end
+  end
+
   describe "#before_destroy" do
     it "replaces the provisioning deadline with a destroy deadline" do
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => Time.now.to_s})
@@ -212,15 +304,16 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "registers a deadline and starts the certificate creation process" do
       identifiers = [cert.hostname]
       order = setup_order(new_order: true)
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      provider = create_shared_provider
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: provider.directory_url, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
       refresh_frame(nx, new_values: {"last_restart_time" => 0})
       expect { nx.start }.to hop("wait_dns_update")
       expect(nx.strand.stack[0]["last_restart_time"]).to be_within(10).of(Time.now.to_i)
       expect(cert.reload.kid).to eq("test-kid")
+      expect(cert.acme_provider_id).to eq(provider.id)
+      expect(cert.account_key).to be_nil
       expect(cert.order_url).to eq("test-order-url")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 600)
@@ -231,9 +324,8 @@ RSpec.describe Prog::Vnet::CertNexus do
       use_add_private(identifiers:)
       # With add_private, ACME returns two authorizations (one per domain)
       order = setup_order(new_order: true, add_private: true)
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      provider = create_shared_provider
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: provider.directory_url, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
       refresh_frame(nx, new_values: {"wait_deadline" => 100})
@@ -244,6 +336,52 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+    end
+
+    it "embeds a fresh account on the certificate for per_cert_accounts providers" do
+      order = setup_order(new_order: true)
+      provider = create_per_cert_provider
+      registration_client = instance_double(Acme::Client)
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://per-cert.example/directory", **described_class::ACME_CLIENT_OPTIONS).and_return(registration_client)
+      expect(registration_client).to receive(:new_account).with(contact: "mailto:ops@example.com", terms_of_service_agreed: true, external_account_binding: {kid: "eab-kid", hmac_key: "eab-hmac"}).and_return(instance_double(Acme::Client::Resources::Account, kid: "per-cert-kid"))
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://per-cert.example/directory", kid: "per-cert-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
+      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.kid).to eq("per-cert-kid")
+      expect(cert.acme_provider_id).to eq(provider.id)
+      expect(Util.parse_key(cert.account_key)).to be_a OpenSSL::PKey::EC
+    end
+
+    it "falls back to a per-cert account from the Config.acme_* settings when no provider is enabled" do
+      order = setup_order(new_order: true)
+      expect(Config).to receive_messages(acme_email: "config@example.com", acme_directory: "https://config.example/directory", acme_eab_kid: "config-eab-kid", acme_eab_hmac_key: "config-eab-hmac")
+      registration_client = instance_double(Acme::Client)
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://config.example/directory", **described_class::ACME_CLIENT_OPTIONS).and_return(registration_client)
+      expect(registration_client).to receive(:new_account).with(contact: "mailto:config@example.com", terms_of_service_agreed: true, external_account_binding: {kid: "config-eab-kid", hmac_key: "config-eab-hmac"}).and_return(instance_double(Acme::Client::Resources::Account, kid: "config-kid"))
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://config.example/directory", kid: "config-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
+      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.kid).to eq("config-kid")
+      expect(cert.acme_provider_id).to be_nil
+      expect(cert.account_key).not_to be_nil
+    end
+
+    it "uses the next enabled provider after a restart" do
+      order = setup_order(new_order: true)
+      first = create_shared_provider
+      second = create_per_cert_provider
+      private_key = Clec::Cert.ec_key
+      second.update(key: private_key.to_der, per_cert_accounts: false)
+      cert.update(acme_provider_id: first.id)
+      refresh_frame(nx, new_values: {"restarted" => 1})
+      expect(Acme::Client).to receive(:new).with(private_key: having_attributes(to_der: private_key.to_der), directory: second.directory_url, kid: second.kid, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
+      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.acme_provider_id).to eq(second.id)
+      expect(cert.kid).to eq(second.kid)
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -566,6 +704,24 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert).not_to exist
     end
 
+    it "emits a log and continues when Let's Encrypt refuses to revoke an expired certificate" do
+      setup_order
+      cert.update(cert: "test-cert")
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("Unable to revoke :: Certificate is expired"))
+      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked", instance_of(Hash)).and_call_original
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+      expect(cert).not_to exist
+    end
+
+    it "re-raises other problem types even when the wording mentions expiry" do
+      setup_order(with_order: false)
+      cert.update(cert: "test-cert")
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Malformed.new("certificate is expired"))
+
+      expect { nx.destroy }.to raise_error Acme::Client::Error::Malformed
+    end
+
     it "fires an exception if the cert is not authorized and the message is not about the certificate being expired" do
       setup_order(with_order: false)
       cert.update(cert: "test-cert")
@@ -587,6 +743,28 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "returns nil if account key is not set" do
       expect(nx.acme_client).to be_nil
+    end
+
+    it "uses the provider's shared account when the certificate has no embedded account key" do
+      provider = create_shared_provider
+      cert.update(acme_provider_id: provider.id, kid: "test-kid")
+      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: "https://shared.example/directory", kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS) do |private_key:, **|
+        expect(private_key.to_der).to eq account_key.to_der
+        "client"
+      end
+
+      expect(nx.acme_client).to eq "client"
+    end
+
+    it "uses the provider's directory with the embedded account key for per_cert_accounts certificates" do
+      provider = create_per_cert_provider
+      cert.update(acme_provider_id: provider.id, kid: "per-cert-kid", account_key: account_key.to_der)
+      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: "https://per-cert.example/directory", kid: "per-cert-kid", **described_class::ACME_CLIENT_OPTIONS) do |private_key:, **|
+        expect(private_key.to_der).to eq account_key.to_der
+        "client"
+      end
+
+      expect(nx.acme_client).to eq "client"
     end
   end
 
