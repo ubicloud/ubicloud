@@ -46,5 +46,13 @@ class PostgresResource < Sequel::Model
 
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers:, exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false)
     end
+
+    def metal_servers_placed?
+      servers.all? { it.vm.vm_host }
+    end
+
+    def metal_use_different_az_by_default?
+      false
+    end
   end
 end

@@ -216,6 +216,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
     end
 
+    it "does not provision a new server on GCP while a server's VM has not picked its zone" do
+      location.update(provider: "gcp")
+      pg.update(ha_type: "sync")
+      create_server(is_representative: true, vm_host_data_center: nil, zone_suffix: "a")
+      create_server(vm_host_data_center: nil)
+      expect { nx.provision_servers }.to nap.and not_change(PostgresServer, :count)
+    end
+
     it "fails fast on GCP upgrade when no dual-version image is available" do
       location.update(provider: "gcp")
       LocationCredentialGcp.create_with_id(location,

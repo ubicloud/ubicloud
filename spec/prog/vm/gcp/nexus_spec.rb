@@ -223,6 +223,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.stack.first["gcp_zone_suffix"]).to eq("c")
     end
 
+    it "starts in the preferred zone" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"preferred_availability_zone" => "b"})
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
+      expect(compute_client).to receive(:insert).and_return(op)
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(st.stack.first["gcp_zone_suffix"]).to eq("b")
+      expect(vm.reload.vm_gcp_resource.location_az.az).to eq("b")
+    end
+
     it "preserves existing gcp_zone_suffix on re-entry (retry case)" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
@@ -320,6 +333,65 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to nap(5)
       stack = st.stack.first
       expect(stack["exclude_zones"]).to eq(["a", "b"])
+      expect(stack["gcp_zone_suffix"]).to eq("c")
+    end
+
+    it "retries in a zone no other server uses before one another server uses" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a", "unsupported_azs" => ["b"]})
+      ensure_vm_gcp_resource(vm, "a")
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone retry", hash_including(zone_retry: hash_including(remaining: ["c"]))).and_call_original
+
+      expect { nx.start }.to nap(5)
+      expect(st.stack.first["gcp_zone_suffix"]).to eq("c")
+      expect(vm.reload.vm_gcp_resource.location_az.az).to eq("c")
+    end
+
+    it "retries in a zone another server uses once every other zone failed" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "b", "exclude_zones" => ["a"], "unsupported_azs" => ["c"]})
+      ensure_vm_gcp_resource(vm, "b")
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone retry", hash_including(zone_retry: hash_including(remaining: ["c"]))).and_call_original
+
+      expect { nx.start }.to nap(5)
+      stack = st.stack.first
+      expect(stack["exclude_zones"]).to eq(["a", "b"])
+      expect(stack["gcp_zone_suffix"]).to eq("c")
+    end
+
+    it "starts a new round in the preferred zone after every zone failed" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "preferred_availability_zone" => "b"})
+      ensure_vm_gcp_resource(vm, "c")
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
+
+      expect { nx.start }.to nap(5 * 60)
+      stack = st.stack.first
+      expect(stack["exclude_zones"]).to eq([])
+      expect(stack["gcp_zone_suffix"]).to eq("b")
+    end
+
+    it "prefers a zone no other server uses after resetting exclusions" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "unsupported_azs" => ["a", "b"]})
+      ensure_vm_gcp_resource(vm, "c")
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
+
+      expect { nx.start }.to nap(5 * 60)
+      stack = st.stack.first
+      expect(stack["exclude_zones"]).to eq([])
       expect(stack["gcp_zone_suffix"]).to eq("c")
     end
 
