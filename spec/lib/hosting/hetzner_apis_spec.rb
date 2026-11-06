@@ -349,4 +349,68 @@ RSpec.describe Hosting::HetznerApis do
       expect { hetzner_apis.set_server_name("84fe406c-42af-8771-bcde-4a29adc23bb0") }.to raise_error Excon::Error::NotFound
     end
   end
+
+  describe "pull_ipv4_subnets" do
+    it "returns the IPv4 subnets of the server" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "1.1.1.1"}).to_return(status: 200, body: JSON.generate([
+        {subnet: {ip: "2.2.2.0", mask: 27, server_ip: "1.1.1.1"}},
+        {subnet: {ip: "2a01:4f8:10a:128b::", mask: 64, server_ip: "1.1.1.1"}},
+      ]))
+      expect(hetzner_apis.pull_ipv4_subnets).to eq ["2.2.2.0/27"]
+    end
+
+    it "returns no subnets if the server has none" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "1.1.1.1"}).to_return(status: 404, body: "")
+      expect(hetzner_apis.pull_ipv4_subnets).to eq []
+    end
+
+    it "raises an error if getting the subnets fails" do
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").with(query: {server_ip: "1.1.1.1"}).to_return(status: 400, body: "")
+      expect { hetzner_apis.pull_ipv4_subnets }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
+  describe "pull_open_ipv4_subnet_orders" do
+    it "returns the subnet orders of the server that are not cancelled" do
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 200, body: JSON.generate([
+        {transaction: {id: "B1", status: "in process", server_number: 123, product: {id: "subnet_ipv4_27"}}},
+        {transaction: {id: "B2", status: "ready", server_number: 123, product: {id: "subnet_ipv4_28"}}},
+        {transaction: {id: "B3", status: "cancelled", server_number: 123, product: {id: "subnet_ipv4_27"}}},
+        {transaction: {id: "B4", status: "in process", server_number: 124, product: {id: "subnet_ipv4_27"}}},
+        {transaction: {id: "B5", status: "in process", server_number: 123, product: {id: "additional_ipv4"}}},
+      ]))
+      expect(hetzner_apis.pull_open_ipv4_subnet_orders).to eq ["B1", "B2"]
+    end
+
+    it "returns no orders if there are none" do
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 404, body: "")
+      expect(hetzner_apis.pull_open_ipv4_subnet_orders).to eq []
+    end
+
+    it "raises an error if getting the orders fails" do
+      stub_request(:get, "https://robot-ws.your-server.de/order/server_addon/transaction").to_return(status: 400, body: "")
+      expect { hetzner_apis.pull_open_ipv4_subnet_orders }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
+  describe "order_ipv4_subnet" do
+    let(:order_body) do
+      {
+        server_number: "123",
+        product_id: "subnet_ipv4_27",
+        reason: "We provision virtual machines on this server. We assign IPv4 addresses to them from the additional subnet.",
+      }
+    end
+
+    it "orders a subnet and returns the transaction id" do
+      stub_request(:post, "https://robot-ws.your-server.de/order/server_addon/transaction").with(body: order_body)
+        .to_return(status: 201, body: JSON.generate(transaction: {id: "B1", status: "in process"}))
+      expect(hetzner_apis.order_ipv4_subnet(27)).to eq "B1"
+    end
+
+    it "raises an error if Hetzner rejects the order" do
+      stub_request(:post, "https://robot-ws.your-server.de/order/server_addon/transaction").with(body: order_body).to_return(status: 409, body: "")
+      expect { hetzner_apis.order_ipv4_subnet(27) }.to raise_error Excon::Error::Conflict
+    end
+  end
 end

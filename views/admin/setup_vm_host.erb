@@ -31,6 +31,12 @@ end %>
       <%== f.input(:select, key: :provider_name, label: "Provider", required: true, add_blank: true, options: SETUP_VM_HOST_PROVIDERS) %>
       <%== f.input(:checkboxset, key: :default_boot_images, label: "Default Boot Images", options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys, wrapper_attr: {class: "rollout-checkboxset"}) %>
       <%== f.input(:text, key: :vhost_block_backend_version, label: "Vhost Block Backend Version", required: true, value: Config.vhost_block_backend_version) %>
+      <%== f.input(:checkbox, key: :order_ipv4_subnet, label: "Order IPv4 Subnet", checked: true) %>
+
+      <p class="rollout-desc">
+        If Order IPv4 Subnet is selected, Hetzner servers without an IPv4 subnet get one ordered: /27 for standard, /28 for premium.
+      </p>
+
       <%== f.input(:checkbox, key: :install_os, label: "Install OS") %>
 
       <p class="rollout-desc">
