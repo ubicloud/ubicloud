@@ -403,6 +403,16 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       refresh_frame(nx, new_values: {"subnet_tag_value_name" => subnet_tag_value_name})
     end
 
+    it "creates no allow rule for the GitHub runner subnet, so its VMs cannot reach each other" do
+      nx.private_subnet.update(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, firewall_priority: nil)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(ps.project_id)
+      expect(nfp_client).not_to receive(:get_rule)
+      expect(nfp_client).not_to receive(:add_rule)
+
+      expect { nx.create_subnet_allow_rules }.to hop("wait")
+      expect(ps.reload.firewall_priority).to be_nil
+    end
+
     it "creates IPv4+IPv6 tag-based egress allow rules (fire-and-forget)" do
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))

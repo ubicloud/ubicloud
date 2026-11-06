@@ -43,6 +43,30 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(LocationCredentialAws[location_id].access_key).to be_nil
     end
 
+    it "assembles the GCP phase with aws provider for the Ubuntu versions with a GCE image" do
+      gcp_location_id = Location.generate_uuid
+      subnet_id = PrivateSubnet.generate_uuid
+      expect(Config).to receive_messages(github_runner_aws_location_id: "5f0db214-de30-8420-8a11-98014b01c5b5", e2e_aws_assume_role: nil, e2e_aws_access_key: "access_key", e2e_aws_secret_key: "secret_key", e2e_cache_proxy_download_url: "")
+      expect(Config).to receive_messages(github_runner_gcp_location_id: gcp_location_id, github_runner_gcp_private_subnet_id: subnet_id, github_ubuntu_2204_x64_gce_image: nil, github_ubuntu_2404_x64_gce_image: "projects/runner-gcp/global/images/github-ubuntu-2404-1")
+      expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.encode64({project_id: "e2e-gcp", client_email: "e2e@e2e-gcp.iam.gserviceaccount.com"}.to_json))
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}], provider: "aws")
+      expect(strand.stack.first["gcp_labels"]).to eq(["ubicloud-premium-8-ubuntu-2404"])
+      expect(LocationCredentialGcp[gcp_location_id].project_id).to eq("e2e-gcp")
+      subnet = PrivateSubnet[subnet_id]
+      expect(subnet.name).to eq(PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(subnet.location_id).to eq(gcp_location_id)
+      expect(subnet.net4.netmask.prefix_len).to eq(16)
+    end
+
+    it "skips the GCP phase with aws provider when no GCE image is configured" do
+      gcp_location_id = Location.generate_uuid
+      expect(Config).to receive_messages(github_runner_aws_location_id: "5f0db214-de30-8420-8a11-98014b01c5b5", e2e_aws_assume_role: nil, e2e_aws_access_key: "access_key", e2e_aws_secret_key: "secret_key", e2e_cache_proxy_download_url: "")
+      expect(Config).to receive_messages(github_runner_gcp_location_id: gcp_location_id, github_ubuntu_2404_x64_gce_image: nil)
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2404"}], provider: "aws")
+      expect(strand.stack.first["gcp_labels"]).to eq([])
+      expect(Location[gcp_location_id]).to be_nil
+    end
+
     it "assembles labels based on test case names" do
       strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}])
       expect(strand.stack.first["labels"]).to eq(["ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404"])
@@ -159,6 +183,17 @@ RSpec.describe Prog::Test::GithubRunner do
       expect { gr_test.trigger_test_run }.to hop("check_test_run")
     end
 
+    it "triggers the GCP labels in the GCP phase" do
+      refresh_frame(gr_test, new_values: {"gcp_phase" => true, "gcp_labels" => ["ubicloud-premium-8-ubuntu-2204"]})
+      allow(ENV).to receive(:[]).and_call_original
+      expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
+      expect(client).to receive(:post).with(
+        "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
+        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: ["ubicloud-premium-8-ubuntu-2204"].to_json}, return_run_details: true},
+      ).and_return({workflow_run_id: 123456789})
+      expect { gr_test.trigger_test_run }.to hop("check_test_run")
+    end
+
     it "hops to clean_resources when trigger fails" do
       allow(ENV).to receive(:[]).and_call_original
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
@@ -196,6 +231,74 @@ RSpec.describe Prog::Test::GithubRunner do
         .and_return({conclusion: "failure"})
       expect { gr_test.check_test_run }.to hop("clean_resources")
     end
+
+    it "hops to start_gcp_test_run when the first run passes and there are GCP labels" do
+      refresh_frame(gr_test, new_values: {"gcp_labels" => ["ubicloud-premium-8-ubuntu-2204"]})
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: "success"})
+      expect { gr_test.check_test_run }.to hop("start_gcp_test_run")
+    end
+
+    it "skips the GCP phase when the first run fails" do
+      refresh_frame(gr_test, new_values: {"gcp_labels" => ["ubicloud-premium-8-ubuntu-2204"]})
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: "failure"})
+      expect { gr_test.check_test_run }.to hop("clean_resources")
+    end
+
+    describe "in the GCP phase" do
+      let(:gcp_location) { Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: gr_test.customer_project_id, display_name: "gcp-e2e", ui_name: "gcp-e2e", visible: true) }
+
+      before do
+        refresh_frame(gr_test, new_values: {"gcp_phase" => true, "gcp_labels" => ["ubicloud-premium-8-ubuntu-2204", "ubicloud-premium-8-ubuntu-2404"], "gcp_runner_labels" => []})
+        allow(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_location.id)
+      end
+
+      def create_runner(label, location_id)
+        vm = create_vm(location_id:)
+        GithubRunner.create(repository_name: "test-repo", label:, vm_id: vm.id, location_id:)
+      end
+
+      it "records the labels of runners on GCP while the run goes on" do
+        create_runner("ubicloud-premium-8-ubuntu-2204", gcp_location.id)
+        create_runner("ubicloud-standard-2-ubuntu-2204", Location::GITHUB_RUNNERS_ID)
+        expect(client).to receive(:workflow_run).and_return({conclusion: "in_progress"})
+        expect { gr_test.check_test_run }.to nap(15)
+        expect(gr_test.gcp_runner_labels).to eq(["ubicloud-premium-8-ubuntu-2204"])
+        expect(gr_test.fail_message).to be_nil
+      end
+
+      it "fails the test when a GCP label runner runs elsewhere" do
+        create_runner("ubicloud-premium-8-ubuntu-2404", Location::GITHUB_RUNNERS_ID)
+        expect(client).to receive(:workflow_run).and_return({conclusion: "in_progress"})
+        expect { gr_test.check_test_run }.to nap(15)
+        expect(gr_test.fail_message).to eq("Runners ran outside GCP for ubicloud-premium-8-ubuntu-2404")
+      end
+
+      it "passes when a runner of every GCP label ran on GCP" do
+        refresh_frame(gr_test, new_values: {"gcp_runner_labels" => ["ubicloud-premium-8-ubuntu-2204"]})
+        create_runner("ubicloud-premium-8-ubuntu-2404", gcp_location.id)
+        expect(client).to receive(:workflow_run).and_return({conclusion: "success"})
+        expect { gr_test.check_test_run }.to hop("clean_resources")
+        expect(gr_test.fail_message).to be_nil
+      end
+
+      it "fails the test when a GCP label never ran on GCP" do
+        refresh_frame(gr_test, new_values: {"gcp_runner_labels" => ["ubicloud-premium-8-ubuntu-2204"]})
+        expect(client).to receive(:workflow_run).and_return({conclusion: "success"})
+        expect { gr_test.check_test_run }.to hop("clean_resources")
+        expect(gr_test.fail_message).to eq("No runner ran on GCP for ubicloud-premium-8-ubuntu-2404")
+      end
+    end
+  end
+
+  describe "#start_gcp_test_run" do
+    it "draws GCP for every eligible runner and triggers the GCP labels" do
+      expect { gr_test.start_gcp_test_run }.to hop("trigger_test_run")
+      expect(Project[gr_test.customer_project_id].get_ff_gcp_alien_runners_percentage).to eq(100)
+      expect(gr_test.gcp_phase).to be(true)
+      expect(gr_test.gcp_runner_labels).to eq([])
+    end
   end
 
   describe "#clean_resources" do
@@ -229,6 +332,15 @@ RSpec.describe Prog::Test::GithubRunner do
       installation = GithubInstallation.first(project_id: gr_test.customer_project_id)
       ps = Prog::Vnet::SubnetNexus.assemble(installation.project_id, allow_only_ssh: true).subject
       installation.add_private_subnet(ps)
+      expect { gr_test.clean_resources }.to nap(15)
+      expect(ps.destroy_set?).to be(true)
+    end
+
+    it "waits the GCP runner subnet to be destroyed" do
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
+      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
+      ps = Prog::Vnet::SubnetNexus.assemble(gr_test.customer_project_id, name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME).subject
+      expect(Config).to receive(:github_runner_gcp_private_subnet_id).and_return(ps.id)
       expect { gr_test.clean_resources }.to nap(15)
       expect(ps.destroy_set?).to be(true)
     end

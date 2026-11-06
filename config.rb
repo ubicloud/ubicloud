@@ -142,6 +142,8 @@ module Config
   optional :github_runner_service_project_id, uuid
   override :enable_github_workflow_poller, true, bool
   optional :github_runner_aws_location_id, uuid
+  optional :github_runner_gcp_location_id, uuid
+  optional :github_runner_gcp_private_subnet_id, uuid
   override :github_runner_aws_spot_instance_enabled, false, bool
   optional :github_runner_aws_spot_instance_max_price_per_vcpu, float
   override :github_runner_aws_spill_threshold_seconds, 30, int
@@ -257,6 +259,9 @@ module Config
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-0e9c89341de1180df", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0bd350cd62c8189a9", string
   override :github_ubuntu_2604_arm64_aws_ami_version, "ami-0a3ac6a7ca9142d5c", string
+  optional :github_ubuntu_2204_x64_gce_image, string
+  optional :github_ubuntu_2404_x64_gce_image, string
+  optional :github_ubuntu_2604_x64_gce_image, string
   override :postgres_gce_image_gcp_project_id, "ubicloud-images", string
 
   # Allocator

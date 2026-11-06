@@ -10,8 +10,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   WORKFLOW_NAME = "test.yml"
   BRANCH_NAME = "main"
 
-  frame_reader :provider, :customer_project_id, :labels, :boot_images, :vm_host_id
-  frame_accessor :vm_pool_id, :fail_message, :test_run_id
+  frame_reader :provider, :customer_project_id, :labels, :boot_images, :vm_host_id, :gcp_labels
+  frame_accessor :vm_pool_id, :fail_message, :test_run_id, :gcp_phase, :gcp_runner_labels
 
   def self.assemble(test_cases, provider: "metal", vm_host_id: nil)
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
@@ -52,6 +52,18 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       labels << "ubicloud-standard-2-arm-ubuntu-2604" if test_cases.any? { it["name"].include?("2604") }
     end
 
+    gcp_labels = []
+    if provider == "aws" && (gcp_location_id = Config.github_runner_gcp_location_id)
+      gcp_labels = %w[2204 2404 2604].filter_map do |version|
+        "ubicloud-premium-8-ubuntu-#{version}" if test_cases.any? { it["name"].include?(version) } && Config.send(:"github_ubuntu_#{version}_x64_gce_image")
+      end
+      unless gcp_labels.empty?
+        location = Location.create_with_id(gcp_location_id, name: "gcp-europe-west3", provider: "gcp", project_id: service_project.id, display_name: "gcp-e2e", ui_name: "gcp-e2e", visible: true)
+        Prog::Test::Base.ensure_gcp_e2e_credential(location)
+        Prog::Vnet::SubnetNexus.assemble(service_project.id, name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, location_id: location.id, ipv4_range_size: 16, allow_only_ssh: true, id: Config.github_runner_gcp_private_subnet_id)
+      end
+    end
+
     boot_images = vm_host_id ? test_cases.flat_map { it["images"] || [] }.uniq : []
 
     Strand.create(
@@ -61,6 +73,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
         "provider" => provider,
         "customer_project_id" => customer_project.id,
         "labels" => labels,
+        "gcp_labels" => gcp_labels,
         "boot_images" => boot_images,
         "vm_host_id" => vm_host_id,
       }],
@@ -106,7 +119,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def trigger_test_run
-    inputs = {triggered_by: ENV["GITHUB_RUN_ID"], provider:, runners: labels.to_json}
+    inputs = {triggered_by: ENV["GITHUB_RUN_ID"], provider:, runners: (gcp_phase ? gcp_labels : labels).to_json}
     response = client.post("repos/#{repository_name}/actions/workflows/#{WORKFLOW_NAME}/dispatches", {ref: BRANCH_NAME, inputs:, return_run_details: true})
     unless response
       self.fail_message = "Couldn't trigger workflow"
@@ -119,6 +132,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def check_test_run
+    record_gcp_runner_placement if gcp_phase
     run = client.workflow_run(repository_name, test_run_id)
     conclusion = run[:conclusion]
     if FAIL_CONCLUSIONS.include?(conclusion)
@@ -127,7 +141,21 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    if gcp_phase
+      missing = gcp_labels - gcp_runner_labels
+      self.fail_message ||= "No runner ran on GCP for #{missing.join(", ")}" unless missing.empty?
+    elsif !fail_message && !gcp_labels.empty?
+      hop_start_gcp_test_run
+    end
+
     hop_clean_resources
+  end
+
+  label def start_gcp_test_run
+    Project[customer_project_id].set_ff_gcp_alien_runners_percentage(100)
+    self.gcp_phase = true
+    self.gcp_runner_labels = []
+    hop_trigger_test_run
   end
 
   label def clean_resources
@@ -167,6 +195,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    if (runner_subnet = PrivateSubnet[Config.github_runner_gcp_private_subnet_id])
+      runner_subnet.incr_destroy
+      Clog.emit("Waiting GCP runner subnet to be destroyed")
+      nap 15
+    end
+
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
     if (project = Project[customer_project_id])
@@ -190,6 +224,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   def vm_host
     @vm_host ||= VmHost[vm_host_id]
+  end
+
+  def record_gcp_runner_placement
+    placed = GithubRunner.where(label: gcp_labels).exclude(location_id: nil).select_hash_groups(:location_id, :label)
+    self.gcp_runner_labels |= placed.delete(Config.github_runner_gcp_location_id) || []
+    self.fail_message ||= "Runners ran outside GCP for #{placed.values.flatten.uniq.join(", ")}" unless placed.empty?
   end
 
   def repository_name
