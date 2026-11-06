@@ -308,6 +308,13 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         expect(old_vm.destroy_set?(cached: false)).to be false
       end
 
+      it "pops without destroying the old vm if cancel_destroy_source is set" do
+        frame_with(Time.now - 1)
+        nx.incr_cancel_destroy_source
+        expect { nx.wait_destroy_source }.to exit({"msg" => "vm moved, source vm kept"})
+        expect(old_vm.destroy_set?(cached: false)).to be false
+      end
+
       it "destroys the old vm and pops once destroy_source_at has passed" do
         frame_with(Time.now - 1)
         expect { nx.wait_destroy_source }.to exit({"msg" => "vm moved"})
