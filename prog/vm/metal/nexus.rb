@@ -187,7 +187,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def prep
-    case host.sshable.cmd("common/bin/daemonizer --check prep_:vm_name", vm_name:)
+    case host.sshable.d_check(prep_unit_name)
     when "Succeeded"
       vm.nics.each(&:incr_setup_nic)
 
@@ -208,11 +208,16 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       write_params_json
 
-      d_command = NetSsh.command("sudo timeout --kill-after=60 300 host/bin/setup-vm prep :vm_name", vm_name:)
-      host.sshable.cmd("common/bin/daemonizer :d_command prep_:vm_name", d_command:, vm_name:, stdin: secrets_json, log: :on_error)
+      # The secrets hold the storage KEKs. daemonizer2 keeps them off disk and
+      # deletes them as soon as setup-vm has read them.
+      host.sshable.d_run(prep_unit_name, "sudo", "timeout", "--kill-after=60", "300", "host/bin/setup-vm", "prep", vm_name, stdin: secrets_json, log: :on_error)
     end
 
     nap 1
+  end
+
+  def prep_unit_name
+    "prep_#{vm_name}"
   end
 
   def write_params_json
@@ -339,7 +344,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_clean_prep_set? do
-      host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:, log: :on_error)
+      host.sshable.d_clean(prep_unit_name)
       decr_clean_prep
     end
 
