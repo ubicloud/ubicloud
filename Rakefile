@@ -276,24 +276,40 @@ end
 
 desc "Report associations that can be removed and association options that should be added"
 task :unused_associations_check do
-  rspec.call({"UNUSED_ASSOCIATIONS" => "1"})
+  spec.call({"UNUSED_ASSOCIATIONS" => "1"})
   task_runner.call({"RACK_ENV" => "test", "UNUSED_ASSOCIATIONS" => "1", "FORCE_AUTOLOAD" => "1"}, "unused_associations_check")
 end
 
 desc "Run each spec file in a separate process"
 task :spec_separate do
   require "rbconfig"
+  require "open3"
 
+  # Start the largest files first, so that a large file does not run alone at the end
+  queue = Queue.new
+  Dir["spec/**/*_spec.rb"].sort_by { -File.size(it) }.each { queue << it }
+  queue.close
+
+  processes = auto_parallel_tests.call ? Integer(nproc.call) : 1
   failures = []
-  Dir["spec/**/*_spec.rb"].each do |file|
-    # system instead of sh as we are reporting all failures at the end
-    failures << file unless system(RbConfig.ruby, "-w", "-S", "rspec", file)
-  end
+  mutex = Mutex.new
+  Array.new(processes) do |i|
+    Thread.new do
+      env = (processes > 1) ? {"TEST_ENV_NUMBER" => (i + 1).to_s} : {}
+      while (file = queue.pop)
+        output, status = Open3.capture2e(env, RbConfig.ruby, "-w", "-S", "rspec", file)
+        mutex.synchronize do
+          print output
+          failures << file unless status.success?
+        end
+      end
+    end
+  end.each(&:join)
 
   if failures.empty?
     puts "All files passed"
   else
-    puts "Failures in:", failures
+    puts "Failures in:", failures.sort
     exit 1
   end
 end
