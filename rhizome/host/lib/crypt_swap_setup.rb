@@ -29,9 +29,15 @@ module CryptSwapSetup
 
     swap_real = resolve_swap_device(fstab[swap_line_idx])
 
-    # dm-crypt needs a block device; we can't encrypt a swapfile in place.
+    # dm-crypt needs a block device, so a swap file can't be encrypted here.
+    # Plaintext swap can put any process memory, keys included, on disk, so
+    # turn the swap file off instead.
     unless File.blockdev?(swap_real)
-      puts "swap is a file (#{swap_real}), not a block device; skipping cryptswap setup"
+      puts "swap is a file (#{swap_real}); disabling it, as plaintext swap is not allowed"
+      r "swapoff", swap_real
+      fstab.delete_at(swap_line_idx)
+      update_fstab(fstab)
+      rm_if_exists(swap_real)
       return
     end
 

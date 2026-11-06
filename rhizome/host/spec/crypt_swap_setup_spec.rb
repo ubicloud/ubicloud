@@ -47,15 +47,20 @@ RSpec.describe CryptSwapSetup do
       described_class.run
     end
 
-    it "skips cryptswap setup when swap is a swapfile" do
+    it "disables and removes a swap file, as it can't be encrypted" do
       expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
             UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
             /swap.img none swap sw 0 0
       FSTAB
       expect(File).to receive(:realpath).with("/swap.img").and_return("/swap.img")
       expect(File).to receive(:blockdev?).with("/swap.img").and_return(false)
+      expect(described_class).to receive(:_run_command).with("swapoff", "/swap.img")
+      expect(Time).to receive(:now).and_return(Time.at(1_700_000_002))
+      expect(FileUtils).to receive(:cp).with(CryptSwapSetup::FSTAB, "#{CryptSwapSetup::FSTAB}.bak.1700000002")
+      expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::FSTAB, "UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0\n")
+      expect(described_class).to receive(:rm_if_exists).with("/swap.img")
 
-      expect { described_class.run }.to output(/skipping cryptswap setup/).to_stdout
+      expect { described_class.run }.to output(/disabling it, as plaintext swap is not allowed/).to_stdout
     end
 
     it "skips if cryptswap is already configured in fstab" do
