@@ -24,6 +24,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "EFI stub: ERROR: Failed to decompress kernel",
   ].freeze
 
+  ERROR_NOTIFICATION_COOLDOWN = 7 * 24 * 60 * 60
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil, schedule: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -217,6 +219,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     @client ||= installation.client(auto_paginate: true)
   end
 
+  # The rate limit resets every hour and is exceeded again, so only the
+  # cooldown limits its emails.
+  def clear_error_notifications
+    DB[:github_error_notification]
+      .where(installation_id: github_runner.installation_id)
+      .where(Sequel.|({repository_id: nil}, {repository_id: github_runner.repository_id}))
+      .exclude(error: "rate_limit_exceeded")
+      .delete
+  end
+
   def busy?
     return unless github_runner.runner_id
     rescue_common_github_api_errors do
@@ -224,6 +236,34 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
   rescue Octokit::NotFound
     nil
+  end
+
+  # Notifies once per error until runners register again, with a reminder
+  # after the cooldown. A nil repository_id records an installation-wide
+  # error. The upsert lets only one of the concurrent runners notify.
+  def notify_customer(error, repository_id, email_body, action_required: true)
+    notify = !DB[:github_error_notification]
+      .returning(:error)
+      .insert_conflict(
+        target: [:installation_id, :repository_id, :error],
+        update: {notified_at: Sequel[:excluded][:notified_at]},
+        update_where: Sequel[:github_error_notification][:notified_at] < Time.now - ERROR_NOTIFICATION_COOLDOWN,
+      )
+      .insert(installation_id: github_runner.installation_id, repository_id:, error:, notified_at: Time.now)
+      .empty?
+    return unless notify && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
+
+    repository_name = github_runner.repository_name
+    Util.send_email(
+      receivers,
+      "#{"Action Required: " if action_required}Couldn't provision Ubicloud runners for the \"#{repository_name}\" repository",
+      greeting: "Hello,",
+      body: [
+        "Our monitoring system detected that we can't provision Ubicloud runners for your \"#{repository_name}\" repository due to the following error:",
+        *email_body,
+        "Please don't hesitate to reach out at support@ubicloud.com if you have any questions or need any help.",
+      ],
+    )
   end
 
   def rescue_common_github_api_errors
@@ -239,11 +279,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     github_runner.incr_destroy unless destroying_set?
     nap 0
   rescue Octokit::Error => e
-    installation_ubid = github_runner.installation.ubid
-    page_args, email_body = case e.message
+    error, repository_id, email_body = case e.message
     when /Repository level self-hosted runners are disabled/
       [
-        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], github_runner.installation_id],
+        "self_hosted_runners_disabled",
+        github_runner.repository_id,
         [
           "\"Repository level self-hosted runners are disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable self-hosted runners for this repository in your GitHub organization settings.",
@@ -251,7 +291,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /GitHub Actions is disabled on this repository/
       [
-        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid], github_runner.installation_id],
+        "actions_disabled",
+        github_runner.repository_id,
         [
           "\"GitHub Actions is disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable GitHub Actions for this repository in your GitHub organization settings.",
@@ -259,16 +300,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /your IP address is not permitted to access this resource/
       [
-        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], github_runner.installation_id],
+        "ip_allowlist_enabled",
+        nil,
         [
           "\"Although you appear to have the correct authorization credentials, your organization has an IP allow list enabled, and our control plane's IP address is not permitted to access this resource.\"",
           "To use Ubicloud runners, you need to disable the IP allow list in your GitHub organization settings.",
         ],
       ]
     when /Resource not accessible by integration/
-      repository_ubid = github_runner.repository.ubid
       [
-        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], github_runner.repository_id],
+        "resource_not_accessible",
+        github_runner.repository_id,
         [
           "\"Resource not accessible by integration.\"",
           "This usually means this repository isn't included in the Ubicloud GitHub App's repository access. To use Ubicloud runners, you need to add this repository to the Ubicloud GitHub App's allowed repository list in your GitHub settings.",
@@ -276,24 +318,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     end
 
-    if page_args
+    if error
       Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
-      summary, tag_parts, resource_id = page_args
-      # Only notify when a new page is created, to avoid duplicate emails.
-      page = Prog::PageNexus.assemble(summary, tag_parts, installation_ubid, resource_id:, severity: "warning")
-      if page && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
-        repository_name = github_runner.repository_name
-        Util.send_email(
-          receivers,
-          "Action Required: Couldn't provision Ubicloud runners for the \"#{repository_name}\" repository",
-          greeting: "Hello,",
-          body: [
-            "Our monitoring system detected that we can't provision Ubicloud runners for your \"#{repository_name}\" repository due to the following error:",
-            *email_body,
-            "Please don't hesitate to reach out at support@ubicloud.com if you have any questions or need any help.",
-          ],
-        )
-      end
+      notify_customer(error, repository_id, email_body)
       github_runner.incr_destroy
       nap 0
     end
@@ -315,18 +342,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if e.message.include?("API rate limit exceeded")
       rate_limit = client.rate_limit
-      Prog::PageNexus.assemble(
-        "GitHub API rate limit exceeded for installation #{installation_ubid}",
-        ["GithubRateLimitExceeded", installation_ubid],
-        installation_ubid,
-        resource_id: github_runner.installation_id,
-        severity: "warning",
-        extra_data: {
-          remaining: rate_limit.remaining,
-          limit: rate_limit.limit,
-          resets_at: rate_limit.resets_at,
-        },
-      )
+      Clog.emit("GitHub API rate limit exceeded", {github_api_rate_limit_exceeded: {installation_ubid: installation.ubid, remaining: rate_limit.remaining, limit: rate_limit.limit, resets_at: rate_limit.resets_at}})
       remaining_seconds = rate_limit.resets_at - Time.now
       if destroying_set?
         register_deadline(nil, 15 * 60, allow_extension: true)
@@ -337,6 +353,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       else
         register_deadline("wait", 10 * 60, allow_extension: true)
         if remaining_seconds >= 10 * 60
+          notify_customer("rate_limit_exceeded", nil, [
+            "\"API rate limit exceeded for installation.\"",
+            "Your GitHub organization exceeded its GitHub API rate limit. GitHub applies different rate limits based on your GitHub organization. GitHub resets the limit at #{rate_limit.resets_at.utc}. Until then, we can't provision Ubicloud runners for your jobs.",
+          ], action_required: false)
           github_runner.incr_destroy
           nap 0
         end
@@ -660,6 +680,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     response = rescue_common_github_api_errors do
       client.post(runners_path("generate-jitconfig"), data)
     end
+    clear_error_notifications
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
     vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
@@ -721,6 +742,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     response = rescue_common_github_api_errors do
       client.post(runners_path("generate-jitconfig"), data)
     end
+    clear_error_notifications
     github_runner.update(runner_id: response[:runner][:id], encoded_jit_config: response[:encoded_jit_config])
     response[:encoded_jit_config]
   rescue Octokit::Conflict => e

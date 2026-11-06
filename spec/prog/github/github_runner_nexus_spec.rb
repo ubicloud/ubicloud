@@ -1028,6 +1028,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.encoded_jit_config).to eq("AABBCC$")
     end
 
+    it "clears the error notifications of the repository and the installation except the rate limit after generating the jit config" do
+      repository = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
+      other_repository = GithubRepository.create(name: "other-repo", installation_id: runner.installation_id)
+      runner.update(repository_id: repository.id)
+      notifications = DB[:github_error_notification]
+      notifications.import([:installation_id, :repository_id, :error], [[installation.id, repository.id, "actions_disabled"], [installation.id, nil, "ip_allowlist_enabled"], [installation.id, nil, "rate_limit_exceeded"], [installation.id, other_repository.id, "actions_disabled"]])
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, anything).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
+      expect { nx.wait_vm }.to nap(10)
+      expect(notifications.select_map([:repository_id, :error])).to contain_exactly([nil, "rate_limit_exceeded"], [other_repository.id, "actions_disabled"])
+    end
+
     it "does not generate the jit config again if it is already generated" do
       vm.update(allocated_at: now)
       runner.update(encoded_jit_config: "AABBCC$")
@@ -1119,7 +1131,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(allocated_at: now)
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.wait_vm }.to nap(0)
-        .and change { Page.active.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
   end
@@ -1305,6 +1316,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.ready_at).to eq(now)
     end
 
+    it "clears the error notifications after registration" do
+      repository = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
+      runner.update(repository_id: repository.id)
+      DB[:github_error_notification].insert(installation_id: installation.id, repository_id: repository.id, error: "actions_disabled")
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, anything).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+      expect(vm.sshable).to receive(:_cmd).with(/runner-script/, stdin: "AABBCC$", log: :on_error)
+      expect { nx.register_runner }.to hop("wait")
+      expect(DB[:github_error_notification].count).to eq(0)
+    end
+
     it "deletes the runner if the generate request fails due to 'already exists with the same name' error and the runner script does not start yet." do
       expect(client).to receive(:post)
         .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
@@ -1367,7 +1388,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "handles common GitHub API errors during registration" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.register_runner }.to nap(0)
-        .and change { Page.active.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
   end
@@ -1442,18 +1462,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#rescue_common_github_api_errors" do
-    it "naps until rate limit resets and creates a page when rate limited" do
+    def add_github_user(email)
+      Account.create(email:).tap do |account|
+        account.add_project(project)
+        AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:github"])
+      end
+    end
+
+    it "naps until rate limit resets without notifying when rate limited" do
+      add_github_user("github-user@example.com")
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
+      expect(Clog).to receive(:emit).with("GitHub API rate limit exceeded", {github_api_rate_limit_exceeded: {installation_ubid: installation.ubid, remaining: 0, limit: 5000, resets_at: now + 300}}).and_call_original
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(300)
-        .and change { Page.count }.by(1)
+        .and not_change { Mail::TestMailer.deliveries.length }
       expect(Time.new(nx.frame["deadline_at"])).to eq(now + 10 * 60)
-      expect(Page.first).to have_attributes(
-        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
-        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
-        severity: "warning",
-        resource_id: installation.id,
-      )
+      expect(DB[:github_error_notification].count).to eq(0)
+      expect(Page.count).to eq(0)
     end
 
     it "naps at least 30 seconds even if rate limit resets sooner" do
@@ -1464,18 +1489,28 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Time.new(nx.frame["deadline_at"])).to eq(now + 15 * 60)
     end
 
-    it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap
-        .and change { Page.active.count }.by(1)
+    it "destroys the runner and emails project users once if the rate limit reset is more than 10 minutes away while provisioning" do
+      add_github_user("github-user@example.com")
+      allow(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(0)
+        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
+      mail = Mail::TestMailer.deliveries.last
+      expect(mail.subject).to eq("Couldn't provision Ubicloud runners for the \"test-repo\" repository")
+      expect(mail.html_part.body).to include("Your GitHub organization exceeded its GitHub API rate limit.")
+      expect(mail.html_part.body).to include("GitHub resets the limit at #{(now + 11 * 60).utc}")
+      expect(DB[:github_error_notification].select_map([:repository_id, :error])).to eq([[nil, "rate_limit_exceeded"]])
+
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(0)
+        .and not_change { Mail::TestMailer.deliveries.length }
     end
 
-    it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
+    it "skips the deregistration without notifying if the rate limit reset is more than 15 minutes away while destroying" do
+      add_github_user("github-user@example.com")
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
       nx.incr_destroying
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap
-        .and change { Page.count }.by(1)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(0)
+        .and not_change { Mail::TestMailer.deliveries.length }
       expect(runner.skip_deregistration_set?).to be(true)
     end
 
@@ -1492,80 +1527,127 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
-    def add_github_user(email)
-      Account.create(email:).tap do |account|
-        account.add_project(project)
-        AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:github"])
-      end
-    end
+    describe "with a known GitHub API error" do
+      let(:repository) { GithubRepository.create(name: "test-repo", installation_id: runner.installation_id) }
 
-    it "destroys the runner and emails project users if self-hosted runners are disabled" do
-      add_github_user("github-user@example.com")
-      add_github_user("another-github-user@example.com")
-      Account.create(email: "billing-only@example.com").tap do |account|
-        account.add_project(project)
-        AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:billing"])
+      let(:notifications) { DB[:github_error_notification] }
+
+      before { runner.update(repository_id: repository.id) }
+
+      def raise_self_hosted_disabled
+        nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) }
       end
 
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
-      expect(runner.destroy_set?).to be(true)
-      mail = Mail::TestMailer.deliveries.last
-      expect(mail.to).to contain_exactly("github-user@example.com", "another-github-user@example.com")
-      expect(mail.subject).to eq("Action Required: Couldn't provision Ubicloud runners for the \"test-repo\" repository")
-      expect(mail.html_part.body).to include("Repository level self-hosted runners are disabled on this repository.")
-      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubSelfHostRunnersDisabled", installation.ubid]), resource_id: installation.id)
-    end
+      it "destroys the runner and emails project users if self-hosted runners are disabled" do
+        add_github_user("github-user@example.com")
+        add_github_user("another-github-user@example.com")
+        Account.create(email: "billing-only@example.com").tap do |account|
+          account.add_project(project)
+          AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:billing"])
+        end
 
-    it "destroys the runner and emails project users if GitHub Actions are disabled" do
-      add_github_user("github-user@example.com")
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "GitHub Actions is disabled on this repository"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
-      expect(runner.destroy_set?).to be(true)
-      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("GitHub Actions is disabled on this repository.")
-      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubActionsDisabled", installation.ubid]), resource_id: installation.id)
-    end
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+          .and not_change { Page.count }
+        expect(runner.destroy_set?).to be(true)
+        mail = Mail::TestMailer.deliveries.last
+        expect(mail.to).to contain_exactly("github-user@example.com", "another-github-user@example.com")
+        expect(mail.subject).to eq("Action Required: Couldn't provision Ubicloud runners for the \"test-repo\" repository")
+        expect(mail.html_part.body).to include("Repository level self-hosted runners are disabled on this repository.")
+        expect(notifications.all).to eq([{installation_id: installation.id, repository_id: repository.id, error: "self_hosted_runners_disabled", notified_at: now}])
+      end
 
-    it "destroys the runner and emails project users if IP allowlist is enabled" do
-      add_github_user("github-user@example.com")
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
-      expect(runner.destroy_set?).to be(true)
-      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("your organization has an IP allow list enabled")
-      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubIPAllowlistEnabled", installation.ubid]), resource_id: installation.id)
-    end
+      it "destroys the runner and emails project users if GitHub Actions are disabled" do
+        add_github_user("github-user@example.com")
+        expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "GitHub Actions is disabled on this repository"}) } }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+        expect(runner.destroy_set?).to be(true)
+        expect(Mail::TestMailer.deliveries.last.html_part.body).to include("GitHub Actions is disabled on this repository.")
+        expect(notifications.select_map([:repository_id, :error])).to eq([[repository.id, "actions_disabled"]])
+      end
 
-    it "destroys the runner and emails project users if resource not accessible by integration" do
-      add_github_user("github-user@example.com")
-      repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
-      runner.update(repository_id: repo.id)
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
-      expect(runner.destroy_set?).to be(true)
-      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("Resource not accessible by integration.")
-      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubResourceNotAccessible", installation.ubid, repo.ubid]), resource_id: repo.id)
-    end
+      it "destroys the runner and emails project users if IP allowlist is enabled" do
+        add_github_user("github-user@example.com")
+        expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+        expect(runner.destroy_set?).to be(true)
+        expect(Mail::TestMailer.deliveries.last.html_part.body).to include("your organization has an IP allow list enabled")
+        expect(notifications.select_map([:repository_id, :error])).to eq([[nil, "ip_allowlist_enabled"]])
+      end
 
-    it "does not send a duplicate email when an active page already exists" do
-      add_github_user("github-user@example.com")
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+      it "destroys the runner and emails project users if resource not accessible by integration" do
+        add_github_user("github-user@example.com")
+        expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+        expect(runner.destroy_set?).to be(true)
+        expect(Mail::TestMailer.deliveries.last.html_part.body).to include("Resource not accessible by integration.")
+        expect(notifications.select_map([:repository_id, :error])).to eq([[repository.id, "resource_not_accessible"]])
+      end
 
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and not_change { Page.count }
-        .and not_change { Mail::TestMailer.deliveries.length }
-    end
+      it "does not send a duplicate email within the cooldown" do
+        add_github_user("github-user@example.com")
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
 
-    it "creates the page but sends no email when no project user has the github permission" do
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
-        .and not_change { Mail::TestMailer.deliveries.length }
-      expect(runner.destroy_set?).to be(true)
+        allow(Time).to receive(:now).and_return(now + 7 * 24 * 60 * 60 - 1)
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and not_change { Mail::TestMailer.deliveries.length }
+        expect(notifications.select_map(:notified_at)).to eq([now])
+      end
+
+      it "sends a reminder email after the cooldown" do
+        add_github_user("github-user@example.com")
+        notifications.insert(installation_id: installation.id, repository_id: repository.id, error: "self_hosted_runners_disabled", notified_at: now - 7 * 24 * 60 * 60 - 1)
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+        expect(notifications.select_map(:notified_at)).to eq([now])
+      end
+
+      it "notifies each error separately, so alternating errors do not repeat emails" do
+        add_github_user("github-user@example.com")
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+        expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "GitHub Actions is disabled on this repository"}) } }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(1).to(2)
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and not_change { Mail::TestMailer.deliveries.length }
+        expect(notifications.count).to eq(2)
+      end
+
+      it "notifies an installation-wide error once for all repositories of the installation" do
+        add_github_user("github-user@example.com")
+        raise_ip_allowlist = -> { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }
+        expect { raise_ip_allowlist.call }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+
+        runner.update(repository_id: GithubRepository.create(name: "other-repo", installation_id: runner.installation_id).id)
+        expect { raise_ip_allowlist.call }.to nap(0)
+          .and not_change { Mail::TestMailer.deliveries.length }
+        expect(notifications.count).to eq(1)
+      end
+
+      it "notifies the same repository error separately for each repository" do
+        add_github_user("github-user@example.com")
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
+
+        runner.update(repository_id: GithubRepository.create(name: "other-repo", installation_id: runner.installation_id).id)
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and change { Mail::TestMailer.deliveries.length }.from(1).to(2)
+      end
+
+      it "records the error but sends no email when no project user has the github permission" do
+        expect { raise_self_hosted_disabled }.to nap(0)
+          .and not_change { Mail::TestMailer.deliveries.length }
+        expect(runner.destroy_set?).to be(true)
+        expect(notifications.count).to eq(1)
+      end
+
+      it "destroys the runner if TooManyRequests is raised with a self-hosted runners disabled message" do
+        expect(client).not_to receive(:rate_limit)
+        expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        expect(runner.destroy_set?).to be(true)
+      end
     end
 
     it "destroys the runner without a page or email if the runner group is full" do
@@ -1573,13 +1655,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.rescue_common_github_api_errors { raise Octokit::UnprocessableEntity.new({body: "Runner group 1 has reached max limit of 10000 runners."}) } }.to nap(0)
         .and not_change { Page.count }
         .and not_change { Mail::TestMailer.deliveries.length }
-      expect(runner.destroy_set?).to be(true)
-    end
-
-    it "destroys the runner if TooManyRequests is raised with a self-hosted runners disabled message" do
-      expect(client).not_to receive(:rate_limit)
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and change { Page.count }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
     end
 
