@@ -1390,6 +1390,21 @@ RSpec.describe PostgresServer do
       postgres_server.export_metrics(session:, tsdb_client:)
     end
 
+    it "observes before re-raising a failed export" do
+      scrape = VictoriaMetrics::Client::Scrape.new(time: Time.now, samples: "metric 1")
+      expect(postgres_server).to receive(:scrape_endpoints).with(session).and_return([scrape])
+      expect(tsdb_client).to receive(:import_prometheus).with(scrape, postgres_server.metrics_config[:additional_labels]).and_raise(VictoriaMetrics::ClientError, "Broken pipe")
+      expect(postgres_server).to receive(:observe_archival_backlog).with(session)
+      expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
+      expect(postgres_server).to receive(:observe_data_disk_usage).with(session)
+      expect(postgres_server).to receive(:observe_root_disk_usage).with(session)
+      expect(postgres_server).to receive(:observe_io_throttle).with(session)
+      expect(postgres_server).to receive(:observe_replica_lag).with(session)
+
+      expect { postgres_server.export_metrics(session:, tsdb_client:) }.to raise_error(VictoriaMetrics::ClientError, "Broken pipe")
+      expect(session[:export_count]).to eq(1)
+    end
+
     it "does not call observe methods when count % 12 != 1" do
       session[:export_count] = 2
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])

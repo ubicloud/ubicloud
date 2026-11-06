@@ -584,7 +584,12 @@ class PostgresServer < Sequel::Model
     # Scrape before observing. Observations can be slow (e.g. the replica lag
     # query), and running them first can leave the session idle long enough to
     # go stale before the scrape.
-    count = super
+    begin
+      count = super
+    rescue VictoriaMetrics::ClientError => export_error
+      # Observe before re-raising; storage scaling needs fresh disk usage.
+      nil
+    end
 
     # Check archival, metrics backlog and disk usage every 12 exports. We do
     # this in metrics export rather than pulse check because the metrics export
@@ -598,6 +603,8 @@ class PostgresServer < Sequel::Model
       observe_metrics_backlog(session)
       observe_replica_lag(session)
     end
+
+    raise export_error if export_error
 
     count
   end
