@@ -37,12 +37,24 @@ func readDataSource(t *testing.T, ty *typeDesc, api *fakeAPI, config values) *da
 	return resp
 }
 
+// partByID is a part with the datasource of a type whose identity accepts
+// only an id.
+func partByID() *typeDesc {
+	t := part()
+	t.datasource("id")
+	return t
+}
+
 func TestDataSourceSchema(t *testing.T) {
 	attrs := datasourceSchema(part()).Attributes
+	if a := attrs["id"]; a.IsRequired() || a.IsOptional() || !a.IsComputed() {
+		t.Errorf("id of a datasource without a lookup is not only computed")
+	}
+	attrs = datasourceSchema(partByID()).Attributes
 	if _, ok := attrs["label"]; !ok {
 		t.Errorf("label is missing")
 	}
-	for name, want := range map[string]string{"location": "required", "gadget_id": "required", "id": "computed"} {
+	for name, want := range map[string]string{"location": "required", "gadget_id": "required", "id": "required", "label": "computed"} {
 		a := attrs[name]
 		if got := map[bool]string{true: "required", false: "computed"}[a.IsRequired()]; got != want || a.IsOptional() {
 			t.Errorf("%s is %s, want %s", name, got, want)
@@ -60,6 +72,9 @@ func TestDataSourceSchema(t *testing.T) {
 	if n := len((&genericDataSource{t: gadget()}).ConfigValidators(context.Background())); n != 1 {
 		t.Errorf("%d config validators, want one for exactly one lookup", n)
 	}
+	if (&genericDataSource{t: partByID()}).ConfigValidators(context.Background()) != nil {
+		t.Errorf("a datasource with one lookup, which is required, has config validators")
+	}
 	if (&genericDataSource{t: scope()}).ConfigValidators(context.Background()) != nil {
 		t.Errorf("a datasource without a lookup has config validators")
 	}
@@ -67,8 +82,9 @@ func TestDataSourceSchema(t *testing.T) {
 
 func TestDataSourceRead(t *testing.T) {
 	api := newFakeAPI(t, map[string][]reply{
-		"GET /p1/location/l1/gadget/web": {{200, running, ""}},
-		"GET /p1":                        {{200, `{"id":"p1","name":"default"}`, ""}},
+		"GET /p1/location/l1/gadget/web":         {{200, running, ""}},
+		"GET /p1":                                {{200, `{"id":"p1","name":"default"}`, ""}},
+		"GET /p1/location/l1/gadget/g1/part/pt1": {{200, `{"gadget_id":"g1","id":"pt1","label":"bolt","location":"l1"}`, ""}},
 	})
 	resp := readDataSource(t, gadget(), api, values{"location": tfStr("l1"), "name": tfStr("web")})
 	checkDiags(t, resp.Diagnostics, "")
@@ -77,6 +93,11 @@ func TestDataSourceRead(t *testing.T) {
 	}
 	resp = readDataSource(t, scope(), api, nil)
 	if got := show(resp.State.Raw, "id", "name"); got != "id=p1 name=default" {
+		t.Errorf("state %s", got)
+	}
+	resp = readDataSource(t, partByID(), api, values{"location": tfStr("l1"), "gadget_id": tfStr("g1"), "id": tfStr("pt1")})
+	checkDiags(t, resp.Diagnostics, "")
+	if got := show(resp.State.Raw, "gadget_id", "id", "label", "location"); got != "gadget_id=g1 id=pt1 label=bolt location=l1" {
 		t.Errorf("state %s", got)
 	}
 	resp = readDataSource(t, gadget(), api, values{"location": tfStr("l1"), "id": tfStr("g9")})
