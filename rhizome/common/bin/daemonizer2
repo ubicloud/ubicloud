@@ -21,7 +21,15 @@ def get_state(name)
   STATE_MAP[state] || "Unknown"
 end
 
-def clean(name, stdin_path)
+# A non-empty stdin can hold secrets (e.g. storage keys). It goes to /dev/shm
+# (RAM; host swap is encrypted, see CryptSwapSetup) with mode 0600, and the
+# unit deletes it as soon as it has read it. clean deletes it too, in case the
+# unit never ran.
+def stdin_path(name)
+  "/dev/shm/#{name}.stdin"
+end
+
+def clean(name)
   state = get_state(name)
   begin
     case state
@@ -34,7 +42,7 @@ def clean(name, stdin_path)
     end
   ensure
     begin
-      File.unlink(stdin_path)
+      File.unlink(stdin_path(name))
     rescue Errno::ENOENT
     end
   end
@@ -50,13 +58,12 @@ end
 
 command = ARGV[0]
 name = ARGV[1]
-stdin_path = "/dev/shm/#{name}.stdin"
 
 case command
 when "check"
   print(get_state(name))
 when "clean"
-  clean(name, stdin_path)
+  clean(name)
 when "restart"
   restart(name)
 when "stop"
@@ -64,15 +71,17 @@ when "stop"
 when "run"
   command_parts = ARGV[2..]
   state = get_state(name)
-  clean(name, stdin_path) if %w[Succeeded Failed].freeze.include?(state)
+  clean(name) if %w[Succeeded Failed].freeze.include?(state)
 
   dir = Dir.pwd
   stdin = $stdin.read.strip
   if stdin.empty?
     command = Shellwords.shelljoin(command_parts)
   else
-    safe_write_to_file(stdin_path, stdin)
-    command = "cat #{stdin_path} | " + Shellwords.shelljoin(command_parts)
+    safe_write_to_file(stdin_path(name), stdin, perm: 0o600)
+    path = Shellwords.escape(stdin_path(name))
+    # Delete the file as soon as it is read. A restart does not replay stdin.
+    command = "(cat #{path}; rm -f #{path}) | " + Shellwords.shelljoin(command_parts)
   end
 
   r "sudo systemd-run --working-directory :dir --unit :name --remain-after-exit /bin/bash -c :command", dir: dir, name: name, command: command
