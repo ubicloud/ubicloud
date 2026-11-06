@@ -137,17 +137,29 @@ RSpec.describe Prog::Test::MoveVm do
       })
     end
 
-    it "hops to destroy_vms when all checksums match" do
+    it "hops to wait_source_destroyed when all checksums match" do
       expect(prog.new_vm_sshable).to receive(:_cmd).with("sudo sha256sum /opt/markers/marker-0").and_return("sha-0  x\n")
       expect(prog.new_vm_sshable).to receive(:_cmd).with("sudo sha256sum /opt/markers/marker-1").and_return("sha-1  x\n")
 
-      expect { prog.verify_new_vm }.to hop("destroy")
+      expect { prog.verify_new_vm }.to hop("wait_source_destroyed")
     end
 
     it "fails when a checksum doesn't match" do
       expect(prog.new_vm_sshable).to receive(:_cmd).with("sudo sha256sum /opt/markers/marker-0").and_return("wrong  x\n")
 
       expect { prog.verify_new_vm }.to hop("failed")
+    end
+  end
+
+  describe "#wait_source_destroyed" do
+    it "naps while the source vm still exists" do
+      refresh_frame(prog, new_values: {"vm_id" => create_vm.id})
+      expect { prog.wait_source_destroyed }.to nap(10)
+    end
+
+    it "hops to destroy once the source vm is gone" do
+      refresh_frame(prog, new_values: {"vm_id" => Vm.generate_uuid})
+      expect { prog.wait_source_destroyed }.to hop("destroy")
     end
   end
 
