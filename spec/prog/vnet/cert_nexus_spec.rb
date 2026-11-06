@@ -220,6 +220,75 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
+  describe "#handle_rate_limit" do
+    def rate_limited(retry_after)
+      Acme::Client::Error::RateLimited.new("too many requests", retry_after)
+    end
+
+    it "returns the result of the block when not rate limited" do
+      expect(nx.handle_rate_limit { :result }).to eq :result
+    end
+
+    it "naps for the Retry-After time and logs the rate limit" do
+      provider = create_shared_provider
+      expect(Clog).to receive(:emit).with("ACME provider rate limited request", hash_including(acme_rate_limited: hash_including(ubid: cert.ubid, label: "start", acme_provider: "shared-ca", retry_after: 60))).and_call_original
+      expect { nx.handle_rate_limit(provider:) { raise rate_limited("60") } }.to nap(55..65)
+    end
+
+    it "defaults to the certificate's provider" do
+      cert.update(acme_provider_id: create_shared_provider.id)
+      expect(Clog).to receive(:emit).with("ACME provider rate limited request", hash_including(acme_rate_limited: hash_including(acme_provider: "shared-ca"))).and_call_original
+      expect { nx.handle_rate_limit { raise rate_limited("60") } }.to nap(55..65)
+    end
+
+    it "naps for the Retry-After time when it is over RATE_LIMIT_MAX_NAP and no auto restarts remain" do
+      expect { nx.handle_rate_limit { raise rate_limited("3600") } }.to nap(3595..3605)
+    end
+
+    it "restarts when Retry-After is over RATE_LIMIT_MAX_NAP and auto restarts remain" do
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100})
+      expect { nx.handle_rate_limit { raise rate_limited("3600") } }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 1
+      expect(st.stack[0]["deadline_target"]).to eq "wait"
+    end
+
+    it "naps instead of restarting when restart: false, even if Retry-After is over RATE_LIMIT_MAX_NAP and auto restarts remain" do
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+      expect { nx.handle_rate_limit(restart: false) { raise rate_limited("3600") } }.to nap(3595..3605)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
+    end
+
+    it "does not handle other ACME errors" do
+      expect { nx.handle_rate_limit { raise Acme::Client::Error::ServerInternal, "boom" } }.to raise_error Acme::Client::Error::ServerInternal
+    end
+
+    described_class::ACME_ORDER_LABELS.each do |label|
+      it "is used by #{label}" do
+        refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100})
+        expect(nx).to receive(:acme_order).and_raise(rate_limited("3600"))
+        expect { nx.public_send(label) }.to hop("restart")
+      end
+    end
+
+    it "is used by destroy without restarting" do
+      st.update(label: "destroy")
+      cert.update(cert: "test-cert", account_key: account_key.to_der, kid: "x")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+      client = instance_double(Acme::Client)
+      expect(nx).to receive(:acme_client).and_return(client)
+      expect(client).to receive(:revoke).and_raise(rate_limited("3600"))
+      expect { nx.destroy }.to nap(3595..3605)
+      expect(cert).to exist
+    end
+
+    it "is used by destroy when cleaning up DNS challenge records" do
+      st.update(label: "destroy")
+      expect(nx).to receive(:acme_order).and_raise(rate_limited("60"))
+      expect { nx.destroy }.to nap(55..65)
+      expect(cert).to exist
+    end
+  end
+
   describe "#before_destroy" do
     it "replaces the provisioning deadline with a destroy deadline" do
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => Time.now.to_s})

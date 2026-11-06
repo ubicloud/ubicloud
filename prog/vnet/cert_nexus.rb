@@ -27,6 +27,8 @@ class Prog::Vnet::CertNexus < Prog::Base
   AUTO_RESTART_SECONDS = 15 * 60
   AUTO_RESTART_WAIT_DEADLINE = AUTO_RESTART_SECONDS * 2
 
+  RATE_LIMIT_MAX_NAP = 5 * 60
+
   def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil, wait_deadline: nil, num_auto_restarts: 0, wakeup_semaphore: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
@@ -61,12 +63,29 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     if AUTO_RESTART_LABELS.include?(strand.label)
-      if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && remaining_auto_restarts&.>(0)
-        self.remaining_auto_restarts -= 1
-        register_deadline("wait", wait_deadline, allow_extension: true)
-        hop_restart
+      if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && auto_restart_remaining?
+        auto_restart
       end
     end
+  end
+
+  def auto_restart_remaining?
+    remaining_auto_restarts&.>(0)
+  end
+
+  def auto_restart
+    self.remaining_auto_restarts -= 1
+    register_deadline("wait", wait_deadline, allow_extension: true)
+    hop_restart
+  end
+
+  def handle_rate_limit(provider: cert.acme_provider, restart: true)
+    yield
+  rescue Acme::Client::Error::RateLimited => ex
+    retry_after = ex.retry_after
+    Clog.emit("ACME provider rate limited request", {acme_rate_limited: Util.exception_to_hash(ex, into: {ubid: cert.ubid, label: strand.label, acme_provider: provider&.name, retry_after:})})
+    auto_restart if restart && retry_after > RATE_LIMIT_MAX_NAP && auto_restart_remaining?
+    nap retry_after
   end
 
   def before_destroy
@@ -91,104 +110,114 @@ class Prog::Vnet::CertNexus < Prog::Base
 
     provider = AcmeProvider.for_attempt(cert, restarted)
     directory = provider.directory_url
-    if provider.per_cert_accounts
-      private_key = OpenSSL::PKey::EC.generate("prime256v1")
-      embedded_account_key = private_key.to_der
-      client = Acme::Client.new(private_key:, directory:, **ACME_CLIENT_OPTIONS)
-      kid = client.new_account(
-        contact: "mailto:#{provider.email}",
-        terms_of_service_agreed: true,
-        external_account_binding: {kid: provider.kid, hmac_key: provider.key},
-      ).kid
-    else
-      private_key = provider.private_key
-      kid = provider.kid
-    end
-    Clog.emit("creating ACME order", {acme_order: {ubid: cert.ubid, acme_provider: provider.name, attempt: restarted}})
-    client = Acme::Client.new(private_key:, directory:, kid:, **ACME_CLIENT_OPTIONS)
-    identifiers = cert.hostnames
-    order = client.new_order(identifiers:)
-    cert.update(acme_provider_id: provider.id, kid:, account_key: embedded_account_key, order_url: order.url)
-    order.authorizations.each do |authorization|
-      dns_challenge = authorization.dns
-      # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
-      # specifying which domain it authorizes. The acme-client gem exposes this
-      # as authorization.domain.
-      record_name = dns_challenge.record_name + "." + authorization.domain
-      dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
+    handle_rate_limit(provider:) do
+      if provider.per_cert_accounts
+        private_key = OpenSSL::PKey::EC.generate("prime256v1")
+        embedded_account_key = private_key.to_der
+        client = Acme::Client.new(private_key:, directory:, **ACME_CLIENT_OPTIONS)
+        kid = client.new_account(
+          contact: "mailto:#{provider.email}",
+          terms_of_service_agreed: true,
+          external_account_binding: {kid: provider.kid, hmac_key: provider.key},
+        ).kid
+      else
+        private_key = provider.private_key
+        kid = provider.kid
+      end
+      Clog.emit("creating ACME order", {acme_order: {ubid: cert.ubid, acme_provider: provider.name, attempt: restarted}})
+      client = Acme::Client.new(private_key:, directory:, kid:, **ACME_CLIENT_OPTIONS)
+      identifiers = cert.hostnames
+      order = client.new_order(identifiers:)
+      cert.update(acme_provider_id: provider.id, kid:, account_key: embedded_account_key, order_url: order.url)
+      order.authorizations.each do |authorization|
+        dns_challenge = authorization.dns
+        # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
+        # specifying which domain it authorizes. The acme-client gem exposes this
+        # as authorization.domain.
+        record_name = dns_challenge.record_name + "." + authorization.domain
+        dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
+      end
     end
 
     hop_wait_dns_update
   end
 
   label def wait_dns_update
-    each_authorization do |authorization|
-      dns_challenge = authorization.dns
-      name = dns_challenge.record_name + "." + authorization.domain
-      dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
-      if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
-        nap 10
+    handle_rate_limit do
+      each_authorization do |authorization|
+        dns_challenge = authorization.dns
+        name = dns_challenge.record_name + "." + authorization.domain
+        dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
+        if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
+          nap 10
+        end
       end
+
+      each_authorization { it.dns.request_validation }
+      self.last_dns_validation_request = Time.now.to_i
+
+      hop_wait_dns_validation
     end
-
-    each_authorization { it.dns.request_validation }
-    self.last_dns_validation_request = Time.now.to_i
-
-    hop_wait_dns_validation
   end
 
   label def wait_dns_validation
-    all_valid = true
-    each_authorization do |authorization|
-      dns_challenge = authorization.dns
-      case (order_status = dns_challenge.status)
-      when "pending", "processing"
-        all_valid = false
-        t = Time.now.to_i
-        if last_dns_validation_request&.<(t - 120)
-          # Rerequest DNS validation every 2 minutes, in case the ACME provider
-          # checked originally and couldn't validate the DNS record, and won't
-          # check again (or as quickly) until rerequested.
-          dns_challenge.request_validation
-          self.last_dns_validation_request = t
+    handle_rate_limit do
+      all_valid = true
+      each_authorization do |authorization|
+        dns_challenge = authorization.dns
+        case (order_status = dns_challenge.status)
+        when "pending", "processing"
+          all_valid = false
+          t = Time.now.to_i
+          if last_dns_validation_request&.<(t - 120)
+            # Rerequest DNS validation every 2 minutes, in case the ACME provider
+            # checked originally and couldn't validate the DNS record, and won't
+            # check again (or as quickly) until rerequested.
+            dns_challenge.request_validation
+            self.last_dns_validation_request = t
+          end
+        when "valid"
+          # do nothing
+        else
+          Clog.emit("DNS validation failed", {order_status:})
+          cleanup_dns_challenge_records
+          hop_restart
         end
-      when "valid"
-        # do nothing
-      else
-        Clog.emit("DNS validation failed", {order_status:})
-        cleanup_dns_challenge_records
-        hop_restart
       end
-    end
 
-    if all_valid
-      cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
-      hop_cert_finalization
-    else
-      # At least one authorization still pending or processing
-      nap 10
+      if all_valid
+        cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        hop_cert_finalization
+      else
+        # At least one authorization still pending or processing
+        nap 10
+      end
     end
   end
 
   label def cert_finalization
-    names = [cert.private_hostname]
-    names.compact!
-    acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
-    hop_wait_cert_finalization
+    handle_rate_limit do
+      names = [cert.private_hostname]
+      names.compact!
+      acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
+      hop_wait_cert_finalization
+    end
   end
 
   label def wait_cert_finalization
-    case (order_status = acme_order.status)
-    when "processing"
-      nap 10
-    when "valid"
-      cert.update(cert: acme_order.certificate, created_at: Time.now)
-      cleanup_dns_challenge_records
-      hop_wait_and_wakeup_waiting_strand(semaphore: wakeup_semaphore)
-    else
-      Clog.emit("Certificate finalization failed", {order_status:})
-      cleanup_dns_challenge_records
-      hop_restart
+    handle_rate_limit do
+      case (order_status = acme_order.status)
+      when "processing"
+        nap 10
+      when "valid"
+        cert.update(cert: acme_order.certificate, created_at: Time.now)
+        cleanup_dns_challenge_records
+        hop_wait_and_wakeup_waiting_strand(semaphore: wakeup_semaphore)
+      else
+        Clog.emit("Certificate finalization failed", {order_status:})
+        cleanup_dns_challenge_records
+        hop_restart
+      end
     end
   end
 
@@ -221,22 +250,25 @@ class Prog::Vnet::CertNexus < Prog::Base
       pop "self-signed certificate destroyed"
     end
 
-    # the reason is chosen as "cessationOfOperation"
-    begin
-      acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
-    rescue Acme::Client::Error::AlreadyRevoked => ex
-      Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-    rescue Acme::Client::Error::NotFound => ex
-      Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-    rescue Acme::Client::Error::Unauthorized => ex
-      if REVOKE_IGNORABLE_ERROR.match?(ex.message)
-        Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-      else
-        raise ex
+    # Revoking can only be retried, not moved to a different provider.
+    handle_rate_limit(restart: false) do
+      # the reason is chosen as "cessationOfOperation"
+      begin
+        acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
+      rescue Acme::Client::Error::AlreadyRevoked => ex
+        Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+      rescue Acme::Client::Error::NotFound => ex
+        Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+      rescue Acme::Client::Error::Unauthorized => ex
+        if REVOKE_IGNORABLE_ERROR.match?(ex.message)
+          Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+        else
+          raise ex
+        end
       end
-    end
 
-    cleanup_dns_challenge_records
+      cleanup_dns_challenge_records
+    end
     cert.destroy
     pop "certificate revoked and destroyed"
   end

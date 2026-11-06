@@ -330,6 +330,21 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(WebMock).not_to have_requested(:post, profile.new_order_url)
     end
 
+    it "naps for the Retry-After time when account registration is rate limited" do
+      profile = acme_wire::LETS_ENCRYPT
+      per_cert_wire_provider(profile, eab_kid: "le-eab-kid", eab_hmac_key:)
+      stub_acme_directory(profile)
+      stub_acme_nonce(profile)
+      stub_acme_json(:post, profile.new_account_url,
+        profile.error_body(type: "urn:ietf:params:acme:error:rateLimited", detail: "too many new registrations (10) from this IP address"),
+        status: 429, headers: {"Retry-After" => "120"})
+
+      expect { fresh_prog.start }.to nap(115..125)
+      expect(cert.reload.kid).to be_nil
+      expect(cert.account_key).to be_nil
+      expect(WebMock).not_to have_requested(:post, profile.new_order_url)
+    end
+
     it "retries transparently when badNonce arrives with a fresh Replay-Nonce" do
       profile = acme_wire::LETS_ENCRYPT
       per_cert_wire_provider(profile, eab_kid: "le-eab-kid", eab_hmac_key:)
@@ -465,16 +480,60 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(WebMock).not_to have_requested(:post, profile.new_order_url)
     end
 
-    it "raises RateLimited with Retry-After on the verbatim new-order limit response" do
+    def stub_new_order_rate_limited(retry_after)
+      headers = retry_after ? {"Retry-After" => retry_after} : {}
       stub_acme_json(:post, profile.new_order_url,
         profile.error_body(
           type: "urn:ietf:params:acme:error:rateLimited",
           detail: "too many new orders recently (300) for this account, retry after 2026-01-25 18:30:00 UTC",
-        ), status: 429, headers: {"Retry-After" => "3600"})
+        ), status: 429, headers:)
+    end
 
-      expect { fresh_prog.start }.to raise_error(Acme::Client::Error::RateLimited) do |ex|
-        expect(ex.retry_after).to be_between(3590, 3600)
-      end
+    it "naps for the Retry-After time when polling the order is rate limited" do
+      cert.update(acme_provider_id: provider.id, kid: profile.account_url, order_url: profile.order_url)
+      st.update(label: "wait_cert_finalization")
+      stub_acme_json(:post, profile.order_url,
+        profile.error_body(type: "urn:ietf:params:acme:error:rateLimited", detail: "too many requests"),
+        status: 429, headers: {"Retry-After" => "30"})
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+
+      expect { fresh_prog.wait_cert_finalization }.to nap(25..35)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
+    end
+
+    it "naps for the Retry-After time on the verbatim new-order limit response when no auto restarts remain" do
+      stub_new_order_rate_limited("3600")
+
+      expect { fresh_prog.start }.to nap(3595..3605)
+      expect(cert.reload.order_url).to be_nil
+      expect(st.reload.label).to eq "start"
+    end
+
+    it "restarts when Retry-After is over #{described_class::RATE_LIMIT_MAX_NAP} seconds and auto restarts remain" do
+      stub_new_order_rate_limited("3600")
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2, "wait_deadline" => 100})
+
+      expect { fresh_prog.start }.to hop("restart")
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 1
+      expect(st.stack[0]["deadline_target"]).to eq "wait"
+      expect(Time.new(st.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+      expect(cert.reload.order_url).to be_nil
+    end
+
+    it "naps instead of restarting when Retry-After is #{described_class::RATE_LIMIT_MAX_NAP} seconds" do
+      stub_new_order_rate_limited(described_class::RATE_LIMIT_MAX_NAP.to_s)
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+
+      expect { fresh_prog.start }.to nap((described_class::RATE_LIMIT_MAX_NAP - 5)..(described_class::RATE_LIMIT_MAX_NAP + 5))
+      expect(st.reload.stack[0]["remaining_auto_restarts"]).to eq 2
+    end
+
+    it "naps for acme-client's default time when the rate limit response has no Retry-After" do
+      stub_new_order_rate_limited(nil)
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+
+      expect { fresh_prog.start }.to nap(Acme::Client::Error::RateLimited::DEFAULT_RETRY_SECONDS)
+      expect(st.reload.stack[0]["remaining_auto_restarts"]).to eq 2
     end
   end
 
@@ -490,12 +549,14 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it_behaves_like "issues a certificate over the wire"
 
-    it "raises RateLimited when quota exhaustion uses the standard problem type" do
+    it "naps for the Retry-After time when quota exhaustion uses the standard problem type, even if auto restarts remain" do
       stub_acme_json(:post, profile.new_order_url,
         profile.error_body(type: "urn:ietf:params:acme:error:rateLimited", detail: "Quota exceeded for new-order requests"),
         status: 429, headers: {"Retry-After" => "60"})
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
 
-      expect { fresh_prog.start }.to raise_error(Acme::Client::Error::RateLimited)
+      expect { fresh_prog.start }.to nap(55..65)
+      expect(st.reload.stack[0]["remaining_auto_restarts"]).to eq 2
     end
 
     it "surfaces a nonstandard quota problem type as the base error class (STAGING: capture real type)" do
@@ -578,6 +639,19 @@ RSpec.describe Prog::Vnet::CertNexus do
         status: 403)
 
       expect { fresh_prog.destroy }.to raise_error Acme::Client::Error
+      expect(cert).to exist
+    end
+
+    it "naps for the Retry-After time without restarting when revocation is rate limited" do
+      profile = acme_wire::LETS_ENCRYPT
+      prepare_revocable_cert(profile)
+      stub_acme_json(:post, profile.revoke_url,
+        profile.error_body(type: "urn:ietf:params:acme:error:rateLimited", detail: "too many revocation requests"),
+        status: 429, headers: {"Retry-After" => "3600"})
+      refresh_frame(nx, new_values: {"remaining_auto_restarts" => 2})
+
+      expect { fresh_prog.destroy }.to nap(3595..3605)
+      expect(st.stack[0]["remaining_auto_restarts"]).to eq 2
       expect(cert).to exist
     end
 
