@@ -119,42 +119,37 @@ class Minio::Client
     response.status == 200
   end
 
-  def list_objects(bucket_name, folder_path, max_keys: 1000, delimiter: "")
-    objects = []
-    query = URI.encode_www_form({
+  # Returns [objects, next_token], where a nil token means the listing is
+  # complete. Callers that must bound their own work stop between pages.
+  def list_objects_page(bucket_name, folder_path, max_keys: 1000, delimiter: "", start_after: nil, token: nil)
+    params = {
       "delimiter" => delimiter,
       "encoding-type" => "url",
       "list-type" => 2,
       "prefix" => folder_path,
       "max-keys" => max_keys,
-    })
-    response = send_request("GET", s3_uri("#{bucket_name}?#{query}"))
-    if response.status == 404
-      return objects
+    }
+    if token
+      params["continuation-token"] = token
+    elsif start_after
+      params["start-after"] = start_after
     end
 
-    parsed_objects = parse_list_objects(response.data[:body])
-    objects.concat(parsed_objects[0])
+    response = send_request("GET", s3_uri("#{bucket_name}?#{URI.encode_www_form(params)}"))
+    return [[].freeze, nil] if response.status == 404
 
-    is_truncated = parsed_objects[1]
-    continuation_token = parsed_objects[2]
-    while is_truncated
-      query = URI.encode_www_form({
-        "continuation-token" => continuation_token,
-        "delimiter" => delimiter,
-        "encoding-type" => "url",
-        "list-type" => 2,
-        "prefix" => folder_path,
-        "max-keys" => max_keys,
-        "start-after" => continuation_token,
-      })
-      response = send_request("GET", s3_uri("#{bucket_name}?#{query}"))
-      parsed_objects = parse_list_objects(response.data[:body])
-      objects.concat(parsed_objects[0])
-      is_truncated = parsed_objects[1]
-      continuation_token = parsed_objects[2]
+    objects, is_truncated, continuation_token = parse_list_objects(response.data[:body])
+    [objects, is_truncated ? continuation_token : nil]
+  end
+
+  def list_objects(bucket_name, folder_path, max_keys: 1000, delimiter: "", start_after: nil)
+    objects = []
+    token = nil
+    loop do
+      page, token = list_objects_page(bucket_name, folder_path, max_keys:, delimiter:, start_after:, token:)
+      objects.concat(page)
+      break unless token
     end
-
     objects
   end
 

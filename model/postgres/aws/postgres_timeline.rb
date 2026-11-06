@@ -67,12 +67,25 @@ PGDATA=/dat/#{version}/data
       )
     end
 
-    def aws_list_objects(prefix, delimiter: "")
-      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:)
-      objects = response.contents
-      while response.is_truncated
-        response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:, continuation_token: response.next_continuation_token)
-        objects.concat(response.contents)
+    def aws_list_objects_page(prefix, delimiter: "", start_after: nil, token: nil)
+      params = {bucket: ubid, prefix:, delimiter:}
+      # continuation_token supersedes start_after.
+      if token
+        params[:continuation_token] = token
+      elsif start_after
+        params[:start_after] = start_after
+      end
+      response = blob_storage_client.list_objects_v2(**params)
+      [response.contents, response.is_truncated ? response.next_continuation_token : nil]
+    end
+
+    def aws_list_objects(prefix, delimiter: "", start_after: nil)
+      objects = []
+      token = nil
+      loop do
+        page, token = aws_list_objects_page(prefix, delimiter:, start_after:, token:)
+        objects.concat(page)
+        break unless token
       end
       objects
     end

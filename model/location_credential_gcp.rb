@@ -5,6 +5,7 @@ require "google/cloud/compute/v1"
 require "google/cloud/storage"
 require "google/apis/cloudresourcemanager_v3"
 require "google/apis/iam_v1"
+require "google/apis/storage_v1"
 require "googleauth"
 
 class LocationCredentialGcp < Sequel::Model
@@ -72,6 +73,15 @@ class LocationCredentialGcp < Sequel::Model
       project_id:,
       credentials: auth_credentials,
     )
+  end
+
+  # Bucket#files cannot list from an offset; startOffset needs this client.
+  def storage_api_client
+    @storage_api_client ||= begin
+      client = Google::Apis::StorageV1::StorageService.new
+      client.authorization = auth_credentials
+      client
+    end
   end
 
   def iam_client
