@@ -52,7 +52,7 @@ module OmniAuth
         provider&.ubid || NO_NAME
       end
 
-      attr_reader :access_token, :user_info
+      attr_reader :access_token, :refresh_token, :user_info
 
       info { @user_info }
       extra { {} }
@@ -61,6 +61,7 @@ module OmniAuth
         {
           id_token: @id_token,
           token: @access_token,
+          refresh_token: @refresh_token,
           expires_in: @access_token_expires_in,
         }
       end
@@ -74,7 +75,7 @@ module OmniAuth
         params = {
           redirect_uri:,
           response_type: "code",
-          scope: "openid email",
+          scope: "openid email offline_access",
           client_id: opts.identifier,
           nonce:,
           state:
@@ -127,6 +128,7 @@ module OmniAuth
 
         @access_token = token_hash["access_token"]
         @access_token_expires_in = token_hash["expires_in"]
+        @refresh_token = token_hash["refresh_token"]
         need_user_info = true
 
         unless (@id_token = token_hash["id_token"])
