@@ -35,6 +35,8 @@ def clean(name)
   when "Failed"
     r "sudo", "systemctl", "reset-failed", "#{name}.service"
   end
+  # The stdin file can hold secrets; don't leave it on disk.
+  rm_if_exists("var/proc/#{name}.stdin")
 end
 
 if ARGV[0] == "--check"
@@ -64,7 +66,7 @@ else
     dir = Dir.pwd
     stdin = $stdin.read
     if stdin != ""
-      safe_write_to_file("var/proc/#{name}.stdin", stdin)
+      safe_write_to_file("var/proc/#{name}.stdin", stdin, perm: 0o600)
       command = "#{command} < #{dir}/var/proc/#{name}.stdin"
     end
 
