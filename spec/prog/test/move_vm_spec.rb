@@ -107,6 +107,7 @@ RSpec.describe Prog::Test::MoveVm do
       move_vm_strand = prog.strand.children.first
       expect(move_vm_strand.prog).to eq("Vm::Metal::MoveVm")
       expect(move_vm_strand.stack.first["subject_id"]).to eq(prog.new_vm_id)
+      expect(move_vm_strand.stack.first["destroy_after"]).to eq(30)
       expect(prog.new_vm_id).not_to eq(vm.id)
     end
   end

@@ -129,6 +129,12 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(st.stack.first["remote_storage_server_id"]).to eq(rss.id)
       expect(st.stack.first["old_vm_id"]).to eq vm.id
       expect(st.stack.first["unset_prevent_destroy"]).to be true
+      expect(st.stack.first["destroy_after"]).to eq(7 * 24 * 60 * 60)
+    end
+
+    it "stores a custom destroy_after" do
+      st = described_class.assemble(vm, vm_host, destroy_after: 3600)
+      expect(st.stack.first["destroy_after"]).to eq(3600)
     end
 
     it "retains the source volume's non-default storage size" do
@@ -219,14 +225,14 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     let(:rss) { Prog::Storage::RemoteStorageServer::Nexus.assemble(rss_source_volume.id).subject }
 
     let(:st) {
-      Strand.create(prog: "Vm::Metal::MoveVm", label: "start", stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => rss.id}])
+      Strand.create(prog: "Vm::Metal::MoveVm", label: "start", stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => rss.id, "destroy_after" => 3600}])
     }
 
     describe "#start" do
-      it "registers a deadline and hops to wait" do
+      it "registers a deadline for reaching wait_destroy_source and hops to wait" do
         expect { nx.start }.to hop("wait")
         frame = st.stack.first
-        expect(frame.fetch("deadline_target")).to be_nil
+        expect(frame.fetch("deadline_target")).to eq("wait_destroy_source")
         expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 60)
       end
     end
@@ -254,11 +260,12 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     end
 
     describe "#destroy" do
-      it "destroys the remote storage server and pops" do
+      it "destroys the remote storage server, schedules the source destroy and hops to wait_remote_storage_server_destroyed" do
         new_vm.incr_prevent_destroy
-        expect { nx.destroy }.to exit({"msg" => "vm moved"})
+        expect { nx.destroy }.to hop("wait_remote_storage_server_destroyed")
         expect(rss.destroy_set?(cached: false)).to be(true)
         expect(new_vm.prevent_destroy_set?(cached: false)).to be(false)
+        expect(st.stack.first["destroy_source_at"]).to be_within(5).of(Time.now.to_i + 3600)
       end
 
       it "also removes prevent_destroy semaphore on old vm is it should unset" do
@@ -273,6 +280,38 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         expect(rss_source_vm.prevent_destroy_set?(cached: false)).to be(false)
         expect(new_vm.prevent_destroy_set?(cached: false)).to be(false)
         expect(new_vm.destroy_set?(cached: false)).to be true
+        expect(rss_source_vm.destroy_set?(cached: false)).to be false
+      end
+    end
+
+    describe "#wait_remote_storage_server_destroyed" do
+      it "naps while the remote storage server still exists" do
+        expect { nx.wait_remote_storage_server_destroyed }.to nap(10)
+      end
+
+      it "hops to wait_destroy_source once the remote storage server is gone" do
+        refresh_frame(nx, new_values: {"remote_storage_server_id" => RemoteStorageServer.generate_uuid})
+        expect { nx.wait_remote_storage_server_destroyed }.to hop("wait_destroy_source")
+      end
+    end
+
+    describe "#wait_destroy_source" do
+      let(:old_vm) { rss_source_volume.vm }
+
+      def frame_with(destroy_source_at)
+        refresh_frame(nx, new_values: {"old_vm_id" => old_vm.id, "destroy_source_at" => destroy_source_at.to_i})
+      end
+
+      it "naps until destroy_source_at" do
+        frame_with(Time.now + 100)
+        expect { nx.wait_destroy_source }.to nap(99..100)
+        expect(old_vm.destroy_set?(cached: false)).to be false
+      end
+
+      it "destroys the old vm and pops once destroy_source_at has passed" do
+        frame_with(Time.now - 1)
+        expect { nx.wait_destroy_source }.to exit({"msg" => "vm moved"})
+        expect(old_vm.destroy_set?(cached: false)).to be true
       end
     end
   end
