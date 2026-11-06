@@ -480,7 +480,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
   describe "#prep" do
     it "hops to wait_sshable if prep command succeeds" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check prep_#{nx.vm_name}").and_return("Succeeded")
       expect { nx.prep }.to hop("wait_sshable", nap: 3)
         .and change { vm.clean_prep_set?(cached: false) }.from(false).to(true)
         .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
@@ -514,7 +514,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
         project.set_ff_ipv6_disabled(true)
 
-        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check prep_#{nx.vm_name}").and_return("NotStarted")
         expect(sshable).to receive(:_cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String, log: :on_error) do |**kwargs|
           require "json"
           params = JSON(kwargs.fetch(:stdin))
@@ -536,14 +536,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             **frame_update,
           )
         end
-        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ timeout\\ --kill-after\\=60\\ 300\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/, log: :on_error})
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run prep_vm4hjdwr sudo timeout --kill-after\\=60 300 host/bin/setup-vm prep vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/, log: :on_error})
 
         expect { nx.prep }.to nap(1)
       end
     end
 
     it "naps if prep command is in progress" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("InProgress")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check prep_#{nx.vm_name}").and_return("InProgress")
       expect { nx.prep }.to nap(1)
     end
   end
@@ -1305,7 +1305,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "cleans the prep daemonizer state when requested" do
       vm.incr_clean_prep
-      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean prep_#{nx.vm_name}")
       expect { nx.wait }.to nap(6 * 60 * 60)
         .and change { vm.clean_prep_set?(cached: false) }.from(true).to(false)
     end
