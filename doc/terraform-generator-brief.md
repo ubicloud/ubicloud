@@ -163,14 +163,30 @@ decision makes unnecessary, or that only an experiment needed, goes.
 up everything locally; this software has a good model locally, the only
 thing you can't really do is e2e and testing github actions itself."
 
-**Objects in a response nest until a schema repeats.** Jeremy Evans
-asked, in review of the prototype
+**Objects in a response nest until a schema repeats.** (Superseded by
+the next entry, of 6 Nov 2026.) Jeremy Evans asked, in review of the
+prototype
 (https://github.com/ubicloud/ubicloud/pull/6331#discussion_r4342893994),
 that a VM's listing of its firewalls show each rule's protocol, which
 nesting one level leaves out. Offered "(a) Keep the one-level rule" and
 "(b) Stop where a schema repeats, not at a fixed depth", Daniel Farina
 answered on 5 Nov 2026: "(b)". So the nesting stops where a schema
 already on the path recurs.
+
+**A response object with a type of its own is exposed by its id.**
+Nesting response objects in full brings drift noise on unrelated
+resources ("Objects have changed outside of Terraform" whenever an
+embedded object moves), makes state large (a nodepool carries every
+node VM), and goes against terraform convention (aws_instance has
+vpc_security_group_ids, not the rules). So Daniel Farina was offered:
+"where a nested object is one that has its own type in the provider,
+expose only its id (firewall_ids, vm_ids, nodepool_ids), and nest in
+full only objects that have no type of their own (postgres tags, CA
+certificates, a destination's options)". He answered on 6 Nov 2026:
+"yes, I agree, too many things against". This replaces the decision of
+5 Nov above: a VM lists its firewalls as firewall_ids, and a
+configuration reads a firewall's own attributes through that firewall's
+resource or datasource.
 
 **Provenance comments are pointers, not prose.** Daniel Farina, 5 Nov
 2026: "comments can be extremely short and cryptic for back-tracing",
