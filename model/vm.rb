@@ -309,6 +309,7 @@ end
 #  location_id                 | uuid                     | NOT NULL
 #  hypervisor_id               | uuid                     |
 #  maintenance_window_start_at | integer                  |
+#  allocation_rules            | jsonb                    |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
