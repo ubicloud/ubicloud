@@ -12,6 +12,7 @@ class Account < Sequel::Model(:accounts)
   one_through_one :default_project, class: :Project, join_table: :account_default_project, left_key: :id, right_key: :project_id
 
   plugin :association_dependencies,
+    api_keys: :destroy,
     projects: :nullify,
     sent_invitations: :destroy,
     usage_alerts: :destroy
