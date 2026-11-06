@@ -3,7 +3,7 @@
 class Prog::Vm::Metal::MoveVm < Prog::Base
   subject_is :vm
 
-  semaphore :cancel_move
+  semaphore :cancel_move, :cancel_destroy_source
 
   frame_reader :remote_storage_server_id, :old_vm_id, :unset_prevent_destroy, :destroy_after
   frame_accessor :destroy_source_at
@@ -102,6 +102,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def wait_destroy_source
+    when_cancel_destroy_source_set? { pop "vm moved, source vm kept" }
     remaining = destroy_source_at - Time.now.to_i
     nap remaining if remaining > 0
     Vm.incr_destroy(old_vm_id)
