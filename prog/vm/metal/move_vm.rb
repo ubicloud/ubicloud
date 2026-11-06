@@ -103,8 +103,9 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
 
   label def wait_destroy_source
     when_cancel_destroy_source_set? { pop "vm moved, source vm kept" }
+    pop "vm moved, source vm already destroyed" if Vm.where(id: old_vm_id).empty?
     remaining = destroy_source_at - Time.now.to_i
-    nap remaining if remaining > 0
+    nap [remaining, 60 * 60].min if remaining > 0
     Vm.incr_destroy(old_vm_id)
     pop "vm moved"
   end

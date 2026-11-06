@@ -308,6 +308,17 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         expect(old_vm.destroy_set?(cached: false)).to be false
       end
 
+      it "naps at most an hour" do
+        frame_with(Time.now + 7 * 24 * 60 * 60)
+        expect { nx.wait_destroy_source }.to nap(60 * 60)
+      end
+
+      it "pops if the old vm has already been destroyed" do
+        frame_with(Time.now + 100)
+        refresh_frame(nx, new_values: {"old_vm_id" => Vm.generate_uuid})
+        expect { nx.wait_destroy_source }.to exit({"msg" => "vm moved, source vm already destroyed"})
+      end
+
       it "pops without destroying the old vm if cancel_destroy_source is set" do
         frame_with(Time.now - 1)
         nx.incr_cancel_destroy_source
