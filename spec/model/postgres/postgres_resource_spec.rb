@@ -2036,33 +2036,33 @@ RSpec.describe PostgresResource do
     it "allows GCP families for GCP locations" do
       family_names = gcp_family_names(project)
 
-      expect(family_names).to include("c4a-standard", "c4a-highmem")
+      expect(family_names).to include("c4a-standard-lssd", "c4a-highmem-lssd")
       expect(family_names).not_to include("standard")
       expect(family_names).not_to include("hobby")
       expect(family_names).not_to include("m8gd")
     end
 
     it "hides a flag-gated GCP family until the project enables it" do
-      expect(gcp_family_names(project)).not_to include("z3-highlssd")
+      expect(gcp_family_names(project)).not_to include("z3-highmem-highlssd")
 
-      project.set_ff_enable_z3_highlssd(true)
-      expect(gcp_family_names(project)).to include("z3-highlssd")
+      project.set_ff_enable_z3_highmem_highlssd(true)
+      expect(gcp_family_names(project)).to include("z3-highmem-highlssd")
     end
 
     it "lets a project opt out of a default-enabled GCP family" do
-      project.set_ff_enable_c4a_standard(false)
+      project.set_ff_enable_c4a_standard_lssd(false)
 
       family_names = gcp_family_names(project)
-      expect(family_names).not_to include("c4a-standard")
-      expect(family_names).to include("c4a-highmem")
+      expect(family_names).not_to include("c4a-standard-lssd")
+      expect(family_names).to include("c4a-highmem-lssd")
     end
 
     it "does not offer a family in a location GCE does not have it in" do
       west3 = Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "europe-west3", ui_name: "Frankfurt, DE (GCP)", visible: false)
-      project.set_ff_enable_c4d_standard(true)
+      project.set_ff_enable_c4d_standard_lssd(true)
 
-      expect(gcp_family_names(project, location: west3)).not_to include("c4d-standard")
-      expect(gcp_family_names(project)).to include("c4d-standard")
+      expect(gcp_family_names(project, location: west3)).not_to include("c4d-standard-lssd")
+      expect(gcp_family_names(project)).to include("c4d-standard-lssd")
     end
 
     it "allows metal families for metal locations" do
@@ -2080,10 +2080,10 @@ RSpec.describe PostgresResource do
       option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
       allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
 
-      c4a_8_options = allowed_storage.select { it["size"] == "c4a-standard-8" }
+      c4a_8_options = allowed_storage.select { it["size"] == "c4a-standard-lssd-8" }
       expect(c4a_8_options.map { it["storage_size"] }).to eq([750])
 
-      c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
+      c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-lssd-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
 

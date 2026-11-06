@@ -924,7 +924,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "bills storage on the flavor row for families with storage included" do
-      postgres_server.vm.update(family: "c4a-standard", vcpus: 8, arch: "arm64", cpu_percent_limit: nil)
+      postgres_server.vm.update(family: "c4a-standard-lssd", vcpus: 8, arch: "arm64", cpu_percent_limit: nil)
       postgres_resource.update(location_id: Location[name: "gcp-us-central1"].id)
       project.update(billable: true)
 
