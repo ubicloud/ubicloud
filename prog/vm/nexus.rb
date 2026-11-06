@@ -14,12 +14,22 @@ class Prog::Vm::Nexus < Prog::Base
     exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
     use_separate_management_nic: false, use_eip: true, management_nic_use_eip: true, remote_storage_server_id: nil,
-    waiting_strand_id: nil, allocated_waiting_strand_id: nil)
+    waiting_strand_id: nil, allocated_waiting_strand_id: nil, allocation_rules: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
     end
-    if exclude_host_ids.include?(force_host_id)
+
+    rules = {}
+    rules["distinct_storage_devices"] = true if distinct_storage_devices
+    rules["force_host_id"] = force_host_id if force_host_id
+    rules["data_center_exclusion_filter"] = exclude_data_centers if exclude_data_centers.any?
+    rules.merge!(allocation_rules || {})
+
+    host_exclusions = exclude_host_ids | (rules["host_exclusion_filter"] || [])
+    rules["host_exclusion_filter"] = host_exclusions unless host_exclusions.empty?
+
+    if rules["force_host_id"] && host_exclusions.include?(rules["force_host_id"])
       fail "Cannot force and exclude the same host"
     end
 
@@ -133,6 +143,7 @@ class Prog::Vm::Nexus < Prog::Base
         arch:,
         project_id:,
         hypervisor_id: ch_version && Hypervisor.first(name: "ch", version: ch_version)&.id,
+        allocation_rules: rules,
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)

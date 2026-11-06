@@ -22,6 +22,11 @@ class Location < Sequel::Model
   GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
   LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
 
+  GITHUB_RUNNERS_ALLOCATION_RULES = {
+    "location_filter" => [GITHUB_RUNNERS_ID, HETZNER_FSN1_ID, HETZNER_HEL1_ID].freeze,
+    "location_preference" => [GITHUB_RUNNERS_ID].freeze,
+  }.freeze
+
   HETZNER_FSN1_UBID = "10saktg1sprp3mxefj1m3kppq2"
   HETZNER_HEL1_UBID = "103wgmgmrbrj0q48dzyw6fvt4z"
   GITHUB_RUNNERS_UBID = "10defff1nr8a2hhjw4qhx9ffkt"
