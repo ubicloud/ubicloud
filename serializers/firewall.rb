@@ -8,11 +8,8 @@ class Serializers::Firewall < Serializers::Base
       description: firewall.description,
       location: firewall.display_location,
       firewall_rules: Serializers::FirewallRule.serialize(firewall.firewall_rules.sort),
+      path: firewall.path,
     }
-
-    if options[:include_path]
-      base[:path] = firewall.path
-    end
 
     if options[:detailed]
       base[:private_subnets] = Serializers::PrivateSubnet.serialize(firewall.private_subnets(eager: [:location, :semaphores, nics: :vm, firewalls: [:location, :firewall_rules]]))

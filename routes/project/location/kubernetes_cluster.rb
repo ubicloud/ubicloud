@@ -53,7 +53,7 @@ class Clover
         metrics_response(Metrics::KUBERNETES_METRICS, kc.ubid, VictoriaMetricsResource.client_for_project(Config.kubernetes_service_project_id))
       end
 
-      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
+      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, serializer_options: {detailed: true}, template_prefix: "kubernetes-cluster"
 
       r.show_object(kc, actions: %w[overview nodepools charts networking settings].freeze, perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
@@ -140,9 +140,13 @@ class Clover
 
         check_found_object(kn)
 
-        r.get web? do
+        r.get true do
           authorize("KubernetesCluster:view", kc.id)
-          r.redirect kn, "/overview"
+          if api?
+            Serializers::KubernetesNodepool.serialize(kn)
+          else
+            r.redirect kn, "/overview"
+          end
         end
 
         r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
@@ -154,11 +158,11 @@ class Clover
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
           unless kn.idle?
-            fail_kubernetes_unprocessable("Nodepool is not ready to be resized")
+            fail_kubernetes_busy("Nodepool is not ready to be resized")
           end
 
           unless kc.idle?
-            fail_kubernetes_unprocessable("Cluster is not ready to resize a nodepool")
+            fail_kubernetes_busy("Cluster is not ready to resize a nodepool")
           end
 
           node_count = typecast_params.pos_int!("node_count")
@@ -178,7 +182,7 @@ class Clover
           end
 
           if api?
-            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+            Serializers::KubernetesNodepool.serialize(kn.reload)
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
             r.redirect kn, "/settings"
@@ -189,18 +193,34 @@ class Clover
           authorize("KubernetesCluster:edit", kc.id)
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
-          unless kn.ready_for_upgrade?
-            fail_kubernetes_unprocessable("Nodepool is not ready to be upgraded")
+          # Check for a no-op request first, so that a client can resend a
+          # request whose response it lost. By then the nodepool is already
+          # at that version, so the checks below would refuse it.
+          version = typecast_params.nonempty_str("version")
+          if version == kn.version
+            no_audit_log
+            next Serializers::KubernetesNodepool.serialize(kn)
           end
 
-          upgrade_candidate = kn.available_upgrade_version
+          if version && version != kc.version
+            fail Validation::ValidationFailed.new({version: "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
+          end
+
+          unless (upgrade_candidate = kn.available_upgrade_version)
+            fail_kubernetes_unprocessable("Nodepool is already at the cluster's version, #{kc.version}")
+          end
+
+          unless kc.idle?
+            fail_kubernetes_busy("Cluster is not ready to upgrade a nodepool")
+          end
+
           DB.transaction do
             kn.request_upgrade
             audit_log(kn, "upgrade", [kc])
           end
 
           if api?
-            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+            Serializers::KubernetesNodepool.serialize(kn)
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be upgraded to #{upgrade_candidate}"
             r.redirect kn, "/settings"
@@ -211,12 +231,6 @@ class Clover
           authorize("KubernetesCluster:edit", kc.id)
 
           DB.transaction do
-            kc.lock!
-
-            if !kn.destroying? && kc.nodepools(eager: [:strand, :semaphores]).count { !it.destroying? } == 1
-              fail_kubernetes_unprocessable("You cannot delete the last nodepool of a cluster")
-            end
-
             kn.incr_destroy
             audit_log(kn, "destroy", [kc])
           end
@@ -257,7 +271,7 @@ class Clover
         end
 
         if api?
-          Serializers::KubernetesNodepool.serialize(np.reload, {detailed: true})
+          Serializers::KubernetesNodepool.serialize(np.reload)
         else
           flash["notice"] = "Node #{node.name} is scheduled to be retired"
           r.redirect np, "/nodes"
@@ -266,21 +280,38 @@ class Clover
 
       r.post "upgrade" do
         authorize("KubernetesCluster:edit", kc)
-        unless kc.nodepools_within_version_skew?
-          fail_kubernetes_unprocessable("All nodepools must be upgraded to within two minor versions of the cluster first")
-        end
-        unless kc.ready_for_upgrade?
-          fail_kubernetes_unprocessable("Cluster is not ready to be upgraded")
+
+        # Check for a no-op request first, so that a client can resend a
+        # request whose response it lost. By then the cluster is already
+        # at that version, so the checks below would refuse it.
+        version = typecast_params.nonempty_str("version")
+        if version == kc.version
+          no_audit_log
+          next Serializers::KubernetesCluster.serialize(kc, {detailed: true})
         end
 
         upgrade_candidate = kc.available_upgrade_version
+        if version && version != upgrade_candidate
+          fail Validation::ValidationFailed.new({version: upgrade_candidate ? "Cluster can only be upgraded to the next version, #{upgrade_candidate}" : "Cluster is at the latest version, #{kc.version}"})
+        end
+
+        unless upgrade_candidate
+          fail_kubernetes_unprocessable("Cluster is at the latest version, #{kc.version}")
+        end
+        unless kc.nodepools_within_version_skew?
+          fail_kubernetes_unprocessable("All nodepools must be upgraded to within two minor versions of the cluster first")
+        end
+        unless kc.idle?
+          fail_kubernetes_busy("Cluster is not ready to be upgraded")
+        end
+
         DB.transaction do
           kc.request_upgrade
           audit_log(kc, "upgrade")
         end
 
         if api?
-          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+          Serializers::KubernetesCluster.serialize(kc.reload, {detailed: true})
         else
           flash["notice"] = "#{kc.name} will be upgraded to #{upgrade_candidate}"
           r.redirect kc

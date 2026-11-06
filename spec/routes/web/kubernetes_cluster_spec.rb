@@ -202,6 +202,29 @@ RSpec.describe Clover, "Kubernetes" do
         expect((find_field name: "name")["value"]).to eq("invalid name")
       end
 
+      it "can not create kubernetes cluster without a name" do
+        fill_in "Cluster Name", with: ""
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: 3
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
+
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
+        expect(page).to have_content "Kubernetes cluster name must only contain lowercase"
+      end
+
+      it "can not create kubernetes cluster with a name longer than 37 characters" do
+        fill_in "Cluster Name", with: "a" * 38
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: 3
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
+
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
+        expect(page).to have_content "Kubernetes cluster name must have max length 37."
+        expect(KubernetesCluster[name: "a" * 38]).to be_nil
+      end
+
       it "can not create kubernetes cluster with same name in same project & location" do
         fill_in "Cluster Name", with: "myk8s"
         choose option: Location::HETZNER_FSN1_UBID
@@ -496,6 +519,13 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_css(".auto-refresh", visible: :all)
       end
 
+      it "redirects a nodepool's own path to its overview page" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kn.path}"
+
+        expect(page).to have_current_path("#{project.path}#{kn.path}/overview")
+      end
+
       it "can rename a nodepool" do
         kn = kc.nodepools.first
         visit "#{project.path}#{kn.path}/settings"
@@ -530,12 +560,16 @@ RSpec.describe Clover, "Kubernetes" do
         expect(kn2.destroy_set?).to be true
       end
 
-      it "does not show the deletion section for the last nodepool" do
+      it "can delete the last nodepool" do
         kn = kc.nodepools.first
         visit "#{project.path}#{kn.path}/settings"
 
-        expect(page).to have_no_content("Danger Zone")
-        expect(page).to have_no_button("Delete")
+        within("#kn-delete-#{kn.ubid}") do
+          click_button "Delete"
+        end
+
+        expect(page).to have_flash_notice("kn nodepool is scheduled for deletion")
+        expect(kn.destroy_set?).to be true
       end
 
       it "can create a nodepool from the nodepools page" do

@@ -69,7 +69,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_UBID
-        uncheck "enable_ip4"
+        uncheck "ip4_enabled"
         choose option: "ubuntu-jammy"
         choose option: "standard-4"
 
@@ -383,7 +383,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_UBID
-        check "enable_ip4"
+        check "ip4_enabled"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 

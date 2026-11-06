@@ -30,6 +30,7 @@ RSpec.describe Serializers::Vm do
         location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
+        storage_size: 100,
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
@@ -51,16 +52,20 @@ RSpec.describe Serializers::Vm do
         location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
+        storage_size: 100,
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
         ip4: "192.168.1.0",
         maintenance_window_start_at: nil,
-        firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
+        firewalls: Serializers::Firewall.serialize(vm.firewalls),
         private_ipv4: vm.private_ipv4.to_s,
         private_ipv6: vm.private_ipv6.to_s,
+        private_subnet_id: vm.user_nic.private_subnet.ubid,
         subnet: "default-eu-central-h1",
         gpu: "1x NVIDIA A100 80GB PCIe",
+        gpu_count: 1,
+        gpu_device: "20b5",
       }
 
       expect(prepare_for_comparison(described_class.serialize_internal(vm, {detailed: true}))).to eq(expected_result)
@@ -71,6 +76,7 @@ RSpec.describe Serializers::Vm do
       vm.reload
 
       serialized = described_class.serialize_internal(vm, {detailed: true})
+      expect(serialized[:private_subnet_id]).to be_nil
       expect(serialized[:subnet]).to be_nil
     end
   end

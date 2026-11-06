@@ -233,6 +233,110 @@ task "update_svg_golden_files" do
   sh "mv spec/lib/svg_chart-spec-output-files/*.svg spec/lib/svg_chart-golden-files/"
 end
 
+# Terraform provider
+
+terraform_generator = lambda do
+  require_relative "terraform/lib/terraform_generator"
+  TerraformGenerator
+end
+
+terraform_generate = lambda do |force: false|
+  tg = terraform_generator.call
+  statuses = tg::Tree.new(tg::MODULE).write(tg.files, force:)
+  statuses.each { |path, status| puts "#{status.to_s.ljust(9)} terraform/provider/#{path}" unless status == :unchanged }
+  puts "rake terraform:diff shows what is left to carry back from the edited files" if statuses.value?(:edited) && !force
+  statuses
+end
+
+# GOTOOLCHAIN=local makes a Go older than the go directive in go.mod fail,
+# rather than download the newer toolchain.
+go_env = {"GOTOOLCHAIN" => "local"}.freeze
+go_cover = File.expand_path("tmp/terraform/cover", __dir__)
+
+terraform_preflight = lambda do
+  found = {"go" => %w[go version], "terraform" => %w[terraform version]}.to_h do |tool, command|
+    [tool, IO.popen(go_env, command, err: File::NULL, &:read)[/\d+(?:\.\d+)+/]]
+  rescue Errno::ENOENT
+    [tool, nil]
+  end
+  wrong = File.read("mise.toml").scan(/^(go|terraform) = "(.+)"$/).reject { |tool, pin| found[tool] == pin }
+  wrong.each { |tool, pin| warn "mise.toml pins #{tool} #{pin}, but #{found[tool] ? "#{tool} #{found[tool]} is" : "no #{tool} is"} installed" }
+  abort "Run mise install" unless wrong.empty?
+end
+
+terraform_check = lambda do |strict:|
+  statuses = terraform_generate.call
+  terraform_generator.call.special_cases.each { |name, types| puts "special case #{name}: #{types.join(", ")}" }
+  abort "A generated file is edited, or no definition renders it" if strict && statuses.values.intersect?(%i[edited orphan])
+
+  unformatted = IO.popen(%w[gofmt -l .], chdir: "terraform/provider", &:read)
+  abort "gofmt would change these files in terraform/provider:\n#{unformatted}" unless unformatted.empty?
+  sh(go_env, "go", "vet", "./...", chdir: "terraform/provider")
+  sh(go_env, "go", "mod", "tidy", "-diff", chdir: "terraform/provider")
+  FileUtils.rm_rf(go_cover)
+  FileUtils.mkdir_p("#{go_cover}/test")
+  sh(go_env, "go", "test", "-cover", "./...", "-args", "-test.gocoverdir=#{go_cover}/test", chdir: "terraform/provider")
+  sh("terraform", "fmt", "-check", "-diff", "-recursive", "examples", chdir: "terraform/provider")
+end
+
+terraform_harness = lambda do
+  sh({"RUBYOPT" => "-w"}, "bundle", "exec", "rspec", *Dir["spec/terraform/**/*_harness.rb"])
+end
+
+namespace :terraform do
+  desc "Write the terraform provider's generated files, keeping edited ones unless FORCE=1"
+  task :generate do
+    terraform_generate.call(force: ENV["FORCE"] == "1")
+  end
+
+  desc "Show what is left to carry back from edits to the terraform provider's generated files"
+  task :diff do
+    tg = terraform_generator.call
+    tg::Tree.new(tg::MODULE).edits(tg.files).each do |path, render|
+      IO.popen(["diff", "-u", "--label", "render/#{path}", "--label", "terraform/provider/#{path}", "-", File.join(tg::MODULE, path)], "w") { it.write(render) }
+      raise "diff failed on terraform/provider/#{path}" if Process.last_status.exitstatus > 1
+    end
+  end
+
+  desc "Write the terraform provider's generated files, failing on an edited or orphaned one, then check the module with Go and terraform"
+  task :check do
+    terraform_preflight.call
+    terraform_check.call(strict: true)
+  end
+
+  desc "Run the examples in spec/terraform, which test the provider with terraform against the API in process"
+  task :harness do
+    terraform_preflight.call
+    terraform_harness.call
+  end
+end
+
+desc "Run the generator's specs, terraform:check and the harness, then report the Go engine's coverage, failing below 100%; CHECK=1 makes an edited or orphaned generated file fail"
+task :terraform do
+  terraform_preflight.call
+  sh({"COVERAGE" => "1", "RUBYOPT" => "-w"}, "bundle", "exec", "rspec", chdir: "terraform")
+  terraform_check.call(strict: ENV["CHECK"] == "1")
+  terraform_harness.call
+
+  # Merge every directory under tmp/terraform/cover: go test writes its
+  # counters to one, and the provider binaries the harness runs to
+  # another. The generated files are data and are not counted. Neither is
+  # main.go, which only starts the server; no test reaches its call of
+  # log.Fatal, which runs only if serving fails.
+  profile = "#{go_cover}.txt"
+  sh(go_env, "go", "tool", "covdata", "textfmt", "-i=#{Dir["#{go_cover}/*"].join(",")}", "-o=#{profile}")
+  prefix = "#{File.read("terraform/provider/go.mod")[/^module (\S+)/, 1]}/"
+  blocks = File.readlines(profile).drop(1).map(&:split).reject { it[0].include?("_gen.go:") || it[0].start_with?("#{prefix}main.go:") }.group_by(&:first).map do |block, counts|
+    [block.delete_prefix(prefix), counts[0][1].to_i, counts.any? { it[2] != "0" }]
+  end
+  total = blocks.sum { it[1] }
+  missed = blocks.reject(&:last)
+  covered = total - missed.sum { it[1] }
+  puts format("The Go engine's statement coverage is %.1f%%, %d of %d", 100.0 * covered / total, covered, total)
+  missed.each { puts "not covered: terraform/provider/#{it[0]}" }
+  abort "The Go engine's statement coverage must be 100%" unless missed.empty?
+end
+
 # Other
 
 desc "Create admin account in production environment"

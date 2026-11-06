@@ -1,8 +1,12 @@
 openapi: 3.0.3
 info:
-  description: API for managing resources on Ubicloud
+  description: |-
+    API for managing resources on Ubicloud
+
+    To use version 2 of the API, send `Accept: application/vnd.ubicloud+json; version=2`. A request that does not name that media type gets version 1. Each version refuses a deprecated operation or request property whose `x-deprecated` sets `removed-in` to that version or an earlier one. It accepts one removed in a later version, but reports its use in the `Deprecation` and `Warning` response headers, and may refuse a share of the requests that use it. Responses are the same in both versions.
   title: Clover API
   version: 0.1.0
+  x-api-version: 2
   contact:
     url: https://www.ubicloud.com/
     email: support@ubicloud.com
@@ -358,6 +362,7 @@ paths:
                 description:
                   description: Description of the firewall
                   type: string
+                  default: ''
               additionalProperties: false
       responses:
         '200':
@@ -379,6 +384,7 @@ paths:
                 description:
                   description: New description for firewall
                   type: string
+                  example: Allows HTTPS from anywhere
               additionalProperties: false
               required:
                 - description
@@ -405,8 +411,10 @@ paths:
               type: object
               properties:
                 private_subnet_id:
-                  description: Private subnet id to attach
+                  description: ID of the private subnet to attach
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  writeOnly: true
               additionalProperties: false
               required:
                 - private_subnet_id
@@ -433,8 +441,10 @@ paths:
               type: object
               properties:
                 private_subnet_id:
-                  description: Private subnet id to detach
+                  description: ID of the private subnet to detach
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  writeOnly: true
               additionalProperties: false
               required:
                 - private_subnet_id
@@ -463,19 +473,35 @@ paths:
                 cidr:
                   description: CIDR or private subnet id or name to allow
                   type: string
+                  example: 0.0.0.0/0
                 firewall_id:
+                  description: Deprecated and ignored; the rule is added to the firewall in the path.
                   type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
                 port_range:
-                  description: Port range to allow
+                  description: Port or port range to allow, such as 443 or 8000..8080
                   type: string
+                  format: port-range
+                  default: 0..65535
+                  pattern: ^\d+(\.\.\d+)?$
                 protocol:
-                  description: Protocol to allow (tcp or udp, default tcp)
+                  description: Protocol to allow (tcp or udp)
                   type: string
+                  default: tcp
                 description:
                   description: Description to use for the firewall rule
                   type: string
+                  default: ''
                 project_id:
+                  description: Deprecated and ignored; the project comes from the path.
                   type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
               additionalProperties: false
               required:
                 - cidr
@@ -520,7 +546,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/FirewallRuleUpdate'
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                  format: cidr
+                port_range:
+                  description: Port or port range of the firewall rule, such as 443 or 8000..8080
+                  type: string
+                  format: port-range
+                  pattern: ^\d+(\.\.\d+)?$
+                protocol:
+                  description: Protocol of the firewall rule (tcp or udp)
+                  type: string
+                description:
+                  description: Description of the firewall rule
+                  type: string
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           $ref: '#/components/responses/FirewallRule'
@@ -546,6 +590,7 @@ paths:
                 name:
                   description: New name for firewall
                   type: string
+                  example: my-firewall
               additionalProperties: false
               required:
                 - name
@@ -577,10 +622,11 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/kubernetes_cluster_reference'
     delete:
       operationId: deleteKubernetesCluster
       summary: Delete a kubernetes cluster
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_reference'
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -591,6 +637,8 @@ paths:
     get:
       operationId: getKubernetesClusterDetails
       summary: Get kubernetes cluster details
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_reference'
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -601,6 +649,8 @@ paths:
     post:
       operationId: createKubernetesCluster
       summary: Create a new kubernetes cluster
+      parameters:
+        - $ref: '#/components/parameters/kubernetes_cluster_new_name'
       requestBody:
         required: true
         content:
@@ -609,21 +659,47 @@ paths:
               type: object
               properties:
                 version:
-                  description: Version of the kubernetes cluster
+                  description: Kubernetes version of the cluster, which must be one of the two newest versions that Ubicloud supports. Any other version that matches the pattern is refused with an error that lists the two.
                   type: string
+                  example: v1.36
+                  pattern: ^v\d+\.\d+$
                 worker_size:
-                  description: Size of each worker VM
+                  description: Deprecated; create a nodepool instead. Size of each worker VM in a default nodepool, which the cluster gets only if this is given.
                   type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 3
+                    use:
+                      - createKubernetesNodepool
                 cp_nodes:
-                  description: Number of control plane nodes
+                  description: Deprecated; send cp_node_count.
                   type: integer
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    renamed-to: cp_node_count
+                cp_node_count:
+                  description: Number of control plane nodes. With 3, the control plane stays available if one of them fails.
+                  type: integer
+                  default: 1
+                  enum:
+                    - 1
+                    - 3
                 worker_nodes:
-                  description: Number of worker nodes
+                  description: Deprecated; create a nodepool instead. Number of worker nodes in the default nodepool, 1 by default; it is refused without worker_size.
                   type: integer
+                  deprecated: true
+                  minimum: 1
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 3
+                    use:
+                      - createKubernetesNodepool
               additionalProperties: false
               required:
                 - version
-                - worker_size
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -717,14 +793,22 @@ paths:
               type: object
               properties:
                 name:
-                  description: Name of the nodepool
+                  description: Name of the nodepool, which must be unique in its cluster
                   type: string
+                  example: my-nodepool-name
                 node_count:
                   description: Number of worker nodes in the nodepool
                   type: integer
+                  example: 2
+                  minimum: 1
                 node_size:
                   description: Size of each worker node
                   type: string
+                  example: standard-2
+                version:
+                  description: Kubernetes version of the nodepool. Since a nodepool is always created at its cluster's version, this must be the cluster's version.
+                  type: string
+                  pattern: ^v\d+\.\d+$
               additionalProperties: false
               required:
                 - name
@@ -753,6 +837,16 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+    get:
+      operationId: getKubernetesNodepoolDetails
+      summary: Get kubernetes nodepool details
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesNodepool'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -772,6 +866,7 @@ paths:
                 name:
                   description: New name for kubernetes nodepool
                   type: string
+                  example: my-nodepool-name
               additionalProperties: false
               required:
                 - name
@@ -801,6 +896,8 @@ paths:
                 node_count:
                   description: New number of nodes for the kubernetes nodepool
                   type: integer
+                  example: 3
+                  minimum: 1
               additionalProperties: false
               required:
                 - node_count
@@ -820,6 +917,18 @@ paths:
     post:
       operationId: upgradeKubernetesNodepool
       summary: Upgrade a kubernetes nodepool to the cluster version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  description: Version to upgrade to, which must be the cluster's version. If the nodepool is already at this version, the request does nothing. If version is omitted, the nodepool is upgraded to the cluster's version.
+                  type: string
+                  pattern: ^v\d+\.\d+$
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/KubernetesNodepool'
@@ -845,6 +954,7 @@ paths:
                 name:
                   description: New name for kubernetes cluster
                   type: string
+                  example: my-cluster-name
               additionalProperties: false
               required:
                 - name
@@ -862,7 +972,19 @@ paths:
       - $ref: '#/components/parameters/kubernetes_cluster_reference'
     post:
       operationId: upgradeKubernetesCluster
-      summary: Upgrade a kubernetes cluster
+      summary: Upgrade a kubernetes cluster to the next minor version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  description: Version to upgrade to, which must be the minor version after the cluster's current one. If the cluster is already at this version, the request does nothing. If version is omitted, the cluster is upgraded to the next minor version.
+                  type: string
+                  pattern: ^v\d+\.\d+$
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -925,25 +1047,38 @@ paths:
                 algorithm:
                   description: Algorithm of the Load Balancer
                   type: string
+                  example: round_robin
+                  enum:
+                    - round_robin
+                    - hash_based
                 stack:
-                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+                  description: Deprecated and ignored; the stack is set when the Load Balancer is created.
                   type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
+                  example: 8080
                 health_check_endpoint:
                   description: Health check endpoint URL
                   type: string
+                  example: /up
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                  example: 443
                 vms:
-                  description: List of VM apids for the Load Balancer
+                  description: IDs of the VMs to attach to the Load Balancer; any other attached VM is detached
                   type: array
                   items:
                     type: string
+                  example:
+                    - vmhfy8gff8c67hasb0eez2k1pd
                 cert_enabled:
-                  description: Whether SSL certificates are enabled for the Load Balancer
+                  description: Whether SSL certificates are enabled for the Load Balancer (if absent or null, the current setting is kept)
                   type: boolean
                   nullable: true
               additionalProperties: false
@@ -973,24 +1108,43 @@ paths:
                 algorithm:
                   description: Algorithm of the Load Balancer
                   type: string
+                  example: round_robin
+                  enum:
+                    - round_robin
+                    - hash_based
                 stack:
-                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+                  description: Networking stack of the Load Balancer
                   type: string
+                  default: dual
+                  enum:
+                    - ipv4
+                    - ipv6
+                    - dual
                 dst_port:
                   description: Destination port for the Load Balancer
                   type: integer
+                  example: 8080
                 health_check_endpoint:
                   description: Health check endpoint URL
                   type: string
+                  default: /up
                 health_check_protocol:
                   description: Health check endpoint protocol
                   type: string
+                  example: http
+                  enum:
+                    - http
+                    - https
+                    - tcp
                 private_subnet_id:
                   description: ID of Private Subnet
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                  example: 443
                 cert_enabled:
                   description: Whether SSL certificates are enabled for the Load Balancer
                   type: boolean
@@ -1024,8 +1178,10 @@ paths:
               type: object
               properties:
                 vm_id:
-                  description: Apid of VM to attach to Load Balancer
+                  description: ID of the VM to attach to the Load Balancer
                   type: string
+                  example: vmhfy8gff8c67hasb0eez2k1pd
+                  writeOnly: true
               additionalProperties: false
               required:
                 - vm_id
@@ -1052,8 +1208,10 @@ paths:
               type: object
               properties:
                 vm_id:
-                  description: Apid of VM to detach from Load Balancer
+                  description: ID of the VM to detach from the Load Balancer
                   type: string
+                  example: vmhfy8gff8c67hasb0eez2k1pd
+                  writeOnly: true
               additionalProperties: false
               required:
                 - vm_id
@@ -1082,6 +1240,7 @@ paths:
                 name:
                   description: New name for load balancer
                   type: string
+                  example: my-load-balancer
               additionalProperties: false
               required:
                 - name
@@ -1110,6 +1269,7 @@ paths:
                 cert_enabled:
                   description: Whether SSL certificates are enabled for the Load Balancer
                   type: boolean
+                  example: true
               additionalProperties: false
               required:
                 - cert_enabled
@@ -1362,17 +1522,39 @@ paths:
                   description: Deprecated and ignored.
                   type: string
                   deprecated: true
+                  x-deprecated:
+                    since: 2026-10-08
+                    removed-in: 2
                 ha_type:
-                  description: High availability type
+                  description: High availability type, which sets the number of standbys
                   type: string
+                  default: none
+                  enum:
+                    - none
+                    - async
+                    - sync
                 size:
                   description: Requested size for the underlying VM
                   type: string
+                  example: standard-2
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                  example: 64
                 version:
-                  description: PostgreSQL version
+                  description: Deprecated; send target_version.
+                  type: string
+                  enum:
+                    - '16'
+                    - '17'
+                    - '18'
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    renamed-to: target_version
+                target_version:
+                  description: Major PostgreSQL version of the new database
                   type: string
                   enum:
                     - '16'
@@ -1381,16 +1563,21 @@ paths:
                 restrict_by_default:
                   description: Whether to restrict access by default (if so, firewall rules must be added to access)
                   type: boolean
+                  default: false
+                  writeOnly: true
                 private_subnet_name:
                   description: Name for the private subnet (if not provided, a name will be auto-generated)
                   type: string
+                  writeOnly: true
                 pg_config:
+                  description: PostgreSQL parameters to set
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set
                   type: object
                   example:
                     max_client_conn: '100'
@@ -1423,8 +1610,12 @@ paths:
               type: object
               properties:
                 ha_type:
-                  description: High availability type
+                  description: High availability type, which sets the number of standbys
                   type: string
+                  enum:
+                    - none
+                    - async
+                    - sync
                 size:
                   description: Requested size for the underlying VM
                   type: string
@@ -1607,7 +1798,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostgresConfig'
+              type: object
+              properties:
+                pg_config:
+                  description: PostgreSQL parameters to set, replacing any set before. A number is stored as a string.
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    anyOf:
+                      - type: string
+                      - type: number
+                pgbouncer_config:
+                  description: PgBouncer parameters to set, replacing any set before. A number is stored as a string.
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    anyOf:
+                      - type: string
+                      - type: number
+              additionalProperties: false
+              required:
+                - pg_config
+                - pgbouncer_config
       responses:
         '200':
           description: Successful response
@@ -1627,7 +1841,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostgresPatchConfig'
+              type: object
+              properties:
+                pg_config:
+                  description: PostgreSQL parameters to set or, with a null value, remove
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                    nullable: true
+                pgbouncer_config:
+                  description: PgBouncer parameters to set or, with a null value, remove
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
+                    nullable: true
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           description: Successful response
@@ -1667,9 +1900,12 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  format: cidr
+                  example: 10.0.0.0/8
                 description:
                   description: Description of the firewall rule
                   type: string
+                  default: ''
                   nullable: true
               additionalProperties: false
               required:
@@ -1687,6 +1923,16 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
+    get:
+      operationId: getLocationPostgresFirewallRule
+      summary: Get a PostgreSQL firewall rule
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
     patch:
       operationId: patchLocationPostgresFirewallRule
       summary: Update a PostgreSQL firewall rule
@@ -1700,6 +1946,7 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  format: cidr
                   nullable: true
                 description:
                   description: Description of the firewall rule
@@ -1722,7 +1969,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Firewall Rule
+        - Postgres Firewall Rule
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination:
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1741,18 +1988,42 @@ paths:
                 name:
                   description: Name for the Log Destination
                   type: string
+                  example: graylog
                 type:
                   description: Destination type. "otlp" sends via OTLP HTTP (https://...); "syslog" sends via RFC 5424 over TLS (tcp://host:port)
                   type: string
+                  example: syslog
                   enum:
                     - otlp
                     - syslog
                 url:
                   description: 'Endpoint URL. For otlp: https://... For syslog: tcp://host:port'
                   type: string
+                  example: tcp://logs.example.com:6514
                 options:
-                  description: 'Authentication options. For otlp: {"headers": {"Header-Name": "value"}}. For syslog: {"structured_data": {"sd-id": {"key": "value"}}}'
+                  description: Authentication options, which are never returned. An otlp destination takes only headers, and a syslog destination only structured_data.
                   type: object
+                  format: password
+                  additionalProperties: false
+                  properties:
+                    headers:
+                      description: HTTP headers to send with each OTLP request, as a map from name to value
+                      type: object
+                      example:
+                        api-key: my-license-key
+                      additionalProperties:
+                        type: string
+                    structured_data:
+                      description: RFC 5424 structured data to send with each message, as a map from each SD-ID to its parameters
+                      type: object
+                      example:
+                        token@41058:
+                          tag: my-token
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          type: string
+                  writeOnly: true
               additionalProperties: false
               required:
                 - name
@@ -1777,6 +2048,16 @@ paths:
       responses:
         '204':
           $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Log Destination
+    get:
+      operationId: getLocationPostgresLogDestination
+      summary: Get a PostgreSQL log destination
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresLogDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1881,26 +2162,59 @@ paths:
               type: object
               properties:
                 options:
-                  description: 'Additional Prometheus remote_write authentication, as {"authorization": {"type": "Bearer", "credentials": "token"}} and/or {"headers": {"Header-Name": "value"}}'
+                  description: Additional Prometheus remote_write authentication, which is never returned. Without username and password, it must give authorization or at least one header.
                   type: object
+                  format: password
+                  additionalProperties: false
                   nullable: true
+                  properties:
+                    authorization:
+                      description: Scheme and credentials for the Authorization header. It cannot be combined with username and password.
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        type:
+                          description: Authentication scheme, which is Bearer when omitted and cannot be Basic
+                          type: string
+                          minLength: 1
+                        credentials:
+                          description: Credentials sent after the scheme, such as a bearer token
+                          type: string
+                          minLength: 1
+                      required:
+                        - credentials
+                    headers:
+                      description: HTTP headers to send with each remote_write request, as a map from name to value. Authorization and the other headers that Prometheus reserves cannot be set.
+                      type: object
+                      example:
+                        X-Scope-OrgID: tenant1
+                      additionalProperties:
+                        type: string
+                  writeOnly: true
                 password:
-                  description: Password for basic auth, required with username
+                  description: Password for basic auth. It is required with username, and never returned.
                   type: string
+                  format: password
                   nullable: true
+                  writeOnly: true
                 url:
                   description: URL for the Metric Destination
                   type: string
+                  example: https://prometheus.example.com/api/v1/write
                 username:
                   description: Username for basic auth, required with password
                   type: string
                   nullable: true
+              example:
+                url: https://prometheus.example.com/api/v1/write
+                username: prometheus
+                password: my-password
               additionalProperties: false
               required:
                 - url
       responses:
         '200':
-          $ref: '#/components/responses/PostgresDatabase'
+          $ref: '#/components/responses/PostgresMetricDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1917,6 +2231,16 @@ paths:
       responses:
         '204':
           $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+    get:
+      operationId: getLocationPostgresMetricDestination
+      summary: Get a PostgreSQL metric destination
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresMetricDestination'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2008,6 +2332,11 @@ paths:
       deprecated: true
       tags:
         - Postgres Database
+      x-deprecated:
+        since: 2026-02-19
+        removed-in: 2
+        use:
+          - promoteReadReplicaPostgresDatabase
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2041,13 +2370,16 @@ paths:
                 name:
                   description: Name for the read replica
                   type: string
+                  example: my-postgres-replica
                 pg_config:
+                  description: PostgreSQL parameters to set, on top of those of the parent
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set, on top of those of the parent
                   type: object
                   example:
                     max_client_conn: '100'
@@ -2101,6 +2433,7 @@ paths:
                 name:
                   description: New name for PostgreSQL database
                   type: string
+                  example: my-postgres
               additionalProperties: false
               required:
                 - name
@@ -2127,7 +2460,10 @@ paths:
               type: object
               properties:
                 password:
+                  description: New superuser password, which must be at least 12 characters long and contain a lowercase letter, an uppercase letter and a digit
                   type: string
+                  format: password
+                  example: Example-Password-123
               additionalProperties: false
               required:
                 - password
@@ -2171,17 +2507,22 @@ paths:
                 name:
                   description: Name for the newly restored Postgres database.
                   type: string
+                  example: my-postgres-restored
                 restore_target:
                   description: The RFC 3339-formatted timestamp for the point in time at which to recover.
                   type: string
                   format: date-time
+                  example: 2026-11-01T12:00:00Z
+                  writeOnly: true
                 pg_config:
+                  description: PostgreSQL parameters to set, on top of those of the source database
                   type: object
                   example:
                     max_connections: '100'
                   additionalProperties:
                     type: string
                 pgbouncer_config:
+                  description: PgBouncer parameters to set, on top of those of the source database
                   type: object
                   example:
                     max_client_conn: '100'
@@ -2234,8 +2575,14 @@ paths:
               type: object
               properties:
                 maintenance_window_start_at:
+                  description: Hour of the day, in UTC, at which the maintenance window starts. A null or omitted value unsets the window and clears its days.
                   type: integer
+                  example: 3
+                  maximum: 23
+                  minimum: 0
+                  nullable: true
                 maintenance_window_days:
+                  description: Days of the week the maintenance window applies to. An empty or omitted list means every day. Only projects with maintenance window days enabled may name days.
                   type: array
                   items:
                     $ref: '#/components/schemas/MaintenanceWindowDay'
@@ -2255,6 +2602,21 @@ paths:
     post:
       operationId: upgradePostgresDatabase
       summary: Upgrade a PostgreSQL database to the next major version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_version:
+                  description: Major version to upgrade to, which must be the one after the current version. If the database already targets this version, the request does nothing. Without target_version, the database is upgraded to the next version.
+                  type: string
+                  enum:
+                    - '16'
+                    - '17'
+                    - '18'
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
@@ -2423,7 +2785,11 @@ paths:
               type: object
               properties:
                 firewall_id:
+                  description: ID of a firewall in the same location to attach to the subnet; if absent, a new firewall that allows all TCP and UDP traffic is attached
                   type: string
+                  example: fwfg7td83em22qfw9pq5xyfqb7
+                  pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+                  writeOnly: true
               additionalProperties: false
       responses:
         '200':
@@ -2448,7 +2814,10 @@ paths:
               type: object
               properties:
                 connected-subnet-id:
+                  description: ID of the private subnet to connect to
                   type: string
+                  example: ps3dngttwvje2kmr2sn8x12x4r
+                  writeOnly: true
               additionalProperties: false
       responses:
         '200':
@@ -2491,6 +2860,7 @@ paths:
                 name:
                   description: New name for private subnet
                   type: string
+                  example: my-subnet
               additionalProperties: false
               required:
                 - name
@@ -2554,32 +2924,63 @@ paths:
               type: object
               properties:
                 boot_image:
-                  description: Boot image of the VM
+                  description: Boot image of the VM, or a machine image as name@version or name@latest
                   type: string
+                  example: ubuntu-noble
                 init_script:
-                  description: VM init script
+                  description: Shell commands that the VM runs once, at its first boot
                   type: string
+                  format: password
+                  writeOnly: true
                 enable_ip4:
-                  description: Enable IPv4
+                  description: Deprecated; send ip4_enabled.
                   type: boolean
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    renamed-to: ip4_enabled
+                ip4_enabled:
+                  description: Whether the VM has a public IPv4 address
+                  type: boolean
+                  default: false
                 private_subnet_id:
-                  description: ID of the private subnet
+                  description: ID of the private subnet to put the VM in; if absent, the project's default subnet in the location
                   type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
                 public_key:
-                  description: Public SSH key for the VM, or name of registered SSH public key
+                  description: SSH public key authorized to log in as unix_user, or the name of a registered SSH public key
                   type: string
+                  example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGkT3pVfM0a9ZsYbq7Qd1xWnRj5LcUe8HvBtKo2PyDmA user@my-laptop
+                  writeOnly: true
                 size:
                   description: Size of the VM
                   type: string
+                  default: standard-2
                 storage_size:
-                  description: Requested storage size in GiB
+                  description: Requested size of each storage volume in GiB
                   type: integer
                 gpu:
-                  description: Requested GPU count and type, in the form of "count:type"
+                  description: Deprecated; send gpu_count and gpu_device, which take precedence. Requested GPU count and device, as "count:device".
+                  type: string
+                  deprecated: true
+                  x-deprecated:
+                    since: 2026-11-02
+                    removed-in: 2
+                    use:
+                      - gpu_count
+                      - gpu_device
+                gpu_count:
+                  description: Number of GPUs
+                  type: integer
+                  minimum: 0
+                gpu_device:
+                  description: PCI device ID of the GPUs, such as 20b5; requires gpu_count
                   type: string
                 unix_user:
                   description: Unix user of the VM
                   type: string
+                  default: ubi
               additionalProperties: false
               required:
                 - public_key
@@ -2608,6 +3009,7 @@ paths:
                 name:
                   description: New name for VM
                   type: string
+                  example: my-vm-name
               additionalProperties: false
               required:
                 - name
@@ -2673,7 +3075,11 @@ paths:
               type: object
               properties:
                 maintenance_window_start_at:
+                  description: Hour of the day, in UTC, at which the daily maintenance window starts; null to unset it
                   type: integer
+                  example: 3
+                  maximum: 23
+                  minimum: 0
                   nullable: true
               additionalProperties: false
               required:
@@ -2964,7 +3370,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SshPublicKeyUpdate'
+              type: object
+              properties:
+                name:
+                  description: Name of the SSH public key
+                  type: string
+                public_key:
+                  description: One or more SSH public keys, one per line, in the format of an authorized_keys file
+                  type: string
+              additionalProperties: false
+              minProperties: 1
       responses:
         '200':
           description: Successful response
@@ -3070,6 +3485,15 @@ components:
         type: string
         example: akkkmx0f2vke4h36nk9cm8v8q0
         pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
+    kubernetes_cluster_new_name:
+      description: Name for a new kubernetes cluster, of at most 37 characters, since the default nodepool that worker_size asks for is named after the cluster with "-np" appended, and a nodepool's name may have at most 40
+      example: my-cluster
+      in: path
+      name: kubernetes_cluster_reference
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9](?:[a-z0-9\-]{0,35}[a-z0-9])?$
     kubernetes_cluster_reference:
       description: Kubernetes cluster ID or name
       examples:
@@ -3366,21 +3790,19 @@ components:
       type: object
       properties:
         pg_config:
+          description: PostgreSQL parameters set by the user
           type: object
           example:
             max_connections: '100'
           additionalProperties:
-            anyOf:
-              - type: string
-              - type: number
+            type: string
         pgbouncer_config:
+          description: PgBouncer parameters set by the user
           type: object
           example:
             max_client_conn: '100'
           additionalProperties:
-            anyOf:
-              - type: string
-              - type: number
+            type: string
         default_pg_config:
           description: System-computed configuration values based on instance size. User overrides in pg_config take precedence.
           type: object
@@ -3400,116 +3822,17 @@ components:
       type: object
       properties:
         name:
+          description: Name of the SSH public key
           type: string
+          example: my-laptop
         public_key:
+          description: One or more SSH public keys, one per line, in the format of an authorized_keys file
           type: string
+          example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGkT3pVfM0a9ZsYbq7Qd1xWnRj5LcUe8HvBtKo2PyDmA user@my-laptop
       additionalProperties: false
       required:
         - name
         - public_key
-    FirewallRuleUpdate:
-      anyOf:
-        - type: object
-          properties:
-            cidr:
-              description: CIDR of the firewall rule
-              type: string
-            port_range:
-              description: Port range of the firewall rule
-              type: string
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - cidr
-        - type: object
-          properties:
-            port_range:
-              description: Port range of the firewall rule
-              type: string
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - port_range
-        - type: object
-          properties:
-            protocol:
-              description: Protocol of the firewall rule (tcp or udp)
-              type: string
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - protocol
-        - type: object
-          properties:
-            description:
-              description: Description of the firewall rule
-              type: string
-          additionalProperties: false
-          required:
-            - description
-    SshPublicKeyUpdate:
-      anyOf:
-        - type: object
-          properties:
-            name:
-              type: string
-            public_key:
-              type: string
-          additionalProperties: false
-          required:
-            - name
-        - type: object
-          properties:
-            public_key:
-              type: string
-          additionalProperties: false
-          required:
-            - public_key
-    PostgresPatchConfig:
-      anyOf:
-        - type: object
-          properties:
-            pg_config:
-              type: object
-              example:
-                max_connections: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-            pgbouncer_config:
-              type: object
-              example:
-                max_client_conn: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-          additionalProperties: false
-          required:
-            - pg_config
-        - type: object
-          properties:
-            pgbouncer_config:
-              type: object
-              example:
-                max_client_conn: '100'
-              additionalProperties:
-                type: string
-                nullable: true
-          additionalProperties: false
-          required:
-            - pgbouncer_config
     CertAuthUserRequest:
       type: object
       properties:
@@ -3555,7 +3878,7 @@ components:
           description: UI name of the private location
           type: string
         provider:
-          description: Name of the private location
+          description: Cloud provider of the private location
           type: string
         path:
           description: Path of the private location
@@ -3655,17 +3978,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FirewallRule'
+          readOnly: true
         id:
           description: ID of the firewall
           type: string
           example: fwfg7td83em22qfw9pq5xyfqb7
           pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the firewall
           type: string
+          readOnly: true
         name:
           description: Name of the firewall
           type: string
+        path:
+          description: Path of the firewall, relative to the project
+          type: string
+          example: /location/eu-central-h1/firewall/my-firewall
+          readOnly: true
       additionalProperties: false
       required:
         - description
@@ -3673,20 +4004,24 @@ components:
         - id
         - location
         - name
+        - path
     FirewallRule:
       type: object
       properties:
         cidr:
           description: CIDR of the firewall rule
           type: string
+          format: cidr
         id:
           description: ID of the firewall rule
           type: string
           example: fraz0q3vbrpa7pkg7zbmah9csn
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         port_range:
-          description: Port range of the firewall rule
+          description: Port or port range of the firewall rule, such as 443 or 8000..8080
           type: string
+          format: port-range
         protocol:
           description: Protocol of the firewall rule (tcp or udp)
           type: string
@@ -3711,6 +4046,7 @@ components:
           type: string
           example: skaz0q3vbrpa7pkg7zbmah9csn
           pattern: ^sk[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the SSH public key
           type: string
@@ -3729,9 +4065,13 @@ components:
           type: string
           example: akaz0q3vbrpa7pkg7zbmah9csn
           pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         key:
-          description: inference API key data
+          description: Secret that authenticates requests to the inference endpoints
           type: string
+          format: password
+          readOnly: true
+          x-immutable: true
       additionalProperties: false
       required:
         - id
@@ -3789,9 +4129,16 @@ components:
         algorithm:
           description: Algorithm of the Load Balancer
           type: string
+          enum:
+            - round_robin
+            - hash_based
         stack:
-          description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
+          description: Networking stack of the Load Balancer
           type: string
+          enum:
+            - ipv4
+            - ipv6
+            - dual
         dst_port:
           description: Destination port for the Load Balancer
           type: integer
@@ -3802,17 +4149,24 @@ components:
         health_check_protocol:
           description: Health check endpoint protocol
           type: string
+          enum:
+            - http
+            - https
+            - tcp
         hostname:
           description: Hostname of the Load Balancer
           type: string
+          readOnly: true
         id:
           description: ID of the Load Balancer
           type: string
           example: 1bhw8r4pn73t1m5f7rn7a5pej2
           pattern: ^1b[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the Load Balancer
           type: string
+          readOnly: true
         name:
           description: Name of the Load Balancer
           type: string
@@ -3826,13 +4180,16 @@ components:
       additionalProperties: false
       required:
         - algorithm
+        - cert_enabled
         - dst_port
         - health_check_endpoint
         - health_check_protocol
         - hostname
         - id
+        - location
         - name
         - src_port
+        - stack
       x-go-name: LoadBalancerSchema
     MachineImage:
       type: object
@@ -3949,31 +4306,66 @@ components:
           description: Deprecated. Always standard.
           type: string
           deprecated: true
+          x-deprecated:
+            since: 2026-10-08
         ha_type:
-          description: High availability type
+          description: High availability type, which sets the number of standbys
           type: string
+          enum:
+            - none
+            - async
+            - sync
         target_server_count:
           description: Target number of servers (primary + standbys)
           type: integer
+          readOnly: true
         id:
           description: ID of the Postgres database
           type: string
           example: pgn30gjk1d1e2jj34v9x0dq4rp
           pattern: ^pg[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the Postgres database
           type: string
+          readOnly: true
         name:
           description: Name of the Postgres database
           type: string
         state:
           description: State of the Postgres database
           type: string
+          enum:
+            - creating
+            - running
+            - restarting
+            - restoring_backup
+            - replaying_wal
+            - finalizing_restore
+            - unavailable
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - restarting
+              - restoring_backup
+              - replaying_wal
+              - finalizing_restore
+              - deleting
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+          readOnly: true
         target_storage_size_gib:
-          description: Desired storage size in GiB
+          description: Storage size in GiB that the servers converge to, which is storage_size unless storage auto-scale raised it
+          type: integer
+          readOnly: true
+        size:
+          description: Size of the underlying VM last requested by create or update
+          type: string
+        storage_size:
+          description: Storage size in GiB last requested by create or update
           type: integer
         version:
           description: Current Postgres version
@@ -3982,6 +4374,7 @@ components:
             - '16'
             - '17'
             - '18'
+          readOnly: true
         target_version:
           description: Target Postgres version
           type: string
@@ -3992,16 +4385,21 @@ components:
         vm_size:
           description: Size of the underlying VM
           type: string
+          readOnly: true
         target_vm_size:
-          description: Desired VM size
+          description: VM size that the servers converge to, which is size unless storage auto-scale raised it
           type: string
+          readOnly: true
         ca_certificates:
           description: CA certificates of the root CA used to issue postgres server certificates
           type: string
           nullable: true
+          readOnly: true
         maintenance_window_start_at:
-          description: Maintenance window start time
+          description: Hour of the day, in UTC, at which the maintenance window starts; null if no window is set
           type: integer
+          maximum: 23
+          minimum: 0
           nullable: true
         maintenance_window_days:
           description: Days of the week the maintenance window applies to (empty list means every day)
@@ -4011,13 +4409,16 @@ components:
         read_replica:
           description: If the database is a read replica or not
           type: boolean
+          readOnly: true
         parent:
           description: Parent Postgres database
           type: string
           nullable: true
+          readOnly: true
         fallback_active:
           description: Whether the primary server is running on a fallback instance type
           type: boolean
+          readOnly: true
         tags:
           description: Tags of the Postgres database
           type: array
@@ -4027,6 +4428,8 @@ components:
           description: Creation timestamp of the Postgres database
           type: string
           format: date-time
+          readOnly: true
+          x-immutable: true
       additionalProperties: false
       required:
         - flavor
@@ -4037,10 +4440,13 @@ components:
         - name
         - state
         - storage_size_gib
+        - size
+        - storage_size
         - version
         - target_version
         - vm_size
         - maintenance_window_start_at
+        - maintenance_window_days
         - read_replica
         - fallback_active
         - tags
@@ -4252,17 +4658,23 @@ components:
         cidr:
           description: CIDR of the firewall rule
           type: string
+          format: cidr
         description:
-          description: Port information for the firewall rule
+          description: Description of the firewall rule
           type: string
         id:
           description: ID of the firewall rule
           type: string
           example: frmjgkgbktw62k53005jpx8tt7
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         port:
-          description: Port for the Postgres firewall rule
+          description: Deprecated. A rule opens port 5432 and pgbouncer's port 6432, and is listed by its 5432 row, so this is 5432 unless only the 6432 row is left or the request names that row's id.
           type: integer
+          deprecated: true
+          readOnly: true
+          x-deprecated:
+            since: 2026-11-06
       additionalProperties: false
       required:
         - cidr
@@ -4275,6 +4687,7 @@ components:
           type: string
           example: 1d000000000000000000000000
           pattern: ^1d[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the log destination
           type: string
@@ -4292,6 +4705,40 @@ components:
         - id
         - name
         - type
+        - url
+    PostgresMetricDestination:
+      type: object
+      properties:
+        id:
+          description: ID of the metric destination
+          type: string
+          example: et7ekmf54nae5nya9s6vebg43f
+          pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
+        auth_methods:
+          description: Kinds of Prometheus remote write authentication the destination uses
+          type: array
+          items:
+            type: string
+            enum:
+              - basic_auth
+              - authorization
+              - headers
+          readOnly: true
+        username:
+          description: Username for basic authentication
+          type: string
+          nullable: true
+          readOnly: true
+        url:
+          description: Prometheus remote write URL
+          type: string
+          readOnly: true
+      additionalProperties: false
+      required:
+        - id
+        - auth_methods
+        - username
         - url
     PostgresPrivateLinkServiceCreate:
       description: Neutral settings at the top level; everything provider-shaped under the provider's key, matching the response. The subnet is the database's.
@@ -4505,34 +4952,54 @@ components:
       type: object
       properties:
         firewalls:
+          description: Firewalls attached to the subnet
           type: array
           items:
             $ref: '#/components/schemas/Firewall'
+          readOnly: true
         id:
           description: ID of the subnet
           type: string
           example: ps3dngttwvje2kmr2sn8x12x4r
           pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the subnet
           type: string
+          readOnly: true
         name:
           description: Name of the subnet
           type: string
         net4:
           description: IPv4 CIDR of the subnet
           type: string
+          readOnly: true
+          x-immutable: true
         net6:
           description: IPv6 CIDR of the subnet
           type: string
+          readOnly: true
+          x-immutable: true
         nics:
           description: List of NICs
           type: array
           items:
             $ref: '#/components/schemas/Nic'
+          readOnly: true
         state:
           description: State of the subnet
           type: string
+          enum:
+            - creating
+            - available
+            - refreshing_keys
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - refreshing_keys
+              - deleting
       additionalProperties: false
       required:
         - firewalls
@@ -4547,13 +5014,16 @@ components:
       type: object
       properties:
         id:
+          description: ID of the project
           type: string
           example: pjkkmx0f2vke4h36nk9cm8v8q0
           pattern: ^pj[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the project
           type: string
           example: my-project
+          readOnly: true
       additionalProperties: false
       required:
         - id
@@ -4573,26 +5043,34 @@ components:
           type: string
           example: vmhfy8gff8c67hasb0eez2k1pd
           pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         ip4:
-          description: IPv4 address
+          description: Public IPv4 address; null until the VM is placed on a host, or if it has none
           type: string
           format: ipv4
           nullable: true
+          readOnly: true
+          x-immutable: true
         ip4_enabled:
           description: Whether IPv4 is enabled
           type: boolean
         ip6:
-          description: IPv6 address
+          description: Public IPv6 address; null until the VM is placed on a host, or if it has none
           type: string
           format: ipv6
           nullable: true
+          readOnly: true
+          x-immutable: true
         location:
           description: Location of the VM
           type: string
           example: eu-central-h1
+          readOnly: true
         maintenance_window_start_at:
-          description: Maintenance window start time
+          description: Hour of the day, in UTC, at which the daily maintenance window starts; null if no window is set
           type: integer
+          maximum: 23
+          minimum: 0
           nullable: true
         name:
           description: Name of the VM
@@ -4604,9 +5082,40 @@ components:
         state:
           description: State of the VM
           type: string
-        storage_size_gib:
-          description: Storage size in GiB
+          enum:
+            - creating
+            - running
+            - rebooting
+            - starting
+            - deleting
+            - stopped by admin
+            - restarting
+            - stopping
+            - stopped
+            - unavailable
+            - waiting for capacity
+            - no capacity available
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - rebooting
+              - starting
+              - restarting
+              - stopping
+              - waiting for capacity
+              - deleting
+            failed:
+              - no capacity available
+        storage_size:
+          description: Size of each storage volume in GiB, as requested when the VM was created
           type: integer
+          nullable: true
+        storage_size_gib:
+          description: Total size of the storage volumes in GiB
+          type: integer
+          readOnly: true
+          x-immutable: true
         unix_user:
           description: Unix user of the VM
           type: string
@@ -4622,6 +5131,7 @@ components:
         - name
         - size
         - state
+        - storage_size
         - storage_size_gib
         - unix_user
       x-go-name: VmSchema
@@ -4655,22 +5165,28 @@ components:
         cp_node_count:
           description: Number of control plane nodes
           type: integer
-        cp_vms:
-          type: array
-          items:
-            $ref: '#/components/schemas/Vm'
+          enum:
+            - 1
+            - 3
         display_state:
-          description: State of the KubernetesCluster
+          description: Deprecated. The same as state.
           type: string
+          deprecated: true
+          x-deprecated:
+            since: 2026-11-02
+            use:
+              - state
         id:
           description: ID of the KubernetesCluster
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         location:
           description: Location of the KubernetesCluster
           type: string
           example: eu-central-h1
+          readOnly: true
         name:
           description: Name of the KubernetesCluster
           type: string
@@ -4678,14 +5194,28 @@ components:
         node_size:
           description: Size of each control plane node
           type: string
-        nodepools:
-          type: array
-          items:
-            $ref: '#/components/schemas/KubernetesNodepool'
+          example: standard-2
+          readOnly: true
+          x-immutable: true
         services_load_balancer_url:
-          description: Services
+          description: Hostname of the load balancer for the cluster's LoadBalancer services; null until the cluster has one
           type: string
           nullable: true
+          readOnly: true
+        state:
+          description: State of the KubernetesCluster
+          type: string
+          enum:
+            - creating
+            - running
+            - upgrading
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - upgrading
+              - deleting
         version:
           description: Version of the KubernetesCluster
           type: string
@@ -4696,6 +5226,8 @@ components:
         - location
         - name
         - node_size
+        - services_load_balancer_url
+        - state
         - version
       x-go-name: KubernetesClusterSchema
     KubernetesNodepool:
@@ -4706,11 +5238,13 @@ components:
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         id:
           description: ID of the KubernetesNodepool
           type: string
           example: knqxhqbg86sj0ng5e9ck5n191z
           pattern: ^kn[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the KubernetesNodepool
           type: string
@@ -4721,14 +5255,31 @@ components:
         node_size:
           description: Size of each worker node
           type: string
+        state:
+          description: State of the KubernetesNodepool
+          type: string
+          enum:
+            - creating
+            - running
+            - resizing
+            - upgrading
+            - deleting
+          readOnly: true
+          x-lifecycle:
+            pending:
+              - creating
+              - resizing
+              - upgrading
+              - deleting
         version:
           description: Version of the KubernetesNodepool
           type: string
         vms:
-          description: Worker VMs definition
+          description: Worker VMs of the nodepool
           type: array
           items:
             $ref: '#/components/schemas/Vm'
+          readOnly: true
       additionalProperties: false
       required:
         - kubernetes_cluster_id
@@ -4736,7 +5287,9 @@ components:
         - name
         - node_count
         - node_size
+        - state
         - version
+        - vms
       x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
       description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from location -> family -> size -> storage_size -> ha_type'
@@ -4824,12 +5377,15 @@ components:
             type: object
             properties:
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/AuditLog'
+                readOnly: true
               pagination_key:
                 description: Key to pass to get next page (only present if additional pages)
                 type: string
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -4837,6 +5393,13 @@ components:
       description: An empty response after successful resource delete
     Error:
       description: An error response
+      headers:
+        Retry-After:
+          description: Number of seconds to wait before sending the same request again. Sent only when the request was refused because a resource was busy.
+          schema:
+            type: integer
+            example: 5
+            minimum: 1
       content:
         application/json:
           schema:
@@ -4855,11 +5418,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateLocation'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4879,12 +5446,14 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Firewall'
-              - properties:
+              - type: object
+                properties:
                   private_subnets:
                     description: List of private subnets
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
+                    readOnly: true
                 additionalProperties: false
                 required:
                   - private_subnets
@@ -4896,11 +5465,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/Firewall'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4929,11 +5502,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubCacheEntry'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4952,11 +5529,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubRepository'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -4981,11 +5562,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubInstallation'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5004,9 +5589,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/SshPublicKey'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -5024,9 +5611,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/InferenceApiKey'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -5038,9 +5627,11 @@ components:
             type: object
             properties:
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/InferenceEndpoint'
+                readOnly: true
             additionalProperties: false
             required:
               - items
@@ -5053,17 +5644,28 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/LoadBalancer'
-              - properties:
-                  subnet:
-                    description: Subnet of the Load Balancer
+              - type: object
+                properties:
+                  private_subnet_id:
+                    description: ID of the Load Balancer's private subnet
                     type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
+                  subnet:
+                    description: Name of the Load Balancer's private subnet
+                    type: string
+                    readOnly: true
                   vms:
+                    description: IDs of the VMs attached to the Load Balancer
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
+                      type: string
+                      example: vmhfy8gff8c67hasb0eez2k1pd
+                      pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
+                    uniqueItems: true
                 additionalProperties: false
                 required:
-                  - location
+                  - private_subnet_id
                   - subnet
                   - vms
     LoadBalancers:
@@ -5074,11 +5676,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/LoadBalancer'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5113,64 +5719,119 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/PostgresDatabase'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   connection_string:
-                    description: Connection string to the Postgres database
+                    description: Connection string to the Postgres database. It contains the superuser password.
                     type: string
+                    format: password
                     nullable: true
+                    readOnly: true
                   private_connection_string:
-                    description: Private connection string to the Postgres database, accessible from connected subnets
+                    description: Private connection string to the Postgres database, accessible from connected subnets. It contains the superuser password.
                     type: string
+                    format: password
                     nullable: true
+                    readOnly: true
                   username:
                     description: Username for the Postgres database
                     type: string
                     nullable: true
+                    readOnly: true
                   password:
                     description: Password for the Postgres database
                     type: string
+                    format: password
                     nullable: true
                   hostname:
                     description: Hostname for the Postgres database
                     type: string
                     nullable: true
+                    readOnly: true
                   earliest_restore_time:
-                    description: Earliest restore time (if primary)
+                    description: Earliest restore time (if primary), or null if there is no backup yet
                     type: string
+                    format: date-time
                     nullable: true
+                    readOnly: true
                   firewall_rules:
                     description: List of Postgres firewall rules
                     type: array
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
-                  latest_restore_time:
-                    description: Latest restore time (if primary)"
+                    readOnly: true
+                  private_subnet_id:
+                    description: ID of the database's private subnet
                     type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
+                    readOnly: true
+                    x-immutable: true
+                  firewall_id:
+                    description: ID of the firewall that holds the database's firewall rules, or null if it was deleted, renamed, or detached from the private subnet
+                    type: string
+                    example: fwfg7td83em22qfw9pq5xyfqb7
+                    nullable: true
+                    pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
+                    readOnly: true
+                  latest_restore_time:
+                    description: Deprecated. Latest restore time (if primary), which is always the current time.
+                    type: string
+                    deprecated: true
+                    x-deprecated:
+                      since: 2026-11-02
                   primary:
                     description: Is the database primary
                     type: boolean
-                  maintenance_window_start_at:
-                    description: Maintenance window start time
-                    type: integer
-                    nullable: true
-                  tags:
-                    description: Tags of the Postgres database
+                    readOnly: true
+                  metric_destinations:
+                    description: List of metric destinations
                     type: array
                     items:
-                      $ref: '#/components/schemas/PostgresTag'
+                      $ref: '#/components/schemas/PostgresMetricDestination'
+                    readOnly: true
+                  log_destinations:
+                    description: List of log destinations
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresLogDestination'
+                    readOnly: true
+                  pg_config:
+                    description: PostgreSQL parameters set by the user
+                    type: object
+                    example:
+                      max_connections: '100'
+                    additionalProperties:
+                      type: string
+                  pgbouncer_config:
+                    description: PgBouncer parameters set by the user
+                    type: object
+                    example:
+                      max_client_conn: '100'
+                    additionalProperties:
+                      type: string
+                  read_replicas:
+                    description: List of read replicas of the Postgres database
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresDatabase'
+                    readOnly: true
                 required:
                   - connection_string
                   - private_connection_string
                   - username
                   - password
                   - hostname
-                  - earliest_restore_time
                   - firewall_rules
-                  - latest_restore_time
+                  - private_subnet_id
+                  - firewall_id
                   - primary
-                  - maintenance_window_start_at
-                  - tags
+                  - metric_destinations
+                  - log_destinations
+                  - pg_config
+                  - pgbouncer_config
+                  - read_replicas
     PostgresDatabases:
       description: A list of Postgres Databases
       content:
@@ -5179,11 +5840,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresDatabase'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5196,22 +5861,29 @@ components:
             type: object
             properties:
               current_version:
+                description: Major PostgreSQL version the database runs
                 type: string
                 enum:
                   - '16'
                   - '17'
                   - '18'
+                readOnly: true
               target_version:
+                description: Major PostgreSQL version that the servers converge to
                 type: string
                 enum:
                   - '16'
                   - '17'
                   - '18'
               upgrade_status:
+                description: running while the database moves to target_version, failed if the upgrade failed, and not_running when no upgrade is under way
                 type: string
+                readOnly: true
               upgrade_stage:
+                description: Current step of the servers' convergence, or null if they are not converging
                 type: string
                 nullable: true
+                readOnly: true
             additionalProperties: false
             required:
               - current_version
@@ -5229,6 +5901,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/PostgresLogDestination'
+    PostgresMetricDestination:
+      description: A Postgres Metric Destination
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresMetricDestination'
     PostgresDatabaseLogs:
       description: Log entries for a Postgres Database
       content:
@@ -5244,6 +5922,7 @@ components:
                 description: Pass as pagination_key to retrieve the next page of results
                 type: string
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                readOnly: true
             additionalProperties: false
             required:
               - logs
@@ -5261,11 +5940,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5278,11 +5961,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresServer'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5295,11 +5982,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects
                 type: integer
+                readOnly: true
               items:
+                description: All the objects
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresBackup'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5330,11 +6021,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateLinkService'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5353,11 +6048,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/PrivateSubnet'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5383,36 +6082,61 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Vm'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   firewalls:
-                    description: List of firewalls
+                    description: Firewalls that apply to the VM
                     type: array
                     items:
                       $ref: '#/components/schemas/Firewall'
+                    readOnly: true
                   private_ipv4:
                     description: Private IPv4 address
                     type: string
                     format: ipv4
+                    nullable: true
+                    readOnly: true
+                    x-immutable: true
                   private_ipv6:
                     description: Private IPv6 address
                     type: string
                     format: ipv6
+                    nullable: true
+                    readOnly: true
+                    x-immutable: true
+                  private_subnet_id:
+                    description: ID of the VM's private subnet
+                    type: string
+                    example: pskkmx0f2vke4h36nk9cm8v8q0
+                    nullable: true
+                    pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
                   subnet:
-                    description: Subnet of the VM
+                    description: Name of the VM's private subnet
                     type: string
-                  unix_user:
-                    description: Unix user of the VM
-                    type: string
+                    nullable: true
+                    readOnly: true
                   gpu:
-                    description: GPU configuration
+                    description: Number and model of the GPUs attached to the VM, such as "1x NVIDIA A100 80GB PCIe"; null if it has none
                     type: string
+                    nullable: true
+                    readOnly: true
+                  gpu_count:
+                    description: Number of GPUs attached to the VM; 0 until the VM is placed on a host
+                    type: integer
+                  gpu_device:
+                    description: PCI device ID of the GPUs attached to the VM; null if it has none
+                    type: string
+                    nullable: true
                 required:
                   - firewalls
+                  - gpu
+                  - gpu_count
+                  - gpu_device
                   - private_ipv4
                   - private_ipv6
+                  - private_subnet_id
                   - subnet
-                  - unix_user
     Vms:
       description: A list of VMs
       content:
@@ -5421,11 +6145,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/Vm'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5444,11 +6172,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/MachineImage'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5468,11 +6200,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/MachineImageVersion'
+                readOnly: true
             additionalProperties: false
             required:
               - count
@@ -5498,6 +6234,24 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/KubernetesCluster'
+              - type: object
+                additionalProperties: false
+                properties:
+                  cp_vms:
+                    description: Control plane VMs
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                    readOnly: true
+                  nodepools:
+                    description: Nodepools of the cluster, in order of name
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KubernetesNodepool'
+                    readOnly: true
+                required:
+                  - cp_vms
+                  - nodepools
     KubernetesClusters:
       description: A list of KubernetesClusters
       content:
@@ -5506,11 +6260,15 @@ components:
             type: object
             properties:
               count:
+                description: Number of objects on all pages
                 type: integer
+                readOnly: true
               items:
+                description: Objects on this page
                 type: array
                 items:
                   $ref: '#/components/schemas/KubernetesCluster'
+                readOnly: true
             additionalProperties: false
             required:
               - count

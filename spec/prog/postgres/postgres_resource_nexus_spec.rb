@@ -93,6 +93,17 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "records the requested size of a top-level resource, but not of a child resource" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      expect(parent.values.slice(:requested_vm_size, :requested_storage_size_gib)).to eq(requested_vm_size: "standard-2", requested_storage_size_gib: 128)
+
+      parent.update(target_storage_size_gib: 256)
+      parent.timeline.update(cached_earliest_backup_at: Time.now - 15 * 60)
+      child = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 256, parent_id: parent.id).subject
+      expect(child.values.slice(:requested_vm_size, :requested_storage_size_gib)).to eq(requested_vm_size: nil, requested_storage_size_gib: nil)
+      expect([child.requested_vm_size, child.requested_storage_size_gib]).to eq(["standard-2", 256])
+    end
+
     it "defaults target_image_family to ubuntu-2604 for a top-level resource" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fam-default", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       expect(pg.target_image_family).to eq("ubuntu-2604")
@@ -414,7 +425,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       # but the resource target drifted to ubuntu-2204. The unarchive must follow
       # the representative's serving family, not the drifted target.
       original.representative_server.update(image_family: "ubuntu-2604")
-      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem", target_image_family: "ubuntu-2204")
+      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem", target_image_family: "ubuntu-2204", target_storage_size_gib: 256)
       id = original.id
       original.representative_server.destroy
       original.destroy
@@ -429,6 +440,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(restored.maintenance_window_start_at).to eq(5)
       expect(restored.cert_auth_users).to eq(["alice"])
       expect(restored.trusted_ca_certs).to eq("ca-pem")
+      expect(restored.values.slice(:target_storage_size_gib, :requested_storage_size_gib)).to eq(target_storage_size_gib: 256, requested_storage_size_gib: 128)
       expect(restored.hostname_version).to eq("v1")
       expect(restored.target_image_family).to eq("ubuntu-2604")
       expect(restored.representative_server.timeline_id).to eq(timeline.id)

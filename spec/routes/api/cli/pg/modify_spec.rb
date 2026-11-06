@@ -24,6 +24,11 @@ RSpec.describe Clover, "cli pg modify" do
     expect(body).to eq "Modified PostgreSQL database with id: #{@pg.ubid}\n"
   end
 
+  it "sends a legacy burstable size as the hobby size" do
+    cli(%w[pg eu-central-h1/test-pg modify -s burstable-2])
+    expect(@pg.reload.target_vm_size).to eq "hobby-2"
+  end
+
   it "modifies PostgreSQL database tags" do
     body = cli(%w[pg eu-central-h1/test-pg modify -t foo=bar,baz=quux])
     expect(PostgresResource.count).to eq 1

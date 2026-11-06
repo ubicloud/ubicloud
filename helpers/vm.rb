@@ -66,11 +66,21 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "gpu_device", "init_script"])
       tp.pos_int("storage_size")
-      tp.bool("enable_ip4")
+      tp.int("gpu_count")
+      tp.bool("ip4_enabled")
     end
+    assemble_params[:enable_ip4] = assemble_params.delete(:ip4_enabled)
     assemble_params.compact!
+
+    # gpu_count and gpu_device replace the deprecated gpu, but the checks
+    # below still expect gpu's "count:device" form.
+    if (gpu_count = assemble_params.delete(:gpu_count))
+      assemble_params[:gpu] = "#{gpu_count}:#{assemble_params.delete(:gpu_device)}"
+    elsif assemble_params.key?(:gpu_device)
+      fail Validation::ValidationFailed.new({gpu_count: "gpu_count is required with gpu_device"})
+    end
 
     # Web-only: translate the MI sentinel into "<name>@latest". API/CLI
     # callers pass boot_image="name@version" directly; if they pass the
@@ -239,7 +249,7 @@ class Clover
       private_subnet[:location_id] == location.id
     end
 
-    options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
+    options.add_option(name: "ip4_enabled", values: ["1"], parent: "location")
 
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
       next false if location_family_check&.call(location, family)

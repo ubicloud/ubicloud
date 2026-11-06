@@ -1,0 +1,6 @@
+inherit_from: ../../.rubocop.yml
+
+RSpec/DescribeClass:
+  Enabled: false
+RSpec/SpecFilePathSuffix:
+  Enabled: false

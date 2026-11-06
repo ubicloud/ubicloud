@@ -84,6 +84,27 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be false
       end
 
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}", {
+          public_key: "ssh key",
+        }.to_json
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
+      it "names every column of a colliding index whose columns all refer to other rows" do
+        errors = Sequel::Model::Errors.new
+        errors.add([:project_id, :location_id], "is already taken")
+        expect(Prog::Vm::Nexus).to receive(:assemble).and_raise(Sequel::ValidationFailed.new(errors))
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+        }.to_json
+
+        message = "project_id and location_id is already taken"
+        expect(last_response).to have_api_error(400, message, {"project_id" => message, "location_id" => message})
+      end
+
       it "rejects the web-only machine_image field" do
         expect {
           post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
@@ -140,7 +161,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: ps_id,
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -198,7 +219,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -210,7 +231,7 @@ RSpec.describe Clover, "vm" do
           unix_user: "ubi",
           size: "standard-2",
           boot_image: "invalid-boot-image",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: boot_image", {"boot_image" => "\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"gpu-ubuntu-resolute\", \"gpu-ubuntu-noble\", \"ubuntu-resolute\", \"ubuntu-noble\", \"ubuntu-jammy\", \"debian-13\", \"debian-12\", \"almalinux-10\", \"almalinux-9\"], or you can use machine-image-name@version, machine-image-name@latest"})
@@ -221,7 +242,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-gpu-6",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\", \"burstable-1\", \"burstable-2\"]"})
@@ -232,7 +253,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           boot_image: "ubuntu-jammy",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -245,7 +266,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: "invalid-ubid",
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-central-h1\""})
@@ -259,7 +280,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
           boot_image: "ubuntu-jammy",
           private_subnet_id: ps_id,
-          enable_ip4: true,
+          ip4_enabled: true,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-central-h1\""})
@@ -270,7 +291,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "invalid-gpu-format",
         }.to_json
 
@@ -282,7 +303,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "3:20b5",
         }.to_json
 
@@ -294,7 +315,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:20b5",
         }.to_json
 
@@ -307,7 +328,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:unsupported",
         }.to_json
 
@@ -320,7 +341,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           unix_user: "ubi",
           size: "burstable-2",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:20b5",
         }.to_json
 
@@ -332,7 +353,7 @@ RSpec.describe Clover, "vm" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
-          enable_ip4: true,
+          ip4_enabled: true,
           gpu: "1:",
         }.to_json
 
@@ -360,6 +381,26 @@ RSpec.describe Clover, "vm" do
         expect(frame.slice("gpu_count", "gpu_device", "distinct_storage_devices")).to eq("gpu_count" => 4, "gpu_device" => "3182", "distinct_storage_devices" => true)
         expect(frame["storage_volumes"].map { it["size_gib"] }).to eq([1600] * 4)
         expect(frame["storage_volumes"].map { it["boot"] }).to eq([true, false, false, false])
+      end
+
+      it "succeeds with gpu_count and gpu_device, answering with each volume's storage size and the total" do
+        create_b300_vm(gpu_count: 4, gpu_device: "3182", storage_size: 3200)
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("storage_size", "storage_size_gib")).to eq("storage_size" => 3200, "storage_size_gib" => 12800)
+        expect(Vm.first(name: "test-vm").strand.stack.first.slice("gpu_count", "gpu_device")).to eq("gpu_count" => 4, "gpu_device" => "3182")
+      end
+
+      it "prefers gpu_count and gpu_device to the deprecated gpu" do
+        create_b300_vm(gpu: "1:3182", gpu_count: 4, gpu_device: "3182")
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "fails with gpu_device and no gpu_count" do
+        create_b300_vm(gpu_device: "3182")
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu_count", {"gpu_count" => "gpu_count is required with gpu_device"})
       end
 
       it "succeeds with the gpus of the size and the larger storage size" do
@@ -414,7 +455,7 @@ RSpec.describe Clover, "vm" do
         public_key: "ssh key",
         unix_user: "ubi",
         size: "standard-2",
-        enable_ip4: true,
+        ip4_enabled: true,
         gpu: "0:",
       }.to_json
 
@@ -426,7 +467,54 @@ RSpec.describe Clover, "vm" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(vm.name)
+        expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{vm.display_location}/firewall/default-#{vm.display_location}-default"])
+        expect(body["private_subnet_id"]).to eq(vm.user_nic.private_subnet.ubid)
+        expect(body["subnet"]).to eq(vm.user_nic.private_subnet.name)
+        expect(body["private_ipv4"]).to eq(vm.private_ipv4.to_s)
+        expect(body["private_ipv6"]).to eq(vm.private_ipv6.to_s)
+        expect(body).to include("gpu" => nil, "gpu_count" => 0, "gpu_device" => nil, "storage_size" => 40, "storage_size_gib" => 40)
+      end
+
+      it "success with a gpu" do
+        vm_host = create_vm_host
+        PciDevice.create(vm_host_id: vm_host.id, vm_id: vm.id, slot: "01:00.0", device_class: "0302", vendor: "10de", device: "20b5", iommu_group: 0)
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("gpu", "gpu_count", "gpu_device")).to eq("gpu" => "1x NVIDIA A100 80GB PCIe", "gpu_count" => 1, "gpu_device" => "20b5")
+      end
+
+      it "success without a private subnet" do
+        vm = create_vm(project_id: project.id, location_id: Location[display_name: TEST_LOCATION].id)
+
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.slice("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu", "storage_size")).to eq("firewalls" => [], "private_ipv4" => nil, "private_ipv6" => nil, "private_subnet_id" => nil, "subnet" => nil, "gpu" => nil, "storage_size" => nil)
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::Vm).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
+      end
+
+      it "checks the firewalls in the response against the schema" do
+        expect(Serializers::Vm).to receive(:serialize_internal).and_wrap_original do |m, *args|
+          body = m.call(*args)
+          body[:firewalls] = body[:firewalls].map { it.merge(undocumented: true) }
+          body
+        end
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
       end
 
       it "success ubid" do
@@ -440,6 +528,18 @@ RSpec.describe Clover, "vm" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/not-exists-vm"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+    end
+
+    describe "rename" do
+      it "answers with the detailed VM" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body.keys).to include("firewalls", "private_ipv4", "private_ipv6", "private_subnet_id", "subnet", "gpu")
+        expect(vm.reload.name).to eq("new-name")
       end
     end
 
@@ -461,11 +561,11 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to be_nil
         expect(vm.reload.maintenance_window_start_at).to be_nil
 
-        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
-          maintenance_window_start_at: 25,
-        }.to_json
-
-        expect(last_response.status).to eq(400)
+        expect do
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+            maintenance_window_start_at: 24,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at 24 is more than maximum value/)
         expect(vm.reload.maintenance_window_start_at).to be_nil
 
         expect do

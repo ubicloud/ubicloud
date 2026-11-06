@@ -283,11 +283,11 @@ class UbiCli
     params_to_hash(params, :tags, "tag", cmd)
   end
 
-  def metric_destinations_response(data)
+  def metric_destinations_response(pg)
     body = []
     body << "Metric destination added to PostgreSQL database.\n"
     body << "Current metric destinations:\n"
-    data[:metric_destinations].each_with_index do |md, i|
+    pg.info[:metric_destinations].each_with_index do |md, i|
       body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:auth_methods].join(",")
       body << "  " << md[:username] if md[:username]
       body << "  " << md[:url] << "\n"
@@ -492,7 +492,11 @@ class UbiCli
   end
 
   def sdk
-    @sdk ||= Ubicloud.new(:rack, app: Clover, env: @env, project_id: project_ubid)
+    @sdk ||= begin
+      # Ask for the latest API version, so that the specs fail if the CLI sends a removed name.
+      env = @env.merge("HTTP_ACCEPT" => "#{Clover::API_MEDIA_TYPE}; version=#{Clover::API_VERSIONS.last}")
+      Ubicloud.new(:rack, app: Clover, env:, project_id: project_ubid)
+    end
   end
 
   def sdk_object

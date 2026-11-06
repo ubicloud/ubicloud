@@ -447,6 +447,37 @@ integration.
 
 Assuredly, there is all this and more in other editor environments.
 
+### Working on the Terraform Provider
+
+The terraform provider in `terraform/provider/` is partly generated
+from `openapi/openapi.yml`, by a separate program in `terraform/` that
+[doc/terraform-generator-design.md](doc/terraform-generator-design.md)
+describes. `mise install` provides the Go and terraform that this work
+needs, and one command runs the whole loop:
+
+```sh
+$ bundle exec rake terraform
+```
+
+It runs the generator's specs, writes the provider's generated files,
+checks and tests the provider's Go, runs the examples in
+`spec/terraform/`, and fails unless the Go tests and the examples
+together cover every statement of the provider's hand-written engine.
+`rake -T terraform` lists the steps that can be run alone. The tests
+above run none of this. CI runs it in the terraform workflow, with
+`CHECK=1` so that a generated file that has been edited fails it.
+
+A misbehaviour of the provider is written as an rspec example in
+`spec/terraform/`, where terraform and the provider run against the API
+in process.
+[doc/terraform-harness-design.md](doc/terraform-harness-design.md) says
+how to write one. A file of examples runs like any spec file; the
+harness generates and builds the provider as it loads:
+
+```sh
+$ bundle exec rspec spec/terraform/ssh_public_key_harness.rb
+```
+
 ### Running Web Console
 
 Web Console is designed with Tailwind CSS. Tailwind CSS works by scanning

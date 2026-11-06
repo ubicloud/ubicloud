@@ -7,7 +7,7 @@ class UbiCli
     options("ubi pg location/pg-name create [options]", key: :pg_create) do
       on("-f", "--flavor=type", "flavor (deprecated and ignored)")
       on("-h", "--ha-type=type", Option::POSTGRES_HA_OPTIONS.keys, "replication type")
-      on("-s", "--size=size", Option::POSTGRES_LEGACY_SIZE_OPTIONS.keys, "server size")
+      on("-s", "--size=size", Option::POSTGRES_LEGACY_SIZE_OPTIONS, "server size")
       on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS.map(&:to_s), "storage size GB")
       on("-v", "--version=version", Option::POSTGRES_VERSION_OPTIONS, "PostgreSQL version")
       on("-c", "--pg-config=config", "postgres config (e.g. key1=value1,key2=value2)")
@@ -22,7 +22,8 @@ class UbiCli
     help_option_values("Version:", Option::POSTGRES_VERSION_OPTIONS)
 
     run do |opts, cmd|
-      params = underscore_keys(opts[:pg_create])
+      params = underscore_keys(opts[:pg_create]).transform_keys!(version: :target_version)
+      params.delete(:flavor)
       pg_tags_to_hash(params, cmd)
       params_to_hash(params, :pg_config, "config", cmd)
       params_to_hash(params, :pgbouncer_config, "pgbouncer config", cmd)

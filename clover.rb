@@ -252,7 +252,27 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
+    when Sequel::ValidationFailed
+      code = 400
+      type = "InvalidRequest"
+      message = e.to_s
+
+      # Sequel keys the error for a unique index by its column, or by an
+      # array of its columns. Repeat it in details under each column, so
+      # that a client can attach it to a field, but leave out a column that
+      # refers to another row, such as project_id, since it identifies the
+      # scope that the path supplies. If that leaves none, keep them all.
+      taken = {}
+      e.errors&.each do |columns, messages|
+        next unless messages.include?("is already taken")
+        columns = Array(columns)
+        taken_message = "#{columns.join(" and ")} is already taken"
+        chosen = columns.reject { it.end_with?("_id") }
+        chosen = columns if chosen.empty?
+        chosen.each { taken[it.to_s] = taken_message }
+      end
+      details = taken unless taken.empty?
+    when Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -265,6 +285,7 @@ class Clover < Roda
       type = e.type
       message = e.message
       details = e.details
+      response.headers["retry-after"] = e.retry_after.to_s if e.retry_after
     when Committee::BadRequest, Committee::InvalidRequest
       code = 400
       type = "BadRequest"
@@ -1207,6 +1228,7 @@ class Clover < Roda
         if (operation = @schema_validator.operation_object)
           env["clover.api_operation"] = operation.original_path
         end
+        api_version
         @schema_validator.request_validate(r)
 
         unless @schema_validator.link_exist?
@@ -1219,6 +1241,8 @@ class Clover < Roda
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
       end
+
+      check_deprecations(operation)
     end
 
     before_authenticated_hash_branches
@@ -1230,6 +1254,10 @@ class Clover < Roda
     status, headers, body = res
     next unless api? && status && headers && body
 
+    # @schema_validator is set only if the route block's API branch ran, and
+    # only the responses of that branch depend on the requested API version.
+    headers["vary"] = [headers["vary"], "accept"].compact.join(", ") if @schema_validator
+    add_deprecation_headers(headers) if @deprecations_used
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e

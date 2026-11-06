@@ -34,6 +34,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool"],
+        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/rename"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
@@ -102,6 +103,36 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(parsed_body["count"]).to eq(1)
         expect(parsed_body["items"][0]["name"]).to eq("cluster")
         expect(parsed_body["items"][0]["version"]).to eq(Option.selectable_kubernetes_versions.first)
+        expect(parsed_body["items"][0]["state"]).to eq("creating")
+        expect(parsed_body["items"][0].keys).not_to include("cp_vms", "nodepools")
+      end
+
+      it "lists several clusters, each with its services load balancer" do
+        kc2 = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster2", version: kc.version, project_id: project.id, location_id: kc.location_id).subject
+        kc3 = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster3", version: kc.version, project_id: project.id, location_id: kc.location_id).subject
+        # Use version 1 hostnames, which include part of the subnet's ubid,
+        # so that serializing them reads each load balancer's subnet.
+        hostnames = [kc2, kc3].map do |c|
+          lb = Prog::Vnet::LoadBalancerNexus.assemble(c.private_subnet_id, name: c.services_load_balancer_name, src_port: 80, dst_port: 8080, hostname_version: 1).subject
+          c.update(services_lb_id: lb.id, kubeconfig: "stored")
+          lb.hostname
+        end
+
+        if Config.unfrozen_test?
+          # The duplicate query check can't catch these lookups, since Sequel
+          # writes the key being looked up into the SQL.
+          expect(LoadBalancer).not_to receive(:primary_key_lookup)
+          expect(PrivateSubnet).not_to receive(:primary_key_lookup)
+        end
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["items"].map { it.slice("name", "state", "services_load_balancer_url") }).to contain_exactly(
+          {"name" => "cluster", "state" => "creating", "services_load_balancer_url" => nil},
+          {"name" => "cluster2", "state" => "running", "services_load_balancer_url" => hostnames[0]},
+          {"name" => "cluster3", "state" => "running", "services_load_balancer_url" => hostnames[1]},
+        )
       end
     end
 
@@ -112,13 +143,109 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version:,
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-cluster")
         expect(JSON.parse(last_response.body)["version"]).to eq(version)
-        expect(KubernetesCluster[name: "test-cluster"]).not_to be_nil
+        expect(last_response["warning"]).to eq('299 - "worker_size is deprecated: use createKubernetesNodepool instead", ' \
+          '299 - "worker_nodes is deprecated: use createKubernetesNodepool instead"')
+        expect(KubernetesCluster[name: "test-cluster"].nodepools.map { [it.name, it.node_count, it.target_node_size] }).to eq([["test-cluster-np", 2, "standard-2"]])
+      end
+
+      def create_cluster(name: "test-cluster", **body)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/#{name}", {version: Option.selectable_kubernetes_versions.last, **body}.to_json
+      end
+
+      it "creates a cluster without a nodepool when no worker input is given" do
+        create_cluster
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["deprecation"]).to be_nil
+        expect(JSON.parse(last_response.body).slice("cp_node_count", "nodepools")).to eq("cp_node_count" => 1, "nodepools" => [])
+        expect(KubernetesCluster[name: "test-cluster"].nodepools).to be_empty
+      end
+
+      it "still makes a default nodepool from worker_size alone in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        create_cluster(worker_size: "standard-4")
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "worker_size is deprecated: use createKubernetesNodepool instead"')
+        expect(KubernetesCluster[name: "test-cluster"].nodepools.map { [it.node_count, it.target_node_size] }).to eq([[1, "standard-4"]])
+      end
+
+      it "refuses worker_nodes without worker_size" do
+        create_cluster(worker_nodes: 2)
+
+        expect(last_response).to have_api_error(400, "missing parameter for worker_size")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "checks vCPU quota against the control plane alone when no worker input is given" do
+        project.add_quota(quota_id: ProjectQuota.default_quotas["KubernetesVCpu"]["id"], value: 4)
+        create_cluster(cp_node_count: 3)
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: cp_node_count")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "creates the cluster with cp_node_count, in both API versions" do
+        ["application/json", "application/vnd.ubicloud+json; version=2"].each_with_index do |accept, i|
+          header "Accept", accept
+          create_cluster(name: "test-cluster-#{i}", cp_node_count: 3)
+
+          expect(last_response.status).to eq(200)
+          expect(last_response["deprecation"]).to be_nil
+          expect(JSON.parse(last_response.body)["cp_node_count"]).to eq(3)
+        end
+      end
+
+      it "takes the deprecated cp_nodes as cp_node_count in API version 1, with a warning" do
+        create_cluster(cp_nodes: 3)
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "cp_nodes is deprecated: use cp_node_count instead"')
+        expect(JSON.parse(last_response.body)["cp_node_count"]).to eq(3)
+      end
+
+      it "refuses cp_nodes together with cp_node_count" do
+        create_cluster(cp_nodes: 3, cp_node_count: 1)
+
+        expect(last_response).to have_api_error(400, "cp_nodes and cp_node_count name one value; send only cp_node_count", {"cp_nodes" => "send only cp_node_count"})
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses cp_nodes in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        create_cluster(cp_nodes: 3)
+
+        expect(last_response).to have_api_error(400, "cp_nodes was removed in API version 2: use cp_node_count instead")
+      end
+
+      it "refuses a control plane node count other than 1 or 3" do
+        expect { create_cluster(cp_node_count: 2) }.to raise_error(Committee::InvalidRequest, /2 isn't part of the enum/)
+        expect { create_cluster(cp_node_count: 0) }.to raise_error(Committee::InvalidRequest, /0 isn't part of the enum/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses a worker node count below 1" do
+        expect { create_cluster(worker_size: "standard-2", worker_nodes: 0) }.to raise_error(Committee::InvalidRequest, /worker_nodes 0 is less than minimum value/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "refuses a version that is not of the form vMAJOR.MINOR" do
+        expect { create_cluster(version: "1.36") }.to raise_error(Committee::InvalidRequest, /does not match value: "1\.36"/)
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
+
+      it "accepts a name of 37 characters, and refuses a longer one" do
+        create_cluster(name: "a" * 37, worker_size: "standard-2")
+        expect(last_response.status).to eq(200)
+        expect(KubernetesCluster[name: "a" * 37].nodepools.map(&:name)).to eq(["#{"a" * 37}-np"])
+
+        expect { create_cluster(name: "a" * 38) }.to raise_error(Committee::InvalidRequest, /pattern .* does not match value: "a{38}"/)
       end
 
       it "returns 400 for invalid kubernetes version" do
@@ -126,7 +253,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version: "v1.30",
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response.status).to eq(400)
@@ -142,7 +269,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version:,
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1,
+          cp_node_count: 1,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: version")
@@ -155,7 +282,48 @@ RSpec.describe Clover, "kubernetes-cluster" do
         get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(kc.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(kc.name)
+        expect(body.slice("state", "display_state", "services_load_balancer_url")).to eq("state" => "creating", "display_state" => "creating", "services_load_balancer_url" => nil)
+        expect(body["nodepools"].map { it.slice("name", "state", "vms") }).to eq([{"name" => "np", "state" => "creating", "vms" => []}])
+      end
+
+      it "shows a cluster with a kubeconfig as running while the nexus does routine work" do
+        kc.update(kubeconfig: "stored")
+        kc.strand.update(label: "sync_kubernetes_services")
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("state", "display_state")).to eq("state" => "running", "display_state" => "running")
+      end
+
+      it "shows the hostname of the services load balancer" do
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet_id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8080).subject
+        kc.update(services_lb_id: lb.id)
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["services_load_balancer_url"]).to eq(lb.hostname)
+      end
+
+      it "shows the state of each nodepool" do
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id)
+        kc.nodepools_dataset.first(name: "np").strand.update(label: "wait")
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["nodepools"].map { it.slice("name", "state") }).to eq([{"name" => "np", "state" => "running"}, {"name" => "np2", "state" => "creating"}])
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::KubernetesCluster).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
       end
 
       it "success ubid" do
@@ -169,6 +337,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
         get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/not-exists-cluster"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+    end
+
+    describe "rename" do
+      it "answers with the detailed cluster" do
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body["cp_vms"]).to eq([])
+        expect(body["nodepools"].map { it["name"] }).to eq(["np"])
+        expect(kc.reload.name).to eq("new-name")
       end
     end
 
@@ -223,13 +404,70 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(body["node_count"]).to eq(2)
           expect(body["node_size"]).to eq("standard-2")
           expect(body["version"]).to eq(kc.version)
+          expect(body.slice("state", "vms")).to eq("state" => "creating", "vms" => [])
           expect(kc.nodepools_dataset.first(name: "np2").start_bootstrapping_set?).to be true
+        end
+
+        it "accepts the cluster's version, and refuses another" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: Option.kubernetes_versions[1]}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Nodepool can only be created at the cluster's version, #{kc.version}"})
+          expect(kc.nodepools_dataset.count).to eq(1)
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: kc.version}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)["version"]).to eq(kc.version)
+          expect(kc.nodepools_dataset.count).to eq(2)
+        end
+
+        it "refuses a node count below 1" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 0}.to_json
+          }.to raise_error(Committee::InvalidRequest, /node_count 0 is less than minimum value/)
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "refuses a version that is not of the form vMAJOR.MINOR" do
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1, version: ""}.to_json
+          }.to raise_error(Committee::InvalidRequest, /does not match value: ""/)
+          expect(kc.nodepools_dataset.count).to eq(1)
         end
 
         it "returns an error while the cluster is not in wait" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns a retryable error while another nodepool is still being set up" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "bootstrap_worker_nodes")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns a final error while the cluster is being deleted" do
+          kc.strand.update(label: "wait")
+          kc.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kc.nodepools_dataset.count).to eq(1)
         end
 
@@ -267,6 +505,30 @@ RSpec.describe Clover, "kubernetes-cluster" do
         end
       end
 
+      describe "show" do
+        it "shows a nodepool by name or ubid" do
+          kn.strand.update(label: "wait")
+
+          [kn.name, kn.ubid].each do |identifier|
+            get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}"
+
+            expect(last_response.status).to eq(200)
+            expect(JSON.parse(last_response.body).slice("id", "kubernetes_cluster_id", "name", "state", "vms")).to eq("id" => kn.ubid, "kubernetes_cluster_id" => kc.ubid, "name" => "np", "state" => "running", "vms" => [])
+          end
+        end
+
+        it "answers 404 for a nodepool the cluster does not have" do
+          other = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other", version: kc.version, project_id: project.id, location_id: Location::HETZNER_FSN1_ID).subject
+          other_kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "other-np", node_count: 1, kubernetes_cluster_id: other.id).subject
+
+          ["not-exists-nodepool", other_kn.name, other_kn.ubid].each do |identifier|
+            get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}"
+
+            expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+          end
+        end
+      end
+
       describe "delete" do
         it "deletes a nodepool by name or ubid" do
           kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
@@ -279,23 +541,11 @@ RSpec.describe Clover, "kubernetes-cluster" do
           end
         end
 
-        it "does not allow deleting the last nodepool of a cluster" do
+        it "deletes the last nodepool of a cluster" do
           delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
 
-          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
-          expect(kn.destroy_set?).to be false
-        end
-
-        it "does not allow deleting the last nodepool that is not already being destroyed" do
-          kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
-
-          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn2.name}"
           expect(last_response.status).to eq(204)
-
-          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
-
-          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
-          expect(kn.destroy_set?).to be false
+          expect(kn.destroy_set?).to be true
         end
       end
 
@@ -304,7 +554,9 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np-renamed"}.to_json
 
           expect(last_response.status).to eq(200)
-          expect(JSON.parse(last_response.body)["name"]).to eq("np-renamed")
+          body = JSON.parse(last_response.body)
+          expect(body["name"]).to eq("np-renamed")
+          expect(body["vms"]).to eq([])
           expect(kn.reload.name).to eq("np-renamed")
         end
 
@@ -313,7 +565,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np2"}.to_json
 
-          expect(last_response).to have_api_error(400, "kubernetes_cluster_id and name is already taken")
+          message = "kubernetes_cluster_id and name is already taken"
+          expect(last_response).to have_api_error(400, message, {"name" => message})
           expect(kn.reload.name).to eq("np")
         end
 
@@ -337,17 +590,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
             expect(last_response.status).to eq(200)
             body = JSON.parse(last_response.body)
             expect(body["node_count"]).to eq(new_count)
+            expect(body["state"]).to eq("resizing")
             expect(kn.reload.node_count).to eq(new_count)
             expect(kn.scale_worker_count_set?).to be true
           end
         end
 
-        it "returns validation error for bad input" do
+        it "refuses a node count below 1" do
           kc.strand.update(label: "wait")
           kn.strand.update(label: "wait")
-          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
-
-          expect(last_response.status).to eq(400)
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
+          }.to raise_error(Committee::InvalidRequest, /node_count 0 is less than minimum value/)
+          expect(kn.reload.node_count).to eq(2)
         end
 
         it "returns an error while the cluster is not in wait" do
@@ -356,6 +611,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to resize a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -367,6 +623,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Cluster is not ready to resize a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -376,6 +633,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -387,6 +645,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
 
           expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers["retry-after"]).to eq("10")
+          expect(kn.reload.node_count).to eq(2)
+        end
+
+        it "returns a final error while the nodepool is being deleted" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          kn.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.reload.node_count).to eq(2)
         end
 
@@ -419,11 +690,45 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
           expect(last_response.status).to eq(200)
-          expect(JSON.parse(last_response.body)["version"]).to eq(kc.version)
+          expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => kc.version, "state" => "upgrading")
           expect(kn.reload.version).to eq(kc.version)
           expect(kn.upgrade_requested_set?).to be true
           expect(kn.upgrade_set?).to be false
           expect(kc.upgrade_nodepools_set?).to be true
+        end
+
+        it "upgrades to version when it is the cluster's version, and does nothing when resent" do
+          kn.update(version: Option.kubernetes_versions[1])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          2.times do
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: kc.version}.to_json
+
+            expect(last_response.status).to eq(200)
+            expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => kc.version, "state" => "upgrading")
+          end
+          expect(kn.reload.version).to eq(kc.version)
+          expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+        end
+
+        it "refuses a version that is not the cluster's" do
+          kn.update(version: Option.kubernetes_versions[2])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: Option.kubernetes_versions[1]}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Nodepool can only be upgraded to the cluster's version, #{kc.version}"})
+          expect(kn.reload.version).to eq(Option.kubernetes_versions[2])
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
+        it "refuses a version that is not of the form vMAJOR.MINOR" do
+          expect {
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade", {version: kc.version.delete_prefix("v")}.to_json
+          }.to raise_error(Committee::InvalidRequest, /does not match value/)
+          expect(kn.upgrade_requested_set?).to be false
         end
 
         it "returns an error when the nodepool is at the cluster version" do
@@ -432,7 +737,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
-          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(last_response).to have_api_error(422, "Nodepool is already at the cluster's version, #{kc.version}")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.reload.version).to eq(kc.version)
           expect(kn.upgrade_requested_set?).to be false
         end
@@ -444,8 +750,22 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
 
-          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(last_response).to have_api_error(422, "Cluster is not ready to upgrade a nodepool")
+          expect(last_response.headers["retry-after"]).to eq("10")
           expect(kn.reload.version).to eq(Option.kubernetes_versions[1])
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
+        it "returns a final error when the cluster is being deleted" do
+          kn.update(version: Option.kubernetes_versions[1])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          kc.incr_destroy
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to upgrade a nodepool")
+          expect(last_response.headers).not_to have_key("retry-after")
           expect(kn.upgrade_requested_set?).to be false
         end
       end
@@ -509,12 +829,54 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["state"]).to eq("upgrading")
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(kc.upgrade_set?).to be true
         expect(kc.upgrade_nodepools_set?).to be false
         expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions[1])
         expect(kn.upgrade_requested_set?).to be false
         expect(kn.upgrade_set?).to be false
+      end
+
+      it "upgrades to version when it is the next version, and does nothing when resent" do
+        kc.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        2.times do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: Option.kubernetes_versions[0]}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("version", "state")).to eq("version" => Option.kubernetes_versions[0], "state" => "upgrading")
+        end
+        expect(kc.reload.version).to eq(Option.kubernetes_versions[0])
+        expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+      end
+
+      it "refuses a version that is not the next one" do
+        kc.update(version: Option.kubernetes_versions[2])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: Option.kubernetes_versions[0]}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Cluster can only be upgraded to the next version, #{Option.kubernetes_versions[1]}"})
+        expect(kc.reload.version).to eq(Option.kubernetes_versions[2])
+        expect(kc.upgrade_set?).to be false
+      end
+
+      it "refuses a version when the cluster is at the latest version" do
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: "v1.99"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: version", {"version" => "Cluster is at the latest version, #{kc.version}"})
+        expect(kc.reload.upgrade_set?).to be false
+      end
+
+      it "refuses a version that is not of the form vMAJOR.MINOR" do
+        expect {
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade", {version: "v1.99.1"}.to_json
+        }.to raise_error(Committee::InvalidRequest, /does not match value: "v1\.99\.1"/)
+        expect(kc.reload.upgrade_set?).to be false
       end
 
       it "returns an error when no upgrade is available" do
@@ -524,7 +886,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
-        expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
+        expect(last_response).to have_api_error(422, "Cluster is at the latest version, #{original_version}")
+        expect(last_response.headers).not_to have_key("retry-after")
         expect(kc.reload.version).to eq(original_version)
       end
 
@@ -538,6 +901,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response).to have_api_error(422, "All nodepools must be upgraded to within two minor versions of the cluster first")
+        expect(last_response.headers).not_to have_key("retry-after")
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions[1])
         expect(kc.upgrade_set?).to be false
       end
@@ -551,6 +915,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
+        expect(last_response.headers["retry-after"]).to eq("10")
         expect(kc.reload.version).to eq(original_version)
         expect(kc.upgrade_set?).to be false
       end

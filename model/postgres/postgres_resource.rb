@@ -68,12 +68,27 @@ class PostgresResource < Sequel::Model
     representative_server.storage_size_gib
   end
 
+  # If no size was requested, as for a read replica or restore (which takes
+  # its parent's size) or a row created before requests were recorded,
+  # report the target instead.
+  def requested_vm_size
+    super || target_vm_size
+  end
+
+  def requested_storage_size_gib
+    super || target_storage_size_gib
+  end
+
   def version
     representative_server.version
   end
 
   RUNNING_STRAND_LABELS = %w[wait refresh_certificates wait_refresh_public_cert refresh_dns_record].freeze
   UNAVAILABLE_STRAND_LABELS = %w[unavailable lockout wait_lockout_attempt wait_locked_out].freeze
+
+  # The values that display_state can return. The enum of
+  # PostgresDatabase.state in openapi.yml must list the same ones.
+  DISPLAY_STATES = %w[creating running restarting restoring_backup replaying_wal finalizing_restore unavailable deleting].freeze
 
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
@@ -396,10 +411,14 @@ class PostgresResource < Sequel::Model
     servers.any? { it.vm.management_nic.nil? }
   end
 
+  # The create inserts a row for each port in PG_FIREWALL_RULE_PORT_RANGES,
+  # and the API shows each such pair as one rule, by its 5432 row. Rows are
+  # paired by CIDR and protocol, as the PATCH and DELETE find a row's twin,
+  # so a 6432 row whose twin was deleted alone is still shown.
   def pg_firewall_rules(firewall: customer_firewall)
     return [] unless firewall
 
-    pg_firewall_rules_dataset(firewall:).all
+    pg_firewall_rules_dataset(firewall:).distinct(:cidr, :protocol).order(:cidr, :protocol, :port_range).all
   end
 
   def pg_firewall_rule(id, firewall: customer_firewall)
@@ -952,6 +971,8 @@ end
 #  required_availability_zone_id   | text                     |
 #  target_image_family             | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
 #  target_storage_configuration    | jsonb                    |
+#  requested_vm_size               | text                     |
+#  requested_storage_size_gib      | bigint                   |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_id_private_subnet_id_uidx        | UNIQUE btree (id, private_subnet_id)

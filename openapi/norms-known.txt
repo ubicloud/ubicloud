@@ -1,0 +1,97 @@
+described: CertAuthUserList.items: describe it
+described: PostgresPrivateLinkServiceCreate.name: describe it
+described: PrivateLinkService.id: describe it
+described: PrivateLinkService.ip_address_type: describe it
+described: PrivateLinkService.location: describe it
+described: PrivateLinkService.name: describe it
+described: PrivateLinkService.ports: describe it
+described: PrivateLinkService.state: describe it
+described: ResourceMetrics.metrics: describe it
+described: responses/PostgresDatabaseLogs.logs: describe it
+described: updateLocationPrivateLinkService.aws: describe it
+direction: CertAuthUserList.items: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.created_at: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.id: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.installation_name: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.key: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.last_accessed_at: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.repository_name: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.scope: mark it readOnly, or accept it in a request
+direction: GithubCacheEntry.size: mark it readOnly, or accept it in a request
+direction: GithubInstallation.id: mark it readOnly, or accept it in a request
+direction: GithubInstallation.name: mark it readOnly, or accept it in a request
+direction: GithubRepository.id: mark it readOnly, or accept it in a request
+direction: GithubRepository.installation_name: mark it readOnly, or accept it in a request
+direction: GithubRepository.name: mark it readOnly, or accept it in a request
+direction: MachineImage.arch: mark it readOnly, or accept it in a request
+direction: MachineImage.created_at: mark it readOnly, or accept it in a request
+direction: MachineImage.id: mark it readOnly, or accept it in a request
+direction: MachineImage.location: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.actual_size_mib: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.archive_size_mib: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.created_at: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.id: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.latest: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.state: mark it readOnly, or accept it in a request
+direction: MachineImageVersion.version: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.access_key_id: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.bucket: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.endpoint: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.expiration: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.region: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.secret_access_key: mark it readOnly, or accept it in a request
+direction: PostgresBackupCredentials.session_token: mark it readOnly, or accept it in a request
+direction: PostgresCapabilities.metadata: mark it readOnly, or accept it in a request
+direction: PostgresCapabilities.option_tree: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.allowed_principals: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.id: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.location: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.postgres_resource: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_dns_name: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_hostname: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.private_subnet: mark it readOnly, or accept it in a request
+direction: PrivateLinkService.state: mark it readOnly, or accept it in a request
+direction: PrivateLocation.id: mark it readOnly, or accept it in a request
+direction: PrivateLocation.path: mark it readOnly, or accept it in a request
+direction: PrivateLocation.provider: mark it readOnly, or accept it in a request
+direction: PrivateLocation.ui_name: mark it readOnly, or accept it in a request
+direction: ResourceMetrics.metrics: mark it readOnly, or accept it in a request
+direction: RunCommand.output: mark it readOnly, or accept it in a request
+direction: RunCommand.status: mark it readOnly, or accept it in a request
+direction: RunCommand.timestamp: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.location: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.name: mark it readOnly, or accept it in a request
+direction: responses/ObjectInfo.type: mark it readOnly, or accept it in a request
+direction: responses/PostgresDatabaseLogs.logs: mark it readOnly, or accept it in a request
+echo: CertAuthUserRequest.name: echo it in the response, or mark it writeOnly
+echo: PostgresPrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.postgres_resource_id: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.private_subnet_id: echo it in the response, or mark it writeOnly
+echo: PrivateLinkServiceCreate.target_ports: echo it in the response, or mark it writeOnly
+echo: createMachineImage.destroy_source: echo it in the response, or mark it writeOnly
+echo: createMachineImage.version: echo it in the response, or mark it writeOnly
+echo: createMachineImage.vm: echo it in the response, or mark it writeOnly
+echo: createMachineImageVersion.destroy_source: echo it in the response, or mark it writeOnly
+echo: createMachineImageVersion.vm: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.access_key: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.provider_location_name: echo it in the response, or mark it writeOnly
+echo: createPrivateLocation.secret_key: echo it in the response, or mark it writeOnly
+echo_agreement: PostgresPrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
+echo_agreement: PrivateLinkServiceCreate.ports: accept every value PrivateLinkService.ports may hold
+examples: CertAuthUserRequest.name: give it an example
+examples: PostgresPrivateLinkServiceCreate.aws: give it an example
+examples: PostgresPrivateLinkServiceCreate.name: give it an example
+examples: PrivateLinkService.id: give it an example
+examples: PrivateLinkServiceCreate.aws: give it an example
+examples: PrivateLinkServiceCreate.private_subnet_id: give it an example
+examples: PrivateLocation.id: give it an example
+examples: createMachineImage.vm: give it an example
+examples: createMachineImageVersion.vm: give it an example
+examples: createPrivateLocation.access_key: give it an example
+examples: createPrivateLocation.name: give it an example
+examples: createPrivateLocation.provider_location_name: give it an example
+examples: createPrivateLocation.secret_key: give it an example
+examples: parameters/private_location_name: give it an example
+examples: renameMachineImage.name: give it an example
+examples: updateMachineImage.latest_version: give it an example
+examples: updatePrivateLocation.name: give it an example

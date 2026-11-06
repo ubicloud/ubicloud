@@ -18,10 +18,12 @@ RSpec.describe Serializers::KubernetesCluster do
         id: kc.ubid,
         name: "cluster",
         location: "eu-central-h1",
+        state: "creating",
         display_state: "creating",
         cp_node_count: 3,
         node_size: "standard-2",
         version: Option.selectable_kubernetes_versions.first,
+        services_load_balancer_url: nil,
       }
 
       expect(described_class.serialize_internal(kc)).to eq(expected_result)
@@ -39,12 +41,14 @@ RSpec.describe Serializers::KubernetesCluster do
         id: kc.ubid,
         name: "cluster",
         location: "eu-central-h1",
+        state: "creating",
         display_state: "creating",
         cp_node_count: 3,
         node_size: "standard-2",
         version: Option.selectable_kubernetes_versions.first,
+        services_load_balancer_url: nil,
         cp_vms: Serializers::Vm.serialize([cp_vm]),
-        nodepools: Serializers::KubernetesNodepool.serialize([kn], {detailed: true}),
+        nodepools: Serializers::KubernetesNodepool.serialize([kn]),
       }
 
       expect(described_class.serialize_internal(kc, {detailed: true})).to eq(expected_result)
