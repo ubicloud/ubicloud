@@ -216,6 +216,19 @@ examples together, runs each verb alone, plans each replacement and
 imports each type, taking the values it changes from the spec, and a
 type's own examples test only its misbehaviours.
 
+**A postgres firewall rule is listed once.** A postgres firewall rule
+is stored as two rows of the database's firewall, one for port 5432
+and one for pgbouncer's port 6432. The create returns the 5432 row,
+the list and the detailed postgres response showed both rows, each
+with its `port`, and since C27 a PATCH or DELETE on either id acts on
+both. Daniel Farina was offered: "(1) List each pair once. Return the
+5432 row, the id the create returned, and leave its twin out of the
+list and the detailed response. Routes still accept the twin's id, as
+C27 made them.", with `port` deprecated in C27's commit. He answered
+on 6 Nov 2026: "Very well. (1)". So a postgres database's
+firewall_rule_ids holds one id for each rule, and `port`, which is
+then 5432, stays in the response, deprecated.
+
 **Provenance comments are pointers, not prose.** Daniel Farina, 5 Nov
 2026: "comments can be extremely short and cryptic for back-tracing",
 and "think: closer to debug symbols than for human legibility (so ruby

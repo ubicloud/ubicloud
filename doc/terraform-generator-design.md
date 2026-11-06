@@ -316,7 +316,7 @@ only records the desired state.
 | create | `createLocationPostgresFirewallRule`, on the collection |
 | keys | `location` R X; `postgres_id` R X, with `PostgresDatabase.id`'s pattern |
 | inputs | `cidr` R (format `cidr`); `description` O C D `""`; both by `patchLocationPostgresFirewallRule` |
-| outputs | `id` st; `port` |
+| outputs | `id` st; not `port`, which C27 deprecates |
 | import | `<location>/<postgres_id>/<id>` |
 | needs | C26, C27, C28 |
 
@@ -645,7 +645,7 @@ missing.
 | C24 | `private_subnet_id` and `firewall_id` in the detailed postgres response | additive |
 | C25 | Annotations for postgres, with its `state` enum and `x-lifecycle`, `ha_type`'s enum and default, `restrict_by_default`'s default | validated |
 | C26 | GET on one postgres firewall rule, log destination and metric destination; a `PostgresMetricDestination` schema | additive |
-| C27 | A postgres firewall rule's PATCH and DELETE also act on its 6432 twin | behaviour |
+| C27 | A postgres firewall rule's PATCH and DELETE also act on its 6432 twin; the list and the detailed postgres response show each pair once, by its 5432 row; `port` deprecated | behaviour |
 | C28 | Typed `options` for both destinations, from the shapes the routes enforce; `writeOnly` and `format: password` on them and on the metric password; annotations | spec |
 | C29 | Metric destination create returns the destination, in every API version; the CLI reads the list with a GET | breaking |
 | C30 | Postgres refuses the legacy `burstable-*` sizes, which it now rewrites to `hobby-*` behind the client's back (whether version 1 may keep them as deprecated values is open, `doc/api-versions-design.md` §11) | breaking |
