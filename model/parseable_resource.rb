@@ -11,7 +11,7 @@ class ParseableResource < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2, :secret_key]
-  plugin SemaphoreMethods, :destroy, :reconfigure
+  plugin SemaphoreMethods, :destroy, :reconfigure, :recycle
 
   LOG_RETENTION_DAYS = 7
 
@@ -23,7 +23,12 @@ class ParseableResource < Sequel::Model
 
   def self.client_for_project(project_id)
     par = for_project(project_id)
-    par&.servers&.first&.client
+    par&.representative_server&.client
+  end
+
+  def representative_server
+    provisioning = Semaphore.where(name: "initial_provisioning").select(:strand_id)
+    servers_dataset.order(Sequel.~(id: provisioning), :created_at).last
   end
 
   def hostname

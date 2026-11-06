@@ -74,6 +74,35 @@ RSpec.describe ParseableResource do
     end
   end
 
+  describe "#representative_server" do
+    def create_server(created_at:)
+      server = ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: create_vm.id, created_at:)
+      Strand.create_with_id(server, prog: "Parseable::ParseableServerNexus", label: "wait")
+      server
+    end
+
+    it "returns nil when there is no server" do
+      expect(parseable_resource.representative_server).to be_nil
+    end
+
+    it "prefers the newest server" do
+      create_server(created_at: Time.now - 60)
+      newer = create_server(created_at: Time.now)
+      expect(parseable_resource.representative_server).to eq(newer)
+    end
+
+    it "prefers a provisioned server over a newer server that was just assembled" do
+      older = create_server(created_at: Time.now - 60)
+      Prog::Parseable::ParseableServerNexus.assemble(parseable_resource)
+      expect(parseable_resource.representative_server).to eq(older)
+    end
+
+    it "returns a provisioning server when no other server exists" do
+      st = Prog::Parseable::ParseableServerNexus.assemble(parseable_resource)
+      expect(parseable_resource.representative_server.id).to eq(st.id)
+    end
+  end
+
   describe "#bucket_name" do
     it "returns the ubid" do
       expect(parseable_resource.bucket_name).to eq(parseable_resource.ubid)
