@@ -46,7 +46,7 @@ RSpec.describe GithubRepository do
       expect(github_repository.reload.extra_cache_storage_gib).to eq(300)
       record = github_repository.active_billing_record
       expect(record.project_id).to eq(github_repository.installation.project_id)
-      expect(record.resource_name).to eq("test-owner/test")
+      expect(record.resource_name).to eq("Extra Cache Storage (test-owner/test)")
       expect(record.billing_rate_id).to eq(BillingRate.from_resource_properties("GitHubCacheStorage", "standard", "global")["id"])
       expect(record.amount).to eq(300)
       expect(record.span.unbounded_end?).to be(true)

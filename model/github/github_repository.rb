@@ -44,7 +44,7 @@ class GithubRepository < Sequel::Model
           BillingRecord.create(
             project_id: project.id,
             resource_id: id,
-            resource_name: name,
+            resource_name: "Extra Cache Storage (#{name})",
             billing_rate_id: BillingRate.from_resource_properties("GitHubCacheStorage", "standard", "global")["id"],
             amount: gib,
           )
