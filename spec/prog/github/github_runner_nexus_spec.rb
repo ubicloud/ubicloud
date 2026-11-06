@@ -1661,6 +1661,34 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.wait }.to raise_error(Errno::ECONNRESET)
     end
 
+    it "destroys runner on ssh exception if it does not pick a job in five minutes and not busy" do
+      runner.update(ready_at: now - 6 * 60, workflow_job: nil)
+      expect(client).to receive(:get).and_return({busy: false})
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+      expect(nx).to receive(:register_deadline).twice
+      expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(GithubRunner)).and_call_original
+
+      expect { nx.wait }.to nap(0)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "raises ssh exception again if it does not pick a job in five minutes but busy" do
+      runner.update(ready_at: now - 6 * 60, workflow_job: nil)
+      expect(client).to receive(:get).and_return({busy: true})
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+      expect(runner.destroy_set?).to be(false)
+    end
+
+    it "raises ssh exception again if it does not pick a job but five minutes not pass yet" do
+      runner.update(ready_at: now - 60, workflow_job: nil)
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+      expect(runner.destroy_set?).to be(false)
+    end
+
     it "raises ssh exception again if aws instance not terminated due to interruption" do
       location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
       LocationCredentialAws.create_with_id(location_id, access_key: "key", secret_key: "secret")
