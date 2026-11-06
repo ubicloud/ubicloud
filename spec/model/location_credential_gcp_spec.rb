@@ -203,4 +203,70 @@ RSpec.describe LocationCredentialGcp do
       expect(Google::Auth).to have_received(:get_application_default).once
     end
   end
+
+  describe "lockout clients" do
+    subject(:location_credential_gcp) {
+      described_class.create_with_id(location,
+        project_id: "test-gcp-project",
+        service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+        credentials_json:)
+    }
+
+    let(:key) { OpenSSL::PKey::RSA.new(2048) }
+    let(:key_json) {
+      {
+        type: "service_account", project_id: "test-gcp-project", private_key_id: "key-1", private_key: key.to_pem,
+        client_email: "test@test-gcp-project.iam.gserviceaccount.com", client_id: "1",
+        token_uri: "https://oauth2.googleapis.com/token",
+      }.to_json
+    }
+    let(:credentials_json) { key_json }
+
+    before do
+      allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_call_original
+    end
+
+    it "gives every lockout RPC a short timeout" do
+      compute = location_credential_gcp.lockout_compute_client
+      expect(compute.configure.rpcs.get.timeout).to eq 2
+      expect(compute.configure.rpcs.delete_network_interface.timeout).to eq 5
+      expect(location_credential_gcp.lockout_compute_client).to be(compute)
+
+      zone_operations = location_credential_gcp.lockout_zone_operations_client
+      expect(zone_operations.configure.rpcs.get.timeout).to eq 2
+      expect(location_credential_gcp.lockout_zone_operations_client).to be(zone_operations)
+    end
+
+    it "signs a JWT locally, on credentials that the other clients do not use" do
+      creds = location_credential_gcp.lockout_compute_client.configure.credentials
+      expect(location_credential_gcp.lockout_zone_operations_client.configure.credentials).to be(creds)
+      shared = location_credential_gcp.compute_client.configure.credentials
+      expect(shared).not_to be(creds)
+      expect(shared.enable_self_signed_jwt?).to be false
+
+      jwt = creds.apply({})[:authorization].delete_prefix("Bearer ")
+      claims, = JWT.decode(jwt, key.public_key, true, algorithm: "RS256")
+      expect(claims).to include(
+        "iss" => "test@test-gcp-project.iam.gserviceaccount.com",
+        "scope" => "https://www.googleapis.com/auth/cloud-platform",
+      )
+    end
+
+    context "when credentials_json is nil" do
+      let(:credentials_json) { nil }
+
+      before do
+        source = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: StringIO.new(key_json), scope: "https://www.googleapis.com/auth/cloud-platform")
+        allow(Google::Auth).to receive(:get_application_default).and_return(source)
+        allow(Google::Auth::ImpersonatedServiceAccountCredentials).to receive(:make_creds).and_call_original
+      end
+
+      it "uses the shared impersonated credentials" do
+        creds = location_credential_gcp.lockout_compute_client.configure.credentials
+        expect(creds).to be_a(Google::Auth::ImpersonatedServiceAccountCredentials)
+        expect(location_credential_gcp.lockout_zone_operations_client.configure.credentials).to be(creds)
+        expect(location_credential_gcp.compute_client.configure.credentials).to be(creds)
+      end
+    end
+  end
 end
