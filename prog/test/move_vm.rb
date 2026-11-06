@@ -69,6 +69,11 @@ class Prog::Test::MoveVm < Prog::Test::Base
       actual_sha256 = sshable.cmd("sudo sha256sum :marker_file", marker_file:).split.first
       fail_test "Marker file #{marker_file} has unexpected sha256" unless actual_sha256 == expected_sha256
     end
+    hop_wait_source_destroyed
+  end
+
+  label def wait_source_destroyed
+    nap 10 unless Vm.where(id: vm_id).empty?
     hop_destroy
   end
 
