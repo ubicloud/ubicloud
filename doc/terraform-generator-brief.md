@@ -201,6 +201,21 @@ sensitive?" He answered on 6 Nov 2026: "Sure". So a datasource looks
 its object up by id, or by name where the identity accepts one, and
 the inference API key's datasource keeps key sensitive.
 
+**One loop tests every type through its generated examples.** On a
+hand-written harness example per type to read each new datasource,
+Daniel Farina said on 6 Nov 2026: "The idea is to make loops instead
+of committing the result of loops." Each type's commit also wrote an
+example per update verb and, for a named type, an import (the harness
+design's question 2). Asked whether "the same loop could cover those
+generically too: change one attribute per verb and check the right
+request went out, re-import by the derived id and expect an empty
+plan. That would leave only misbehaviour examples written by hand", he
+answered on 6 Nov 2026: "Sure, let's follow the recommendation". So
+the examples harness applies each type's resource and datasource
+examples together, runs each verb alone, plans each replacement and
+imports each type, taking the values it changes from the spec, and a
+type's own examples test only its misbehaviours.
+
 **Provenance comments are pointers, not prose.** Daniel Farina, 5 Nov
 2026: "comments can be extremely short and cryptic for back-tracing",
 and "think: closer to debug symbols than for human legibility (so ruby
