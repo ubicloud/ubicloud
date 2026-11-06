@@ -142,16 +142,20 @@ func boolDefault(a *attrDesc) defaults.Bool {
 
 // datasourceSchema follows rule lookup: the item path's keys are required,
 // exactly one lookup attribute is given, and every other attribute is
-// computed. Write-only inputs, which the API never returns, are left out.
+// computed. A lone lookup attribute is therefore required too. Write-only
+// inputs, which the API never returns, are left out.
 func datasourceSchema(t *typeDesc) dschema.Schema {
 	ids := t.identity()
-	keys := ids[:max(len(ids)-1, 0)]
+	required := ids[:max(len(ids)-1, 0)]
+	if len(t.lookup) == 1 {
+		required = append(slices.Clip(required), t.lookup[0])
+	}
 	attrs := map[string]dschema.Attribute{}
 	for _, a := range t.attrs {
 		lookup := slices.Contains(t.lookup, a.name)
 		switch {
 		case a.has(writeOnly):
-		case slices.Contains(keys, a.name):
+		case slices.Contains(required, a.name):
 			attrs[a.name] = datasourceAttr(a, true, false)
 		default:
 			attrs[a.name] = datasourceAttr(a, false, lookup)
