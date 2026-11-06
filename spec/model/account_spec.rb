@@ -14,6 +14,16 @@ RSpec.describe Account do
     expect(ace).not_to be_exists
   end
 
+  it "destroys personal access tokens and their access control entries" do
+    project = account.create_project_with_default_policy("project-1", default_policy: false)
+    pat = ApiKey.create_personal_access_token(account, project:)
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: pat.id)
+
+    account.destroy
+    expect(pat).not_to exist
+    expect(ace).not_to exist
+  end
+
   it "suspend" do
     now = Time.now
     expect(Time).to receive(:now).and_return(now).at_least(:once)
