@@ -63,6 +63,68 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
+  describe "#vm_allocation_rules" do
+    def nx_for(label)
+      other_vm = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: vm.project_id, boot_image: "github-ubuntu-2204", name: "vm-#{label}")
+      runner = GithubRunner.create(
+        installation_id: installation.id,
+        vm_id: other_vm.id,
+        location_id: Location::GITHUB_RUNNERS_ID,
+        repository_name: "test-repo",
+        label:,
+      )
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
+      described_class.new(runner.strand).tap { it.instance_variable_set(:@github_runner, runner) }
+    end
+
+    it "defaults to the runner locations and the installation family filter" do
+      expect(nx.vm_allocation_rules).to eq(
+        family_filter: ["premium", "standard"],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+      )
+    end
+
+    it "uses installation location preferences and exclusions" do
+      installation.update(allocator_preferences: {
+        "host_exclusion_filter" => ["vh1"],
+        "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
+        "location_preference" => [Location::LEASEWEB_WDC02_ID],
+      })
+
+      expect(nx.vm_allocation_rules).to eq(
+        family_filter: ["standard"],
+        host_exclusion_filter: ["vh1"],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
+        location_preference: [Location::LEASEWEB_WDC02_ID],
+      )
+    end
+
+    it "uses the installation family filter" do
+      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
+
+      expect(nx.vm_allocation_rules[:family_filter]).to eq(["standard", "premium"])
+    end
+
+    it "adds premium when the free upgrade is enabled" do
+      installation.update(allocator_preferences: {})
+      project.set_ff_free_runner_upgrade_until((now + 5 * 24 * 60 * 60).to_s)
+
+      expect(nx.vm_allocation_rules[:family_filter]).to eq(["standard", "premium"])
+    end
+
+    it "keeps the label family when the upgrade is disabled" do
+      upgrade_nx = nx_for("ubicloud-standard-4")
+      upgrade_nx.github_runner.incr_not_upgrade_premium
+
+      expect(upgrade_nx.vm_allocation_rules[:family_filter]).to eq(["standard"])
+    end
+
+    it "does not downgrade a premium label" do
+      expect(nx_for("ubicloud-premium-30").vm_allocation_rules[:family_filter]).to eq(["premium"])
+    end
+  end
+
   describe ".pick_vm" do
     it "provisions a VM if the pool is not existing" do
       vm = nx.pick_vm
