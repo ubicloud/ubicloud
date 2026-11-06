@@ -26,9 +26,11 @@ elsif (suite = ENV.delete("COVERAGE"))
 
       cover "rhizome/**/*.rb"
     else
+      # lib/terraform_generator runs only under rake, and is tested
+      # outside this suite.
       skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
-        path.match?(/\A\/(rhizome|kubernetes|migrate|ruby_lsp|spec|var|(db|model|loader|\.env)\.rb)/) ||
+        path.match?(/\A\/(rhizome|kubernetes|migrate|ruby_lsp|spec|var|lib\/terraform_generator|(db|model|loader|\.env)\.rb)/) ||
           (file.relevant_lines.zero? && file.no_branches?)
       end
 

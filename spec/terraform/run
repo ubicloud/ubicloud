@@ -1,0 +1,29 @@
+#!/bin/sh
+# Run the spec/terraform suite with its full environment, restarting
+# the dev postgres cluster if it isn't running. Usage:
+#   spec/terraform/run [rspec args...]
+# Defaults to the whole spec/terraform tree on the dedicated test
+# database index. Must run as a non-root user that owns the cluster
+# (e.g. runuser -u clover_dev -- spec/terraform/run).
+set -e
+
+export RACK_ENV=test
+
+# A locally initialized dev cluster (PGDATA present) speaks over /tmp,
+# gets the dedicated test-database index, and is started on demand.
+# An externally managed postgres (CI's system service) is left alone
+# and addressed by whatever CLOVER_DATABASE_URL the caller set; no
+# socket or index conventions are imposed on it.
+export PGDATA="${PGDATA:-$HOME/pgdata}"
+if [ -d "$PGDATA" ]; then
+  export PGHOST="${PGHOST:-/tmp}"
+  export TEST_ENV_NUMBER="${TEST_ENV_NUMBER:-9}"
+  export CLOVER_DATABASE_URL="${CLOVER_DATABASE_URL:-postgres://%2Ftmp/clover_test${TEST_ENV_NUMBER}?user=clover}"
+  pg_ctl status >/dev/null 2>&1 || pg_ctl -o "-k /tmp -c listen_addresses=" -l /tmp/pg.log start
+fi
+
+cd "$(dirname "$0")/../.."
+# Harness files are *_harness.rb, outside the default *_spec.rb pattern,
+# so the main suite never loads them (they need go, terraform, and the
+# generated module); this runner selects them explicitly.
+exec bundle exec rspec --pattern "**/*_harness.rb" "${@:-spec/terraform/}"

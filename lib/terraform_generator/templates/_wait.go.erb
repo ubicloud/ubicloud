@@ -1,0 +1,48 @@
+<%# One poll-first skeleton serves every wait: match yields success,
+    a "gone" wait treats 404 as its match, transient failures spend a
+    bounded budget. Rendered once per declared wait. -%>
+// waitFor<%= camel %><%= w[:suffix] %> polls the details GET (poll-first, sleep-after)
+// until <%= w[:until_doc] %>; transient failures spend a bounded budget.
+func waitFor<%= camel %><%= w[:suffix] %>(ctx context.Context, r *<%= camel_lower %>Resource, state *<%= model_type %>, <%= w[:extra_param] %>timeout, poll time.Duration) (<%= w[:ret] %>) {
+	var diags diag.Diagnostics
+	deadline := time.Now().Add(timeout)
+	transientBudget := 5
+	for {
+		apiResp, err := <%= details_call %>
+		switch {
+<% if w[:gone] -%>
+		case err == nil && apiResp.StatusCode() == http.StatusNotFound:
+			return diags
+<% end -%>
+		case err != nil || apiResp.StatusCode() != http.StatusOK || apiResp.JSON200 == nil:
+			transientBudget--
+			if transientBudget <= 0 {
+				diags.AddError(
+					fmt.Sprintf("Gave up polling <%= human %>: %s", <%= camel_lower %>ResourceLogIdentifier(state)),
+					fmt.Sprintf("repeated transient failures while waiting for <%= w[:want_fmt] %>", <%= w[:want_args] %>))
+				return <%= w[:fail_ret] %>
+			}
+<% unless w[:gone] -%>
+		case <%= w[:match] %>:
+			return apiResp.JSON200, diags
+		default:
+			transientBudget = 5
+<% end -%>
+		}
+		if time.Now().After(deadline) {
+			diags.AddError(
+				fmt.Sprintf("Timed out waiting for <%= human %><%= w[:timeout_tail] %>: %s", <%= camel_lower %>ResourceLogIdentifier(state)),
+				fmt.Sprintf("<%= w[:want_fmt] %> not reached within %s", <%= w[:want_args] %>timeout))
+			return <%= w[:fail_ret] %>
+		}
+		select {
+		case <-ctx.Done():
+			diags.AddError(
+				fmt.Sprintf("Cancelled waiting for <%= human %><%= w[:timeout_tail] %>: %s", <%= camel_lower %>ResourceLogIdentifier(state)),
+				ctx.Err().Error())
+			return <%= w[:fail_ret] %>
+		case <-time.After(poll):
+		}
+	}
+}
+
