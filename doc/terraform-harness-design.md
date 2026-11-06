@@ -23,8 +23,8 @@ one part of the terraform work tied to clover's test infrastructure.
   rollback transaction, so committee, the token check, authorization and duplicate-query detection
   apply, mocks reach the API, and the rollback is the cleanup.
 - **Hooks, not progs.** After the API accepts a change, `settle_<table>` puts the object in the
-  resting state the API reports for it. A type that the API reports at rest from the start needs no
-  hook.
+  resting state the API reports for it. A type needs no hook if the API reports its objects at rest
+  after every change it accepts, including a DELETE.
 - **Gates.** `at(:response, "POST postgres/db") { it.answer(502) }` runs once, on the example's
   thread, while the provider waits for the answer. A gate that never runs fails the example.
 - **The ledger.** Every request is recorded with its path shown relative to the project, each id
@@ -374,12 +374,12 @@ each example's directory, with each request's method, path and status.
 
 ## 5. The examples each type brings
 
-The commit that adds a type adds a hook to `spec/terraform/settle.rb` if the API reports a new
-object of the type as pending, and examples of the type's specific behaviours: an order of
-requests, adoption, drift, the adoption of a write-only input, or a customer's file. The examples
-harness covers each update verb, each replacement and the import (§3.7). Each file starts with
-`# frozen_string_literal: true` and `require_relative "spec_helper"`, which the examples below leave
-out.
+The commit that adds a type adds a hook to `spec/terraform/settle.rb` if the API reports an object
+of the type as pending after any change it accepts, including a DELETE, and examples of the type's
+specific behaviours: an order of requests, adoption, drift, the adoption of a write-only input, or a
+customer's file. The examples harness covers each update verb, each replacement and the import
+(§3.7). Each file starts with `# frozen_string_literal: true` and `require_relative "spec_helper"`,
+which the examples below leave out.
 
 §2's example goes into `network_harness.rb`. Against the prototype's provider it failed at the
 second apply with "Update of firewall is not supported", and the ledger showed that no rename was

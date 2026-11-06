@@ -66,16 +66,20 @@ module TerraformHarness
   # A request the API received. Its path is shown as an example writes it:
   # relative to the project and the default location, with the id of each
   # named object replaced by @ and the name the object had when the
-  # request arrived.
+  # request arrived. Its subject is the last object the path names by id.
   class Request
-    attr_reader :command, :verb, :shown, :body, :fault
+    attr_reader :command, :verb, :shown, :subject, :body, :fault
     attr_accessor :status, :response, :error
 
     def initialize(env, project, command)
       @command, @verb = command, env["REQUEST_METHOD"]
       @body = env["rack.input"].read.tap { env["rack.input"].rewind }
       segments = env["PATH_INFO"].delete_prefix("/project/#{project.ubid}").delete_prefix("/location/#{TEST_LOCATION}").delete_prefix("/").split("/")
-      @shown = segments.map { (object = UBID.decode(it)).respond_to?(:name) ? "@#{object.name}" : it }.join("/")
+      @shown = segments.map do |segment|
+        next segment unless (object = UBID.decode(segment))
+        @subject = object
+        object.respond_to?(:name) ? "@#{object.name}" : segment
+      end.join("/")
     end
 
     def to_s = "#{verb} #{shown}"
@@ -189,6 +193,13 @@ module TerraformHarness
       gates << [phase, pattern, block]
     end
 
+    # Puts the object at rest, as the harness does after each change the
+    # API accepts.
+    def settle(object)
+      hook = :"settle_#{object.class.table_name}"
+      Settle.public_send(hook, object) if Settle.respond_to?(hook)
+    end
+
     # Runs terraform and serves each request it sends on this thread, until
     # terraform exits or the deadline passes. Returns terraform's exit
     # status. Requests left from an earlier command get a 503 first.
@@ -235,8 +246,18 @@ module TerraformHarness
       return request.fault if request.fault
 
       response = call_api(env, request)
+      settle_after(request)
       gate(:response, request)
       request.fault || response
+    end
+
+    # The object to settle is the one whose id the answer carries, or, if
+    # the answer carries none (as for a DELETE), the request's subject.
+    def settle_after(request)
+      return if request.verb == "GET" || !request.status.between?(200, 299)
+
+      object = UBID.decode(request.response&.dig("id")) || request.subject
+      settle(object) if object&.exists?
     end
 
     # An exception inside the API is answered with an empty 500, and the
@@ -267,6 +288,7 @@ module TerraformHarness
   end
 end
 
+require_relative "settle"
 TerraformHarness.build
 
 RSpec.configure do |config|

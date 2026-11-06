@@ -8,6 +8,7 @@ module TerraformGenerator::Definitions
     firewall: {},
     firewall_rule: {},
     inference_api_key: {},
+    private_subnet: {},
     project: {},
     ssh_public_key: {},
   }.freeze
