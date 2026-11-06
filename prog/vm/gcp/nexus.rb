@@ -24,9 +24,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Zone selection is a VM concern. Pick a zone on first entry, then
     # honour the value already set by retry_zone_capacity on later entries.
     unless strand.stack.first.key?("gcp_zone_suffix")
-      excluded = (exclude_zones || [].freeze) + (unsupported_azs || [].freeze)
-      available = gcp_az_suffixes - excluded
-      location_az = location_az_for(available.sample || gcp_az_suffixes.sample)
+      location_az = location_az_for(preferred_zones(gcp_az_suffixes).sample)
       VmGcpResource.create_with_id(vm, location_az_id: location_az.id) unless vm.vm_gcp_resource
       self.gcp_zone_suffix = location_az.az
     end
@@ -452,14 +450,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def bump_excluded_zone(error_message)
     excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
-    available = gcp_az_suffixes - excluded
+    available = preferred_zones(gcp_az_suffixes - excluded)
 
     if available.empty?
       Clog.emit("GCE zone retry exhausted, resetting exclusions",
         {zone_retry: {failed_zone: gcp_zone, excluded:,
                       error: error_message}})
       excluded = []
-      available = gcp_az_suffixes
+      available = preferred_zones(gcp_az_suffixes)
     else
       Clog.emit("GCE zone retry",
         {zone_retry: {failed_zone: gcp_zone, excluded:,
@@ -474,7 +472,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm.reload.vm_gcp_resource.update(location_az_id: location_az_for(new_suffix).id)
     # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
     # 5 seconds: still have untried zones. Move on to the next one quickly.
-    (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
+    excluded.empty? ? 5 * 60 : 5
+  end
+
+  # unsupported_azs holds the zones of the other servers of an HA Postgres
+  # resource. They are a last resort: a standby next to another server
+  # beats no standby while the other zones are out of capacity.
+  def preferred_zones(zones)
+    spread = zones - (unsupported_azs || [].freeze)
+    spread.empty? ? zones : spread
   end
 
   def gcp_az_suffixes
