@@ -196,6 +196,14 @@ RSpec.describe PrivateLinkService do
     expect(described_class.default_private_dns_name(pg)).to be_nil
   end
 
+  it "derives the private hostname as the private DNS name of a v2 resource" do
+    pg = create_pg
+    pg.update(hostname_version: "v2")
+    serve_pg_zone(pg)
+    expect(described_class.default_private_dns_name(pg)).to eq "private.#{pg.name}.#{pg.ubid}.#{pg.hostname_suffix}"
+    expect(described_class.default_private_dns_name(pg)).to eq pg.cert_private_hostname
+  end
+
   describe "managed private DNS zone" do
     def zone_with_server(name, with_vm: true)
       zone = DnsZone.create(project_id: project.id, name:)

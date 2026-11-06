@@ -93,10 +93,11 @@ class PrivateLinkService < Sequel::Model
     PrivateLinkService.managed_dns_zone_for(private_dns_domain)
   end
 
-  # The wildcard SAN of the resource's certificate, so a consumer resolving the
-  # resource's private hostname through the endpoint passes verify-full.
+  # The private SAN of the resource's certificate (a wildcard under v3, the
+  # private hostname under v2), so a consumer resolving the resource's private
+  # hostname through the endpoint passes verify-full. v1 names carry no ubid.
   def self.default_private_dns_name(pg)
-    return unless pg && pg.hostname_version == "v3" && (zone = pg.dns_zone) && dns_zone_served?(zone)
+    return unless pg && pg.hostname_version != "v1" && (zone = pg.dns_zone) && dns_zone_served?(zone)
 
     pg.cert_private_hostname
   end
