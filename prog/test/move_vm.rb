@@ -55,7 +55,7 @@ class Prog::Test::MoveVm < Prog::Test::Base
 
   label def move_vm
     nap 10 unless vm.strand.label == "stopped_by_admin"
-    self.new_vm_id = Prog::Vm::Metal::MoveVm.assemble(vm, VmHost[vm_host_id], parent_id: strand.id).stack.first["subject_id"]
+    self.new_vm_id = Prog::Vm::Metal::MoveVm.assemble(vm, VmHost[vm_host_id], parent_id: strand.id, destroy_after: 30).stack.first["subject_id"]
     hop_wait_vm_moved
   end
 

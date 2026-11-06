@@ -5,9 +5,12 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
 
   semaphore :cancel_move
 
-  frame_reader :remote_storage_server_id, :old_vm_id, :unset_prevent_destroy
+  frame_reader :remote_storage_server_id, :old_vm_id, :unset_prevent_destroy, :destroy_after
+  frame_accessor :destroy_source_at
 
-  def self.assemble(vm, vm_host, parent_id: nil)
+  DEFAULT_DESTROY_SOURCE_AFTER = 7 * 24 * 60 * 60
+
+  def self.assemble(vm, vm_host, parent_id: nil, destroy_after: DEFAULT_DESTROY_SOURCE_AFTER)
     fail "Vm is not ready to move" unless vm.strand.label == "stopped_by_admin" && vm.prepare_to_move_set?
     fail "VmHost is not in the same location as the Vm" unless vm_host.location_id == vm.location_id
     fail "VmHost arch does not match Vm arch" unless vm_host.arch == vm.arch
@@ -53,6 +56,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
           "remote_storage_server_id" => remote_storage_server.id,
           "old_vm_id" => vm.id,
           "unset_prevent_destroy" => unset_prevent_destroy,
+          "destroy_after" => destroy_after,
         }],
       )
     end
@@ -67,7 +71,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 60 * 60)
+    register_deadline("wait_destroy_source", 60 * 60)
     hop_wait
   end
 
@@ -84,7 +88,23 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
     ids = [@subject_id]
     ids << old_vm_id if unset_prevent_destroy
     Semaphore.where(strand_id: ids, name: "prevent_destroy").delete
-    when_cancel_move_set? { Vm.incr_destroy(@subject_id) }
+    when_cancel_move_set? do
+      Vm.incr_destroy(@subject_id)
+      pop "vm moved"
+    end
+    self.destroy_source_at = Time.now.to_i + destroy_after
+    hop_wait_remote_storage_server_destroyed
+  end
+
+  label def wait_remote_storage_server_destroyed
+    nap 10 unless RemoteStorageServer.where(id: remote_storage_server_id).empty?
+    hop_wait_destroy_source
+  end
+
+  label def wait_destroy_source
+    remaining = destroy_source_at - Time.now.to_i
+    nap remaining if remaining > 0
+    Vm.incr_destroy(old_vm_id)
     pop "vm moved"
   end
 end
