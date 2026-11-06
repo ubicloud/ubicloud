@@ -1,10 +1,10 @@
 {
   "devDependencies": {
-    "@redocly/cli": "^2.57.0",
+    "@redocly/cli": "^2.69.0",
     "@stoplight/spectral-cli": "^6.17.0",
-    "openapi-format": "^1.33.7",
-    "@herb-tools/linter": "^0.11.0",
-    "@herb-tools/formatter": "^0.11.0",
+    "openapi-format": "^1.34.0",
+    "@herb-tools/linter": "^0.11.1",
+    "@herb-tools/formatter": "^0.11.1",
     "tailwindcss": "^3.4.19",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.20"
