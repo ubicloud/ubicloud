@@ -125,6 +125,72 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
+  describe "allocator arguments" do
+    let(:runner_arguments) do
+      {
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        data_center_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        gpu_device: nil,
+        os_filter: nil,
+        family_filter: ["premium", "standard"],
+      }
+    end
+
+    def expect_allocation(expected)
+      picked_vm = nx.pick_vm
+      # allocate_vm points the runner at the vm before the vm's own nexus runs.
+      nx.github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id)
+      arguments = nil
+      expect(Scheduling::Allocator).to receive(:allocate) { |_vm, _volumes, **kwargs| arguments = kwargs }
+      expect { Prog::Vm::Metal::Nexus.new(picked_vm.strand).start }.to hop("create_unix_user")
+      expect(arguments).to eq(expected)
+    end
+
+    it "passes the expected arguments for the default installation" do
+      expect_allocation(runner_arguments)
+    end
+
+    it "passes the expected arguments for installation location preferences and exclusions" do
+      installation.update(allocator_preferences: {
+        "host_exclusion_filter" => ["vh1"],
+        "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
+        "location_preference" => [Location::LEASEWEB_WDC02_ID],
+      })
+
+      expect_allocation(runner_arguments.merge(
+        family_filter: ["standard"],
+        host_exclusion_filter: ["vh1"],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
+        location_preference: [Location::LEASEWEB_WDC02_ID],
+      ))
+    end
+
+    it "passes the expected arguments when the free upgrade is enabled" do
+      installation.update(allocator_preferences: {})
+      project.set_ff_free_runner_upgrade_until((now + 5 * 24 * 60 * 60).to_s)
+
+      expect_allocation(runner_arguments.merge(family_filter: ["standard", "premium"]))
+    end
+
+    it "passes the expected arguments for a premium label" do
+      runner.update(label: "ubicloud-premium-4")
+
+      expect_allocation(runner_arguments.merge(family_filter: ["premium"]))
+    end
+
+    it "passes the expected arguments when the premium upgrade is disabled" do
+      nx.github_runner.incr_not_upgrade_premium
+
+      expect_allocation(runner_arguments.merge(family_filter: ["standard"]))
+    end
+  end
+
   describe ".pick_vm" do
     it "provisions a VM if the pool is not existing" do
       vm = nx.pick_vm

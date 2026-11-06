@@ -11,8 +11,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   CH_VERSION_OS_VERSIONS = ["46.0", "53.0"].to_h { [it, ["ubuntu-24.04", "ubuntu-26.04"].freeze] }.freeze
 
   subject_is :vm
-  frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes, :ch_version
+  frame_reader :gpu_count, :gpu_device, :storage_volumes, :ch_version
   frame_accessor :reason_determined
 
   def vm_name
@@ -55,16 +54,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
   end
 
-  def log_stored_rules_mismatch(frame_args, stored_args, gpu_count:, gpu_device:)
-    differing = Scheduling::VmJob.differing_request_fields(
-      Scheduling::Allocator.build_request(vm, storage_volumes, gpu_count:, gpu_device:, **frame_args),
-      Scheduling::Allocator.build_request(vm, storage_volumes, gpu_count:, gpu_device:, **stored_args),
-    )
-    return if differing.empty?
-
-    Clog.emit("allocation rules mismatch", {allocation_rules_mismatch: {vm_ubid: vm.ubid, differing:}})
-  end
-
   def queued_vms
     Vm.where(location_id: vm.location_id, arch: vm.arch, vm_host_id: nil)
   end
@@ -78,59 +67,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def start
     begin
-      distinct_storage_devices = self.distinct_storage_devices || false
-      host_exclusion_filter = exclude_host_ids || []
-      data_center_exclusion_filter = exclude_data_centers || []
       gpu_count = self.gpu_count || 0
       gpu_device = self.gpu_device || nil
-      runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
-      allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if force_host_id
-          [[], [], [], [force_host_id], []]
-        elsif vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          runner_location_preference = [Location::GITHUB_RUNNERS_ID]
-          installation = runner&.installation
-          prefs = installation&.allocator_preferences || {}
-          host_exclusion_filter |= prefs["host_exclusion_filter"] || []
 
-          runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
-            [vm.family]
-          elsif installation&.free_runner_upgrade?
-            prefs["family_filter"] || [vm.family, "premium"]
-          else
-            prefs["family_filter"] || [vm.family]
-          end
-          [
-            ["accepting"],
-            prefs["location_filter"] || runner_location_filter,
-            prefs["location_preference"] || runner_location_preference,
-            [],
-            runner_family_filter,
-          ]
-        else
-          [["accepting"], [vm.location_id], [], [], [vm.family]]
-        end
-      family_filter = ["standard"] if vm.family == "burstable"
-      os_filter = CH_VERSION_OS_VERSIONS[ch_version]
+      args = Scheduling::VmJob.allocator_args(vm, os_filter: CH_VERSION_OS_VERSIONS[ch_version])
 
-      frame_args = {
-        distinct_storage_devices:,
-        allocation_state_filter:,
-        location_filter:,
-        location_preference:,
-        host_filter:,
-        host_exclusion_filter:,
-        data_center_exclusion_filter:,
-        os_filter:,
-        family_filter:,
-      }
-      if vm.allocation_rules
-        stored_args = Scheduling::VmJob.allocator_args(vm, os_filter:)
-        log_stored_rules_mismatch(frame_args, stored_args, gpu_count:, gpu_device:)
-      end
-
-      Scheduling::Allocator.allocate(vm, storage_volumes, gpu_count:, gpu_device:, **frame_args)
+      Scheduling::Allocator.allocate(vm, storage_volumes, gpu_count:, gpu_device:, **args)
     rescue Scheduling::Allocator::HostsBusy
       Clog.emit("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
 
