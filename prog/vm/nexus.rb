@@ -204,6 +204,8 @@ class Prog::Vm::Nexus < Prog::Base
           # Cleared when all AZs are exhausted, then retried after a wait.
           "exclude_availability_zones" => [],
           "required_availability_zone" => (availability_zone if availability_zone_required),
+          # Tried first; capacity errors still move the VM to another zone.
+          "preferred_availability_zone" => (availability_zone unless availability_zone_required),
         }],
       ) { it.id = vm.id }
     end

@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
+  frame_reader :unsupported_azs, :preferred_availability_zone
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
@@ -24,7 +24,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Zone selection is a VM concern. Pick a zone on first entry, then
     # honour the value already set by retry_zone_capacity on later entries.
     unless strand.stack.first.key?("gcp_zone_suffix")
-      location_az = location_az_for(preferred_zones(gcp_az_suffixes).sample)
+      location_az = location_az_for(first_choice_zones.sample)
       VmGcpResource.create_with_id(vm, location_az_id: location_az.id) unless vm.vm_gcp_resource
       self.gcp_zone_suffix = location_az.az
     end
@@ -457,7 +457,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         {zone_retry: {failed_zone: gcp_zone, excluded:,
                       error: error_message}})
       excluded = []
-      available = preferred_zones(gcp_az_suffixes)
+      available = first_choice_zones
     else
       Clog.emit("GCE zone retry",
         {zone_retry: {failed_zone: gcp_zone, excluded:,
@@ -481,6 +481,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def preferred_zones(zones)
     spread = zones - (unsupported_azs || [].freeze)
     spread.empty? ? zones : spread
+  end
+
+  # Each round of zone attempts starts in the preferred zone when the VM has
+  # one, otherwise anywhere outside the other servers' zones.
+  def first_choice_zones
+    preferred_availability_zone ? [preferred_availability_zone] : preferred_zones(gcp_az_suffixes)
   end
 
   def gcp_az_suffixes
