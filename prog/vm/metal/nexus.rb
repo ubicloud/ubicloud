@@ -68,56 +68,19 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def start
     begin
-      distinct_storage_devices = self.distinct_storage_devices || false
-      host_exclusion_filter = exclude_host_ids || []
-      data_center_exclusion_filter = exclude_data_centers || []
       gpu_count = self.gpu_count || 0
       gpu_device = self.gpu_device || nil
-      runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
-      allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if force_host_id
-          [[], [], [], [force_host_id], []]
-        elsif vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          runner_location_preference = [Location::GITHUB_RUNNERS_ID]
-          installation = runner&.installation
-          prefs = installation&.allocator_preferences || {}
-          host_exclusion_filter |= prefs["host_exclusion_filter"] || []
 
-          runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
-            [vm.family]
-          elsif installation&.free_runner_upgrade?
-            prefs["family_filter"] || [vm.family, "premium"]
-          else
-            prefs["family_filter"] || [vm.family]
-          end
-          [
-            ["accepting"],
-            prefs["location_filter"] || runner_location_filter,
-            prefs["location_preference"] || runner_location_preference,
-            [],
-            runner_family_filter,
-          ]
-        else
-          [["accepting"], [vm.location_id], [], [], [vm.family]]
-        end
-      family_filter = ["standard"] if vm.family == "burstable"
-      os_filter = CH_VERSION_OS_VERSIONS[ch_version]
-
-      Scheduling::Allocator.allocate(
-        vm, storage_volumes,
+      # VMs created before vm.allocation_rules existed still read the frame.
+      legacy_rules = {
         distinct_storage_devices:,
-        allocation_state_filter:,
-        location_filter:,
-        location_preference:,
-        host_filter:,
-        host_exclusion_filter:,
-        data_center_exclusion_filter:,
-        gpu_count:,
-        gpu_device:,
-        os_filter:,
-        family_filter:,
-      )
+        force_host_id:,
+        host_exclusion_filter: exclude_host_ids,
+        data_center_exclusion_filter: exclude_data_centers,
+      }
+      args = Scheduling::VmJob.allocator_args(vm, legacy: legacy_rules, os_filter: CH_VERSION_OS_VERSIONS[ch_version])
+
+      Scheduling::Allocator.allocate(vm, storage_volumes, gpu_count:, gpu_device:, **args)
     rescue Scheduling::Allocator::HostsBusy
       Clog.emit("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
 
