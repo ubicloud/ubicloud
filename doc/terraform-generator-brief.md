@@ -188,6 +188,19 @@ certificates, a destination's options)". He answered on 6 Nov 2026:
 configuration reads a firewall's own attributes through that firewall's
 resource or datasource.
 
+**Every type with an item GET has a datasource.** Under the entry
+above, a firewall lists its rules only as firewall_rule_ids, but a type
+got a datasource only when its identity accepted a name or was the
+scope, so a firewall rule, a postgres firewall rule, a postgres log or
+metric destination and an inference API key could not be read unless
+the configuration managed them. Daniel Farina was asked: "should every
+type with an item GET get a datasource looked up by id, so that
+firewall rules and postgres rules and destinations can be read again?
+If so, should the inference key get one too, with its key marked
+sensitive?" He answered on 6 Nov 2026: "Sure". So a datasource looks
+its object up by id, or by name where the identity accepts one, and
+the inference API key's datasource keeps key sensitive.
+
 **Provenance comments are pointers, not prose.** Daniel Farina, 5 Nov
 2026: "comments can be extremely short and cryptic for back-tracing",
 and "think: closer to debug symbols than for human legibility (so ruby
