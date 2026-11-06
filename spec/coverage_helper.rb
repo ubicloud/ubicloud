@@ -3,7 +3,14 @@
 if ENV["UNUSED_ASSOCIATIONS"]
   require "coverage"
   Coverage.start(methods: true)
-  at_exit { Sequel::Model.update_associations_coverage }
+  at_exit do
+    # Parallel spec processes merge their results into the same coverage
+    # file, so take a lock to keep them from overwriting each other
+    File.open(__FILE__) do |file|
+      file.flock(File::LOCK_EX)
+      Sequel::Model.update_associations_coverage
+    end
+  end
 elsif (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
