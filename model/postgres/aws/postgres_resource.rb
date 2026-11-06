@@ -66,5 +66,14 @@ class PostgresResource < Sequel::Model
       end
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:, availability_zone_required: false)
     end
+
+    # The NIC gets its subnet, and so its zone, when the server is assembled.
+    def aws_servers_placed?
+      true
+    end
+
+    def aws_use_different_az_by_default?
+      project.get_ff_postgres_aws_use_different_azs_for_standbys
+    end
   end
 end
