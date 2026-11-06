@@ -152,3 +152,51 @@ RSpec.describe "reported by customers" do
     expect(rules.map { it.cidr.to_s }.uniq.sort).to eq ["2001:db8::7/128", "203.0.113.7/32"]
   end
 end
+
+RSpec.describe "ubicloud_private_subnet" do
+  def subnet(name = "net", firewall_id = nil) = <<~HCL
+    resource "ubicloud_private_subnet" "net" {
+      location    = "eu-central-h1"
+      name        = "#{name}"
+      #{"firewall_id = \"#{firewall_id}\"" if firewall_id}
+    }
+  HCL
+
+  # The API never returns firewall_id, so an import leaves it null in state.
+  # The plan then adopts the configured value with an update that sends
+  # nothing, rather than replacing the subnet.
+  it "imports a subnet by name, with its firewall_id configured, and plans no replacement" do
+    fw = Firewall.create(name: "web", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+    Prog::Vnet::SubnetNexus.assemble(project.id, name: "net", firewall_id: fw.id)
+
+    expect(tf.plan(<<~HCL + subnet("net", fw.ubid)).actions).to eq("ubicloud_private_subnet.net" => :update)
+      import {
+        to = ubicloud_private_subnet.net
+        id = "eu-central-h1/net"
+      }
+    HCL
+    expect(tf.apply.mutations).to be_empty
+    expect(tf.state("ubicloud_private_subnet.net")["firewall_id"]).to eq fw.ubid
+    expect(tf.plan).to be_empty
+  end
+
+  it "waits after a DELETE until the subnet is gone" do
+    tf.apply subnet
+    ps = PrivateSubnet.first(project_id: project.id)
+    allow(TerraformHarness::Settle).to receive(:settle_private_subnet)
+    at(:response, "GET private-subnet/@net") { ps.destroy }
+
+    expect(tf.destroy("-refresh=false").requests).to match ["DELETE private-subnet/@net", "GET private-subnet/@net", %r{\AGET private-subnet/ps\w+\z}]
+    expect(ledger.entries.last(2).map { [it.status, it.response&.dig("state")] }).to eq [[200, "deleting"], [404, nil]]
+  end
+
+  it "plans to create again a subnet deleted outside terraform" do
+    tf.apply subnet
+    ps = PrivateSubnet.first(project_id: project.id)
+    ps.incr_destroy
+    settle(ps)
+
+    expect(ps).not_to exist
+    expect(tf.plan.actions).to eq("ubicloud_private_subnet.net" => :create)
+  end
+end
