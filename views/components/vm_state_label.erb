@@ -1,2 +1,2 @@
-<%# locals: (state:, extra_class: nil) %>
-<%== render("components/state_label", locals: { state:, color: VM_STATE_LABEL_COLOR[state], extra_class: }) %>
+<%# locals: (state:) %>
+<%== part("components/state_label", state:, kind: VM_STATE_LABEL_KIND[state]) %>

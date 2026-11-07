@@ -2,7 +2,7 @@
 <%== render("components/free_quota") %>
 <%== render("inference/tabbar") %>
 
-<div>
+<div id="inference-api-keys">
   <%== part(
     "components/table_card",
     headers: ["ID", "API Key", ""],
@@ -27,7 +27,7 @@
                       url: path(token),
                       confirmation: "delete api key"
                     },
-                    extra_class: "flex justify-end"
+                    extra_class: "actions"
                   }
                 ]
               end
@@ -39,7 +39,7 @@
   ) %>
 
   <% if has_project_permission("InferenceApiKey:create") && @inference_api_keys.size < 10 %>
-    <div class="flex justify-end space-y-1 mt-6">
+    <div class="actions">
       <% form(action: "#{@project.path}/inference-api-key", method: :post, id: "create-inference-api-key") do %>
         <%== part("components/form/submit_button", text: "Create API Key") %>
       <% end %>

@@ -18,17 +18,17 @@
     ["Total", @invoice_data.total]
   ].compact.map do |name, value|
     <<~CONTENT
-      <dl class="grid grid-cols-3 gap-x-3 #{"text-2xl" if name == "Total"}">
-        <dt class="text-right font-semibold text-gray-800 col-span-2">#{name}:</dt>
-        <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
+      <dl>
+        <dt>#{name}:</dt>
+        <dd id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
       </dl>
     CONTENT
   end.join %>
 
-<div class="grid gap-6">
-  <div class="md:flex md:items-center md:justify-between text-2xl">
-    <div class="min-w-0 flex-1">This invoice will be finalized on the first day of next month</div>
-    <div class="text-right"><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></div>
+<div class="stack" id="invoice">
+  <div>
+    <p>This invoice will be finalized on the first day of next month</p>
+    <p><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></p>
   </div>
 
   <!-- Invoice Card -->
@@ -40,16 +40,16 @@
          amount_html = "<div>#{item.cost_humanized}</div>"
          if item.discount_amount > 0
            discount_humanized = Serializers::InvoiceV2.humanized_cost(item.discount_amount)
-           usage_html << "<div class=\"text-xs text-green-600\">#{h item.discount_name} (-#{item.discount_percent}%)</div>"
-           amount_html << "<div class=\"text-xs text-green-600\">-#{discount_humanized}</div>"
+           usage_html << "<div>#{h item.discount_name} (-#{item.discount_percent}%)</div>"
+           amount_html << "<div>-#{discount_humanized}</div>"
          end
          item.credits.each do |credit|
            credit_humanized = Serializers::InvoiceV2.humanized_cost(credit.amount)
-           usage_html << "<div class=\"text-xs text-green-600\">#{h credit.name}</div>"
-           amount_html << "<div class=\"text-xs text-green-600\">-#{credit_humanized}</div>"
+           usage_html << "<div>#{h credit.name}</div>"
+           amount_html << "<div>-#{credit_humanized}</div>"
          end
-         usage_cell = [usage_html, { extra_class: "text-right", escape: false }]
-         amount_cell = [amount_html, { extra_class: "text-right", escape: false }]
+         usage_cell = [usage_html, { extra_class: "numeric", escape: false }]
+         amount_cell = [amount_html, { extra_class: "numeric", escape: false }]
 
          [
            [
@@ -62,6 +62,6 @@
          ]
       end,
       empty_state: "No resources",
-      footer: "<div class=\"px-4 py-5 sm:p-6 flex justify-end\"><div class=\"grid gap-2 text-right\">#{footer_content}</div></div>"
+      footer: "<div id=\"invoice-totals\"><div>#{footer_content}</div></div>"
     ) %>
 </div>

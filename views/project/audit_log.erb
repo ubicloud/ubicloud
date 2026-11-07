@@ -6,55 +6,53 @@
   breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Audit Log", "#"]]
 ) %>
 
-<div class="grid gap-6">
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
-      <% form(action: "#{@project.path}/audit-log", method: :get) do %>
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "action",
-              label: "Action",
-              value: typecast_params.nonempty_str("action"),
-              attributes: { placeholder: "Filter by action" }
-            ) %>
-          </div>
+<div class="stack">
+  <div class="card">
+    <div>
+      <% form(action: "#{@project.path}/audit-log", method: :get, class: "audit-log-filter") do %>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "action",
+            label: "Action",
+            value: typecast_params.nonempty_str("action"),
+            attributes: { placeholder: "Filter by action" }
+          ) %>
+        </div>
 
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "subject",
-              label: "Account",
-              value: typecast_params.nonempty_str("subject"),
-              attributes: { placeholder: "Filter by account name/email/ID" }
-            ) %>
-          </div>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "subject",
+            label: "Account",
+            value: typecast_params.nonempty_str("subject"),
+            attributes: { placeholder: "Filter by account name/email/ID" }
+          ) %>
+        </div>
 
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "object",
-              label: "Object",
-              value: typecast_params.nonempty_str("object"),
-              attributes: { placeholder: "Filter by object ID" }
-            ) %>
-          </div>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "object",
+            label: "Object",
+            value: typecast_params.nonempty_str("object"),
+            attributes: { placeholder: "Filter by object ID" }
+          ) %>
+        </div>
 
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "end",
-              type: "date",
-              label: "#{@month_limit} Months Prior To",
-              value: @end_date,
-              attributes: {required: true}
-            ) %>
-          </div>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "end",
+            type: "date",
+            label: "#{@month_limit} Months Prior To",
+            value: @end_date,
+            attributes: {required: true}
+          ) %>
+        </div>
 
-          <div class="col-span-12 sm:col-span-2 flex items-end">
-            <%== part("components/form/submit_button", text: "Search") %>
-          </div>
+        <div>
+          <%== part("components/form/submit_button", text: "Search") %>
         </div>
       <% end %>
     </div>

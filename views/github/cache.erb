@@ -2,61 +2,38 @@
 
 <%== render("github/tabbar") %>
 
-<div class="grid grid-cols-1 gap-6">
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+<div id="caches">
+  <div class="card">
     <% if @entries_by_repo.count > 0 %>
-      <div class="px-4 py-3 flex justify-end">
+      <div>
         <% form(action: "#{path(@installation)}/cache/delete", method: :post, id: "delete-selected-form") do %>
           <%== part("components/button", text: "Delete Selected Cache Entries", type: "danger", icon: "hero-trash") %>
         <% end %>
       </div>
     <% end %>
 
-    <div class="overflow-x-auto">
-      <table id="cache-entries" class="min-w-full divide-y divide-gray-300">
-        <tbody class="divide-y divide-gray-200 bg-white">
+    <div>
+      <table id="cache-entries">
+        <tbody>
           <% if @entries_by_repo.count > 0 %>
             <% @entries_by_repo.each do |repository, entries| %>
-              <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository.ubid %>">
-                <th
-                  scope="colgroup"
-                  class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50"
-                  colspan="2"
-                >
-                  <div class="flex">
-                    <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
+              <tr class="cache-group-row" data-repository="<%= repository.ubid %>">
+                <th scope="colgroup" colspan="2">
+                  <div>
+                    <%== part("components/icon", name: "hero-chevron-right") %>
                     <%= repository.name %>
                   </div>
                 </th>
 
-                <th
-                  scope="colgroup"
-                  class="
-                    py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap
-                    group-[.active]:bg-gray-50
-                  "
-                  colspan="2"
-                >
+                <th scope="colgroup" colspan="2">
                   <%= entries.count %> cache entries
                 </th>
 
-                <th
-                  scope="colgroup"
-                  class="
-                    py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap
-                    group-[.active]:bg-gray-50
-                  "
-                >
+                <th scope="colgroup">
                   <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= repository.cache_storage_gib %> GB
                 </th>
 
-                <th
-                  scope="colgroup"
-                  class="
-                    py-3.5 pl-3 pr-4 text-right text-sm font-normal text-gray-900 whitespace-nowrap
-                    group-[.active]:bg-gray-50
-                  "
-                >
+                <th scope="colgroup">
                   <%== part(
                   "components/delete_button",
                   url: "#{path(@installation)}/repository/#{repository.ubid}/cache",
@@ -69,46 +46,39 @@
               </tr>
 
               <% entries.each do |entry| %>
-                <tr id="entry-<%= entry.ubid %>" class="hidden cache-group cache-group-<%= repository.ubid %>">
-                  <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
+                <tr id="entry-<%= entry.ubid %>" class="cache-group cache-group-<%= repository.ubid %>" hidden>
+                  <td>
                     <input
                       type="checkbox"
                       name="ubids[]"
                       value="<%= entry.ubid %>"
                       form="delete-selected-form"
-                      class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
                       id="delete-cache-entry-<%= entry.ubid %>"
                     >
 
                     <label for="delete-cache-entry-<%= entry.ubid %>" class="cache-group-overlay"></label>
                   </td>
 
-                  <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
-                    <div class="font-medium text-gray-900 break-all"><%= entry.key %></div>
+                  <td scope="row">
+                    <div><%= entry.key %></div>
 
-                    <div class="mt-1 text-gray-500 text-xs">
+                    <div>
                       created
                       <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span>
                     </div>
                   </td>
 
-                  <td class="px-3 py-3 text-sm text-gray-500">
+                  <td>
                     <div><%= entry.scope %></div>
                   </td>
 
-                  <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                    <div
-                      class="
-                        inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100
-                        text-slate-800
-                      "
-                      title="<%= entry.size %> bytes"
-                    >
+                  <td>
+                    <div title="<%= entry.size %> bytes">
                       <%= humanize_size(entry.size) %>
                     </div>
                   </td>
 
-                  <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500" colspan="2">
+                  <td colspan="2">
                     <% if entry.last_accessed_at %>
                       <div>Last used</div>
                       <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>">
@@ -124,12 +94,12 @@
           <% else %>
             <tr>
               <td colspan="6">
-                <div class="text-center py-4 px-8 lg:px-32">
-                  <h3 class="text-xl leading-10 font-medium mb-3">No cache entries</h3>
+                <div>
+                  <h3>No cache entries</h3>
 
-                  <p class="leading-6">
+                  <p>
                     Check out
-                    <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
+                    <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache">our documentation</a>
                     to use Ubicloud Cache for faster caching.
                   </p>
                 </div>

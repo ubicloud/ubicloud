@@ -355,7 +355,7 @@ RSpec.describe Clover, "postgres" do
         expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
-        expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90.0%)")
+        expect(page).to have_css("span.danger", text: "115.2 GB is used (90.0%)")
       end
 
       it "shows total disk if there is no VictoriaMetricsResource" do
@@ -407,7 +407,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_content "No connection information available"
         expect(page).to have_no_content "Use Private DNS?"
         password = pg.superuser_password
-        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+        expect(page.all(".connection-info-box div[data-content]", visible: :all).map { it["data-content"] }).to eq [
           "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
           "psql 'postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require'",
           "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCHANNELBINDING=require",
@@ -425,7 +425,7 @@ RSpec.describe Clover, "postgres" do
         pg.private_subnet.connect_subnet(ps)
         page.refresh
         expect(page).to have_content "Use Private DNS?"
-        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+        expect(page.all(".connection-info-box div[data-content]", visible: :all).map { it["data-content"] }).to eq [
           "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
           "psql 'postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require'",
           "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCHANNELBINDING=require",
@@ -457,7 +457,7 @@ RSpec.describe Clover, "postgres" do
         DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
         page.refresh
         expect(page).to have_content "Use Private DNS?"
-        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+        expect(page.all(".connection-info-box div[data-content]", visible: :all).map { it["data-content"] }).to eq [
           "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system",
           "psql 'postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system'",
           "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.app\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=verify-full\nPGCHANNELBINDING=require\nPGSSLROOTCERT=system",
@@ -488,7 +488,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.update(label: "wait_servers")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_content "No connection information available"
-        expect(page.all(".connection-info-box div[data-content]").to_a).to eq []
+        expect(page.all(".connection-info-box div[data-content]", visible: :all).to_a).to eq []
       end
 
       it "shows 404 for invalid pages for read replicas" do
@@ -643,7 +643,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content("Resizing to standard-4")
         expect(page).to have_content("Resizing to 256 GB")
-        expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90%)")
+        expect(page).to have_css("span.danger", text: "115.2 GB is used (90%)")
       ensure
         POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
@@ -1177,10 +1177,10 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/logs"
 
         expect(page).to have_content("invalidZ")
-        expect(page).to have_css("span.text-yellow-600", text: "WARN")
-        expect(page).to have_css("span.text-gray-400", text: "DEBUG")
-        expect(page).to have_css("span.text-gray-400", text: "NONE", count: 2)
-        expect(page).to have_css("span.text-sky-600", text: "INFO")
+        expect(page).to have_css("span.warn", text: "WARN")
+        expect(page).to have_css("span.debug", text: "DEBUG")
+        expect(page).to have_css("span.debug", text: "NONE", count: 2)
+        expect(page).to have_css("span.info", text: "INFO")
         expect(page).to have_no_css("details")
       end
 
@@ -1522,7 +1522,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/config"
         expect(page).to have_button "Save"
 
-        expect { find ".pg-config-card .delete-config-btn" }.not_to raise_error
+        expect { find ".pg-config-card .delete-config-btn", visible: :all }.not_to raise_error
         expect { find ".save-config-btn" }.not_to raise_error
       end
 

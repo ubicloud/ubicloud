@@ -19,13 +19,13 @@ current_usage = @project.current_resource_usage("VmVCpu")
   ]
 ) %>
 
-<% ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"
+<% ps_description = "<p>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet'>Private Subnets</a> page.</p>"
 
   form_elements = [
-    {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='half'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required"},
-    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, opening_tag: "<div class='sm:col-span-3'>"},
-    {name: "new_private_subnet_name", type: "text", label: "Private Subnet Name", placeholder: "Private Subnet Name", opening_tag: "<div class='sm:col-span-3' id='new-private-subnet-name'>", value: typecast_body_params.str("new_private_subnet_name")},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, opening_tag: "<div class='half'>"},
+    {name: "new_private_subnet_name", type: "text", label: "Private Subnet Name", placeholder: "Private Subnet Name", opening_tag: "<div class='half' id='new-private-subnet-name'>", value: typecast_body_params.str("new_private_subnet_name")},
     {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address."},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required"}
   ]
@@ -48,29 +48,29 @@ current_usage = @project.current_resource_usage("VmVCpu")
   if @option_parents.key?("machine_image")
     form_elements.push(
       {name: "machine_image", type: "select", label: "Machine Image", placeholder: "Select a machine image",
-       opening_tag: "<div id='machine-image-block' class='col-span-full sm:col-span-2'>"}
+       opening_tag: "<div id='machine-image-block' class='third'>"}
     )
   end
 
   form_elements.push(
-    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-start-1 sm:col-span-2'>"}
+    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='third row-start'>"}
   )
 
-  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
+  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper'>"}
 
   if @project.ssh_public_keys.empty?
     public_key_params[:required] = "required"
     public_key_params[:description] = "SSH keys are a more secure method of logging into a server."
     if has_project_permission("Project:edit")
-      public_key_params[:description] += " You can <a class='text-orange-600 hover:text-orange-700' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
+      public_key_params[:description] += " You can <a href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
       public_key_params[:escape_description] = false
     end
   else
-    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", opening_tag: "<div class='sm:col-span-3'>"})
+    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", opening_tag: "<div class='half'>"})
   end
 
   form_elements.push(public_key_params)
-  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper' class='col-span-full'>", attributes: {maxlength: 2000}})
+  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper'>", attributes: {maxlength: 2000}})
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}

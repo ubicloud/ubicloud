@@ -7,7 +7,7 @@ pg_resources = dataset_authorize(@project.postgres_resources_dataset.where(priva
 kcs = dataset_authorize(@project.kubernetes_clusters_dataset.where(private_subnet_id: @ps.id), "KubernetesCluster:view").all
 other_resources = pg_resources + kcs %>
 
-<div id="private-subnet-nics" class="p-6">
+<section id="private-subnet-nics">
   <%== part(
     "components/table_card",
     title: "Attached VMs",
@@ -37,7 +37,7 @@ other_resources = pg_resources + kcs %>
   ) %>
 
   <% unless other_resources.empty? %>
-    <div class="pt-4">
+    <div>
       <%== part(
         "components/table_card",
         title: "Other Attached Resources",
@@ -56,4 +56,4 @@ other_resources = pg_resources + kcs %>
       ) %>
     </div>
   <% end %>
-</div>
+</section>

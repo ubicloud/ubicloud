@@ -3,30 +3,30 @@ vm = server.vm
 
 compute_subtext = h("#{vm.vcpus} vCPUs / #{vm.memory_gib} GB RAM")
 if server.fallback_active?
-  compute_subtext += "<br><span class=\"text-amber-600 text-sm\">Fallback from #{h(@pg.target_vm_size)}</span>"
+  compute_subtext += "<br><span class=\"pending\">Fallback from #{h(@pg.target_vm_size)}</span>"
 elsif @pg.target_vm_size != @pg.vm_size
-  compute_subtext += "<br><span class=\"text-amber-600 text-sm\">Resizing to #{h(@pg.target_vm_size)}</span>"
+  compute_subtext += "<br><span class=\"pending\">Resizing to #{h(@pg.target_vm_size)}</span>"
 end
 
 storage_subtext = if (disk_usage_percent = server.observed_disk_usage_percent)
   disk_usage_gib = (disk_usage_percent * server.storage_size_gib / 100.0).round(1)
   subtext = "#{disk_usage_gib} GB is used (#{disk_usage_percent}%)"
-  (disk_usage_percent > 80) ? "<span class=\"text-red-600\">#{subtext}</span>" : subtext
+  (disk_usage_percent > 80) ? "<span class=\"danger\">#{subtext}</span>" : subtext
 else
   ""
 end
 if @pg.target_storage_size_gib != server.storage_size_gib
-  storage_subtext += "<br><span class=\"text-amber-600 text-sm\">Resizing to #{@pg.target_storage_size_gib} GB</span>"
+  storage_subtext += "<br><span class=\"pending\">Resizing to #{@pg.target_storage_size_gib} GB</span>"
 end %>
 
-<div class="p-6">
-  <h3 class="text-base font-semibold text-gray-900 pb-4">Current configuration</h3>
+<section id="pg-current-configuration">
+  <h3>Current configuration</h3>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div>
     <%== part("components/icon_with_text", icon: "hero-cpu-chip", text: @pg.vm_size, subtext_html: compute_subtext) %>
     <%== part("components/icon_with_text", icon: "hero-circle-stack", text: "#{server.storage_size_gib} GB storage", subtext_html: storage_subtext) %>
   </div>
-</div>
+</section>
 
 <% failover_steps = [
   ["hero-server-stack", "Copy your data to the new server", "Minutes to hours, by data size"],
@@ -54,7 +54,7 @@ end
 form_elements = [
   {name: "family", type: "radio_small_cards", label: "Server family", required: "required"},
   {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
-  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", option_disabler: storage_option_disabler, description_html: "<p class=\"mt-2 text-sm text-gray-600\">#{h(storage_description)}</p>"},
+  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", option_disabler: storage_option_disabler, description_html: "<p class=\"storage-description\">#{h(storage_description)}</p>"},
   {name: "failover_time_notice", type: "section", label: "What happens after you update", content_html: part("components/step_timeline", steps: failover_steps, note: "Your database stays online until the failover."), separator: false}
 ]
 

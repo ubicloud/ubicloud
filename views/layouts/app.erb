@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html class="h-full bg-gray-50">
+<html>
   <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -59,30 +59,24 @@
     <% end %>
   </head>
 
-  <body class="h-full">
+  <body>
     <% if rodauth.authenticated? && !@use_page_message %>
-      <div>
-        <%== render("layouts/sidebar/desktop") %>
-        <%== render("layouts/sidebar/mobile") %>
+      <%== render("layouts/sidebar/desktop") %>
+      <%== render("layouts/sidebar/mobile") %>
 
-        <div class="lg:pl-72 overflow-x-clip">
-          <%== render("layouts/topbar") %>
+      <div id="app-content">
+        <%== render("layouts/topbar") %>
 
-          <main class="py-10">
-            <div class="px-4 sm:px-6 lg:px-8">
-              <div class="px-2 sm:px-3 lg:px-4">
-                <%== render("components/flash_message") %>
-                <%== yield %>
-              </div>
-            </div>
-          </main>
-        </div>
+        <main>
+          <%== render("components/flash_message") %>
+          <%== yield %>
+        </main>
       </div>
       <%== render("layouts/notifications") %>
     <% elsif @direct_body_yield %>
       <%== yield %>
     <% else %>
-      <%== part(@wide_page_message ? "layouts/content_wide" : "layouts/content", content_html: yield) %>
+      <%== part("layouts/content", content_html: yield, wide: @wide_page_message) %>
     <% end %>
 
     <%== assets(:js) %>

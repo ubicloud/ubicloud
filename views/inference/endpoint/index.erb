@@ -2,7 +2,7 @@
 <%== render("components/free_quota") %>
 <%== render("inference/tabbar") %>
 
-<div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+<div id="inference-endpoints">
   <% @inference_models.each_with_index do | ie, index |
     path, model_icon, curl_message = case ie.tags["capability"]
       when "Text Generation"
@@ -25,55 +25,55 @@ MSG
 
     curl_snippet_html = <<-CURL
 curl #{ie.load_balancer.health_check_url(path:)} \\
-  -H <span class="text-green-400">"Content-Type: application/json"</span> \\
-  -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_API_KEY</span>"</span> \\
-  -d <span class="text-green-400">'{
+  -H <span class="string">"Content-Type: application/json"</span> \\
+  -H <span class="string">"Authorization: Bearer <span class="variable">$INFERENCE_API_KEY</span>"</span> \\
+  -d <span class="string">'{
     "model": "#{ie.model_name}",
     #{curl_message}   }'</span>
   CURL
     %>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-4">
-    <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
-    <div class="grid sm:grid-cols-2 gap-4">
+  <div class="card">
+    <h2><%= ie.tags["display_name"] || ie.model_name %></h2>
+    <div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
-        <div class="flex items-center gap-1 text-gray-500">
+        <h3>Model card</h3>
+        <div>
           <%if hf_model = ie.tags["hf_model"]%>
-          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
+          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" >🤗 <%= hf_model %></a>
           <%else%>
-          <p class="text-gray-500">Not available</p>
+          <p>Not available</p>
           <%end%>
         </div>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Price</h3>
-        <p class="text-gray-500">
+        <h3>Price</h3>
+        <p>
           Input: $<%= "%0.02f" % BillingRate.million_token_price(ie.prompt_billing_resource) %> / 1M tokens
           <br>
           Output: $<%= "%0.02f" % BillingRate.million_token_price(ie.completion_billing_resource) %> / 1M tokens
         </p>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
-        <div class="flex items-center gap-1 text-gray-500">
-          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
+        <h3>Capability</h3>
+        <div>
+          <%== part("components/icon", name: model_icon) %>
           <%= ie.tags["capability"] %>
         </div>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
-        <p class="text-gray-500"><%= ie.tags.fetch("context_length", "Full") %></p>
+        <h3>Context length</h3>
+        <p><%= ie.tags.fetch("context_length", "Full") %></p>
       </div>
-      <div class="sm:col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">URL</h3>
-        <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
+      <div>
+        <h3>URL</h3>
+        <div><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
       </div>
-      <div class="sm:col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">
+      <div>
+        <h3>
           CURL usage example
         </h3>
-        <div class="mt-2">
-          <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet_html %></pre>
+        <div>
+          <pre><%== curl_snippet_html %></pre>
         </div>
       </div>
       <% if ie.tags["capability"] == "Text Generation" %>

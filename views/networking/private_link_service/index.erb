@@ -4,7 +4,7 @@ create_link = "#{@project.path}/private-link-service/#{@provider}/create"
 
 <%== render("networking/tabbar") %>
 
-<div class="grid gap-6">
+<div class="stack">
   <%== part(
     "components/table_card",
     headers: ["Name", "Private Subnet", "Service Name", "Attached Resource", "State"],
@@ -32,7 +32,7 @@ create_link = "#{@project.path}/private-link-service/#{@provider}/create"
   ) %>
 
   <% if @private_link_services.count > 0 && has_project_permission("PrivateLinkService:create") %>
-    <div class="flex justify-end">
+    <div class="actions">
       <%== part("components/button", text: ui[:create], link: create_link) %>
     </div>
   <% end %>

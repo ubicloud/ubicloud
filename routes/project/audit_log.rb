@@ -42,9 +42,9 @@ class Clover
             object_ubid = UBID.to_ubid(object_id)
             l_params = to_query_string("end" => end_date, "object" => object_ubid)
             if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path) && obj.project_id_match?(@project.id)
-              "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
+              "<a href=\"?#{h l_params}\">#{h obj.name}</a> (<a href=\"#{@project.path}#{obj.path}\">View</a>)"
             else
-              "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h object_ubid}</a>"
+              "<a href=\"?#{h l_params}\">#{h object_ubid}</a>"
             end
           end
         end

@@ -2,11 +2,11 @@
 
 <% @page_message = "Resend account verification" %>
 
-<% form(action: rodauth.verify_account_resend_path, method: :post, class: "rodauth space-y-6") do %>
+<% form(action: rodauth.verify_account_resend_path, method: :post, class: "auth-form") do %>
   <% recently_sent = rodauth.verify_account_email_recently_sent? if rodauth.account %>
 
   <% if !rodauth.account || recently_sent %>
-    <div class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></div>
+    <div class="explanation"><%== rodauth.verify_account_resend_explanatory_text %></div>
   <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>
@@ -15,13 +15,13 @@
     <%== render("components/rodauth/login_field") %>
   <% end %>
 
-  <div class="flex flex-col text-center">
+  <div class="auth-actions">
     <%== part(
       "components/form/submit_button",
       text: "Send Verification Again",
       attributes: recently_sent ? { disabled: true } : {}
     ) %>
 
-    <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
+    <a href="/login">Sign in to another account</a>
   </div>
 <% end %>

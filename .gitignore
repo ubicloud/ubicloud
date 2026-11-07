@@ -4,7 +4,6 @@
 /demo/.env
 /var/*
 /tmp/*
-/assets/css/app.css
 /.auto-parallel-tests
 /sdk/ruby/*.gem
 /sql.log

@@ -40,23 +40,23 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
   [stage.first, description, database_availability_icon, stage_status_icon]
 end %>
 
-<div class="p-6">
-  <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Upgrade</h3>
+<section id="pg-upgrade">
+  <h3>Upgrade</h3>
 
   <% flash["errors"]&.each_value do |msg| %>
-    <p class="text-red-900 mt-2"><%= msg %></p>
+    <p class="error"><%= msg %></p>
   <% end %>
 
   <% if @pg.display_state == "creating" %>
-    <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
+    <p class="unavailable">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
-    <% if @pg.upgrade_stage == "upgrade_failed" %>
-      <p>
+    <p>
+      <% if @pg.upgrade_stage == "upgrade_failed" %>
         Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
-      </p>
-    <% else %>
-      <p>Database upgrade is in progress.</p>
-    <% end %>
+      <% else %>
+        Database upgrade is in progress.
+      <% end %>
+    </p>
     <% upgrade_progress_rows = upgrade_progress
     .map do |stage, description, database_availability_icon, stage_status_icon|
       [
@@ -86,7 +86,7 @@ end %>
   <% elsif @pg.can_upgrade? %>
     <p>Your database can be upgraded to Postgres <%= @pg.version.to_i + 1 %>.</p>
 
-    <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+    <% form(action: "#{path(@pg)}/restore", method: :post) do %>
       <%== part("components/form/section", label: "Preparing for an Upgrade",
       content: "Before starting an upgrade, make sure to test the upgrade on a
       staging database along with your application to ensure compatibility. 
@@ -97,7 +97,7 @@ end %>
       <%== part("components/form/hidden", name: "#{@pg.name}-upgrade-test") %>
       <%== part("components/form/hidden", restore_target: @pg.timeline.latest_restore_time.to_s) %>
 
-      <div class="flex justify-end mt-6">
+      <div class="actions">
         <%== part("components/form/submit_button", text: "Create a test fork") if @edit_perm %>
       </div>
     <% end %>
@@ -109,15 +109,15 @@ end %>
     ]
     upgrade_steps << ["read-replica", "Upgrade the read replicas", "Starts once the primary is upgraded"] if @pg.read_replicas.any? %>
 
-    <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+    <% form(action: "#{path(@pg)}/upgrade", method: :post) do %>
       <%== part("components/form/section", label: "What happens after you start",
       content_html: part("components/step_timeline", steps: upgrade_steps, note: "Your database stays online until the upgrade.")) %>
 
-      <div class="flex justify-end mt-6">
-        <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
+      <div class="actions">
+        <%== part("components/form/submit_button", text: "Start Upgrade") if @edit_perm %>
       </div>
     <% end %>
   <% else %>
     <p>Your database is already on the latest version.</p>
   <% end %>
-</div>
+</section>

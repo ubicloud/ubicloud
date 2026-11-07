@@ -11,7 +11,7 @@ nodes =
     retire =
       if can_edit
         if node.state != "active"
-          "<span class=\"text-sm font-medium text-gray-500\">Retiring...</span>"
+          "<span class=\"retiring\">Retiring...</span>"
         elsif node_retirable
           part(
             "components/delete_button",
@@ -29,7 +29,7 @@ nodes =
 headers = %w[Name State Hostname]
 headers << "Actions" if can_edit %>
 
-<div class="p-6">
+<section>
   <%== part(
     "components/table_card",
     title: "Nodes",
@@ -42,4 +42,4 @@ headers << "Actions" if can_edit %>
         [columns, { id: "node-#{n[:name]}" }]
       end
   ) %>
-</div>
+</section>

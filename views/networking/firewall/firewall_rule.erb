@@ -25,18 +25,14 @@
 
   page_heading = "#{heading} Firewall Rule" %>
 
-<div class="p-6 grid gap-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        <%= page_heading %>
-      </h3>
-    </div>
+<section id="firewall-rule">
+  <div class="section-header">
+    <h3><%= page_heading %></h3>
   </div>
 
   <div>
-    <% form(action:, method: :post, class: "gap-6", id: "firewall-rule-form") do %>
-      <div class="mb-2">
+    <% form(action:, method: :post, id: "firewall-rule-form") do %>
+      <div>
         <div id="port-type">
           <%== part(
             "components/form/select",
@@ -55,7 +51,7 @@
         </div>
       </div>
 
-      <div class="mb-2">
+      <div>
         <div id="source-type">
           <%== part(
             "components/form/select",
@@ -88,7 +84,7 @@
         </div>
       </div>
 
-      <div class="mb-2">
+      <div>
         <%== part("components/form/text", name: "description", label: "Rule Description", attributes: {placeholder: "reason rule was added"}, value: description) %>
       </div>
 
@@ -97,41 +93,36 @@
   </div>
 
   <% unless fwr %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-2 py-2 sm:p-6">
-        <div class="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <div class="mt-2 text-sm text-gray-500">
-              <p class="mb-2">
-                Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The
-                default behavior for a new connection without an applicable firewall rule is to disallow access.
-              </p>
+    <div class="card">
+      <div>
+        <div>
+          <p>
+            Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The default
+            behavior for a new connection without an applicable firewall rule is to disallow access.
+          </p>
 
-              <p class="mb-2">
-                To allow access, create a firewall rule for the source IP address range that will be connecting and the
-                desination port range that will be connected to.
-              </p>
+          <p>
+            To allow access, create a firewall rule for the source IP address range that will be connecting and the
+            desination port range that will be connected to.
+          </p>
 
-              <ul class="ml-6 mb-2 list-disc">
-                <li>
-                  To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of
-                  "1.2.3.4/32").
-                </li>
+          <ul>
+            <li>
+              To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of
+              "1.2.3.4/32").
+            </li>
 
-                <li>
-                  You can optionally add a description for the rule, to help you remember why the access has been
-                  allowed.
-                </li>
-              </ul>
+            <li>
+              You can optionally add a description for the rule, to help you remember why the access has been allowed.
+            </li>
+          </ul>
 
-              <p class="mb-2">
-                Rules added to this firewall affect access to all resources in all private subnets that the firewall is
-                attached to.
-              </p>
-            </div>
-          </div>
+          <p>
+            Rules added to this firewall affect access to all resources in all private subnets that the firewall is
+            attached to.
+          </p>
         </div>
       </div>
     </div>
   <% end %>
-</div>
+</section>

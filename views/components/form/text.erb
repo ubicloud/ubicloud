@@ -2,21 +2,14 @@
 <% value = typecast_body_params.str(name) || value if name
 error = rodauth.field_error(name) || flash.dig("errors", name) %>
 
-<div class="space-y-2 text-gray-900">
+<div class="field">
   <% if label %>
-    <label for="<%= name %>" class="block text-sm font-medium leading-6"><%= label %></label>
+    <label for="<%= name %>"><%= label %></label>
   <% end %>
 
-  <div class="flex">
+  <div>
     <% if prefix %>
-      <div
-        class="
-          flex shrink-0 items-center rounded-l-md bg-gray-50 px-3 text-base text-gray-500 outline outline-1
-          -outline-offset-1 outline-gray-300 sm:text-sm/6
-        "
-      >
-        <%= prefix %>
-      </div>
+      <span><%= prefix %></span>
     <% end %>
 
     <input
@@ -26,7 +19,12 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
       <% if value %>
         value="<%= value %>"
       <% end %>
-      class="block w-full border-0 py-1.5 pl-3 pr-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600" %> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
+      <% if extra_class %>
+        class="<%= extra_class %>"
+      <% end %>
+      <% if error %>
+        aria-invalid="true"
+      <% end %>
       <%== html_attrs(attributes) %>
     >
 

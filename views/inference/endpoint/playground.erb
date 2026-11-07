@@ -3,9 +3,9 @@
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
 
-<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-  <div class="px-4 py-5 sm:p-6 grid gap-6">
-    <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
+<div class="card" id="playground">
+  <div>
+    <div>
       <%== part(
         "components/form/select",
         name: "inference_endpoint",
@@ -37,8 +37,8 @@
       options: [["show_advanced", "Show advanced settings", nil, nil]]
     ) %>
 
-    <div class="hidden grid gap-6" id="inference_config_advanced_settings">
-      <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
+    <div id="inference_config_advanced_settings" hidden>
+      <div>
         <%== part(
           "components/form/text",
           name: "inference_temperature",
@@ -48,8 +48,7 @@
             "placeholder" => 1.0,
             "min" => 0.0,
             "max" => 2.0,
-          },
-          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          }
         ) %>
 
         <%== part(
@@ -62,7 +61,6 @@
             "min" => 0.0,
             "max" => 1.0,
           },
-          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         ) %>
       </div>
 
@@ -80,7 +78,7 @@
     </div>
   </div>
 
-  <div class="px-4 py-5 sm:p-6 grid gap-6">
+  <div>
     <div>
       <%== part(
         "components/button",
@@ -93,8 +91,8 @@
     </div>
 
     <div>
-      <div class="block text-sm font-medium leading-6 text-gray-900 mb-2">Previous Messages</div>
-      <div id="inference_previous_empty" class="text-sm text-gray-500">There are no messages yet.</div>
+      <div>Previous Messages</div>
+      <div id="inference_previous_empty">There are no messages yet.</div>
       <div id="inference_previous"></div>
     </div>
 
@@ -110,19 +108,12 @@
         },
       ) %>
 
-      <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
-        <div class="flex flex-row items-center">
-          <input
-            type="file"
-            id="inference_files"
-            accept=".jpg,.jpeg,.png,.pdf"
-            class="inline-flex items-center text-sm"
-            multiple
-            aria-label="Upload files"
-          >
+      <div>
+        <div>
+          <input type="file" id="inference_files" accept=".jpg,.jpeg,.png,.pdf" multiple aria-label="Upload files">
         </div>
 
-        <div class="flex flex-row items-center justify-end">
+        <div>
           <%== part(
             "components/button",
             text: "Submit",

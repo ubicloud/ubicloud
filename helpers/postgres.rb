@@ -110,7 +110,7 @@ class Clover
     if (window = pg.maintenance_window_label)
       ["hero-cog-8-tooth", "Wait for the maintenance window", h(window)]
     else
-      link = "<a href=\"#{path(pg)}/settings\" class=\"font-medium text-orange-600 hover:text-orange-700\">Set a maintenance window</a>"
+      link = "<a href=\"#{path(pg)}/settings\">Set a maintenance window</a>"
       ["hero-cog-8-tooth", "No maintenance window", "#{subject} starts right away. #{link}."]
     end
   end

@@ -170,11 +170,11 @@ RSpec.describe Clover, "vm" do
 
         click_link vm.name
         expect(page).to have_content "123 GB"
-        expect(page.body).to include "auto-refresh hidden"
+        expect(page).to have_css(".auto-refresh", visible: :all)
 
         vm.this.update(display_state: "running")
         page.refresh
-        expect(page.body).not_to include "auto-refresh hidden"
+        expect(page).to have_no_css(".auto-refresh", visible: :all)
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
@@ -654,10 +654,11 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}/vm/create?show_gpu=true"
 
         expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
-        expect(page).to have_content "96 vCPUs / 864 GB RAM"
-        expect(page).to have_content "4 × 1600GB"
-        expect(page).to have_content "4 × 3200GB"
-        expect(page.find("input[name=size][value=b300-4]").find(:xpath, "..")[:class].split).to include("form_gpu_4:3182")
+        # Options are hidden until a GPU is selected
+        expect(page).to have_text :all, "96 vCPUs / 864 GB RAM"
+        expect(page).to have_text :all, "4 × 1600GB"
+        expect(page).to have_text :all, "4 × 3200GB"
+        expect(page.find("input[name=size][value=b300-4]", visible: :all).find(:xpath, "..", visible: :all)[:class].split).to include("form_gpu_4:3182")
         expect(page.all("input[name=size][value=standard-2]", visible: :all).flat_map { it.find(:xpath, "..")[:class].split }).not_to include(start_with("form_gpu_"))
       end
 

@@ -8,20 +8,14 @@ let option_children = <%== allow_unescaped(JSON.generate(option_parents.each_wit
 let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] })) %>
 </script>
 
-<div>
-  <div class="grid gap-6">
-    <% form(action:, method: "POST", id: "creation-form") do %>
-      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
-      <div class="<%= container_class %>">
-        <div class="px-4 py-5 sm:p-6">
-          <div class="space-y-12">
-            <div>
-              <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+<% form(action:, method: "POST", id: "creation-form", class: (mode == "create") ? "card resource-form" : "resource-form") do %>
+  <div>
+    <div>
                 <% selected_options = {}
   pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
 
   form_elements.each do |element|
-    container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
+    container_opening_tag = element[:opening_tag] || "<div>"
     container_closing_tag = element[:closing_tag] || "</div>"
 
     name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
@@ -58,11 +52,11 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
         selected_options[name] = opt_val if checked
 
         opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.tr(".", "-")}" }
-        opt_classes << "hidden" unless parents_selected
         opt_classes << "option-unavailable" if unavailable_reason
         opt_classes = opt_classes.join(" ")
 
         opt_attrs = {}
+        opt_attrs[:hidden] = true unless parents_selected
         opt_attrs[:disabled] = "disabled" if unavailable_reason || !parents_selected
         opt_attrs[:checked] = checked
 
@@ -101,21 +95,14 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
                   <%== part("components/form/#{type}", **locals) %>
                   <%== container_closing_tag %>
                 <% end %>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="flex items-center justify-end gap-x-6">
-            <% if mode == "create" %>
-              <a href="<%= cancel_link %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-              <%== part("components/form/submit_button", text: "Create") %>
-            <% else %>
-              <%== part("components/form/submit_button", text: "Update") %>
-            <% end %>
-          </div>
-        </div>
-      </div>
+    </div>
+  </div>
+  <div>
+    <% if mode == "create" %>
+      <a href="<%= cancel_link %>">Cancel</a>
+      <%== part("components/form/submit_button", text: "Create") %>
+    <% else %>
+      <%== part("components/form/submit_button", text: "Update") %>
     <% end %>
   </div>
-</div>
+<% end %>
