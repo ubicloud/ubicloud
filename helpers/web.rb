@@ -1,46 +1,41 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  PG_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
-    "running" => "bg-green-100 text-green-800",
-    "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800",
+  # Badge kinds used for state labels (see .badge in assets/css/app.css).
+  # States not listed use the neutral badge.
+  PG_STATE_LABEL_KIND = {
+    "running" => "success",
+    "creating" => "warning",
+    "deleting" => "danger",
+  }.freeze
+
+  PS_STATE_LABEL_KIND = Hash.new("warning").merge!(
+    "available" => "success",
+    "deleting" => "danger",
   ).freeze
 
-  PS_STATE_LABEL_COLOR = Hash.new("bg-yellow-100 text-yellow-80").merge!(
-    "available" => "bg-green-100 text-green-800",
-    "deleting" => "bg-red-100 text-red-800",
+  KUBERNETES_STATE_LABEL_KIND = PG_STATE_LABEL_KIND
+
+  MACHINE_IMAGE_VERSION_STATE_LABEL_KIND = {
+    "ready" => "success",
+    "creating" => "warning",
+    "destroying" => "danger",
+    "failed" => "danger",
+  }.freeze
+
+  VM_STATE_LABEL_KIND = PG_STATE_LABEL_KIND.merge(
+    "rebooting" => "warning",
+    "starting" => "warning",
+    "waiting for capacity" => "warning",
+    "restarting" => "warning",
+    "deleted" => "danger",
   ).freeze
 
-  KUBERNETES_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
-    "running" => "bg-green-100 text-green-800",
-    "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800",
-  ).freeze
-
-  MACHINE_IMAGE_VERSION_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
-    "ready" => "bg-green-100 text-green-800",
-    "creating" => "bg-yellow-100 text-yellow-800",
-    "destroying" => "bg-red-100 text-red-800",
-    "failed" => "bg-red-100 text-red-800",
-  ).freeze
-
-  VM_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
-    "running" => "bg-green-100 text-green-800",
-    "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800",
-  )
-  ["rebooting", "starting", "waiting for capacity", "restarting"].each do
-    VM_STATE_LABEL_COLOR[it] = VM_STATE_LABEL_COLOR["creating"]
-  end
-  VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
-  VM_STATE_LABEL_COLOR.freeze
-
-  BUTTON_COLOR = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
-    "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
-    "safe" => "bg-green-600 hover:bg-green-700 focus-visible:outline-green-600",
-    "warning" => "bg-amber-600 hover:bg-amber-700 focus-visible:outline-amber-600",
-    "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600",
+  BUTTON_CLASS = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
+    "primary" => "button",
+    "safe" => "button safe",
+    "warning" => "button warning",
+    "danger" => "button danger",
   ).freeze
 
   PG_HA_DATA = {
@@ -167,7 +162,7 @@ class Clover < Roda
   def html_attrs(attributes)
     attributes.map do |key, value|
       case key
-      when :required, :checked, :readonly, :autofocus
+      when :required, :checked, :readonly, :autofocus, :hidden
         case value
         when true
           key.name
@@ -263,7 +258,7 @@ class Clover < Roda
     end
 
     if link_text
-      rows << [[["<a class=\"text-orange-600\" href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
+      rows << [[["<a href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
     end
   end
 

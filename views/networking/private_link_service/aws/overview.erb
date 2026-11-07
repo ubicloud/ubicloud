@@ -3,7 +3,7 @@
 <% aws = pls.private_link_service_aws_resource %>
 
 <div>
-  <h3 class="text-base font-semibold leading-6 text-gray-900 pb-2" id="aws-privatelink-heading">AWS PrivateLink</h3>
+  <h3 id="aws-privatelink-heading">AWS PrivateLink</h3>
 
   <%== part("components/kv_data_card", data: [
     ["Service Name", aws.service_name || "Provisioning", { copyable: !aws.service_name.nil? }],

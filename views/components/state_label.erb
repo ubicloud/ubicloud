@@ -1,6 +1,6 @@
-<%# locals: (state:, color:, extra_class: nil) %>
+<%# locals: (state:, kind: nil) %>
 
-<span class="inline-flex items-baseline rounded-full px-2 text-xs font-semibold leading-5 <%= color %> <%= extra_class %>">
-  <%== part("components/icon", name: "dot", classes: "mr-1.5 h-2 w-2") %>
+<span class="badge <%= kind %>">
+  <%== part("components/icon", name: "dot") %>
   <%= state %>
 </span>

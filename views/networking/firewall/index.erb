@@ -1,7 +1,7 @@
 <% @page_title = "Firewalls" %>
 <%== render("networking/tabbar") %>
 
-<div class="grid gap-6">
+<div class="stack">
   <%== part(
     "components/table_card",
     headers: ["Name", "Location", "Description"],
@@ -27,7 +27,7 @@
   ) %>
 
   <% if @firewalls.count > 0 && has_project_permission("Firewall:create") %>
-    <div class="flex justify-end">
+    <div class="actions">
       <%== part("components/button", text: "Create Firewall", link: "firewall/create") %>
     </div>
   <% end %>

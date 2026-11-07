@@ -6,10 +6,10 @@
   in_flight_states = %w[creating destroying].freeze %>
 
 <% if @versions.any? { |v| in_flight_states.include?(v.metal&.display_state) } %>
-  <div class="auto-refresh hidden" data-interval="60"></div>
+  <div class="auto-refresh" data-interval="60" hidden></div>
 <% end %>
 
-<div class="p-6">
+<section>
   <%== part(
   "components/table_card",
   headers: version_headers,
@@ -33,7 +33,7 @@
       cells << if metal && metal.display_state != "destroying"
         [
           "delete_button",
-          {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}
+          {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "actions"}
         ]
       else
         ""
@@ -47,4 +47,4 @@
     description: "Create a version by capturing a stopped VM."
   }
 ) %>
-</div>
+</section>

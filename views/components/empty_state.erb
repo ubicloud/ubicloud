@@ -1,13 +1,13 @@
 <%# locals: (title:, icon:, description:, button_link: nil, button_title: nil, buttons: nil) %>
 
-<div class="text-center empty-state">
-  <%== part("components/icon", name: icon, classes: "mx-auto h-12 w-12 text-gray-400") %>
+<div class="empty-state">
+  <%== part("components/icon", name: icon) %>
 
-  <h3 class="mt-2 text-sm font-semibold text-gray-900"><%= title %></h3>
+  <h3><%= title %></h3>
 
-  <p class="mt-1 text-sm text-gray-500"><%= description %></p>
+  <p><%= description %></p>
 
-  <div class="mt-6">
+  <div>
     <% if buttons %>
       <% buttons.each do |text, link| %>
         <%== part("components/button", link:, text:) %>
@@ -15,7 +15,7 @@
     <% elsif button_link %>
       <%== part("components/button", link: button_link, text: button_title) %>
     <% elsif button_title %>
-      <div class="flex justify-center">
+      <div>
         <%== part("components/button", text: button_title, attributes: { type: "submit" }) %>
       </div>
     <% end %>

@@ -15,33 +15,33 @@ end
   <% active_resource_discounts = @project.active_resource_discounts
      active_resource_credits = @project.active_resource_credits %>
 
-  <div class="grid grid-cols-1 gap-6">
+  <div class="stack" id="billing">
     <!-- Summary -->
     <div>
-      <dl class="grid grid-cols-2 gap-5 <%= active_resource_discounts.any? ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
+      <dl id="billing-summary">
+        <div>
+          <dt>Current Usage</dt>
 
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          <dd>
             <%= money(@invoices.first.subtotal) %>
           </dd>
         </div>
 
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
+        <div>
+          <dt>Last Month</dt>
 
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          <dd>
             <%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %>
           </dd>
         </div>
 
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credits</dt>
+        <div>
+          <dt>Remaining Credits</dt>
 
           <% if active_resource_credits.empty? || active_resource_credits.sum(&:amount).to_f == 0 %>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">$0.00</dd>
+            <dd>$0.00</dd>
           <% else %>
-            <dd class="mt-1 text-lg font-semibold tracking-tight text-gray-900">
+            <dd>
               <% active_resource_credits.each do |rc| %>
                 <% next if rc.amount == 0 %>
 
@@ -52,10 +52,10 @@ end
         </div>
 
         <% if active_resource_discounts.any? %>
-          <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-            <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
+          <div>
+            <dt>Discount</dt>
 
-            <dd class="mt-1 text-lg font-semibold tracking-tight text-gray-900">
+            <dd>
               <% active_resource_discounts.each do |rd| %>
                 <div><%= rd.name.to_s.empty? ? "Discount" : rd.name %>: <%= rd.discount_percent.to_i %>%</div>
               <% end %>
@@ -68,135 +68,125 @@ end
     <!-- Billing Info Update Card -->
     <% stripe_data = billing_info.stripe_data %>
 
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Billing Details
-        </h3>
-      </div>
+    <div class="section-header compact">
+      <h3>Billing Details</h3>
     </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <% form(action: billing_path, method: :post) do %>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="space-y-12">
+    <div class="card">
+      <% form(action: billing_path, method: :post, id: "billing-details") do %>
+        <div>
+          <div>
+            <div class="half">
+              <%== part(
+                "components/form/text",
+                name: "name",
+                label: "Billing Name",
+                value: stripe_data["name"],
+                attributes: {
+                  required: true
+                }
+              ) %>
+            </div>
+
+            <div class="half">
+              <%== part(
+                "components/form/text",
+                name: "email",
+                label: "Billing Email",
+                value: stripe_data["email"],
+                attributes: {
+                  required: true
+                }
+              ) %>
+            </div>
+
+            <div class="quarter">
+              <%== part(
+                "components/form/select",
+                name: "country",
+                label: "Country",
+                placeholder: "Select a Country",
+                selected: stripe_data["country"],
+                options:
+                  ISO3166::Country
+                    .all
+                    .reject { Config.sanctioned_countries.include?(it.alpha2) }
+                    .sort_by(&:common_name)
+                    .map { |c| [c.alpha2, c.common_name] },
+                attributes: {
+                  required: true
+                }
+              ) %>
+            </div>
+
+            <div class="quarter">
+              <%== part("components/form/text", name: "state", label: "State", value: stripe_data["state"]) %>
+            </div>
+
+            <div class="quarter">
+              <%== part("components/form/text", name: "city", label: "City", value: stripe_data["city"]) %>
+            </div>
+
+            <div class="quarter">
+              <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: stripe_data["postal_code"]) %>
+            </div>
+
             <div>
-              <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-8">
-                <div class="sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "name",
-                    label: "Billing Name",
-                    value: stripe_data["name"],
-                    attributes: {
-                      required: true
-                    }
-                  ) %>
-                </div>
+              <%== part(
+                "components/form/textarea",
+                name: "address",
+                label: "Address",
+                value: stripe_data["address"],
+                attributes: {
+                  required: true
+                }
+              ) %>
+            </div>
 
-                <div class="sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "email",
-                    label: "Billing Email",
-                    value: stripe_data["email"],
-                    attributes: {
-                      required: true
-                    }
-                  ) %>
-                </div>
+            <div class="half">
+              <%== part(
+                "components/form/text",
+                name: "tax_id",
+                label: billing_info.country&.in_eu_vat? ? "VAT ID" : "Tax ID",
+                value: stripe_data["tax_id"]
+              ) %>
 
-                <div class="sm:col-span-4 md:col-span-2">
-                  <%== part(
-                    "components/form/select",
-                    name: "country",
-                    label: "Country",
-                    placeholder: "Select a Country",
-                    selected: stripe_data["country"],
-                    options:
-                      ISO3166::Country
-                        .all
-                        .reject { Config.sanctioned_countries.include?(it.alpha2) }
-                        .sort_by(&:common_name)
-                        .map { |c| [c.alpha2, c.common_name] },
-                    attributes: {
-                      required: true
-                    }
-                  ) %>
-                </div>
-
-                <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "state", label: "State", value: stripe_data["state"]) %>
-                </div>
-
-                <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "city", label: "City", value: stripe_data["city"]) %>
-                </div>
-
-                <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: stripe_data["postal_code"]) %>
-                </div>
-
-                <div class="col-span-full">
-                  <%== part(
-                    "components/form/textarea",
-                    name: "address",
-                    label: "Address",
-                    value: stripe_data["address"],
-                    attributes: {
-                      required: true
-                    }
-                  ) %>
-                </div>
-
-                <div class="sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "tax_id",
-                    label: billing_info.country&.in_eu_vat? ? "VAT ID" : "Tax ID",
-                    value: stripe_data["tax_id"]
-                  ) %>
-
-                  <% if billing_info.country&.in_eu_vat? %>
-                    <div class="mt-2 text-sm text-gray-500">
-                      <% if billing_info.valid_vat == false %>
-                        The VAT ID you entered could not be verified in the VIES database. Please enter a valid VAT ID,
-                        otherwise VAT may be charged even if you don't expect to pay it.
-                      <% elsif billing_info.country.alpha2 == "NL" %>
-                        21% VAT is collected from customers located in the Netherlands.
-                      <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
-                        EU registered business can enter their VAT ID to remove VAT from future invoices.
-                      <% else %>
-                        VAT subject to reverse charge.
-                      <% end %>
-                    </div>
+              <% if billing_info.country&.in_eu_vat? %>
+                <p>
+                  <% if billing_info.valid_vat == false %>
+                    The VAT ID you entered could not be verified in the VIES database. Please enter a valid VAT ID,
+                    otherwise VAT may be charged even if you don't expect to pay it.
+                  <% elsif billing_info.country.alpha2 == "NL" %>
+                    21% VAT is collected from customers located in the Netherlands.
+                  <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
+                    EU registered business can enter their VAT ID to remove VAT from future invoices.
+                  <% else %>
+                    VAT subject to reverse charge.
                   <% end %>
-                </div>
+                </p>
+              <% end %>
+            </div>
 
-                <div class="sm:col-span-4">
-                  <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
-                </div>
+            <div class="half">
+              <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
+            </div>
 
-                <div class="col-span-full">
-                  <%== part(
-                    "components/form/textarea",
-                    name: "note",
-                    label: "Invoice Note",
-                    value: stripe_data["note"],
-                    attributes: {
-                      placeholder: "Enter details for your invoices, such as a PO number, tax information, or special instructions"
-                    }
-                  ) %>
-                </div>
-              </div>
+            <div>
+              <%== part(
+                "components/form/textarea",
+                name: "note",
+                label: "Invoice Note",
+                value: stripe_data["note"],
+                attributes: {
+                  placeholder: "Enter details for your invoices, such as a PO number, tax information, or special instructions"
+                }
+              ) %>
             </div>
           </div>
         </div>
 
-        <div class="px-4 py-5 sm:p-6">
-          <div class="flex items-center justify-end gap-x-6">
-            <%== part("components/form/submit_button", text: "Update") %>
-          </div>
+        <div>
+          <%== part("components/form/submit_button", text: "Update") %>
         </div>
       <% end %>
     </div>
@@ -226,7 +216,7 @@ end
                       hidden_inputs: { project_id: @project.ubid },
                       confirmation: pm.stripe_data["last4"]
                     },
-                    extra_class: "flex justify-end"
+                    extra_class: "actions"
                   }
                 ]
               else
@@ -243,40 +233,36 @@ end
 
     <!-- Invoices -->
     <div>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Invoices
-          </h3>
-        </div>
+      <div class="section-header compact">
+        <h3>Invoices</h3>
       </div>
 
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-300">
-            <thead class="bg-gray-50">
+      <div class="card" id="invoices">
+        <div>
+          <table>
+            <thead>
               <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                <th scope="col">
                   Invoice
                 </th>
 
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+                <th scope="col">Amount</th>
 
-                <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">
+                <th scope="col">
                   Status
                 </th>
               </tr>
             </thead>
 
-            <tbody class="divide-y divide-gray-200 bg-white">
+            <tbody>
               <% @invoices.each do |inv| %>
                 <tr id="invoice-<%= inv.path_id %>">
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <a href="<%= path(inv) %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                  <td scope="row">
+                    <a href="<%= path(inv) %>" target="_blank">
                       <%= inv.name %>
                     </a>
 
-                    <span class="text-xs text-gray-400 italic">
+                    <span>
                       <% if inv.invoice_number %>
                         #<%= inv.invoice_number %>
                       <% else %>
@@ -285,15 +271,15 @@ end
                     </span>
                   </td>
 
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <td>
                     <%= inv.total_humanized %>
 
                     <% if inv.cost != inv.subtotal %>
-                      <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
+                      <span>(<%= money(inv.subtotal) %>)</span>
                     <% end %>
                   </td>
 
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
+                  <td>
                     <%= inv.status %>
 
                     <% if inv.payable? %>
@@ -308,7 +294,7 @@ end
               <% if @invoices.count == 1 %>
                 <tr>
                   <td colspan="3">
-                    <div class="text-center text-lg p-4">
+                    <div>
                       No invoices finalized yet. Invoice for the current month will be created on the first day of next
                       month.
                     </div>
@@ -339,63 +325,55 @@ end
 
 <!-- Usage alerts -->
 <div>
-  <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Usage Alerts
-      </h3>
-    </div>
+  <div class="section-header compact">
+    <h3>Usage Alerts</h3>
   </div>
 
-  <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <div class="stack">
+    <div class="card" id="usage-alerts">
       <!-- Add usage alert -->
-      <div class="px-4 py-5 sm:p-6">
+      <div>
         <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
-          <div class="space-y-4">
-            <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
+          <div>
+            <h2>Add new usage alert</h2>
 
-              <p class="mt-1 text-sm text-gray-500">
-                Usage alerts will be sent to your email address. If you want to send alerts to specific email addresses,
-                you need to log in with that email address.
-                <br>
-                <br>
-                Please note that alerts are only for informational purposes and no action is taken automatically.
-              </p>
+            <p>
+              Usage alerts will be sent to your email address. If you want to send alerts to specific email addresses,
+              you need to log in with that email address.
+              <br>
+              <br>
+              Please note that alerts are only for informational purposes and no action is taken automatically.
+            </p>
+          </div>
+
+          <div>
+            <div>
+              <%== part(
+                "components/form/text",
+                name: "alert_name",
+                label: "Alert Name",
+                attributes: {
+                  required: true,
+                  placeholder: "Alert Name"
+                }
+              ) %>
             </div>
 
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-5 sm:col-span-3">
-                <%== part(
-                  "components/form/text",
-                  name: "alert_name",
-                  label: "Alert Name",
-                  attributes: {
-                    required: true,
-                    placeholder: "Alert Name"
-                  },
-                  extra_class: "pr-3"
-                ) %>
-              </div>
+            <div>
+              <%== part(
+                "components/form/text",
+                name: "limit",
+                label: "Limit",
+                type: "number",
+                attributes: {
+                  required: true,
+                  placeholder: "100"
+                }
+              ) %>
+            </div>
 
-              <div class="col-span-5 sm:col-span-3">
-                <%== part(
-                  "components/form/text",
-                  name: "limit",
-                  label: "Limit",
-                  type: "number",
-                  attributes: {
-                    required: true,
-                    placeholder: "100"
-                  },
-                  extra_class: "pr-3"
-                ) %>
-              </div>
-
-              <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
-                <%== part("components/form/submit_button", text: "Add") %>
-              </div>
+            <div>
+              <%== part("components/form/submit_button", text: "Add") %>
             </div>
           </div>
         <% end %>
@@ -403,34 +381,34 @@ end
 
       <!-- List alerts -->
       <% if @usage_alerts.count > 0 %>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-300">
-            <thead class="bg-gray-50">
+        <div>
+          <table>
+            <thead>
               <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
+                <th scope="col">Name</th>
 
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">
+                <th scope="col">
                   Limit
                 </th>
 
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">
+                <th scope="col">
                   E-mail
                 </th>
 
-                <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
+                <th scope="col">
                   <span class="sr-only">Remove</span>
                 </th>
               </tr>
             </thead>
 
-            <tbody class="divide-y divide-gray-200 bg-white">
+            <tbody>
               <% @usage_alerts.each do |alert| %>
-                <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
-                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
-                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
-                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
+                <tr id="alert-<%= alert.ubid %>">
+                  <td scope="row"><%= alert.name %></td>
+                  <td scope="row"><%= alert.limit %></td>
+                  <td scope="row"><%= alert.user.email %></td>
 
-                  <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                  <td>
                     <%== part(
                     "components/delete_button",
                     text: "Remove",
@@ -444,7 +422,7 @@ end
           </table>
         </div>
       <% else %>
-        <div class="text-center p-4">
+        <div>
           No usage alerts...
         </div>
       <% end %>

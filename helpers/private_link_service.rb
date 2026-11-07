@@ -227,13 +227,13 @@ class Clover
   }.freeze
 
   PRIVATE_LINK_SERVICE_DNS_STATE_LABELS = {
-    "verified" => ["Verified", "bg-green-100 text-green-800"],
-    "pendingVerification" => ["Pending verification", "bg-yellow-100 text-yellow-800"],
-    "failed" => ["Verification failed", "bg-red-100 text-red-800"],
+    "verified" => ["Verified", "success"],
+    "pendingVerification" => ["Pending verification", "warning"],
+    "failed" => ["Verification failed", "danger"],
   }.freeze
 
   def private_link_service_dns_state_label(state)
-    PRIVATE_LINK_SERVICE_DNS_STATE_LABELS.fetch(state, ["Not verified yet", "bg-slate-100 text-slate-800"])
+    PRIVATE_LINK_SERVICE_DNS_STATE_LABELS.fetch(state, ["Not verified yet", nil])
   end
 
   # ports[] and target_ports[] are parallel; the PostgreSQL defaults apply

@@ -289,16 +289,16 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Active Runners")
       expect(page).to have_no_content runner_deleted.ubid
-      displayed_runner_rows = page.all("table.min-w-full tbody tr").map { |row| row.all("td").map(&:text) }
+      displayed_runner_rows = page.all(".table-card tbody tr").map { |row| row.all("td").map(&:text) }
       expect(displayed_runner_rows).to eq [
-        ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
-        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
-        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
-        ["my-repo", "#{runner_allocation_slot.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Queued for provisioning\nWaiting for 1m", "", ""],
-        ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
-        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
+        ["my-repo", "#{runner_with_job.ubid}\n4 vCPU premium x64 ubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
+        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU standard x64 ubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
+        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU standard arm64 ubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
+        ["my-repo", "#{runner_allocation_slot.ubid}\n2 vCPU standard x64 ubuntu-24", "Queued for provisioning\nWaiting for 1m", "", ""],
+        ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU standard x64 ubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
+        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU standard x64 ubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
       ]
-      expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
+      expect(page.all("#current-usages div").map { [it.find("dt").text, it.find("dd").text] }).to eq [
         ["Allocated vCPU", "4 vCPU"],
         ["Requested vCPU", "16 vCPU"],
         ["Today", "$0.02"],
@@ -412,14 +412,14 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content "3 cache entries"
       expect(page).to have_content "21.4 KB used of 100 GB"
-      expect(page).to have_content "created just now"
-      expect(page).to have_content "Never used"
-      expect(page).to have_content "800 B"
-      expect(page).to have_content "created 10 minutes ago"
-      expect(page).to have_content "5 minutes ago"
-      expect(page).to have_content "20.6 KB"
-      expect(page).to have_content "created 4 days ago"
-      expect(page).to have_content "3 hours ago"
+      expect(page).to have_text :all, "created just now"
+      expect(page).to have_text :all, "Never used"
+      expect(page).to have_text :all, "800 B"
+      expect(page).to have_text :all, "created 10 minutes ago"
+      expect(page).to have_text :all, "5 minutes ago"
+      expect(page).to have_text :all, "20.6 KB"
+      expect(page).to have_text :all, "created 4 days ago"
+      expect(page).to have_text :all, "3 hours ago"
     end
 
     it "shows the cache storage limit of each repository" do
@@ -436,7 +436,7 @@ RSpec.describe Clover, "github" do
     it "can delete a cache entry" do
       entry = create_cache_entry(key: "new-cache")
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      find("#entry-#{entry.ubid} input[type=checkbox]").check
+      find("#entry-#{entry.ubid} input[type=checkbox]", visible: :all).check
       click_button "Delete Selected Cache Entries"
 
       expect(DB[:audit_log].where(action: "destroy").count).to eq(1)
@@ -459,8 +459,8 @@ RSpec.describe Clover, "github" do
       allow(client).to receive(:delete_object)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      find("#entry-#{entry1.ubid} input[type=checkbox]").check
-      find("#entry-#{entry2.ubid} input[type=checkbox]").check
+      find("#entry-#{entry1.ubid} input[type=checkbox]", visible: :all).check
+      find("#entry-#{entry2.ubid} input[type=checkbox]", visible: :all).check
       click_button "Delete Selected Cache Entries"
 
       expect(page.title).to eq "Ubicloud - Caches"

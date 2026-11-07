@@ -1,13 +1,3 @@
-FROM docker.io/library/node:26.5-alpine3.23 AS frontend-builder
-WORKDIR /app
-COPY tailwind.config.js package.json package-lock.json ./
-COPY views/ ./views/
-COPY assets/ ./assets/
-COPY helpers/web.rb ./helpers/web.rb
-RUN npm ci
-RUN npm run prod
-
-
 FROM docker.io/library/ruby:4.0.9-alpine3.23 AS bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
@@ -41,9 +31,8 @@ RUN adduser -D ubicloud && \
 USER ubicloud
 WORKDIR /app
 
-# Copy built assets from builders
+# Copy installed gems from the bundler stage
 COPY --from=bundler /usr/local/bundle/ /usr/local/bundle/
-COPY --chown=ubicloud --from=frontend-builder /app/assets/css/app.css /app/assets/css/app.css
 COPY --chown=ubicloud . /app
 
 ENV RACK_ENV=production

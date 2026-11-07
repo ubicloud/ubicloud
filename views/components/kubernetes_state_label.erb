@@ -1,2 +1,2 @@
-<%# locals: (state:, extra_class: nil) %>
-<%== part("components/state_label", state:, color: KUBERNETES_STATE_LABEL_COLOR[state], extra_class:) %>
+<%# locals: (state:) %>
+<%== part("components/state_label", state:, kind: KUBERNETES_STATE_LABEL_KIND[state]) %>

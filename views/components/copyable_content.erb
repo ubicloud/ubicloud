@@ -1,7 +1,7 @@
-<%# locals: (content:, message: "Copied", revealable: false, classes: "") %>
+<%# locals: (content:, message: "Copied", revealable: false, classes: nil) %>
 
 <div
-  class="copyable-content inline-flex items-center gap-1 <%= classes %>"
+  class="<%= ["copyable-content", classes].compact.join(" ") %>"
   data-content="<%= content %>"
   data-message="<%= message %>"
 >
@@ -11,10 +11,5 @@
     <%= content %>
   <% end %>
 
-  <img
-    src="/icons/hero-clipboard-document.svg"
-    width="18px"
-    class="inline-block copy-button cursor-pointer ms1"
-    alt="Copy"
-  >
+  <img src="/icons/hero-clipboard-document.svg" width="18px" class="copy-button" alt="Copy">
 </div>

@@ -21,7 +21,7 @@
     {name: "version", type: "radio_small_cards", label: "Version", required: "required"},
     {name: "cp_nodes", type: "radio_small_cards", label: "Control Plane", required: "required"},
     {name: "worker_size", type: "radio_small_cards", label: "Worker size", required: "required"},
-    {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", opening_tag: "<div class='half'>"},
   ]
 
   action = "#{@project.path}/kubernetes-cluster" %>

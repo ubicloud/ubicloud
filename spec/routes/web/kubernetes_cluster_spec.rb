@@ -251,7 +251,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         kc.reload
         expect(kc.display_state).to eq("creating")
-        expect(page.body).to include "auto-refresh hidden"
+        expect(page).to have_css(".auto-refresh", visible: :all)
         expect(page.body).to include "creating"
         expect(page).to have_content "Waiting for cluster to be ready..."
         expect(page).to have_no_content "Download"
@@ -260,7 +260,7 @@ RSpec.describe Clover, "Kubernetes" do
         kn.strand.update(label: "wait")
         kc.update(kubeconfig: "kubeconfig content")
         page.refresh
-        expect(page.body).not_to include "auto-refresh hidden"
+        expect(page).to have_no_css(".auto-refresh", visible: :all)
         expect(page.body).to include "running"
         expect(page).to have_no_content "Waiting for cluster to be ready..."
         expect(page).to have_content "Download"
@@ -275,7 +275,7 @@ RSpec.describe Clover, "Kubernetes" do
         expect(kc.display_state).to eq("deleting")
         within("#kubernetes-cluster-submenu") { click_link "Overview" }
         expect(page.body).to include "deleting"
-        expect(page.body).to include "auto-refresh hidden"
+        expect(page).to have_css(".auto-refresh", visible: :all)
       end
 
       it "shows up on customer private subnet vms page" do

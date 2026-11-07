@@ -140,11 +140,6 @@ jobs:
 
     - name: Set up Clover
       uses: $/.github/actions/setup-clover
-      with:
-        setup-node: true
-
-    - name: Build assets
-      run: npm run prod
 
     - name: Install cloudflared
       if: needs.setup.outputs.has_github_runner == 'true'

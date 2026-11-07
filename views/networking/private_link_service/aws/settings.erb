@@ -3,27 +3,25 @@
 <% aws = pls.private_link_service_aws_resource
 hostname = pls.private_hostname %>
 
-<div class="p-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Allowed AWS principals
-      </h3>
+<section id="pls-principals">
+  <div class="section-header">
+    <div>
+      <h3>Allowed AWS principals</h3>
 
-      <p class="mt-2 text-sm text-gray-500">
+      <p>
         AWS accounts, IAM users or roles allowed to create endpoints to this service. Saving triggers a reconcile of the
         private link service permissions.
       </p>
     </div>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
+  <div class="card">
+    <div>
       <% form(action: "#{path(pls)}/principals", method: :post, id: "form-private-link-service-principals") do %>
-        <div class="space-y-4">
-          <div id="allowed-principals" class="space-y-2" data-multi-input>
+        <div>
+          <div id="allowed-principals" data-multi-input>
             <% (pls.allowed_principals.empty? ? [""] : pls.allowed_principals).each_with_index do |principal, i| %>
-              <div class="flex gap-2 multi-input-row">
+              <div class="multi-input-row">
                 <input
                   type="text"
                   id="allowed-principal-<%= i %>"
@@ -31,11 +29,6 @@ hostname = pls.private_hostname %>
                   value="<%= principal %>"
                   placeholder="arn:aws:iam::123456789012:root"
                   required
-                  class="
-                    block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset text-sm sm:leading-6
-                    text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset
-                    focus:ring-orange-600
-                  "
                 >
 
                 <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
@@ -47,7 +40,7 @@ hostname = pls.private_hostname %>
             <%== part("components/form/error", name: "allowed_principals", error:) %>
           <% end %>
 
-          <div class="flex items-center justify-between">
+          <div>
             <%== part("components/button", text: "Add another principal", extra_class: "add-multi-input", attributes: {"type" => "button", "data-target" => "#allowed-principals"}) %>
             <%== part("components/form/submit_button", text: "Save principals") %>
           </div>
@@ -55,16 +48,14 @@ hostname = pls.private_hostname %>
       <% end %>
     </div>
   </div>
-</div>
+</section>
 
-<div class="p-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Private DNS
-      </h3>
+<section id="pls-private-dns">
+  <div class="section-header">
+    <div>
+      <h3>Private DNS</h3>
 
-      <p class="mt-2 text-sm text-gray-500">
+      <p>
         Lets consumers reach the attached PostgreSQL resource by its own private hostname through the endpoint. The name
         is set when a resource whose DNS zone Ubicloud serves is attached. Ubicloud publishes the verification TXT
         record and AWS checks it; there is nothing to configure.
@@ -72,20 +63,20 @@ hostname = pls.private_hostname %>
     </div>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6 space-y-4">
+  <div class="card">
+    <div>
       <% if pls.private_dns_name %>
-        <% state_text, state_color = private_link_service_dns_state_label(aws.private_dns_verification_state) %>
+        <% state_text, state_kind = private_link_service_dns_state_label(aws.private_dns_verification_state) %>
         <%== part("components/kv_data_card", data: [
           ["Private DNS name", pls.private_dns_name, {copyable: true}],
           ["Private hostname", hostname || "Attach a PostgreSQL resource", {copyable: !hostname.nil?}],
-          ["Verification", "state_label", {component: {state: state_text, color: state_color}}],
+          ["Verification", "state_label", {component: {state: state_text, kind: state_kind}}],
           ["TXT record name", aws.private_dns_verification_name || "Waiting for AWS", {copyable: !aws.private_dns_verification_name.nil?}],
           ["TXT record value", aws.private_dns_verification_value || "Waiting for AWS", {copyable: !aws.private_dns_verification_value.nil?}]
         ]) %>
 
         <% unless aws.private_dns_verified? %>
-          <p class="text-sm text-gray-500">
+          <p>
             The TXT record is published automatically in the resource's DNS zone, and AWS is asked to check it every 30
             minutes until the name verifies. Verify asks right away.
           </p>
@@ -97,31 +88,29 @@ hostname = pls.private_hostname %>
         <%== part("components/kv_data_card", data: [
           ["Private hostname", hostname || "Attach a PostgreSQL resource", {copyable: !hostname.nil?}]
         ]) %>
-        <p class="text-sm text-gray-500">
+        <p>
           No private DNS name. Attach a PostgreSQL resource whose DNS zone Ubicloud serves and the name is derived from
           its private hostname.
         </p>
       <% end %>
     </div>
   </div>
-</div>
+</section>
 
-<div class="p-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Supported AWS regions
-      </h3>
+<section id="pls-regions">
+  <div class="section-header">
+    <div>
+      <h3>Supported AWS regions</h3>
 
-      <p class="mt-2 text-sm text-gray-500">
+      <p>
         Consumers in <%= pls.location.name %>, the service's own region, can always connect. Select additional regions
         to allow cross-region PrivateLink connections from them. Saving triggers a reconcile.
       </p>
     </div>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
+  <div class="card">
+    <div>
       <% form(action: "#{path(pls)}/supported-regions", method: :post, id: "form-private-link-service-supported-regions") do %>
         <%== part(
           "networking/private_link_service/aws/region_select",
@@ -131,10 +120,10 @@ hostname = pls.private_hostname %>
           description: "Remove every row and save to allow only #{pls.location.name}."
         ) %>
 
-        <div class="mt-4 flex justify-end">
+        <div class="actions">
           <%== part("components/form/submit_button", text: "Save regions") %>
         </div>
       <% end %>
     </div>
   </div>
-</div>
+</section>

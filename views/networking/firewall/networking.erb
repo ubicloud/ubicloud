@@ -24,63 +24,47 @@ ps_map = {}
 firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
-<div class="p-6 grid grid-cols-1 gap-6">
-  <div class="min-w-0 md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-      Firewall Rules
-    </h3>
+<section id="firewall-networking">
+  <div class="section-header">
+    <h3>Firewall Rules</h3>
 
     <% if edit_perm %>
-      <div class="mt-4 flex md:ml-4 md:mt-0">
+      <div>
         <%== part("components/button", text: "Add Firewall Rule", link: "#{firewall_path}/firewall-rule") %>
       </div>
     <% end %>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="overflow-auto">
-      <table class="min-w-full divide-y divide-gray-300" id="firewall-rules">
-        <thead class="bg-gray-50">
+  <div class="card">
+    <div>
+      <table id="firewall-rules">
+        <thead>
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Source</th>
-
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-              Destination Ports
-            </th>
-
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-              Rule Description
-            </th>
+            <th scope="col">Source</th>
+            <th scope="col">Destination Ports</th>
+            <th scope="col">Rule Description</th>
 
             <% if edit_perm %>
-              <th scope="col" class="p-1 text-center text-sm font-semibold text-gray-900">Edit</th>
-              <th scope="col" class="p-1 pr-2 text-center text-sm font-semibold text-gray-900">Remove</th>
+              <th scope="col">Edit</th>
+              <th scope="col">Remove</th>
             <% end %>
           </tr>
         </thead>
 
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <tbody>
           <% fwrs.each do |fwr| %>
             <% ubid = fwr.ubid %>
 
             <tr>
-              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row">
-                <%= fwr.web_display_cidr(ps_map) %>
-              </td>
-
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%= fwr.web_display_port_range %>
-              </td>
-
-              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row">
-                <%= fwr.description %>
-              </td>
+              <td scope="row"><%= fwr.web_display_cidr(ps_map) %></td>
+              <td scope="row"><%= fwr.web_display_port_range %></td>
+              <td scope="row"><%= fwr.description %></td>
 
               <% if edit_perm %>
-                <td id="fwr-edit-<%= ubid %>" class="relative whitespace-nowrap p-1 text-center text-sm font-medium">
+                <td id="fwr-edit-<%= ubid %>">
                   <%== part("components/button", text: "", icon: "hero-pencil", link: "#{firewall_path}/firewall-rule/#{ubid}", attributes: {id: "edit-#{ubid}"}) %>
                 </td>
-                <td id="fwr-delete-<%= ubid %>" class="relative whitespace-nowrap p-1 text-center text-sm font-medium">
+                <td id="fwr-delete-<%= ubid %>">
                   <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{ubid}", text: "") %>
                 </td>
               <% end %>
@@ -91,43 +75,36 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
     </div>
   </div>
 
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Attached Private Subnets
-      </h3>
-    </div>
+  <div class="section-header">
+    <h3>Attached Private Subnets</h3>
   </div>
 
-  <div
-    id="fw-private-subnets"
-    class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200"
-  >
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
+  <div id="fw-private-subnets" class="card">
+    <div>
+      <table>
+        <thead>
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col">Name</th>
 
             <% if edit_perm %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+              <th scope="col"></th>
             <% end %>
           </tr>
         </thead>
 
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <tbody>
           <% @firewall.private_subnets.each do |ps| %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <td scope="row">
                 <% if viewable_subnets.include?(ps.id) %>
-                  <a href="<%= path(ps) %>" class="text-orange-600 hover:text-orange-700"><%= ps.name %></a>
+                  <a href="<%= path(ps) %>"><%= ps.name %></a>
                 <% else %>
                   <%= ps.name %>
                 <% end %>
               </td>
 
               <% if edit_perm %>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <td>
                   <% form(action: "#{firewall_path}/detach-subnet", method: :post) do %>
                     <input type="hidden" name="private_subnet_id" value="<%= ps.ubid %>">
                     <%== part("components/form/submit_button", text: "Detach") %>
@@ -139,7 +116,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
           <% if edit_perm %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <td scope="row">
                 <%== part(
                 "components/form/select",
                 name: "private_subnet_id",
@@ -152,7 +129,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
               ) %>
               </td>
 
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <td>
                 <% form(action: "#{firewall_path}/attach-subnet", method: :post, id: "form-fw-attach-#{@firewall.ubid}") do %>
                   <%== part("components/form/submit_button", text: "Attach") %>
                 <% end %>
@@ -163,4 +140,4 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
       </table>
     </div>
   </div>
-</div>
+</section>

@@ -22,7 +22,7 @@ else
   []
 end %>
 
-<div class="p-6 space-y-6">
+<section id="pls-postgres">
   <%== part(
     "components/table_card",
     title: "Attached PostgreSQL resource",
@@ -36,17 +36,17 @@ end %>
   ) %>
 
   <% if edit_perm && (error = flash.dig("errors", "postgres_resource_id")) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-3 sm:px-6">
+    <div class="card">
       <%== part("components/form/error", name: "postgres_resource_id", error:) %>
     </div>
   <% end %>
 
   <% if edit_perm && pg.nil? %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <% form(action: "#{path(@pls)}/attach-postgres", method: :post, id: "form-private-link-service-attach") do %>
-          <div class="grid grid-cols-6 gap-6">
-            <div class="col-span-6 col-start-1 md:col-end-4 xl:col-end-3">
+    <div class="card">
+      <div>
+        <% form(action: "#{path(@pls)}/attach-postgres", method: :post, id: "form-private-link-service-attach", class: "pls-form") do %>
+          <div>
+            <div class="narrow">
               <%== part(
                 "components/form/select",
                 name: "postgres_resource_id",
@@ -57,7 +57,7 @@ end %>
               ) %>
             </div>
 
-            <div class="col-span-6 flex justify-end">
+            <div class="actions">
               <%== part("components/form/submit_button", text: "Attach") %>
             </div>
           </div>
@@ -65,4 +65,4 @@ end %>
       </div>
     </div>
   <% end %>
-</div>
+</section>

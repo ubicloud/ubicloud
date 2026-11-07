@@ -13,7 +13,7 @@ option_tree, option_parents = generate_machine_image_version_options(@machine_im
 ) %>
 
 <% form_elements = [
-    {name: "version", type: "text", label: "Version Label", placeholder: "(optional, defaults to timestamp)", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "version", type: "text", label: "Version Label", placeholder: "(optional, defaults to timestamp)", opening_tag: "<div class='half'>"},
     {name: "vm", type: "select", label: "Source VM (stopped)", required: "required", placeholder: "Select a stopped VM", content_generator: ->(vm) { vm[:display_name] }},
     {name: "destroy_source", type: "checkbox", default_unchecked: true, content_generator: ->(_value) { "Destroy source VM after capture" }}
   ] %>

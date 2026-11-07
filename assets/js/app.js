@@ -13,14 +13,15 @@ $(function () {
 
 $(".toggle-mobile-menu").on("click", function (event) {
   let menu = $("#mobile-menu")
-  if (menu.is(":hidden")) {
-    menu.show(0, function () {
-      menu.toggleClass("mobile-menu-open")
-    });
+  if (menu.prop("hidden")) {
+    menu.prop("hidden", false);
+    // Force a reflow so the transition runs after the menu is displayed
+    menu[0].offsetWidth;
+    menu.addClass("mobile-menu-open");
   } else {
-    menu.toggleClass("mobile-menu-open")
+    menu.removeClass("mobile-menu-open")
     setTimeout(function () {
-      menu.hide();
+      menu.prop("hidden", true);
     }, 300);
   }
 });
@@ -28,7 +29,7 @@ $(".toggle-mobile-menu").on("click", function (event) {
 $(".cache-group-row").on("click", function (event) {
   let repository = $(this).data("repository");
   $(this).toggleClass("active");
-  $(".cache-group-" + repository).toggleClass("hidden");
+  $(".cache-group-" + repository).prop("hidden", (i, hidden) => !hidden);
 });
 
 
@@ -41,8 +42,8 @@ $(".dropdown").on("click", function (event) {
   $(this).toggleClass("active");
 });
 
-$(".toggle-parent-to-active").on("click", function (event) {
-  $(this).parent().toggleClass("active");
+$("button[role=switch]").on("click", function (event) {
+  $(this).attr("aria-checked", (i, checked) => (checked === "true") ? "false" : "true");
 });
 
 $("#tag-membership-add tr, #tag-membership-remove tr").on("click", function (event) {
@@ -53,13 +54,13 @@ $("#tag-membership-add tr, #tag-membership-remove tr").on("click", function (eve
   checkbox.prop("checked", !checkbox.prop("checked"));
 });
 
-$("#ace-template").addClass('hidden');
+$("#ace-template").prop('hidden', true);
 
 var num_aces = 0;
 $("#new-ace-btn").on("click", function (event) {
   event.preventDefault();
   num_aces++;
-  var template = $('#ace-template').clone().removeClass('hidden').removeAttr('id');
+  var template = $('#ace-template').clone().prop('hidden', false).removeAttr('id');
   var pos = 0;
   var id_attr = '';
   template.find('select, input').each(function (i, element) {
@@ -117,13 +118,12 @@ $(".back-btn").on("click", function (event) {
 
 function notification(message) {
   let container = $("#notification-template").parent();
-  let newNotification = $("#notification-template").clone();
+  let newNotification = $("#notification-template").clone().removeAttr("id");
   newNotification.find("p").text(message);
-  newNotification.appendTo(container).show(0, function () {
-    $(this)
-      .removeClass("translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2")
-      .addClass("translate-y-0 opacity-100 sm:translate-x-0");
-  });
+  newNotification.appendTo(container).prop("hidden", false);
+  // Force a reflow so the transition runs after the notification is displayed
+  newNotification[0].offsetWidth;
+  newNotification.addClass("shown");
 
   setTimeout(function () {
     newNotification.remove();
@@ -153,7 +153,7 @@ function setupCountdownButtons() {
       }
       // Zero-padded and tabular-nums so the button doesn't jitter as digits change.
       const padded = String(remainingSeconds).padStart(2, "0");
-      const countdown = $("<span>", {class: "tabular-nums", text: padded});
+      const countdown = $("<span>", {class: "countdown", text: padded});
       button.empty().append(document.createTextNode(label + " ("), countdown, document.createTextNode("s)"));
       setTimeout(tick, 1000);
     }
@@ -210,9 +210,9 @@ $(".fork-icon").on("click", function () {
   date_picker = flatpickr("#restore_target", {enableTime: true, dateFormat: "Y-m-d H:i"})
   date_picker.setDate(target_datetime, true);
 
-  $("#restore_target").addClass("animate-flash transition-colors duration-1000");
+  $("#restore_target").addClass("flash");
   setTimeout(() => {
-    $("#restore_target").removeClass('animate-flash');
+    $("#restore_target").removeClass('flash');
   }, 2000);
 })
 
@@ -220,11 +220,11 @@ $(".connection-info-format-selector select, .connection-info-format-selector inp
   let format = $(".connection-info-format-selector select").val();
   let port = $(".connection-info-format-selector input[name=use_pgbouncer]").is(":checked") ? "6432" : "5432";
   let suffix = $(".connection-info-format-selector input[name=use_private_dns]").is(":checked") ? "-private" : "";
-  let reveal_status = $(".connection-info-box:visible").find(".group").hasClass('active')
+  let reveal_status = $(".connection-info-box:not([hidden])").find(".revealable-content").hasClass('active')
 
-  $(".connection-info-box").hide();
-  $(".connection-info-box-" + format + "-" + port + suffix).find(".group").toggleClass('active', reveal_status);
-  $(".connection-info-box-" + format + "-" + port + suffix).show();
+  $(".connection-info-box").prop("hidden", true);
+  $(".connection-info-box-" + format + "-" + port + suffix).find(".revealable-content").toggleClass('active', reveal_status);
+  $(".connection-info-box-" + format + "-" + port + suffix).prop("hidden", false);
 });
 
 
@@ -260,9 +260,9 @@ function redrawChildOptions(name) {
 
       switch (child_type) {
         case "input_radio":
-          $("input[name=" + child_name + "]").parent().hide()
+          $("input[name=" + child_name + "]").parent().prop('hidden', true)
           $("input[name=" + child_name + "]").prop('disabled', true).prop('checked', false).prop('selected', false);
-          $("input[name=" + child_name + "]").parent(classes).show()
+          $("input[name=" + child_name + "]").parent(classes).prop('hidden', false)
           $("input[name=" + child_name + "]").parent(classes + available).children("input[name=" + child_name + "]").prop('disabled', false);
 
           if (option_dirty[child_name]) {
@@ -284,8 +284,8 @@ function redrawChildOptions(name) {
 
           break;
         case "select":
-          $("select[name=" + child_name + "]").children().hide().prop('disabled', true).prop('checked', false).prop('selected', false);
-          $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
+          $("select[name=" + child_name + "]").children().prop('hidden', true).prop('disabled', true).prop('checked', false).prop('selected', false);
+          $("select[name=" + child_name + "]").children(".always-visible, " + classes).prop('hidden', false).prop('disabled', false);
 
           if (option_dirty[child_name]) {
             elements2select = $("select[name=" + child_name + "]").children(classes + "[value=\"" + option_dirty[child_name] + "\"]");
@@ -341,7 +341,7 @@ function setupPlayground() {
     }
     previous_messages.splice(0);
     previous_message_containers.splice(0);
-    $("#inference_previous_empty").show();
+    $("#inference_previous_empty").prop("hidden", false);
   });
 
   // Show reasoning in a different style.
@@ -352,8 +352,8 @@ function setupPlayground() {
       text = text.trim().replace(/\n+/g, '<br>');
       if (text.length > 0) {
         return `
-          <div class="text-sm italic p-4 bg-gray-50 mb-2">
-            <div class="font-bold mb-4">Reasoning</div>
+          <div class="reasoning">
+            <div>Reasoning</div>
             ${text}
           </div>`;
       }
@@ -422,21 +422,21 @@ function setupPlayground() {
     const PROCESSING_STATUS = "<span class='mask-sweep'>Processing...</span>";
     const num_files = message.content.length - 1;
     const $new_message = $(`
-      <div class="mt-6 first:mt-2">
-        <div class="inline-flex items-baseline rounded-full px-2 text-xs font-semibold leading-5 bg-gray-200 text-gray-800">${role}</div>
-        <div id="inference_message_${message_id}" class="mt-2 text-sm ml-2">${text}</div>
-        <div class="text-sm ml-2 mt-1 text-gray-500">${num_files > 0 ? `Attached ${num_files} file(s).` : ""}</div>
-        <div id="inference_message_info_${message_id}" class="text-sm ml-2 mt-1 text-gray-500">${show_processing ? PROCESSING_STATUS : ""}</div>
-        <div class="flex mt-2 gap-1 ml-2 items-center">
-          <div id="copy_inference_message_${message_id}" class="group inline-block text-gray-400 hover:text-black cursor-pointer">
-            <svg id="inference_icon_${message_id}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+      <div class="message">
+        <div>${role}</div>
+        <div id="inference_message_${message_id}">${text}</div>
+        <div>${num_files > 0 ? `Attached ${num_files} file(s).` : ""}</div>
+        <div id="inference_message_info_${message_id}">${show_processing ? PROCESSING_STATUS : ""}</div>
+        <div>
+          <div id="copy_inference_message_${message_id}">
+            <svg id="inference_icon_${message_id}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               ${COPY_ICON}
             </svg>
           </div>
         </div>
       </div>
     `);
-    $("#inference_previous_empty").hide();
+    $("#inference_previous_empty").prop("hidden", true);
     $("#inference_previous").append($new_message);
     previous_message_containers.push($new_message);
     previous_messages.push(message);
@@ -632,7 +632,7 @@ function setupPlayground() {
 
   $('#inference_submit').on("click", generate);
   $('#inference_config-show_advanced-0').on("change", function() {
-    $('#inference_config_advanced_settings').toggleClass("hidden", !$(this).is(":checked"));
+    $('#inference_config_advanced_settings').prop("hidden", !$(this).is(":checked"));
   });
 }
 
@@ -645,34 +645,13 @@ let metricsZoomRange = null;
 // smallest time-range preset (30 minutes) without gaps.
 const MIN_ZOOM_WINDOW_MS = 30 * 60 * 1000;
 const colorPalette = [
-  {
-    color: '#5470c6',
-    class: 'blue-600'
-  },
-  {
-    color: '#91cc75',
-    class: 'green-400'
-  },
-  {
-    color: '#fac858',
-    class: 'amber-400'
-  },
-  {
-    color: '#ee6666',
-    class: 'red-400'
-  },
-  {
-    color: '#73c0de',
-    class: 'sky-300'
-  },
-  {
-    color: '#3ba272',
-    class: 'emerald-600'
-  },
-  {
-    color: '#fc8452',
-    class: 'orange-500',
-  }
+  '#5470c6',
+  '#91cc75',
+  '#fac858',
+  '#ee6666',
+  '#73c0de',
+  '#3ba272',
+  '#fc8452'
 ];
 
 function setupMetricsCharts() {
@@ -730,7 +709,7 @@ function setupMetricsCharts() {
 
 function setupInitialChartOptions(chartInstance) {
   const options = {
-    color: colorPalette.map(p => p.color),
+    color: colorPalette,
     tooltip: {
       trigger: 'axis',
       formatter: function (params) {
@@ -741,9 +720,9 @@ function setupInitialChartOptions(chartInstance) {
         params.forEach((item) => {
           const value = unitFormatter(chartInstance.unit, 2)(item.value[1]);
           // Use the series color for the marker
-          const colorClass = colorPalette[item.componentIndex % colorPalette.length].class;
+          const colorIndex = item.componentIndex % colorPalette.length;
           html += `
-            <span class="text-${colorClass} text-right">● ${item.seriesName}</span><span class="ml-2">${value}<br/></span>
+            <span class="series series-${colorIndex}">● ${item.seriesName}</span><span>${value}<br/></span>
           `;
         });
         return html;
@@ -832,25 +811,22 @@ function zoomMetricsCharts(startMs, endMs) {
     }
   }
   metricsZoomRange = { start: new Date(startMs), end: new Date(endMs) };
-  $('#metrics-container #reset-zoom-button').removeClass('hidden');
+  $('#metrics-container #reset-zoom-button').prop('hidden', false);
   updateMetricsCharts();
 }
 
 function resetMetricsZoom() {
   metricsZoomRange = null;
-  $('#metrics-container #reset-zoom-button').addClass('hidden');
+  $('#metrics-container #reset-zoom-button').prop('hidden', true);
   updateMetricsCharts();
 }
 
 function toggleChartMaximize(card) {
   const maximize = !card.hasClass('chart-maximized');
-  card.toggleClass('chart-maximized fixed inset-0 z-50 flex flex-col', maximize);
-  card.toggleClass('rounded-lg border', !maximize);
-  card.find('.metric-chart').toggleClass('h-64', !maximize).toggleClass('grow', maximize);
-  card.find('.maximize-icon').toggleClass('hidden', maximize);
-  card.find('.minimize-icon').toggleClass('hidden', !maximize);
-  // Keep the page behind the maximized chart from scrolling.
-  $('body').toggleClass('overflow-hidden', maximize);
+  // The page behind the maximized chart is kept from scrolling via CSS.
+  card.toggleClass('chart-maximized', maximize);
+  card.find('.maximize-icon').prop('hidden', maximize);
+  card.find('.minimize-icon').prop('hidden', !maximize);
 
   const chart = echarts.getInstanceByDom(card.find('.metric-chart')[0]);
   if (chart) {
@@ -1096,19 +1072,19 @@ function addRowToConfigCard(card, key, value) {
   newRow.find("input").prop("disabled", false);
   newRow.find("input").eq(0).val(key);
   newRow.find("input").eq(1).val(value);
-  newRow.removeClass("hidden config-placeholder-group").addClass("config-group");
+  newRow.removeClass("config-placeholder-group").addClass("config-group").prop("hidden", false);
   placeholder.before(newRow);
 }
 
 function setupPgConfigCard() {
   $(".delete-config-btn").on("click", function (event) {
-    const configGroup = $(this).closest(".group");
+    const configGroup = $(this).closest(".config-row");
     configGroup.remove();
   });
 
   $(".add-config-btn").on("click", function (e) {
     e.preventDefault();
-    const createConfigGroup = $(e.target).closest(".group");
+    const createConfigGroup = $(e.target).closest(".config-row");
     const keyInput = createConfigGroup.find("input").eq(0);
     const valueInput = createConfigGroup.find("input").eq(1);
     if (!keyInput[0].reportValidity()) return;
@@ -1133,7 +1109,7 @@ function setupStructuredDataCard() {
     newRow.find('input[name="structured_data_ids[]"]').val(sdId).prop("disabled", false);
     newRow.find('input[name="structured_data_keys[]"]').val(key).prop("disabled", false);
     newRow.find('input[name="structured_data_values[]"]').val(valueInput.val()).prop("disabled", false);
-    newRow.removeClass("sd-kv-placeholder-row hidden").addClass("sd-kv-row");
+    newRow.removeClass("sd-kv-placeholder-row").addClass("sd-kv-row").prop("hidden", false);
 
     group.find(".sd-kv-rows").append(newRow);
     keyInput.val("");
@@ -1150,7 +1126,7 @@ function setupStructuredDataCard() {
     const newGroup = placeholder.clone(true);
     newGroup.attr("data-sd-id", sdId);
     newGroup.find(".sd-id-label").text(sdId);
-    newGroup.removeClass("sd-id-placeholder-group hidden").addClass("sd-id-group");
+    newGroup.removeClass("sd-id-placeholder-group").addClass("sd-id-group").prop("hidden", false);
 
     placeholder.before(newGroup);
     nameInput.val("");
@@ -1199,14 +1175,14 @@ function setupLogDestinationForm() {
     $("label[for='url-display']").text(type === "otlp" ? "OTLP Endpoint URL" : "Syslog TCP Endpoint");
 
     if (type === "otlp") {
-      $("#log-destination-otlp-auth").removeClass("hidden");
-      $("#log-destination-syslog-auth").addClass("hidden");
+      $("#log-destination-otlp-auth").prop("hidden", false);
+      $("#log-destination-syslog-auth").prop("hidden", true);
       const card = $("#log-destination-otlp-auth");
       card.find(".config-group").remove();
       headers.forEach(([key, value]) => addRowToConfigCard(card, key, value));
     } else {
-      $("#log-destination-otlp-auth").addClass("hidden");
-      $("#log-destination-syslog-auth").removeClass("hidden");
+      $("#log-destination-otlp-auth").prop("hidden", true);
+      $("#log-destination-syslog-auth").prop("hidden", false);
     }
   });
 }

@@ -3,70 +3,53 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
 @versions = @machine_image.versions_dataset.eager(metal: :semaphores).reverse(:created_at).all %>
 
 <% if edit_perm %>
-  <div class="p-6">
+  <section>
     <%== part("components/rename_object", object: @machine_image, type: "machine image") %>
-  </div>
+  </section>
 
-  <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Latest Version
-        </h3>
-      </div>
+  <section>
+    <div class="section-header">
+      <h3>Latest Version</h3>
     </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
+    <div class="card">
+      <div>
         <% ready_versions = @versions.select { |v| v.metal&.display_state == "ready" } %>
 
         <% form(action: "#{path(@machine_image)}/set-latest-version", method: :post, id: "set-latest-version") do %>
-          <div class="flex items-center gap-3">
-            <%== part(
-              "components/form/select",
-              name: "latest_version",
-              options: ready_versions.map { |v| [v.version, v.version] },
-              selected: @machine_image.latest_version&.version,
-              classes: "max-w-xs",
-            ) %>
+          <%== part(
+            "components/form/select",
+            name: "latest_version",
+            options: ready_versions.map { |v| [v.version, v.version] },
+            selected: @machine_image.latest_version&.version
+          ) %>
 
-            <%== part("components/form/submit_button", text: "Save") %>
-          </div>
+          <%== part("components/form/submit_button", text: "Save") %>
         <% end %>
       </div>
     </div>
-  </div>
+  </section>
 <% end %>
 
 <% if delete_perm %>
-  <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Danger Zone
-        </h3>
-      </div>
+  <section>
+    <div class="section-header">
+      <h3>Danger Zone</h3>
     </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="sm:flex sm:items-center sm:justify-between">
+    <div class="card">
+      <div>
+        <div class="setting">
           <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete machine image</h3>
-
-            <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this machine image. All versions must be deleted first.</p>
-            </div>
+            <h3>Delete machine image</h3>
+            <p>This action will permanently delete this machine image. All versions must be deleted first.</p>
           </div>
 
-          <div
-            id="mi-delete-<%= @machine_image.ubid %>"
-            class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
-          >
+          <div id="mi-delete-<%= @machine_image.ubid %>">
             <%== part("components/delete_button", text: "Delete Machine Image", url: path(@machine_image), confirmation: @machine_image.name) %>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 <% end %>

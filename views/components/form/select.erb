@@ -2,14 +2,19 @@
 <% selected = typecast_body_params.str(name) || selected if name
 error ||= flash.dig("errors", name) %>
 
-<div class="space-y-2 text-gray-900">
+<div class="field">
   <% if label %>
-    <label for="<%= name %>" class="text-sm font-medium leading-6"><%= label %></label>
+    <label for="<%= name %>"><%= label %></label>
   <% end %>
   <select
     id="<%= id %>"
     name="<%= name %>"
-    class="<%= classes %> block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%>"
+    <% if classes %>
+      class="<%= classes %>"
+    <% end %>
+    <% if error %>
+      aria-invalid="true"
+    <% end %>
     <%== html_attrs(attributes) %>
   >
     <% if placeholder %>
@@ -27,7 +32,9 @@ error ||= flash.dig("errors", name) %>
       <% opts.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
         <option
           value="<%= opt_val %>"
-          class="<%= opt_classes %>"
+          <% if opt_classes && !opt_classes.empty? %>
+            class="<%= opt_classes %>"
+          <% end %>
           <%= (opt_val == selected) ? "selected" : "" %>
           <%== html_attrs(opt_attrs || {}) %>
         >
@@ -40,7 +47,7 @@ error ||= flash.dig("errors", name) %>
     <% end %>
   </select>
   <% if error %>
-    <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
+    <p id="<%= name %>-error"><%= error %></p>
   <% end %>
   <%== description_html %>
 </div>

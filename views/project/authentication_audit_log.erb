@@ -14,57 +14,55 @@
   <%== part("components/page_header", title: "Authentication Audit Log") %>
 <% end %>
 
-<div class="grid gap-6">
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
-      <% form do %>
-        <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-12 sm:col-span-4">
+<div class="stack">
+  <div class="card">
+    <div>
+      <% form(class: "audit-log-filter") do %>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "action",
+            label: "Action",
+            value: typecast_params.nonempty_str("action"),
+            attributes: { placeholder: "Filter by action" }
+          ) %>
+        </div>
+
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "metadata",
+            label: "Metadata",
+            value: typecast_params.nonempty_str("metadata"),
+            attributes: { placeholder: "Filter by metadata, e.g. ip=1.2.3.4" }
+          ) %>
+        </div>
+
+        <% if @project %>
+          <div>
             <%== part(
               "components/form/text",
-              name: "action",
-              label: "Action",
-              value: typecast_params.nonempty_str("action"),
-              attributes: { placeholder: "Filter by action" }
+              name: "account",
+              label: "Account",
+              value: typecast_params.nonempty_str("account"),
+              attributes: { placeholder: "Filter by account name/email/ID" }
             ) %>
           </div>
+        <% end %>
 
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "metadata",
-              label: "Metadata",
-              value: typecast_params.nonempty_str("metadata"),
-              attributes: { placeholder: "Filter by metadata, e.g. ip=1.2.3.4" }
-            ) %>
-          </div>
+        <div>
+          <%== part(
+            "components/form/text",
+            name: "end",
+            type: "date",
+            label: "#{@month_limit} Months Prior To",
+            value: @end_date,
+            attributes: {required: true}
+          ) %>
+        </div>
 
-          <% if @project %>
-            <div class="col-span-12 sm:col-span-4">
-              <%== part(
-                "components/form/text",
-                name: "account",
-                label: "Account",
-                value: typecast_params.nonempty_str("account"),
-                attributes: { placeholder: "Filter by account name/email/ID" }
-              ) %>
-            </div>
-          <% end %>
-
-          <div class="col-span-12 sm:col-span-4">
-            <%== part(
-              "components/form/text",
-              name: "end",
-              type: "date",
-              label: "#{@month_limit} Months Prior To",
-              value: @end_date,
-              attributes: {required: true}
-            ) %>
-          </div>
-
-          <div class="col-span-12 sm:col-span-2 flex items-end">
-            <%== part("components/form/submit_button", text: "Search") %>
-          </div>
+        <div>
+          <%== part("components/form/submit_button", text: "Search") %>
         </div>
       <% end %>
     </div>
@@ -79,7 +77,7 @@
           [entry[:message], {link: "?#{to_query_string("end" => end_date, "action" => entry[:message])}"}],
           [
             entry[:metadata].map do |k, v|
-              "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "metadata" => "#{k}=#{v}")}\">#{h k}: #{h v}</a>"
+              "<a href=\"?#{h to_query_string("end" => end_date, "metadata" => "#{k}=#{v}")}\">#{h k}: #{h v}</a>"
             end.join(", "),
             {escape: false}
           ]

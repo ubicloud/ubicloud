@@ -9,7 +9,7 @@
   ] : []
 ) %>
 
-<div class="grid gap-6">
+<div class="stack">
   <%== part(
       "components/table_card",
       headers: ["Name", "Set As Default", "Remove Access"],
@@ -46,7 +46,7 @@
 </div>
 
 <% unless @invitations.empty? %>
-  <div class="grid gap-6 mt-4">
+  <div class="stack" id="invitations">
     <%== part(
         "components/table_card",
         title: "Project Invitations",

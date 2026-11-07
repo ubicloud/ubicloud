@@ -1,5 +1,5 @@
 <% if @vm.display_state != "running" %>
-  <div class="auto-refresh hidden" data-interval="10"></div>
+  <div class="auto-refresh" data-interval="10" hidden></div>
 <% end %>
 
 <% data = [
@@ -19,14 +19,14 @@
       ["IPv6", @vm.ip6, { copyable: true }],
       [
         "SSH Command",
-        "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm.unix_user}@#{@vm.ip4 || @vm.ip6}")}</span>",
+        "<code>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm.unix_user}@#{@vm.ip4 || @vm.ip6}")}</code>",
         { escape: false }
       ],
       ["Private IPv4", @vm.private_ipv4, { copyable: true }],
       ["Private IPv6", @vm.private_ipv6, { copyable: true }],
       [
         "Private subnet",
-        "<a href='#{path(subnet)}' class='text-rose-500 hover:underline'>#{subnet.name}</a>",
+        "<a href='#{path(subnet)}' class='resource-link'>#{subnet.name}</a>",
         { escape: false }
       ]
     ] %>

@@ -4,7 +4,7 @@ viewable_fws =
     .select_map(:id)
     .to_set { UBID.to_ubid(it) } %>
 
-<div id="vm-firewall-rules" class="p-6">
+<section id="vm-firewall-rules">
   <%== part(
     "components/table_card",
     title: "Applied Firewall Rules",
@@ -21,4 +21,4 @@ viewable_fws =
         end
       end
   ) %>
-</div>
+</section>

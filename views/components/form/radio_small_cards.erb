@@ -3,37 +3,38 @@
 error = flash.dig("errors", name)
 is_content_array = options[0][1].is_a?(Array) %>
 
-<div class="space-y-2">
-  <label class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+<div class="field">
+  <label><%= label %></label>
 
-  <fieldset class="radio-small-cards">
+  <fieldset class="radio-cards">
     <legend class="sr-only"><%= label %></legend>
 
-    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(285px,1fr))]">
+    <div>
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
-        <label class="<%= opt_classes %>">
-          <input
-            type="radio"
-            name="<%= name %>"
-            value="<%= opt_val %>"
-            class="peer sr-only"
-            <%== html_attrs(**attributes, **opt_attrs) %>
-          >
+        <label
+          <% if opt_classes && !opt_classes.empty? %>
+            class="<%= opt_classes %>"
+          <% end %>
+          <% if opt_attrs[:hidden] %>
+            hidden
+          <% end %>
+        >
+          <input type="radio" name="<%= name %>" value="<%= opt_val %>" <%== html_attrs(**attributes, **opt_attrs.except(:hidden)) %>>
 
           <% if is_content_array %>
-            <span class="radio-small-card justify-between p-4">
-              <span class="flex flex-col">
-                <span class="text-md font-semibold"><%= opt_text[0] %></span>
-                <span class="text-sm opacity-80"><span class="block sm:inline"><%= opt_text[1] %></span></span>
+            <span>
+              <span>
+                <span><%= opt_text[0] %></span>
+                <span><span><%= opt_text[1] %></span></span>
               </span>
 
-              <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                <span class="font-medium"><%= opt_text[2] %></span>
-                <span class="ml-1 opacity-50 sm:ml-0"><%= opt_text[3] %></span>
+              <span>
+                <span><%= opt_text[2] %></span>
+                <span><%= opt_text[3] %></span>
               </span>
             </span>
           <% else %>
-            <span class="radio-small-card justify-center p-3 text-sm font-semibold"><%= opt_text %></span>
+            <span><%= opt_text %></span>
           <% end %>
         </label>
       <% end %>
@@ -43,7 +44,7 @@ is_content_array = options[0][1].is_a?(Array) %>
   </fieldset>
 
   <% if error %>
-    <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
+    <p id="<%= name %>-error"><%= error %></p>
   <% end %>
 
   <%== description_html %>

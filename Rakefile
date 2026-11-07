@@ -387,12 +387,6 @@ task "build-sdk-gem" do
   sh("cd sdk/ruby && gem build ubicloud.gemspec")
 end
 
-desc "Emit assets before deploying"
-task "assets:precompile" do
-  sh("npm", "install")
-  sh("npm", "run", "prod")
-end
-
 desc "Open a new shell allowing use of by for speeding up tests"
 task "by" do
   by_path = "bin/by"

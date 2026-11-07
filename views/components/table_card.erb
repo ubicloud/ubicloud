@@ -1,55 +1,43 @@
 <%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false, id: nil, allow_wrap: false) %>
 
-<div class="grid grid-cols-1">
+<div class="table-card">
   <% if title || right_items %>
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          <%= title %>
-        </h3>
-      </div>
+    <div class="section-header">
+      <h3><%= title %></h3>
 
       <% if right_items %>
-        <div class="mt-4 flex md:ml-4 md:mt-0">
+        <div>
           <%== allow_unescaped(right_items.join) %>
         </div>
       <% end %>
     </div>
   <% end %>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="overflow-x-auto">
+  <div class="card">
+    <div>
       <table
-        class="min-w-full divide-y divide-gray-300<%= " w-full table-fixed" if allow_wrap %>"
+        <% table_classes = [("uniform" if consistent_styling), ("wrap" if allow_wrap)].compact %>
+        <% unless table_classes.empty? %>
+          class="<%= table_classes.join(" ") %>"
+        <% end %>
         <% if id %>
           id="<%= id %>"
         <% end %>
       >
         <% unless headers.empty? || rows.empty? %>
-          <thead class="bg-gray-50">
+          <thead>
             <tr>
-              <% headers.each_with_index do |name, i| %>
-                <th
-                  scope="col"
-                  <% if i == 0 && !consistent_styling %>
-                    class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% elsif i + 1 == headers.length && !consistent_styling %>
-                    class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% else %>
-                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% end %>
-                >
-                  <%= name %>
-                </th>
+              <% headers.each do |name| %>
+                <th scope="col"><%= name %></th>
               <% end %>
             </tr>
           </thead>
         <% end %>
 
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <tbody>
           <% if rows.empty? %>
             <tr>
-              <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">
+              <td colspan="<%= headers.length %>">
                 <% if empty_state.is_a?(Hash) %>
                   <%== part("components/empty_state", **empty_state) %>
                 <% else %>
@@ -62,31 +50,23 @@
               <% row_opts ||= {} %>
 
               <tr id="<%= row_opts[:id] %>">
-                <% columns.each_with_index do |(value, col_opts), i| %>
+                <% columns.each do |value, col_opts| %>
                   <% col_opts ||= {} %>
 
-                  <td <% if i == 0 && !consistent_styling
-                      cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium text-sm"
-                    elsif i + 1 == columns.length && !consistent_styling
-                      cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 text-sm"
-                    else
-                      cls="px-3 py-4 text-gray-500 text-sm"
-                    end
-
-                    if allow_wrap
-                      cls += " break-all"
-                    else
-                      cls += " whitespace-nowrap"
-                    end %> class="<%= cls %> <%= col_opts[:extra_class] %>">
+                  <td
+                    <% if col_opts[:extra_class] %>
+                      class="<%= col_opts[:extra_class] %>"
+                    <% end %>
+                  >
                     <% if value.is_a?(Array) %>
                       <% (first_value, first_opts), (second_value, second_opts) = value %>
-                      <div class="font-medium text-gray-900">
+                      <p>
                         <%== part("components/value_content", content: first_value, opts: first_opts) %>
-                      </div>
+                      </p>
                       <% if second_value %>
-                        <div class="mt-1 text-gray-500 text-xs">
+                        <p>
                           <%== part("components/value_content", content: second_value, opts: second_opts) %>
-                        </div>
+                        </p>
                       <% end %>
                     <% else %>
                       <%== part("components/value_content", content: value, opts: col_opts) %>

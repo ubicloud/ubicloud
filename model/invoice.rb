@@ -241,9 +241,9 @@ class Invoice < Sequel::Model
 
     column_width = (pdf.bounds.width / 2) - 10
     right_column_x = column_width + 20
-    dark_gray = "1F2937" # Tailwind text-gray-800
-    light_gray = "6B7280" # Tailwind text-gray-500
-    green = "059669" # Tailwind text-green-600
+    dark_gray = "1F2937" # --gray-800 in assets/css/app.css
+    light_gray = "6B7280" # --gray-500 in assets/css/app.css
+    green = "059669" # --emerald-600 in assets/css/app.css
 
     pdf.fill_color light_gray
 

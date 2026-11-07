@@ -1,18 +1,18 @@
 <% @page_title = "Virtual Machines" %>
 
-<div class="auto-refresh hidden" data-interval="10"></div>
+<div class="auto-refresh" data-interval="10" hidden></div>
 
 <%== part(
   "components/page_header",
   breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Virtual Machines", "#"]],
   right_items: (!@vms.empty? && has_project_permission("Vm:create")) ?
     ([
-        part("components/button", text: "Create Virtual Machine", link: "vm/create?show_gpu=f", extra_class: "mr-2"),
+        part("components/button", text: "Create Virtual Machine", link: "vm/create?show_gpu=f"),
         part("components/button", text: "Create GPU Virtual Machine", link: "vm/create?show_gpu=t"),
       ]) : []
 ) %>
 
-<div class="grid gap-6">
+<div class="stack">
   <%== part(
     "components/table_card",
     headers: ["Name", "Location", "Size", "Storage Size", "State", "IP Address"],

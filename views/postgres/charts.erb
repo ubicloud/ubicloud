@@ -2,63 +2,49 @@
 
 <%== part("components/metrics_charts", resource: @pg, metrics: Metrics::POSTGRES_METRICS, running_subject: "database") %>
 
-<div class="p-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Metric Destinations
-      </h3>
-    </div>
+<section>
+  <div class="section-header">
+    <h3>Metric Destinations</h3>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50">
+  <div class="card">
+    <table id="metric-destinations" class="form-table">
+      <thead>
         <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">URL</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Auth</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Username</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Password</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+          <th scope="col">URL</th>
+          <th scope="col">Auth</th>
+          <th scope="col">Username</th>
+          <th scope="col">Password</th>
+          <th scope="col"></th>
         </tr>
       </thead>
 
-      <tbody class="divide-y divide-gray-200 bg-white">
+      <tbody>
         <% @pg.metric_destinations.each do |md| %>
           <tr>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.url %></td>
+            <td><%= md.url %></td>
+            <td><%= md.auth_methods.join(", ") %></td>
+            <td><%= md.username %></td>
+            <td>-</td>
 
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-              <%= md.auth_methods.join(", ") %>
-            </td>
-
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-              <%= md.username %>
-            </td>
-
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">-</td>
-
-            <td
-              id="md-delete-<%= md.ubid %>"
-              class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
-            >
+            <td id="md-delete-<%= md.ubid %>">
               <%== part("components/delete_button", url: "#{path(@pg)}/metric-destination/#{md.ubid}", text: "") %>
             </td>
           </tr>
         <% end %>
 
         <tr>
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+          <td>
             <%== part("components/form/text", name: "url", attributes: { form: "form-pg-md-create", required: true }) %>
           </td>
 
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">basic_auth</td>
+          <td>basic_auth</td>
 
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+          <td>
             <%== part("components/form/text", name: "username", attributes: { form: "form-pg-md-create", required: true }) %>
           </td>
 
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+          <td>
             <%== part(
                 "components/form/text",
                 name: "metric-destination-password",
@@ -72,7 +58,7 @@
               ) %>
           </td>
 
-          <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+          <td>
             <% form(action: "#{path(@pg)}/metric-destination", method: :post, id: "form-pg-md-create") do %>
               <%== part("components/form/submit_button", text: "Create", extra_class: "metric-destination-create-button") %>
             <% end %>
@@ -81,4 +67,4 @@
       </tbody>
     </table>
   </div>
-</div>
+</section>
