@@ -85,28 +85,30 @@
   </section>
 
   <% if @kc.nodepools_dataset.count > 1 %>
-  <section>
-    <div class="section-header">
-      <h3>Danger Zone</h3>
-    </div>
+    <section>
+      <div class="section-header">
+        <h3>Danger Zone</h3>
+      </div>
 
-    <div class="card">
-      <!-- Delete Card -->
-      <div>
-        <div class="setting">
-          <div>
-            <h3>Delete Nodepool</h3>
-            <p>
-              This action will permanently delete this nodepool and its nodes. Deleted data cannot be recovered. Use it carefully.
-            </p>
-          </div>
+      <div class="card">
+        <!-- Delete Card -->
+        <div>
+          <div class="setting">
+            <div>
+              <h3>Delete Nodepool</h3>
 
-          <div id="kn-delete-<%= @kn.ubid %>">
-            <%== part("components/delete_button", url: path(@kn), confirmation: @kn.name) %>
+              <p>
+                This action will permanently delete this nodepool and its nodes. Deleted data cannot be recovered. Use
+                it carefully.
+              </p>
+            </div>
+
+            <div id="kn-delete-<%= @kn.ubid %>">
+              <%== part("components/delete_button", url: path(@kn), confirmation: @kn.name) %>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
   <% end %>
 <% end %>

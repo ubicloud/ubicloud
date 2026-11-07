@@ -46,8 +46,8 @@ linter:
   # failLevel: warning
 
   # # Additional patterns beyond the defaults for linting
-  # include:
-  #   - '**/*.xml.erb'
+  include:
+    - 'views/**/*.erb'
   #
   # # Patterns to exclude from linting
   # exclude:
@@ -138,8 +138,8 @@ formatter:
   maxLineLength: 120
 
   # # Additional patterns beyond the defaults for formatting
-  # include:
-  #   - '**/*.xml.erb'
+  include:
+    - 'views/**/*.erb'
   #
   # # Patterns to exclude from formatting
   # exclude:

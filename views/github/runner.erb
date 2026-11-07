@@ -180,22 +180,22 @@
 
 <% if @runners.any? { it.workflow_job.nil? } %>
   <div class="runner-note">
-    <%== part("components/icon", name: "hero-information-circle") %> Runners
-    are only billed when they run a job. Provisioning time and runners that GitHub never assigns a job to are free.
+    <%== part("components/icon", name: "hero-information-circle") %> Runners are only billed when they run a job.
+    Provisioning time and runners that GitHub never assigns a job to are free.
   </div>
 <% end %>
 
 <% if !@installation.premium_runner_enabled? && @runners.any? { it.label_data["family"] == "standard" && it.vm&.family == "premium" } %>
   <div class="runner-note">
-    <%== part("components/icon", name: "hero-information-circle") %> Some of
-    your standard runners were given premium hardware instead, on us. You're not charged the premium rate for these.
+    <%== part("components/icon", name: "hero-information-circle") %> Some of your standard runners were given premium
+    hardware instead, on us. You're not charged the premium rate for these.
   </div>
 <% end %>
 
 <% if @installation.premium_runner_enabled? && @runners.any? { it.label_data["arch"] == "x64" && it.vm&.allocated_at && it.vm.family != "premium" } %>
   <div class="runner-note">
-    <%== part("components/icon", name: "hero-information-circle") %> Some of
-    your premium runners were given standard hardware instead, so they don't wait in the queue for premium capacity.
-    You're only charged the standard rate for these.
+    <%== part("components/icon", name: "hero-information-circle") %> Some of your premium runners were given standard
+    hardware instead, so they don't wait in the queue for premium capacity. You're only charged the standard rate for
+    these.
   </div>
 <% end %>

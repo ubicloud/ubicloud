@@ -101,7 +101,17 @@
             <% [[5432, 5432], [6432, 6432]].each_with_index do |(port, target_port), i| %>
               <div class="multi-input-row">
                 <input type="number" id="port-<%= i %>" name="ports[]" value="<%= port %>" min="1" max="65535" required>
-                <input type="number" id="target-port-<%= i %>" name="target_ports[]" value="<%= target_port %>" min="1" max="65535" required>
+
+                <input
+                  type="number"
+                  id="target-port-<%= i %>"
+                  name="target_ports[]"
+                  value="<%= target_port %>"
+                  min="1"
+                  max="65535"
+                  required
+                >
+
                 <%== part("components/button", text: "Remove", type: "danger", extra_class: "remove-multi-input", attributes: {"type" => "button"}) %>
               </div>
             <% end %>

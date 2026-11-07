@@ -74,8 +74,7 @@ headings = [
       ) %>
     <% else %>
       <p>
-        Change <code>runs-on</code> to a
-        Ubicloud runner in each workflow file:
+        Change <code>runs-on</code> to a Ubicloud runner in each workflow file:
       </p>
 
       <div class="workflow-diff">
@@ -93,31 +92,27 @@ headings = [
           <div>
             <span>&nbsp;</span>
 
-            <span>  build:</span>
+            <span> build:</span>
           </div>
 
           <div class="removed">
             <span>−</span>
 
-            <span>  runs-on: ubuntu-latest</span>
+            <span> runs-on: ubuntu-latest</span>
           </div>
 
           <div class="added">
             <span>+</span>
 
-            <span>  runs-on: </span>
+            <span> runs-on: </span>
 
             <%== part("components/copyable_content", content: "ubicloud-standard-2") %>
           </div>
         </div>
       </div>
 
-      <a
-        href="https://www.ubicloud.com/docs/github-actions-integration/runner-types"
-        class="runner-types"
-      >
-        Browse all runner types
-        <%== part("components/icon", name: "hero-arrow-top-right-on-square") %>
+      <a href="https://www.ubicloud.com/docs/github-actions-integration/runner-types" class="runner-types">
+        Browse all runner types <%== part("components/icon", name: "hero-arrow-top-right-on-square") %>
       </a>
 
       <div>

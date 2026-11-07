@@ -14,13 +14,7 @@
           <%== rodauth.webauthn_setup_additional_form_tags %>
           <%== hidden_inputs(rodauth.webauthn_setup_challenge_param => cred.challenge, rodauth.webauthn_setup_challenge_hmac_param => rodauth.compute_hmac(cred.challenge)) %>
 
-          <input
-            id="webauthn-setup"
-            type="text"
-            name="<%= rodauth.webauthn_setup_param %>"
-            value=""
-            hidden
-          >
+          <input id="webauthn-setup" type="text" name="<%= rodauth.webauthn_setup_param %>" value="" hidden>
 
           <div class="form-grid">
             <div>

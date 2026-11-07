@@ -3,5 +3,7 @@
 <% form(action:, method: :post, id: "#{name}_toggle") do %>
   <%== hidden_inputs(name => !active) %>
 
-  <button type="submit" role="switch" aria-checked="<%= active ? "true" : "false" %>"><span></span></button>
+  <button type="submit" role="switch" aria-checked="<%= active ? "true" : "false" %>">
+    <span></span>
+  </button>
 <% end %>

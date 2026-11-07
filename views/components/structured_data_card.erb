@@ -14,19 +14,11 @@
           <div class="sd-kv-row">
             <input type="hidden" name="structured_data_ids[]" value="<%= sd_id %>">
 
-            <input
-              type="text"
-              name="structured_data_keys[]"
-              value="<%= key %>"
-            >
+            <input type="text" name="structured_data_keys[]" value="<%= key %>">
 
             <span>=</span>
 
-            <input
-              type="text"
-              name="structured_data_values[]"
-              value="<%= val %>"
-            >
+            <input type="text" name="structured_data_values[]" value="<%= val %>">
 
             <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
           </div>
@@ -35,28 +27,13 @@
 
       <%# Hidden placeholder row for cloning new kv pairs %>
       <div class="sd-kv-placeholder-row" hidden>
-        <input
-          type="hidden"
-          name="structured_data_ids[]"
-          value="<%= sd_id %>"
-          disabled
-        >
+        <input type="hidden" name="structured_data_ids[]" value="<%= sd_id %>" disabled>
 
-        <input
-          type="text"
-          name="structured_data_keys[]"
-          value=""
-          disabled
-        >
+        <input type="text" name="structured_data_keys[]" value="" disabled>
 
         <span>=</span>
 
-        <input
-          type="text"
-          name="structured_data_values[]"
-          value=""
-          disabled
-        >
+        <input type="text" name="structured_data_values[]" value="" disabled>
 
         <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
       </div>
@@ -81,28 +58,13 @@
     <div class="sd-kv-rows"></div>
 
     <div class="sd-kv-placeholder-row" hidden>
-      <input
-        type="hidden"
-        name="structured_data_ids[]"
-        value=""
-        disabled
-      >
+      <input type="hidden" name="structured_data_ids[]" value="" disabled>
 
-      <input
-        type="text"
-        name="structured_data_keys[]"
-        value=""
-        disabled
-      >
+      <input type="text" name="structured_data_keys[]" value="" disabled>
 
       <span>=</span>
 
-      <input
-        type="text"
-        name="structured_data_values[]"
-        value=""
-        disabled
-      >
+      <input type="text" name="structured_data_values[]" value="" disabled>
 
       <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-sd-kv-btn") %>
     </div>
@@ -117,11 +79,7 @@
   </div>
 
   <div class="new-sd-id-row">
-    <input
-      type="text"
-      class="new-sd-id-name"
-      placeholder="provider@65535"
-    >
+    <input type="text" class="new-sd-id-name" placeholder="provider@65535">
 
     <%== part("components/button", type: "safe", text: "Add SD-ID", icon: "hero-plus", extra_class: "add-sd-id-btn") %>
   </div>

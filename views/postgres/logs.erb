@@ -223,12 +223,7 @@
 
       <div class="card">
         <% form(action: "#{path(@pg)}/log-destination", method: :post, id: "log-destination-form") do %>
-          <input
-            type="hidden"
-            name="type"
-            id="log-destination-type"
-            value="<%= form_type %>"
-          >
+          <input type="hidden" name="type" id="log-destination-type" value="<%= form_type %>">
 
           <div>
             <div class="field">

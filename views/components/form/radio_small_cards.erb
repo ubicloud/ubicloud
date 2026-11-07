@@ -19,7 +19,12 @@ is_content_array = options[0][1].is_a?(Array) %>
             hidden
           <% end %>
         >
-          <input type="radio" name="<%= name %>" value="<%= opt_val %>" <%== html_attrs(**attributes, **opt_attrs.except(:hidden)) %>>
+          <input
+            type="radio"
+            name="<%= name %>"
+            value="<%= opt_val %>"
+            <%== html_attrs(**attributes, **opt_attrs.except(:hidden)) %>
+          >
 
           <% if is_content_array %>
             <span>

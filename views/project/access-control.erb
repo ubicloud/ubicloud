@@ -42,11 +42,11 @@ end
   <% unless unrestricted %>
     <% if @token.nil? && edit_perm %>
       <p>
-          Access is allowed if there is an access control entry allowing the subject to take the action on the object.
-          Subjects, actions, and objects can all be tags, which are used for grouping. The recommended way to handle
-          access control in Ubicloud is to create appropriate tags, add the subjects, actions, and objects to the tags,
-          and create the minimum number of access control entries you need to enforce the access you want. However, you
-          can create access control entries referencing specific subjects, actions, or objects.
+        Access is allowed if there is an access control entry allowing the subject to take the action on the object.
+        Subjects, actions, and objects can all be tags, which are used for grouping. The recommended way to handle
+        access control in Ubicloud is to create appropriate tags, add the subjects, actions, and objects to the tags,
+        and create the minimum number of access control entries you need to enforce the access you want. However, you
+        can create access control entries referencing specific subjects, actions, or objects.
       </p>
     <% end %>
 
@@ -151,17 +151,17 @@ end
         <div class="setting">
           <div>
             <h3><%= restriction_title %> Personal Access Token</h3>
+
             <p>
               <% if unrestricted %>
                 This token currently has the same access to this project that your account has. If you would like to
                 restrict the access of this token, use the "Restrict Token Access" button. After restricting token
-                access, the token will have no access to the project, and you can grant the specific access you want
-                the token to have. Be aware that the token can never have more access to the project than your
-                account has.
+                access, the token will have no access to the project, and you can grant the specific access you want the
+                token to have. Be aware that the token can never have more access to the project than your account has.
               <% else %>
-                This token currently has access to the project based on the access control entries above. If you
-                would like to remove access control restrictions, and grant the token full access to your account,
-                click on the "Unrestrict Token Access" button.
+                This token currently has access to the project based on the access control entries above. If you would
+                like to remove access control restrictions, and grant the token full access to your account, click on
+                the "Unrestrict Token Access" button.
               <% end %>
             </p>
           </div>

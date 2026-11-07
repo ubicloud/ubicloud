@@ -19,7 +19,13 @@
           hidden
         <% end %>
       >
-        <input id="<%= id %>" name="<%= name %>" type="checkbox" value="<%= opt_val %>" <%== html_attrs(opt_attrs.except(:hidden)) %>>
+        <input
+          id="<%= id %>"
+          name="<%= name %>"
+          type="checkbox"
+          value="<%= opt_val %>"
+          <%== html_attrs(opt_attrs.except(:hidden)) %>
+        >
 
         <% if opt_text %>
           <label for="<%= id %>"><%== allow_unescaped(opt_text) %></label>

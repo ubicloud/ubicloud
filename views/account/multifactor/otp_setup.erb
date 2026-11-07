@@ -13,12 +13,7 @@
         <% form(action: rodauth.otp_setup_path, method: :post) do %>
           <%== rodauth.otp_setup_additional_form_tags %>
 
-          <input
-            type="hidden"
-            id="otp-key"
-            name="<%= rodauth.otp_setup_param %>"
-            value="<%= rodauth.otp_user_key %>"
-          >
+          <input type="hidden" id="otp-key" name="<%= rodauth.otp_setup_param %>" value="<%= rodauth.otp_user_key %>">
 
           <input
             type="hidden"
@@ -32,8 +27,7 @@
               <%== rodauth.otp_qr_code %>
 
               <p>
-                If you can't scan the QR code, please enter the following secret in your authenticator app
-                manually:
+                If you can't scan the QR code, please enter the following secret in your authenticator app manually:
                 <br>
                 <span id="otp-secret"><%= rodauth.otp_user_key %></span>
               </p>

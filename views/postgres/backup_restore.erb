@@ -61,8 +61,7 @@ backups = @pg.timeline.backups %>
       } %>
       <div class="credentials">
         <p>
-          These credentials are read-only and expire at
-          <span><%= creds[:expiration] %></span>.
+          These credentials are read-only and expire at <span><%= creds[:expiration] %></span>.
         </p>
 
         <dl>
@@ -91,12 +90,7 @@ backups = @pg.timeline.backups %>
             >
               <pre><%= cmd %></pre>
 
-              <img
-                src="/icons/hero-clipboard-document.svg"
-                width="18px"
-                class="copy-button"
-                alt="Copy command"
-              >
+              <img src="/icons/hero-clipboard-document.svg" width="18px" class="copy-button" alt="Copy command">
             </div>
           <% end %>
         </div>
