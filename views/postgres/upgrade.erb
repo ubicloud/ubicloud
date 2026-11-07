@@ -50,13 +50,13 @@ end %>
   <% if @pg.display_state == "creating" %>
     <p class="unavailable">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
-    <% if @pg.upgrade_stage == "upgrade_failed" %>
-      <p>
+    <p>
+      <% if @pg.upgrade_stage == "upgrade_failed" %>
         Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
-      </p>
-    <% else %>
-      <p>Database upgrade is in progress.</p>
-    <% end %>
+      <% else %>
+        Database upgrade is in progress.
+      <% end %>
+    </p>
     <% upgrade_progress_rows = upgrade_progress
     .map do |stage, description, database_availability_icon, stage_status_icon|
       [

@@ -54,8 +54,8 @@
     <h3>Metrics Summary</h3>
   </header>
 
-  <% if @pg.display_state != "creating" %>
-    <div>
+  <div>
+    <% if @pg.display_state != "creating" %>
       <% Metrics::POSTGRES_METRICS.slice(:cpu_usage, :disk_usage).each do |key, metric| %>
         <div class="metric-chart-card">
           <h4><%= metric.name %></h4>
@@ -69,11 +69,9 @@
           ></div>
         </div>
       <% end %>
-    </div>
-  <% else %>
-    <div>
+    <% else %>
       <h2>No metrics available</h2>
       <p>Metrics will be available once the database is running.</p>
-    </div>
-  <% end %>
+    <% end %>
+  </div>
 </section>

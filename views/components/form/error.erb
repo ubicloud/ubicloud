@@ -1,10 +1,10 @@
 <%# locals: (name:, error:) %>
-<% if error.is_a?(Array) %>
-  <p id="<%= name %>-error">
+<p id="<%= name %>-error">
+  <% if error.is_a?(Array) %>
     <% error.each do |e| %>
       <%= e %><br>
     <% end %>
-  </p>
-<% else %>
-  <p id="<%= name %>-error"><%= error %></p>
-<% end %>
+  <% else %>
+    <%= error %>
+  <% end %>
+</p>

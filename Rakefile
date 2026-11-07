@@ -418,8 +418,8 @@ namespace :linter do
 
   desc "Run Herb linter and formatter"
   task :erb_formatter do
-    sh "npm run format-erb"
-    # sh "npm run lint-erb"
+    sh "npx @herb-tools/formatter >/dev/null 2>&1"
+    # sh "npx @herb-tools/linter --no-color --fix --fix-unsafely"
   end
 
   desc "Run golangci-lint"

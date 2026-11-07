@@ -114,11 +114,13 @@
           <tr>
             <td><a href="/model/Page/<%= info_page.ubid %>"><%= info_page.summary %></a></td>
 
-            <% if info_page.details["related_resources"] %>
-              <td><%== linkify_ubids(info_page.details["related_resources"].join(" ")) %></td>
-            <% else %>
-              <td>No related resources</td>
-            <% end %>
+            <td>
+              <% if info_page.details["related_resources"] %>
+                <%== linkify_ubids(info_page.details["related_resources"].join(" ")) %>
+              <% else %>
+                No related resources
+              <% end %>
+            </td>
 
             <td><%= info_page.created_at.strftime("%F %T") %></td>
           </tr>

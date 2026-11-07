@@ -38,17 +38,17 @@ end
         <div>
           <dt>Remaining Credits</dt>
 
-          <% if active_resource_credits.empty? || active_resource_credits.sum(&:amount).to_f == 0 %>
-            <dd>$0.00</dd>
-          <% else %>
-            <dd>
+          <dd>
+            <% if active_resource_credits.empty? || active_resource_credits.sum(&:amount).to_f == 0 %>
+              $0.00
+            <% else %>
               <% active_resource_credits.each do |rc| %>
                 <% next if rc.amount == 0 %>
 
                 <div><%= rc.name %>: <%= money(rc.amount) %></div>
               <% end %>
-            </dd>
-          <% end %>
+            <% end %>
+          </dd>
         </div>
 
         <% if active_resource_discounts.any? %>
@@ -380,8 +380,8 @@ end
       </div>
 
       <!-- List alerts -->
-      <% if @usage_alerts.count > 0 %>
-        <div>
+      <div>
+        <% if @usage_alerts.count > 0 %>
           <table>
             <thead>
               <tr>
@@ -420,12 +420,10 @@ end
               <% end %>
             </tbody>
           </table>
-        </div>
-      <% else %>
-        <div>
+        <% else %>
           No usage alerts...
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
   </div>
 </div>

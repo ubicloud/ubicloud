@@ -2,8 +2,8 @@
 max_date = @pg.timeline.latest_restore_time
 backups = @pg.timeline.backups %>
 
-<% if min_date && max_date > min_date %>
-  <section id="pg-fork">
+<section id="pg-fork">
+  <% if min_date && max_date > min_date %>
     <% form(action: "#{path(@pg)}/restore", method: :post) do %>
       <div>
         <h3>Fork PostgreSQL database</h3>
@@ -24,9 +24,7 @@ backups = @pg.timeline.backups %>
         </div>
       </div>
     <% end %>
-  </section>
-<% else %>
-  <section id="pg-fork">
+  <% else %>
     <p>
       <% if backups.count > 0 %>
         Point-in-time restore is not available yet. The restore window opens a few minutes after the first backup
@@ -35,8 +33,8 @@ backups = @pg.timeline.backups %>
         No backups available for this PostgreSQL database.
       <% end %>
     </p>
-  </section>
-<% end %>
+  <% end %>
+</section>
 
 <% if @pg.backup_download_unavailable_message.nil? %>
   <section id="backup-download">

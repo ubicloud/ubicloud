@@ -26,8 +26,8 @@ is_content_array = options[0][1].is_a?(Array) %>
             <%== html_attrs(**attributes, **opt_attrs.except(:hidden)) %>
           >
 
-          <% if is_content_array %>
-            <span>
+          <span>
+            <% if is_content_array %>
               <span>
                 <span><%= opt_text[0] %></span>
                 <span><span><%= opt_text[1] %></span></span>
@@ -37,10 +37,10 @@ is_content_array = options[0][1].is_a?(Array) %>
                 <span><%= opt_text[2] %></span>
                 <span><%= opt_text[3] %></span>
               </span>
-            </span>
-          <% else %>
-            <span><%= opt_text %></span>
-          <% end %>
+            <% else %>
+              <%= opt_text %>
+            <% end %>
+          </span>
         </label>
       <% end %>
 
