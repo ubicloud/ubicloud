@@ -284,10 +284,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first
     instance_response = reservation&.instances&.first
     state = instance_response&.dig(:state, :name)
+    reason_code = instance_response&.dig(:state_reason, :code)
 
-    if state == "terminated" && instance_response.dig(:state_reason, :code) == "Server.InternalError" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
+    if state == "terminated" && %w[Server.InternalError Server.SpotInstanceTermination].include?(reason_code) && is_runner? && (runner = GithubRunner[vm_id: vm.id])
       if runner.provision_spare_runner
-        Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message: instance_response.dig(:state_reason, :message)}})
+        Clog.emit("aws runner terminated before allocation", {aws_runner_terminated_before_allocation: {vm:, reason_code:, message: instance_response.dig(:state_reason, :message)}})
         runner.incr_destroy
       end
       nap 60 * 60
