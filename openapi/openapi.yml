@@ -1378,6 +1378,7 @@ paths:
                     - '16'
                     - '17'
                     - '18'
+                    - '19'
                 restrict_by_default:
                   description: Whether to restrict access by default (if so, firewall rules must be added to access)
                   type: boolean
@@ -3982,6 +3983,7 @@ components:
             - '16'
             - '17'
             - '18'
+            - '19'
         target_version:
           description: Target Postgres version
           type: string
@@ -3989,6 +3991,7 @@ components:
             - '16'
             - '17'
             - '18'
+            - '19'
         vm_size:
           description: Size of the underlying VM
           type: string
@@ -5201,12 +5204,14 @@ components:
                   - '16'
                   - '17'
                   - '18'
+                  - '19'
               target_version:
                 type: string
                 enum:
                   - '16'
                   - '17'
                   - '18'
+                  - '19'
               upgrade_status:
                 type: string
               upgrade_stage:

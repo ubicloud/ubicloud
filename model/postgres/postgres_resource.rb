@@ -865,7 +865,7 @@ class PostgresResource < Sequel::Model
   # Bumped on its own schedule: a version is offered in POSTGRES_VERSION_OPTIONS
   # for a while before new databases are created with it by default.
   DEFAULT_VERSION = "18"
-  LATEST_VERSION = "18"
+  LATEST_VERSION = "19"
 
   def self.default_version
     DEFAULT_VERSION
@@ -907,6 +907,7 @@ class PostgresResource < Sequel::Model
     "ubuntu-2604" => {
       "17" => "20260824.1.0",
       "18" => "20260824.1.0",
+      "19" => "20261112.9.1",
     },
   }
 end

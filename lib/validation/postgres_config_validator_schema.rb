@@ -2762,5 +2762,7 @@ module Validation
       removed.each { |key| schema.delete(key) }
       schema.merge!(added_or_modified)
     end.freeze
+
+    PG_19_CONFIG_SCHEMA = PG_18_CONFIG_SCHEMA
   end
 end
