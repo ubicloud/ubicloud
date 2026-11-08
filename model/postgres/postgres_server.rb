@@ -937,7 +937,7 @@ end
 #  postgres_server_resource_id_index                 | btree (resource_id)
 # Check constraints:
 #  image_family_check | (image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
-#  version_check      | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  version_check      | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text, '19'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
