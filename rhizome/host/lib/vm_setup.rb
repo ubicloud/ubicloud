@@ -182,13 +182,13 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   # The prep unit's stdin holds the storage KEKs. The unit deletes it once
-  # read, but remove any copy left by a prep that never ran, or by the old
-  # daemonizer, which kept it on disk.
+  # read, but remove any copy left by a prep that never ran, by a write cut
+  # short before its rename, or by the old daemonizer, which kept it on disk.
   def purge_prep_stdin
     [
       "/dev/shm/prep_#{@vm_name}.stdin",
       "/home/rhizome/var/proc/prep_#{@vm_name}.stdin",
-    ].each { |path| rm_if_exists(path) }
+    ].each { |path| [path, "#{path}.tmp"].each { |p| rm_if_exists(p) } }
   end
 
   def purge_user

@@ -920,7 +920,9 @@ NFTABLES_CONF
   describe "#purge_prep_stdin" do
     it "removes every copy of the prep unit's stdin" do
       expect(vs).to receive(:rm_if_exists).with("/dev/shm/prep_test.stdin")
+      expect(vs).to receive(:rm_if_exists).with("/dev/shm/prep_test.stdin.tmp")
       expect(vs).to receive(:rm_if_exists).with("/home/rhizome/var/proc/prep_test.stdin")
+      expect(vs).to receive(:rm_if_exists).with("/home/rhizome/var/proc/prep_test.stdin.tmp")
       vs.purge_prep_stdin
     end
   end
