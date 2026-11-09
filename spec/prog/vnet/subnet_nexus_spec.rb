@@ -127,6 +127,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.128/26")
     end
 
+    it "does not pick the AWS default VPC range" do
+      expect(PrivateSubnet).to receive(:random_subnet).with(16).and_return("172.16.0.0/12", "10.0.0.0/8")
+      project = Project.create(name: "test-project")
+      expect(SecureRandom).to receive(:random_number).with(2**(16 - 12) - 1).and_return(14)
+      expect(SecureRandom).to receive(:random_number).with(2**(16 - 8) - 1).and_return(15)
+      expect(Clog).to receive(:emit).with("Selected IPv4 subnet 172.31.0.0/16 is banned").and_call_original
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 16).to_s).to eq("10.16.0.0/16")
+    end
+
     it "finds a new subnet if the initial range is smaller than the requested cidr range" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
       project = Project.create(name: "test-project")
