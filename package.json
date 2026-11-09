@@ -18,7 +18,10 @@
   },
   "overrides": {
     "rollup": "^2.80.0",
-    "lodash": "^4.18.0"
+    "lodash": "^4.18.0",
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "^6.1.5"
+    }
   },
   "engines": {
     "node": "24.12.0",
