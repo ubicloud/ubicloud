@@ -382,6 +382,14 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#reset_blob_storage" do
+    it "registers a deadline that scales with the cache entries and hops to recreate_blob_storage" do
+      GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-1", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      expect { nx.reset_blob_storage }.to hop("recreate_blob_storage")
+      expect(Time.new(nx.deadline_at)).to be_within(5).of(now + 401)
+    end
+  end
+
+  describe "#recreate_blob_storage" do
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
     let(:cloudflare_client) { instance_double(CloudflareClient) }
     let(:no_uploads) { instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: []) }
@@ -397,7 +405,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.incr_reset_blob_storage
       entry = GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-1", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
       expect(blob_storage_client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
-      expect { nx.reset_blob_storage }.to nap(0)
+      expect { nx.recreate_blob_storage }.to nap(0)
       expect(entry.exists?).to be(false)
 
       expect(blob_storage_client).to receive(:list_multipart_uploads).and_return(no_uploads)
@@ -406,7 +414,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       new_bucket_name = "#{repository.ubid}-enam"
       expect(blob_storage_client).to receive(:create_bucket).with({bucket: new_bucket_name, create_bucket_configuration: {location_constraint: "enam"}})
       expect(cloudflare_client).to receive(:create_token).with("#{new_bucket_name}-token", instance_of(Array)).and_return(["new-key", "new-secret"])
-      expect { nx.reset_blob_storage }.to hop("wait")
+      expect { nx.recreate_blob_storage }.to hop("wait")
       repository.reload
       expect(repository.bucket_name).to eq(new_bucket_name)
       expect(repository.access_key).to eq("new-key")
@@ -417,13 +425,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       repository.update(access_key: "access-key")
       expect(blob_storage_client).to receive(:list_multipart_uploads).and_return(no_uploads)
       expect(blob_storage_client).to receive(:delete_bucket).and_raise(Aws::S3::Errors::BucketNotEmpty.new(nil, nil))
-      expect { nx.reset_blob_storage }.to nap(5)
+      expect { nx.recreate_blob_storage }.to nap(5)
       expect(repository.reload.access_key).to eq("access-key")
     end
 
     it "hops to wait if the repository has no blob storage" do
       nx.incr_reset_blob_storage
-      expect { nx.reset_blob_storage }.to hop("wait")
+      expect { nx.recreate_blob_storage }.to hop("wait")
       expect(Semaphore.where(strand_id: repository.id, name: "reset_blob_storage").count).to eq(0)
     end
   end
