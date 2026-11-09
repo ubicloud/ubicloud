@@ -15,6 +15,7 @@ class UbiCli
       on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
       on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
       on("-P", "--private-subnet-name=name", "override name of created private subnet")
+      on("-i", "--ipv4-range=cidr", "private IPv4 range of the created private subnet (e.g. 10.20.0.0/20)")
     end
     help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
     help_option_values("Size:", Option::POSTGRES_SIZE_OPTIONS.keys)
@@ -23,6 +24,7 @@ class UbiCli
 
     run do |opts, cmd|
       params = underscore_keys(opts[:pg_create])
+      params[:private_subnet_ipv4_range] = params.delete(:ipv4_range) if params[:ipv4_range]
       pg_tags_to_hash(params, cmd)
       params_to_hash(params, :pg_config, "config", cmd)
       params_to_hash(params, :pgbouncer_config, "pgbouncer config", cmd)
