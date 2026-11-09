@@ -108,6 +108,21 @@ RSpec.describe Clover, "private_subnet" do
         expect(resp_body["firewalls"].first["id"]).to eq(fw.ubid)
       end
 
+      it "with an IPv4 range" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {ipv4_range: "10.20.0.0/20"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["net4"]).to eq("10.20.0.0/20")
+        expect(PrivateSubnet.first(name: "test-ps").net4.to_s).to eq("10.20.0.0/20")
+      end
+
+      it "with an invalid IPv4 range" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {ipv4_range: "10.20.0.5/20"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: ipv4_range")
+        expect(PrivateSubnet.where(name: "test-ps").count).to eq(0)
+      end
+
       it "with invalid firewall id" do
         firewall_id = "a" * 25 + "b"
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id:}.to_json

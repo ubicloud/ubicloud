@@ -225,6 +225,38 @@ module Validation
     fail ValidationFailed.new({cidr: "Invalid CIDR"})
   end
 
+  IPV4_CIDR_PATTERN = %r{\A\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}\z}
+
+  def self.validate_private_subnet_ipv4_range(range, project:, location:, key:)
+    max_prefix = location.aws? ? 24 : 26
+    range = range.strip
+    net = begin
+      NetAddr::IPv4Net.parse(range) if range.match?(IPV4_CIDR_PATTERN)
+    rescue NetAddr::ValidationError
+      nil
+    end
+
+    prefix = net.netmask.prefix_len if net
+    message = if net.nil?
+      "Enter an address and a size, such as 10.20.0.0/20."
+    elsif PrivateSubnet::PRIVATE_IPV4_NETS.none? { [0, 1].include?(it.rel(net)) }
+      "#{range} isn't a private range. Use one inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16."
+    elsif prefix > max_prefix
+      "/#{prefix} is too small#{" for an AWS location" if location.aws?}. Use /16 to /#{max_prefix}."
+    elsif prefix < 16
+      "/#{prefix} is too large. Use /16 to /#{max_prefix}."
+    elsif net.to_s != range
+      "A /#{prefix} can't start at #{range.split("/").first}. Use #{net}."
+    end
+    fail ValidationFailed.new({key => message}) if message
+
+    unless project.private_subnets_dataset.where(location_id: location.id).overlapping_net4(net).empty?
+      fail ValidationFailed.new({key => "#{net} overlaps another private subnet of the project in this location."})
+    end
+
+    net.to_s
+  end
+
   # "*" or the IAM ARN of an account root, user or role, as a VPC endpoint
   # service accepts.
   AWS_PRINCIPAL_RESOURCE = %r{\A(root|(user|role)/[\w+=,.@/-]+)\z}

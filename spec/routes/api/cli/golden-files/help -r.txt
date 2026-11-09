@@ -1246,6 +1246,7 @@ Usage:
 
 Options:
     -f, --firewall-id=fw-id-or-name  add to given firewall
+    -i, --ipv4-range=cidr            private IPv4 range (e.g. 10.20.0.0/20)
 
 
 Destroy a private subnet

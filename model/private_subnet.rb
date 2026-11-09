@@ -24,6 +24,8 @@ class PrivateSubnet < Sequel::Model
     [it, [prefix, PRIVATE_24_BLOCK_COUNT - 2**prefix].freeze]
   }.freeze
 
+  PRIVATE_IPV4_NETS = PRIVATE_SUBNET_RANGES.keys.map { NetAddr::IPv4Net.parse(it) }.freeze
+
   BANNED_IPV4_SUBNETS = [
     NetAddr::IPv4Net.parse("172.16.0.0/16"),
     NetAddr::IPv4Net.parse("172.17.0.0/16"),

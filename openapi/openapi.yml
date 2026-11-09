@@ -2424,6 +2424,10 @@ paths:
               properties:
                 firewall_id:
                   type: string
+                ipv4_range:
+                  description: Private IPv4 range of the subnet, from /16 to /26 (/16 to /24 in AWS locations) inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16, not overlapping another private subnet of the project in the location. A random range is used if not provided.
+                  type: string
+                  example: 10.20.0.0/20
               additionalProperties: false
       responses:
         '200':

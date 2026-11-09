@@ -370,6 +370,72 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_private_subnet_ipv4_range" do
+    let(:project) { Project.create(name: "test-project") }
+    let(:location) { Location[Location::HETZNER_FSN1_ID] }
+    let(:parse_message) { "Enter an address and a size, such as 10.20.0.0/20." }
+
+    def validate(range, location: self.location)
+      described_class.validate_private_subnet_ipv4_range(range, project:, location:, key: "ipv4_range")
+    end
+
+    def expect_refused(range, message, location: self.location)
+      expect { validate(range, location:) }.to raise_error(described_class::ValidationFailed) { expect(it.details).to eq("ipv4_range" => message) }
+    end
+
+    it "returns the range in canonical form" do
+      expect(validate(" 10.20.0.0/20 ")).to eq("10.20.0.0/20")
+      expect(validate("172.31.0.0/16")).to eq("172.31.0.0/16")
+      expect(validate("192.168.10.0/26")).to eq("192.168.10.0/26")
+    end
+
+    it "refuses input that is not an IPv4 range" do
+      ["abc", "fd00::/64", "10.20.0.0", "10.20.0.0/", "/", "10.20.0.0/33", "300.20.0.0/16"].each do
+        expect_refused(it, parse_message)
+      end
+    end
+
+    it "refuses a range that does not start on its own boundary and names the aligned one" do
+      expect_refused("10.20.0.5/20", "A /20 can't start at 10.20.0.5. Use 10.20.0.0/20.")
+    end
+
+    it "refuses ranges outside /16 to /26" do
+      expect_refused("10.0.0.0/15", "/15 is too large. Use /16 to /26.")
+      expect_refused("10.20.0.0/27", "/27 is too small. Use /16 to /26.")
+    end
+
+    it "refuses ranges that are not private" do
+      expect_refused("100.64.0.0/16", "100.64.0.0/16 isn't a private range. Use one inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16.")
+      expect_refused("172.32.0.0/16", "172.32.0.0/16 isn't a private range. Use one inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16.")
+    end
+
+    it "allows at most /24 in AWS locations" do
+      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      expect(validate("10.20.0.0/24", location: aws_location)).to eq("10.20.0.0/24")
+      expect_refused("10.20.0.0/25", "/25 is too small for an AWS location. Use /16 to /24.", location: aws_location)
+      expect_refused("10.0.0.0/15", "/15 is too large. Use /16 to /24.", location: aws_location)
+    end
+
+    it "allows /16 to /26 in GCP locations" do
+      gcp_location = Location[name: "gcp-us-central1"]
+      expect(validate("10.20.0.0/16", location: gcp_location)).to eq("10.20.0.0/16")
+      expect(validate("10.20.0.0/26", location: gcp_location)).to eq("10.20.0.0/26")
+    end
+
+    it "refuses a range overlapping another private subnet of the project in the location" do
+      PrivateSubnet.create(name: "taken", location_id: location.id, net6: "fd10::/64", net4: "10.20.4.0/26", state: "waiting", project_id: project.id)
+      expect_refused("10.20.0.0/20", "10.20.0.0/20 overlaps another private subnet of the project in this location.")
+      expect_refused("10.20.4.0/26", "10.20.4.0/26 overlaps another private subnet of the project in this location.")
+      expect(validate("10.21.0.0/20")).to eq("10.21.0.0/20")
+    end
+
+    it "allows ranges used in other projects or locations" do
+      PrivateSubnet.create(name: "other-project", location_id: location.id, net6: "fd10::/64", net4: "10.20.0.0/20", state: "waiting", project_id: Project.create(name: "other").id)
+      PrivateSubnet.create(name: "other-location", location_id: Location[name: "hetzner-hel1"].id, net6: "fd11::/64", net4: "10.20.0.0/20", state: "waiting", project_id: project.id)
+      expect(validate("10.20.0.0/20")).to eq("10.20.0.0/20")
+    end
+  end
+
   describe "#validate_account_name" do
     it "valid account names" do
       [
