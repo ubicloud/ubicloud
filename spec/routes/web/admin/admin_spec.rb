@@ -3459,6 +3459,60 @@ RSpec.describe CloverAdmin do
     ]
   end
 
+  it "shows US fleet installations, quotas, hosts and runner capacity" do
+    wdc02 = Location::LEASEWEB_WDC02_ID
+    big = Project.create(name: "big")
+    big.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 1000)
+    small = Project.create(name: "small", reputation: "limited")
+    us_only = GithubInstallation.create(installation_id: 1, name: "big-us-only", type: "Organization", project_id: big.id, allocator_preferences: {"location_filter" => [wdc02]})
+    GithubInstallation.create(installation_id: 2, name: "big-prefers-us", type: "Organization", project_id: big.id, allocator_preferences: {"location_preference" => [wdc02]})
+    GithubInstallation.create(installation_id: 3, name: "small-us-or-eu", type: "Organization", project_id: small.id, allocator_preferences: {"location_filter" => [wdc02, Location::HETZNER_FSN1_ID]})
+    GithubInstallation.create(installation_id: 4, name: "eu-only", type: "Organization", project_id: small.id, allocator_preferences: {"location_filter" => [Location::HETZNER_FSN1_ID]})
+
+    rows = ->(table) { page.all(".#{table} tbody tr").map { it.all("td").map(&:text) } }
+
+    click_link "US Fleet"
+    expect(page.title).to eq "Ubicloud Admin - US Fleet"
+    expect(page.all(".us-fleet-quota-table thead th").map(&:text)).to eq ["GithubRunnerVCpu Quota", "x64 Runner vCPUs", "Quota / Fleet"]
+    expect(rows.call("us-fleet-quota-table")).to eq [["1128", "0", "-"]]
+
+    x64_runner = create_vm_host(location_id: wdc02, data_center: "WDC02-A", total_cores: 48, total_cpus: 96, used_cores: 8)
+    BootImage.create(name: "github-ubuntu-2404", version: "1", vm_host_id: x64_runner.id, size_gib: 75, activated_at: Time.now)
+    x64_draining = create_vm_host(location_id: wdc02, data_center: "WDC02-A", allocation_state: "draining", total_cores: 48, total_cpus: 96, used_cores: 2)
+    BootImage.create(name: "github-ubuntu-2404", version: "1", vm_host_id: x64_draining.id, size_gib: 75, activated_at: Time.now)
+    x64_no_runner = create_vm_host(location_id: wdc02, data_center: "WDC02-B", total_cores: 48, total_cpus: 96, used_cores: 4)
+    BootImage.create(name: "ubuntu-noble", version: "1", vm_host_id: x64_no_runner.id, size_gib: 14, activated_at: Time.now)
+    BootImage.create(name: "github-ubuntu-2404", version: "1", vm_host_id: x64_no_runner.id, size_gib: 75)
+    arm_runner = create_vm_host(location_id: wdc02, data_center: "WDC02-B", arch: "arm64", total_cores: 80, total_cpus: 80, used_cores: 10, used_hugepages_1g: 40, total_hugepages_1g: 300)
+    BootImage.create(name: "github-ubuntu-2404", version: "1", vm_host_id: arm_runner.id, size_gib: 75, activated_at: Time.now)
+    fsn1_runner = create_vm_host(location_id: Location::HETZNER_FSN1_ID, total_cpus: 96)
+    BootImage.create(name: "github-ubuntu-2404", version: "1", vm_host_id: fsn1_runner.id, size_gib: 75, activated_at: Time.now)
+
+    page.refresh
+    expect(rows.call("us-fleet-quota-table")).to eq [["1128", "96", "11.75x"]]
+    expect(page.all(".us-fleet-installation-table thead th").map(&:text)).to eq ["Installation", "Project", "Reputation", "US Only", "GithubRunnerVCpu Quota"]
+    expect(rows.call("us-fleet-installation-table")).to eq [
+      ["big-prefers-us", "big", "new", "false", "1000"],
+      ["big-us-only", "big", "new", "true", "1000"],
+      ["small-us-or-eu", "small", "limited", "false", "128"],
+    ]
+    expect(page.all(".us-fleet-capacity-table thead th").map(&:text)).to eq ["Arch", "Hosts", "vCPUs", "Hugepages"]
+    expect(rows.call("us-fleet-capacity-table")).to eq [
+      ["x64", "1", "16 / 96", "16 / 375"],
+      ["arm64", "1", "10 / 80", "40 / 300"],
+    ]
+    expect(page.all(".us-fleet-host-table thead th").map(&:text)).to eq ["Host", "State", "Arch", "Family", "Data Center", "vCPUs", "Hugepages"]
+    expect(rows.call("us-fleet-host-table")).to eq [
+      [x64_runner.ubid, "accepting", "x64", "standard", "WDC02-A", "16 / 96", "16 / 375"],
+      [x64_no_runner.ubid, "accepting", "x64", "standard", "WDC02-B", "8 / 96", "16 / 375"],
+      [x64_draining.ubid, "draining", "x64", "standard", "WDC02-A", "4 / 96", "16 / 375"],
+      [arm_runner.ubid, "accepting", "arm64", "standard", "WDC02-B", "10 / 80", "40 / 300"],
+    ]
+
+    click_link "big-us-only"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")

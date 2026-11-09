@@ -2191,6 +2191,105 @@ class CloverAdmin < Roda
       view("github_runner_usage")
     end
 
+    r.get "us-fleet" do
+      us_location_ids = [Location::LEASEWEB_WDC02_ID]
+      quota_default = ProjectQuota.default_quotas["GithubRunnerVCpu"]
+      gi = Sequel[:github_installation]
+      prefs = Sequel.pg_jsonb_op(gi[:allocator_preferences])
+
+      installations = DB[:github_installation]
+        .join(Sequel[:project].as(:p), id: gi[:project_id])
+        .left_join(Sequel[:project_quota].as(:pq), project_id: Sequel[:p][:id], quota_id: quota_default["id"])
+        .where(prefs["location_filter"].contains(us_location_ids) | prefs["location_preference"].contains(us_location_ids))
+        .select(
+          gi[:id],
+          gi[:name],
+          gi[:project_id],
+          gi[:allocator_preferences],
+          Sequel[:p][:name].as(:project_name),
+          Sequel[:p][:reputation],
+          effective_quota_expr(quota_default, Sequel[:pq][:value], Sequel[:p][:reputation]).as(:quota),
+        )
+        .order(Sequel.desc(:quota), gi[:name])
+        .all
+
+      us_total_quota = installations.uniq { it[:project_id] }.sum { it[:quota] }
+      @installations = installations.map do |row|
+        {
+          "Installation" => table_link(row[:name], "/model/GithubInstallation/#{UBID.to_ubid(row[:id])}"),
+          "Project" => table_link(row[:project_name], "/model/Project/#{UBID.to_ubid(row[:project_id])}"),
+          "Reputation" => row[:reputation],
+          "US Only" => row[:allocator_preferences]["location_filter"] == us_location_ids,
+          "GithubRunnerVCpu Quota" => row[:quota],
+        }
+      end
+
+      vmh = Sequel[:vm_host]
+      hosts = DB[:vm_host]
+        .where(vmh[:location_id] => us_location_ids)
+        .select(
+          vmh[:id],
+          vmh[:allocation_state],
+          vmh[:arch],
+          vmh[:family],
+          vmh[:data_center],
+          (vmh[:total_cpus] * vmh[:used_cores] / Sequel.function(:nullif, vmh[:total_cores], 0)).as(:used_vcpus),
+          vmh[:total_cpus].as(:total_vcpus),
+          vmh[:used_hugepages_1g],
+          vmh[:total_hugepages_1g],
+        )
+
+      @hosts = hosts.order(vmh[:arch], vmh[:allocation_state], vmh[:data_center], vmh[:id]).map do |row|
+        {
+          "Host" => UBID.to_ubid(row[:id]),
+          "State" => row[:allocation_state],
+          "Arch" => row[:arch],
+          "Family" => row[:family],
+          "Data Center" => row[:data_center],
+          "vCPUs" => "#{row[:used_vcpus]} / #{row[:total_vcpus]}",
+          "Hugepages" => "#{row[:used_hugepages_1g]} / #{row[:total_hugepages_1g]}",
+        }
+      end
+
+      sum = ->(column) { Sequel.function(:coalesce, Sequel.function(:sum, column), 0) }
+      runner_host_ids = DB[:boot_image]
+        .where(Sequel.like(:name, "github-%"))
+        .exclude(activated_at: nil)
+        .select(:vm_host_id)
+      runner_capacity = hosts
+        .where(vmh[:id] => runner_host_ids)
+        .where(vmh[:allocation_state] => "accepting")
+        .from_self
+        .select_group(:arch)
+        .select_append(
+          Sequel.function(:count).*.as(:host_count),
+          sum.call(:used_vcpus).as(:used_vcpus),
+          sum.call(:total_vcpus).as(:total_vcpus),
+          sum.call(:used_hugepages_1g).as(:used_hugepages_1g),
+          sum.call(:total_hugepages_1g).as(:total_hugepages_1g),
+        )
+        .order(:arch)
+        .to_hash(:arch)
+
+      fleet_vcpus = runner_capacity.dig("x64", :total_vcpus) || 0
+      @quota_vs_fleet = [{
+        "GithubRunnerVCpu Quota" => us_total_quota,
+        "x64 Runner vCPUs" => fleet_vcpus,
+        "Quota / Fleet" => fleet_vcpus.positive? ? format("%.2fx", us_total_quota.fdiv(fleet_vcpus)) : "-",
+      }]
+
+      @runner_capacity = runner_capacity.values.map do |row|
+        {
+          "Arch" => row[:arch],
+          "Hosts" => row[:host_count],
+          "vCPUs" => "#{row[:used_vcpus]} / #{row[:total_vcpus]}",
+          "Hugepages" => "#{row[:used_hugepages_1g]} / #{row[:total_hugepages_1g]}",
+        }
+      end
+
+      view("us_fleet")
+    end
+
     r.get "cogs" do
       @rate = BigDecimal(typecast_params.nonempty_str("rate") || "1.14", exception: false)
       fail CloverError.new(400, "InvalidRequest", "invalid conversion rate") unless @rate&.positive?
