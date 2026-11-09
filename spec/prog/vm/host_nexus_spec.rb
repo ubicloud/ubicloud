@@ -85,6 +85,9 @@ RSpec.describe Prog::Vm::HostNexus do
 
       st = described_class.assemble("1.2.3.4", install_os: true)
       expect(st.stack.first["install_os"]).to be true
+
+      st = described_class.assemble("1.2.3.5", install_os: "Debian-1300-trixie-amd64-base.tar.gz")
+      expect(st.stack.first["install_os"]).to eq "Debian-1300-trixie-amd64-base.tar.gz"
     end
 
     it "stores ipv6_disabled on the host" do
@@ -285,6 +288,16 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to setup_ssh_keys without installing when the host is not on Hetzner" do
       st = described_class.assemble("192.168.0.2", install_os: true)
       expect { described_class.new(st).install_host_os }.to hop("setup_ssh_keys")
+    end
+
+    it "does not set os_image_filename when install_os is true" do
+      nx = described_class.new(assemble_hetzner_host(install_os: true))
+      expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs") { !it.strand_update_args[:stack].first.key?("os_image_filename") }
+    end
+
+    it "passes the image filename to Hetzner::InstallOs when install_os is a string" do
+      nx = described_class.new(assemble_hetzner_host(install_os: "Debian-1300-trixie-amd64-base.tar.gz"))
+      expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs") { it.strand_update_args[:stack].first["os_image_filename"] == "Debian-1300-trixie-amd64-base.tar.gz" }
     end
 
     it "returns to setup_ssh_keys once the OS is installed" do

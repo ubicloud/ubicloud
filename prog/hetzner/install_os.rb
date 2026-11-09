@@ -3,6 +3,8 @@
 class Prog::Hetzner::InstallOs < Prog::Base
   subject_is :sshable
 
+  frame_reader :os_image_filename
+
   INSTALLIMAGE = "/root/.oldroot/nfs/install/installimage"
 
   label def start
@@ -14,7 +16,8 @@ class Prog::Hetzner::InstallOs < Prog::Base
   end
 
   label def install
-    image_name = case (machine = setup_root_cmd("uname -m").strip)
+    image_name = os_image_filename
+    image_name ||= case (machine = setup_root_cmd("uname -m").strip)
     when "x86_64" then "Ubuntu-2404-noble-amd64-base.tar.zst"
     when "aarch64" then "Ubuntu-2404-noble-arm64-base.tar.zst"
     else fail "Unexpected machine architecture #{machine.inspect} reported by the rescue system"

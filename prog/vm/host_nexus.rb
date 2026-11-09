@@ -68,7 +68,12 @@ class Prog::Vm::HostNexus < Prog::Base
     hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
 
     register_deadline("setup_ssh_keys", 2 * 60 * 60, allow_extension: true)
-    hop_push :setup_ssh_keys, Prog::Hetzner::InstallOs
+    new_frame = if install_os.is_a?(String)
+      {"os_image_filename" => install_os}
+    else
+      {}
+    end
+    hop_push(:setup_ssh_keys, Prog::Hetzner::InstallOs, new_frame:)
   end
 
   label def setup_ssh_keys
