@@ -421,13 +421,13 @@ class Scheduling::Dispatcher
 
   # The number of seconds to wait before picking up strands from
   # outside the current partition.  This uses how long it is
-  # taking to process strands in the current partition, adds 20%
+  # taking to process strands in the current partition, doubles it
   # to that, then adds an additional 5 seconds.  The reason for
-  # 20% is the current strand delay is only recalculated every
+  # doubling is the current strand delay is only recalculated every
   # METRICS_EVERY, so this allows some padding in case the delay
   # number is growing quickly.
   def old_strand_delay
-    (@current_strand_delay * 1.2) + 5
+    (@current_strand_delay * 2) + 5
   end
 
   # A pg_array for the strand ids to skip.  These are the strand

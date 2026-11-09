@@ -221,9 +221,9 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.scan_old.map(&:id)).to eq([st.id])
       di.instance_variable_set(:@current_strand_delay, 10)
       expect(di.scan_old.map(&:id)).to eq([])
-      st.update(schedule: Time.now - 16)
+      st.update(schedule: Time.now - 24)
       expect(di.scan_old.map(&:id)).to eq([])
-      st.update(schedule: Time.now - 18)
+      st.update(schedule: Time.now - 26)
       expect(di.scan_old.map(&:id)).to eq([st.id])
     end
   end
@@ -368,7 +368,7 @@ RSpec.describe Scheduling::Dispatcher do
         strands_per_second: 400,
       })
       expect(di.instance_variable_get(:@current_strand_delay)).to eq 12.0
-      expect(di.old_strand_delay).to eq 19.4
+      expect(di.old_strand_delay).to eq 29.0
     end
   end
 
