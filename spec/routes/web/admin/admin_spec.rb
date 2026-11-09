@@ -1553,7 +1553,7 @@ RSpec.describe CloverAdmin do
     expect(vm.reload.name).to start_with("moving-with-")
     new_vm = Vm.first(name: "test-name")
     expect(new_vm.id).not_to eq vm.id
-    expect(new_vm.strand.stack.first["force_host_id"]).to eq vm.vm_host_id
+    expect(new_vm.allocation_rules["force_host_id"]).to eq vm.vm_host_id
   end
 
   it "does not support moving a Vm that is not ready to move" do
@@ -1848,7 +1848,7 @@ RSpec.describe CloverAdmin do
     expect(vm.location_id).to eq vmh.location_id
     expect(vm.arch).to eq vmh.arch
     expect(vm.ip4_enabled).to be true
-    expect(Strand[vm.id].stack.first["force_host_id"]).to eq vmh.id
+    expect(vm.allocation_rules["force_host_id"]).to eq vmh.id
     expect(vm.vm_storage_volumes.map(&:size_gib)).to eq [40]
   end
 

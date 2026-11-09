@@ -68,11 +68,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
       expect(Config).to receive(:allow_unspread_servers).and_return(false)
       node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
-      expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq existing_hosts
+      expect(node.vm.allocation_rules["host_exclusion_filter"]).to eq existing_hosts
 
       expect(Config).to receive(:allow_unspread_servers).and_return(true)
       node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node4", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
-      expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq []
+      expect(node.vm.allocation_rules["host_exclusion_filter"]).to be_nil
     end
 
     it "doesn't exclude hosts when creating worker nodes" do
@@ -83,7 +83,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
       node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       expect(node.kubernetes_nodepool).to eq kn
-      expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq []
+      expect(node.vm.allocation_rules["host_exclusion_filter"]).to be_nil
     end
   end
 
