@@ -5,7 +5,7 @@ class Prog::Vm::HostNexus < Prog::Base
   frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true)
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true, ipv4_subnets: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -27,6 +27,11 @@ class Prog::Vm::HostNexus < Prog::Base
       else
         Address.create_with_id(id, cidr: sshable_hostname, routed_to_host_id: id)
         AssignedHostAddress.create(ip: sshable_hostname, address_id: id, host_id: id)
+      end
+
+      # For providers without an API to pull the IPv4 subnets routed to the host.
+      ipv4_subnets.each do |cidr|
+        Address.create(cidr:, routed_to_host_id: id).populate_ipv4_addresses
       end
 
       Strand.create_with_id(vmh,

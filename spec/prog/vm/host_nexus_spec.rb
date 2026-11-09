@@ -32,6 +32,13 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.provider).to be_nil
     end
 
+    it "creates the given ipv4 subnets and populates their addresses" do
+      st = described_class.assemble("127.0.0.1", ipv4_subnets: ["89.117.242.160/28", "89.117.243.8/30"])
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }).to contain_exactly("127.0.0.1/32", "89.117.242.160/28", "89.117.243.8/30")
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq(["127.0.0.1/32"])
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((160..175).map { "89.117.242.#{it}" } + (8..11).map { "89.117.243.#{it}" })
+    end
+
     it "sets the server name and leaves the other provider api pulls to the strand for a hetzner host" do
       rename = stub_request(:post, "https://robot-ws.your-server.de/server/1").to_return(status: 200, body: "{}")
       st = described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
