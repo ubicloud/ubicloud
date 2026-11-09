@@ -243,6 +243,38 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
       expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.1.0.0/20", "10.1.16.0/20"])
     end
+
+    def aws_subnet_cidrs_for(range, az_count)
+      az_count.times { LocationAz.create(location_id: aws_location.id, az: ("a".ord + it).chr, zone_id: "usw2-az#{it + 1}") }
+      ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: range).subject
+      ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }
+    end
+
+    it "splits a given range evenly across the AZs" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 3)).to eq(["10.1.0.0/22", "10.1.4.0/22", "10.1.8.0/22"])
+    end
+
+    it "splits a given range into power of two sized AZ subnets" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 6)).to eq(%w[10.1.0.0/23 10.1.2.0/23 10.1.4.0/23 10.1.6.0/23 10.1.8.0/23 10.1.10.0/23])
+    end
+
+    it "keeps a spare AZ slot when the AZ count is a power of two" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 4)).to eq(%w[10.1.0.0/23 10.1.2.0/23 10.1.4.0/23 10.1.6.0/23])
+    end
+
+    it "keeps a spare AZ slot in a single AZ location" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/24", 1)).to eq(["10.1.0.0/25"])
+    end
+
+    it "takes the range size from a given range over a passed ipv4_range_size" do
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: "10.1.0.0/20", ipv4_range_size: 16).subject
+      expect(ps.private_subnet_aws_resource.aws_subnets_dataset.map { it.ipv4_cidr.to_s }).to eq(["10.1.0.0/21"])
+    end
+
+    it "does not split a given range below /28" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/26", 6)).to eq(%w[10.1.0.0/28 10.1.0.16/28 10.1.0.32/28 10.1.0.48/28])
+    end
   end
 
   describe ".random_private_ipv6" do
