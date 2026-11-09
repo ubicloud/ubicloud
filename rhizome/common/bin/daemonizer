@@ -36,7 +36,7 @@ def clean(name)
     r "sudo", "systemctl", "reset-failed", "#{name}.service"
   end
   # The stdin file can hold secrets; don't leave it on disk.
-  rm_if_exists("var/proc/#{name}.stdin")
+  ["var/proc/#{name}.stdin", "var/proc/#{name}.stdin.tmp"].each { |path| rm_if_exists(path) }
 end
 
 if ARGV[0] == "--check"

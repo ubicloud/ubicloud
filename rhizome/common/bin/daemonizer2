@@ -41,10 +41,7 @@ def clean(name)
       r "sudo", "systemctl", "reset-failed", "#{name}.service"
     end
   ensure
-    begin
-      File.unlink(stdin_path(name))
-    rescue Errno::ENOENT
-    end
+    [stdin_path(name), "#{stdin_path(name)}.tmp"].each { |path| rm_if_exists(path) }
   end
 end
 
