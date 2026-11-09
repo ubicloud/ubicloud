@@ -15,11 +15,11 @@
  *
  * All colors are referenced through the semantic variables (e.g. --text-muted,
  * --surface, --accent) defined on body in the theme section, which are defined
- * in terms of the palette variables. A dark theme only needs to override the
- * semantic variables, using the same approach as the admin site
- * (public/admin/app.css): set --theme to dark on :root (via
- * prefers-color-scheme or a class on html), and override the variables in
- * `@container style(--theme: dark) { body { ... } }`.
+ * in terms of the palette variables. The dark theme overrides the semantic
+ * variables in `@container style(--theme: dark) { body { ... } }`, the same
+ * approach as the admin site (public/admin/app.css). --theme follows
+ * prefers-color-scheme, unless the html element has the theme-light or
+ * theme-dark class for the theme picked in the account menu.
  */
 
 /* 1. Theme */
@@ -27,6 +27,20 @@
 :root {
   --theme: light;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --theme: dark;
+  }
+}
+
+html.theme-light {
+  --theme: light;
+}
+
+html.theme-dark {
+  --theme: dark;
 }
 
 body {
@@ -48,6 +62,7 @@ body {
   --orange-100: #ffedd5;
   --orange-200: #fed7aa;
   --orange-300: #fdba74;
+  --orange-400: #fb923c;
   --orange-500: #f97316;
   --orange-600: #ea580c;
   --orange-700: #c2410c;
@@ -55,6 +70,7 @@ body {
 
   --red-50: #fef2f2;
   --red-100: #fee2e2;
+  --red-200: #fecaca;
   --red-300: #fca5a5;
   --red-400: #f87171;
   --red-500: #ef4444;
@@ -65,7 +81,10 @@ body {
 
   --green-50: #f0fdf4;
   --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-300: #86efac;
   --green-400: #4ade80;
+  --green-500: #22c55e;
   --green-600: #16a34a;
   --green-700: #15803d;
   --green-800: #166534;
@@ -73,6 +92,7 @@ body {
 
   --yellow-100: #fef9c3;
   --yellow-200: #fef08a;
+  --yellow-400: #facc15;
   --yellow-500: #eab308;
   --yellow-600: #ca8a04;
   --yellow-800: #854d0e;
@@ -81,6 +101,7 @@ body {
   --amber-600: #d97706;
   --amber-700: #b45309;
 
+  --rose-400: #fb7185;
   --rose-500: #f43f5e;
   --rose-600: #e11d48;
   --rose-700: #be123c;
@@ -88,14 +109,27 @@ body {
   --blue-500: #3b82f6;
   --blue-600: #2563eb;
   --sky-300: #7dd3fc;
+  --sky-400: #38bdf8;
   --sky-600: #0284c7;
   --emerald-600: #059669;
   --indigo-200: #c7d2fe;
   --indigo-300: #a5b4fc;
+  --purple-400: #c084fc;
   --purple-600: #9333ea;
 
   --slate-100: #f1f5f9;
   --slate-800: #1e293b;
+
+  --stone-100: #f5f5f4;
+  --stone-200: #e7e5e4;
+  --stone-300: #d6d3d1;
+  --stone-400: #a8a29e;
+  --stone-500: #78716c;
+  --stone-600: #57534e;
+  --stone-700: #44403c;
+  --stone-800: #292524;
+  --stone-900: #1c1917;
+  --stone-950: #0c0a09;
 }
 
 body {
@@ -135,10 +169,13 @@ body {
   --accent-light: var(--orange-500);
   --accent-soft: var(--orange-50);
   --accent-soft-hover: var(--orange-100);
+  --accent-text: var(--orange-600);
+  --accent-text-hover: var(--orange-700);
 
   --sidebar-bg: var(--orange-600);
   --sidebar-active: var(--orange-700);
-  --sidebar-hover: var(--orange-800);
+  --sidebar-raised: var(--orange-700);
+  --sidebar-raised-hover: var(--orange-800);
   --sidebar-text: var(--orange-100);
   --sidebar-heading: var(--orange-200);
   --sidebar-icon: var(--white);
@@ -237,6 +274,109 @@ body {
   --snippet-text: var(--white);
   --snippet-string: var(--green-400);
   --snippet-variable: var(--orange-500);
+}
+
+@container style(--theme: dark) {
+  body {
+    color-scheme: dark;
+
+    --text: var(--stone-100);
+    --text-strong: var(--stone-100);
+    --text-secondary: var(--stone-300);
+    --text-tertiary: var(--stone-300);
+    --text-muted: var(--stone-400);
+    --text-subtle: var(--stone-500);
+    --text-dropdown: var(--stone-200);
+    --text-placeholder: var(--stone-500);
+
+    --page-bg: var(--stone-950);
+    --surface: var(--stone-900);
+    --surface-subtle: var(--stone-950);
+    --surface-hover: var(--stone-800);
+    --surface-muted: var(--stone-800);
+    --surface-code: var(--stone-800);
+    --code-text: var(--rose-400);
+    --terminal-bg: var(--stone-950);
+    --terminal-text: var(--stone-100);
+
+    --border-default: var(--stone-800);
+    --border: var(--stone-800);
+    --border-strong: var(--stone-700);
+    --border-subtle: color-mix(in srgb, var(--stone-800) 50%, var(--stone-900));
+    --ring: rgb(255 255 255 / 0.05);
+    --ring-subtle: rgb(255 255 255 / 0.05);
+    --backdrop: rgb(12 10 9 / 0.8);
+    --separator: rgb(255 255 255 / 0.1);
+
+    --accent-soft: color-mix(in srgb, var(--orange-500) 10%, var(--surface));
+    --accent-soft-hover: color-mix(in srgb, var(--orange-500) 15%, var(--surface));
+    --accent-text: var(--orange-400);
+    --accent-text-hover: var(--orange-300);
+
+    --sidebar-bg: var(--stone-900);
+    --sidebar-raised: var(--stone-800);
+    --sidebar-raised-hover: var(--stone-700);
+    --sidebar-text: var(--stone-300);
+    --sidebar-heading: var(--stone-500);
+
+    --danger: var(--red-400);
+    --danger-strong: var(--red-200);
+    --danger-soft: color-mix(in srgb, var(--red-500) 10%, var(--surface));
+    --danger-text: var(--red-300);
+    --success: var(--green-400);
+    --success-strong: var(--green-200);
+    --success-soft: color-mix(in srgb, var(--green-500) 10%, var(--surface));
+    --success-stronger: var(--green-100);
+
+    --meter-bg: var(--stone-700);
+
+    --badge-bg: var(--stone-800);
+    --badge-text: var(--stone-200);
+    --badge-success-bg: color-mix(in srgb, var(--green-500) 15%, var(--surface));
+    --badge-success-text: var(--green-200);
+    --badge-warning-bg: color-mix(in srgb, var(--yellow-500) 15%, var(--surface));
+    --badge-warning-text: var(--yellow-200);
+    --badge-danger-bg: color-mix(in srgb, var(--red-500) 15%, var(--surface));
+    --badge-danger-text: var(--red-200);
+
+    --highlight: color-mix(in srgb, var(--yellow-500) 25%, var(--surface));
+
+    --form-ring: var(--stone-700);
+    --form-ring-error: color-mix(in srgb, var(--red-500) 55%, var(--surface));
+    --form-text-error: var(--red-200);
+    --form-default-border: var(--stone-500);
+    --form-default-placeholder: var(--stone-400);
+    --switch-off: var(--stone-700);
+
+    --text-faint: var(--stone-600);
+    --text-emphasis: var(--stone-200);
+
+    --pg-pending-text: var(--amber-400);
+    --pg-chip-checked-bg: var(--accent-soft);
+    --pg-chip-checked-text: var(--orange-300);
+    --pg-chip-checked-hover: var(--accent-soft-hover);
+    --pg-notice-ring: color-mix(in srgb, var(--orange-500) 55%, var(--surface));
+    --pg-example-bg: var(--stone-950);
+    --pg-log-level-error: var(--red-400);
+    --pg-log-level-warn: var(--yellow-400);
+    --pg-log-level-info: var(--sky-400);
+    --pg-log-stream: var(--purple-400);
+    --pg-config-error-bg: color-mix(in srgb, var(--red-500) 15%, var(--surface));
+    --pg-box-bg: var(--stone-700);
+
+    --tag-bg: var(--stone-800);
+    --tag-text: var(--stone-200);
+    --tag-accent-bg: var(--accent-soft-hover);
+    --ring-subtle-gray: var(--stone-800);
+    --diff-removed-bg: color-mix(in srgb, var(--red-500) 10%, var(--surface));
+    --diff-removed-text: var(--red-300);
+    --diff-added-bg: color-mix(in srgb, var(--green-500) 10%, var(--surface));
+    --diff-added-text: var(--green-300);
+    --chip-border: color-mix(in srgb, var(--orange-500) 40%, var(--surface));
+    --role-bg: var(--stone-700);
+    --role-text: var(--stone-200);
+    --snippet-bg: var(--stone-950);
+  }
 }
 
 /* 2. Reset and base element styles (equivalent to Tailwind's preflight) */
@@ -644,7 +784,7 @@ input:where([type="file"]) {
 .field :where(input[type="checkbox"]) {
   border-radius: 0.25rem;
   border-color: var(--border-strong);
-  color: var(--accent);
+  color: var(--accent-text);
 
   &:focus {
     box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
@@ -698,10 +838,10 @@ input:where([type="file"]) {
     color: var(--text-tertiary);
 
     a {
-      color: var(--accent);
+      color: var(--accent-text);
 
       &:hover {
-        color: var(--accent-hover);
+        color: var(--accent-text-hover);
       }
     }
   }
@@ -1043,7 +1183,139 @@ button[role="switch"] {
   }
 }
 
+@container style(--theme: dark) {
+  body {
+    .flatpickr-calendar {
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--border-strong), 0 3px 13px var(--shadow-color);
+
+      &.arrowTop::before {
+        border-bottom-color: var(--border-strong);
+      }
+
+      &.arrowTop::after {
+        border-bottom-color: var(--surface);
+      }
+
+      &.arrowBottom::before {
+        border-top-color: var(--border-strong);
+      }
+
+      &.arrowBottom::after {
+        border-top-color: var(--surface);
+      }
+
+      &.hasTime .flatpickr-time {
+        border-top-color: var(--border-strong);
+      }
+    }
+
+    .flatpickr-months {
+      .flatpickr-month,
+      .flatpickr-prev-month,
+      .flatpickr-next-month {
+        color: var(--text-strong);
+        fill: var(--text-strong);
+      }
+
+      .flatpickr-prev-month:hover,
+      .flatpickr-next-month:hover {
+        color: var(--text-muted);
+      }
+    }
+
+    .numInputWrapper {
+      &:hover {
+        background: var(--surface-hover);
+      }
+
+      span {
+        border-color: var(--border-strong);
+
+        &:hover {
+          background: var(--surface-hover);
+        }
+
+        svg path {
+          fill: var(--text-muted);
+        }
+      }
+    }
+
+    .flatpickr-current-month {
+      span.cur-month:hover {
+        background: var(--surface-hover);
+      }
+
+      input.cur-year[disabled] {
+        color: var(--text-muted);
+      }
+    }
+
+    :is(.flatpickr-current-month, .flatpickr-time) .numInputWrapper span {
+      &.arrowUp::after {
+        border-bottom-color: var(--text-strong);
+      }
+
+      &.arrowDown::after {
+        border-top-color: var(--text-strong);
+      }
+    }
+
+    span.flatpickr-weekday {
+      color: var(--text-muted);
+    }
+
+    .flatpickr-day {
+      color: var(--text-strong);
+
+      &:hover,
+      &:focus,
+      &.prevMonthDay:hover,
+      &.nextMonthDay:hover {
+        background: var(--surface-hover);
+        border-color: var(--surface-hover);
+      }
+
+      &.prevMonthDay,
+      &.nextMonthDay,
+      &.flatpickr-disabled {
+        color: var(--text-subtle);
+      }
+    }
+
+    .flatpickr-time {
+      input,
+      .flatpickr-time-separator,
+      .flatpickr-am-pm {
+        color: var(--text-strong);
+      }
+
+      input:hover,
+      input:focus,
+      .flatpickr-am-pm:hover,
+      .flatpickr-am-pm:focus {
+        background: var(--surface-hover);
+      }
+    }
+  }
+}
+
 /* 4. Application layout */
+
+.logo-dark {
+  display: none;
+}
+
+@container style(--theme: dark) {
+  img:has(+ .logo-dark) {
+    display: none;
+  }
+
+  .logo-dark {
+    display: block;
+  }
+}
 
 #desktop-menu {
   display: none;
@@ -1185,7 +1457,11 @@ button[role="switch"] {
       font-weight: 600;
       color: var(--sidebar-text);
 
-      &:hover,
+      &:hover {
+        color: var(--sidebar-active-text);
+        background-color: var(--sidebar-raised);
+      }
+
       &[aria-current] {
         color: var(--sidebar-active-text);
         background-color: var(--sidebar-active);
@@ -1212,10 +1488,10 @@ button[role="switch"] {
       font-weight: 600;
       line-height: 1.5rem;
       color: var(--sidebar-active-text);
-      background-color: var(--sidebar-active);
+      background-color: var(--sidebar-raised);
 
       &:hover {
-        background-color: var(--sidebar-hover);
+        background-color: var(--sidebar-raised-hover);
       }
 
       svg {
@@ -1274,11 +1550,11 @@ button[role="switch"] {
 
         &[aria-current] {
           background-color: var(--accent-soft);
-          color: var(--accent);
+          color: var(--accent-text);
 
           &:hover {
             background-color: var(--accent-soft);
-            color: var(--accent-hover);
+            color: var(--accent-text-hover);
           }
         }
 
@@ -1497,6 +1773,42 @@ button[role="switch"] {
         width: 100%;
         text-align: left;
       }
+
+      .theme-switcher {
+        padding: 0.375rem 0.75rem;
+
+        p {
+          font-size: 0.75rem;
+          line-height: 1.25rem;
+          color: var(--text-muted);
+        }
+
+        > div {
+          display: flex;
+          column-gap: 0.25rem;
+          margin-top: 0.25rem;
+        }
+
+        form {
+          flex: 1 1 0%;
+        }
+
+        button {
+          padding: 0.125rem 0;
+          border-radius: 0.375rem;
+          text-align: center;
+          font-size: 0.75rem;
+          line-height: 1.25rem;
+          box-shadow: inset 0 0 0 1px var(--border-strong);
+
+          &[aria-checked="true"] {
+            font-weight: 600;
+            color: var(--accent-text);
+            background-color: var(--accent-soft);
+            box-shadow: inset 0 0 0 1px var(--accent);
+          }
+        }
+      }
     }
   }
 }
@@ -1654,7 +1966,7 @@ button[role="switch"] {
         color: var(--accent-light);
 
         &:hover {
-          color: var(--accent);
+          color: var(--accent-text);
         }
       }
     }
@@ -2076,10 +2388,10 @@ button.button span + svg {
 
       > a:not([class]) {
         font-weight: 500;
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:hover {
-          color: var(--accent-hover);
+          color: var(--accent-text-hover);
         }
       }
     }
@@ -2190,10 +2502,10 @@ button.button span + svg {
 
     > a:not([class]) {
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-text);
 
       &:hover {
-        color: var(--accent-hover);
+        color: var(--accent-text-hover);
       }
     }
   }
@@ -2336,10 +2648,10 @@ button.button span + svg {
     }
 
     &[aria-current] {
-      color: var(--accent);
+      color: var(--accent-text);
 
       &:hover {
-        color: var(--accent-hover);
+        color: var(--accent-text-hover);
       }
 
       &::after {
@@ -2470,10 +2782,10 @@ button.button span + svg {
 
   &.warning {
     background-color: var(--accent-soft);
-    color: var(--accent);
+    color: var(--accent-text);
 
     a {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 
@@ -2598,7 +2910,7 @@ button.button span + svg {
       flex-shrink: 0;
       width: 1.25rem;
       height: 1.25rem;
-      color: var(--accent);
+      color: var(--accent-text);
     }
 
     > div > div {
@@ -2650,7 +2962,7 @@ button.button span + svg {
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   > div > div:first-child {
@@ -2793,7 +3105,7 @@ button.button span + svg {
     &.done,
     &[aria-current] {
       > div:first-child > div:not(:first-child, :last-child) {
-        color: var(--accent);
+        color: var(--accent-text);
         border-color: var(--accent);
       }
 
@@ -3048,14 +3360,14 @@ body:has(.chart-maximized) {
       &[aria-current] {
         border-color: var(--accent);
         background-color: var(--accent-soft);
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:hover {
-          color: var(--accent-hover);
+          color: var(--accent-text-hover);
         }
 
         svg {
-          color: var(--accent);
+          color: var(--accent-text);
         }
       }
     }
@@ -3217,10 +3529,10 @@ a.resource-link {
 
       a {
         font-weight: 500;
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:hover {
-          color: var(--accent-hover);
+          color: var(--accent-text-hover);
         }
       }
     }
@@ -3272,7 +3584,7 @@ a.resource-link {
 
     > p:first-child {
       font-weight: 600;
-      color: var(--accent);
+      color: var(--accent-text);
     }
 
     h1 {
@@ -3336,10 +3648,10 @@ a.resource-link {
 
   a {
     font-weight: 500;
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 
@@ -3348,7 +3660,7 @@ a.resource-link {
     font-weight: inherit;
 
     &:hover {
-      color: var(--accent);
+      color: var(--accent-text);
     }
   }
 
@@ -3470,7 +3782,7 @@ p.help {
     color: var(--accent-light);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 }
@@ -3533,7 +3845,7 @@ p.help {
   input {
     border-radius: 0.25rem;
     border-color: var(--border-strong);
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:focus {
       box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
@@ -3552,10 +3864,10 @@ p.help {
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 }
@@ -3643,14 +3955,14 @@ p.help {
       &[aria-current] {
         border-color: var(--accent);
         background-color: var(--accent-soft);
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:hover {
-          color: var(--accent-hover);
+          color: var(--accent-text-hover);
         }
 
         svg {
-          color: var(--accent);
+          color: var(--accent-text);
         }
       }
     }
@@ -3710,7 +4022,7 @@ p.help {
           text-underline-offset: 2px;
 
           &:hover {
-            color: var(--accent);
+            color: var(--accent-text);
           }
         }
       }
@@ -3880,7 +4192,7 @@ p.help {
     input {
       margin-block: 0.25rem;
       border-color: var(--border-strong);
-      color: var(--accent);
+      color: var(--accent-text);
 
       &:focus {
         box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
@@ -3970,7 +4282,7 @@ form.rodauth .form-group {
       line-height: 2.25rem;
       font-weight: 600;
       letter-spacing: -0.025em;
-      color: var(--accent);
+      color: var(--accent-text);
     }
   }
 
@@ -4023,7 +4335,7 @@ form.rodauth .form-group {
       border-radius: 0.5rem;
       padding: 0.75rem;
       background-color: var(--accent-soft);
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
       box-shadow: 0 0 0 4px var(--surface);
     }
 
@@ -4095,7 +4407,7 @@ form.rodauth .form-group {
         color: var(--accent-light);
 
         &:hover {
-          color: var(--accent-hover);
+          color: var(--accent-text-hover);
         }
       }
     }
@@ -4212,10 +4524,10 @@ form.rodauth .form-group {
   th a {
     font-size: 0.75rem;
     line-height: 1rem;
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 
@@ -4410,7 +4722,7 @@ form.rodauth .form-group {
   font-weight: 400;
 
   &:hover {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 }
 
@@ -4835,7 +5147,7 @@ form.rodauth .form-group {
   line-height: 1.5rem;
 
   a {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 }
 
@@ -4957,10 +5269,10 @@ form.rodauth .form-group {
 
 .step-timeline a {
   font-weight: 500;
-  color: var(--accent);
+  color: var(--accent-text);
 
   &:hover {
-    color: var(--accent-hover);
+    color: var(--accent-text-hover);
   }
 }
 
@@ -5271,7 +5583,7 @@ form.rodauth .form-group {
 
 #storage-auto-scale {
   .section-header h3 {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .card {
@@ -5353,7 +5665,7 @@ form.rodauth .form-group {
         color: var(--text-strong);
 
         &:hover {
-          color: var(--accent);
+          color: var(--accent-text);
         }
       }
     }
@@ -5393,7 +5705,7 @@ form.rodauth .form-group {
       border-bottom: 1px solid var(--border);
 
       a {
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:hover {
           text-decoration-line: underline;
@@ -5690,7 +6002,7 @@ form.rodauth .form-group {
     svg {
       width: 1rem;
       height: 1rem;
-      color: var(--accent);
+      color: var(--accent-text);
     }
   }
 }
@@ -5978,10 +6290,10 @@ form.rodauth .form-group {
 #lb-ssl-help,
 #lb-settings {
   a {
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 }
@@ -6332,10 +6644,10 @@ form.rodauth .form-group {
 
   td a,
   > div a {
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
 }
@@ -6552,10 +6864,10 @@ form.rodauth .form-group {
 /* Links in stacked table cell values */
 .card table td > p > a:not([class]) {
   font-weight: 500;
-  color: var(--accent);
+  color: var(--accent-text);
 
   &:hover {
-    color: var(--accent-hover);
+    color: var(--accent-text-hover);
   }
 }
 
@@ -6574,7 +6886,7 @@ form.rodauth .form-group {
 
     &.premium {
       background-color: var(--tag-accent-bg);
-      color: var(--accent);
+      color: var(--accent-text);
     }
   }
 }
@@ -6637,7 +6949,7 @@ form.rodauth .form-group {
         font-size: 0.75rem;
         line-height: 1rem;
         font-weight: 500;
-        color: var(--accent);
+        color: var(--accent-text);
       }
     }
 
@@ -6694,7 +7006,7 @@ form.rodauth .form-group {
       font-size: 0.875rem;
       line-height: 1.25rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-text);
       white-space: nowrap;
     }
   }
@@ -6816,7 +7128,7 @@ form.rodauth .form-group {
       input {
         border-radius: 0.25rem;
         border-color: var(--border-strong);
-        color: var(--accent);
+        color: var(--accent-text);
 
         &:focus {
           box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring);
@@ -6908,7 +7220,7 @@ form.rodauth .form-group {
   font-size: 0.75rem;
   line-height: 1rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 #premium-runners {
@@ -6966,7 +7278,7 @@ form.rodauth .form-group {
         font-size: 0.875rem;
         line-height: 1.5rem;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--accent-text);
       }
 
       div {
@@ -6998,7 +7310,7 @@ form.rodauth .form-group {
         height: 1.5rem;
         width: 1.25rem;
         flex: none;
-        color: var(--accent);
+        color: var(--accent-text);
       }
     }
   }
@@ -7106,7 +7418,7 @@ form.rodauth .form-group {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.025em;
-        color: var(--accent);
+        color: var(--accent-text);
       }
 
       h1 {
@@ -7173,10 +7485,10 @@ form.rodauth .form-group {
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
-    color: var(--accent);
+    color: var(--accent-text);
 
     &:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
 
     svg {
@@ -7320,7 +7632,7 @@ form.rodauth .form-group {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   svg {

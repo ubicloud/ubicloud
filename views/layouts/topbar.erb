@@ -8,7 +8,7 @@
   <div></div>
 
   <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-    <img src="/logo-primary.png" alt="Ubicloud">
+    <%== part("components/logo") %>
   </a>
 
   <nav>
@@ -40,6 +40,20 @@
         <div>
           <a href="/account" role="menuitem" tabindex="-1">My Account</a>
           <a href="/project" role="menuitem" tabindex="-1">Projects</a>
+        </div>
+
+        <div class="theme-switcher">
+          <p>Theme</p>
+
+          <div>
+            <% %w[light dark system].each do |theme| %>
+              <% form(action: "/theme/#{theme}", method: :post) do %>
+                <button type="submit" role="menuitemradio" aria-checked="<%= theme == current_theme %>" tabindex="-1">
+                  <%= theme.capitalize %>
+                </button>
+              <% end %>
+            <% end %>
+          </div>
         </div>
 
         <div>
