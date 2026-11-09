@@ -40,20 +40,20 @@ RSpec.describe CloudHypervisor do
     end
   end
 
-  describe "CloudHypervisor::Version.ubuntu_version" do
-    it "parses ubuntu version from os-release" do
-      expect(File).to receive(:read).with("/etc/os-release").and_return('ID=ubuntu\nVERSION_ID="22"\n')
-      expect(CloudHypervisor::Version.ubuntu_version).to eq(22)
+  describe "CloudHypervisor::Version.ubuntu_22_04?" do
+    it "returns true for Ubuntu 22.04" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return("ID=ubuntu\nVERSION_ID=\"22.04\"\n")
+      expect(CloudHypervisor::Version.ubuntu_22_04?).to be true
     end
 
-    it "parses ubuntu version without quotes" do
-      expect(File).to receive(:read).with("/etc/os-release").and_return("VERSION_ID=24\n")
-      expect(CloudHypervisor::Version.ubuntu_version).to eq(24)
+    it "returns false for later Ubuntu versions" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return("ID=ubuntu\nVERSION_ID=\"24.04\"\n")
+      expect(CloudHypervisor::Version.ubuntu_22_04?).to be false
     end
 
-    it "raises when version cannot be determined" do
-      expect(File).to receive(:read).with("/etc/os-release").and_return("ID=debian\n")
-      expect { CloudHypervisor::Version.ubuntu_version }.to raise_error("unable to determine Ubuntu version")
+    it "returns false for other OSes" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return("PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nVERSION_ID=\"13\"\nID=debian\n")
+      expect(CloudHypervisor::Version.ubuntu_22_04?).to be false
     end
   end
 
