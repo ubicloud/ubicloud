@@ -6,6 +6,10 @@ require "octokit"
 RSpec.describe Project do
   subject(:project) { described_class.create(name: "test") }
 
+  let(:gcp_runner_location) {
+    Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "gcp-runners-europe-west3", ui_name: "gcp-runners-europe-west3", visible: false, project_id: described_class.create(name: "runner-service").id)
+  }
+
   it "#visible_location_names returns feature flagged locations and locations of hosts owned by the project" do
     expect(project.visible_location_names).to eq []
     project.set_ff_visible_locations(["latitude-ai"])
@@ -257,8 +261,9 @@ RSpec.describe Project do
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 
-  it "calculates github runner vcpu usage separately for metal and alien (aws) placements" do
+  it "calculates github runner vcpu usage separately for metal and alien placements" do
     expect(Config).to receive(:github_runner_aws_location_id).and_return(Location::HETZNER_HEL1_ID).at_least(:once)
+    expect(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_runner_location.id).exactly(5).times
     gi = GithubInstallation.create(installation_id: 2, name: "b", project_id: project.id, type: "a")
 
     metal_vm = create_vm(location_id: Location::HETZNER_FSN1_ID, vcpus: 2, project_id: project.id)
@@ -284,11 +289,47 @@ RSpec.describe Project do
 
     expect(project.current_resource_usage("GithubRunnerVCpuArmAws")).to eq 16
 
+    gcp_vm = create_vm(location_id: gcp_runner_location.id, family: "c4d-standard", vcpus: 4, project_id: project.id, name: "gcp-vm")
+    gr_gcp = gi.add_runner(label: "ubicloud-standard-4", repository_name: "a/a")
+    gr_gcp.update(vm_id: gcp_vm.id, location_id: gcp_vm.location_id)
+    Strand.create_with_id(gr_gcp, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    gcp_arm_vm = create_vm(location_id: gcp_runner_location.id, family: "c4a-standard", arch: "arm64", vcpus: 4, project_id: project.id, name: "gcp-arm-vm")
+    gr_gcp_arm = gi.add_runner(label: "ubicloud-standard-4-arm", repository_name: "a/a")
+    gr_gcp_arm.update(vm_id: gcp_arm_vm.id, location_id: gcp_arm_vm.location_id)
+    Strand.create_with_id(gr_gcp_arm, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 4
+    expect(project.current_resource_usage("GithubRunnerVCpuArm")).to eq 0
+    expect(project.current_resource_usage("GithubRunnerVCpuArmAws")).to eq 16
+
     gr_unplaced = gi.add_runner(label: "ubicloud-standard-8", repository_name: "a/a")
     Strand.create(id: gr_unplaced.id, label: "allocate_vm", prog: "Prog::Github::GithubRunnerNexus")
 
     expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 10
     expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 4
+  end
+
+  it "keeps gcp runners out of the metal vcpu usage when only the gcp alien location is configured" do
+    expect(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_runner_location.id)
+    gi = GithubInstallation.create(installation_id: 4, name: "d", project_id: project.id, type: "a")
+
+    metal_vm = create_vm(vcpus: 2, project_id: project.id)
+    gr_metal = gi.add_runner(label: "ubicloud", repository_name: "a/a")
+    gr_metal.update(vm_id: metal_vm.id, location_id: metal_vm.location_id)
+    Strand.create_with_id(gr_metal, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    gcp_vm = create_vm(location_id: gcp_runner_location.id, family: "c4d-standard", vcpus: 4, project_id: project.id, name: "gcp-vm")
+    gr_gcp = gi.add_runner(label: "ubicloud-standard-4", repository_name: "a/a")
+    gr_gcp.update(vm_id: gcp_vm.id, location_id: gcp_vm.location_id)
+    Strand.create_with_id(gr_gcp, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    gr_unplaced = gi.add_runner(label: "ubicloud-standard-8", repository_name: "a/a")
+    Strand.create_with_id(gr_unplaced, label: "allocate_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 10
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 0
   end
 
   it "counts no alien vcpu usage when the aws alien location isn't configured" do

@@ -132,6 +132,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_subnet_allow_rules
+    # Runners of different customers share the GitHub runner subnet and must
+    # not reach each other, so the VPC-wide deny rules stay in force there.
+    hop_wait if private_subnet.gcp_github_runner?
+
     allocate_subnet_firewall_priority unless private_subnet.firewall_priority
 
     # Allow same-subnet IPv4 egress (overrides the VPC-wide deny-egress)

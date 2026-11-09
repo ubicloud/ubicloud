@@ -101,17 +101,27 @@ class Prog::Vm::Nexus < Prog::Base
           .with_pk(nic_id)
         raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless nic
         subnet = nic.private_subnet
-      else
-        if private_subnet_id
-          subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
-            .with_pk(private_subnet_id)
+      elsif private_subnet_id
+        subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
+          .with_pk(private_subnet_id)
 
-          raise "Given subnet is not available in the given project" unless subnet
-        elsif new_private_subnet_name
-          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
-        else
-          subnet = project.default_private_subnet(location)
-        end
+        raise "Given subnet is not available in the given project" unless subnet
+      elsif new_private_subnet_name
+        subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
+      else
+        subnet = project.default_private_subnet(location)
+      end
+
+      # The GitHub runner subnet has one firewall and its VMs have none, so
+      # they can never reach the GCP firewall cap the lock below protects.
+      runner_subnet = subnet.gcp_github_runner?
+
+      # Lock before the NIC insert, which takes a key share lock on the
+      # subnet row: two VMs joining one GCP subnet at once would otherwise
+      # each hold that and wait for the other's FOR UPDATE.
+      subnet.lock! if location.gcp? && !runner_subnet
+
+      unless nic_id
         availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, use_eip:, create_network_interface:).subject
       end
@@ -134,8 +144,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id:,
         hypervisor_id: ch_version && Hypervisor.first(name: "ch", version: ch_version)&.id,
       ) { it.id = ubid.to_uuid }
-      subnet.lock! if location.gcp?
-      vm.validate_subnet_firewall_cap(subnet)
+      vm.validate_subnet_firewall_cap(subnet) unless runner_subnet
       nic.update(vm_id: vm.id)
 
       if use_separate_management_nic

@@ -81,12 +81,14 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    begin
-      op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: "ubicloud-#{nic.name}")
-      save_gcp_op("release_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
-      hop_wait_release_ip
-    rescue Google::Cloud::NotFoundError
-      nil
+    unless use_eip == false
+      begin
+        op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: "ubicloud-#{nic.name}")
+        save_gcp_op("release_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
+        hop_wait_release_ip
+      rescue Google::Cloud::NotFoundError
+        nil
+      end
     end
 
     hop_finalize_destroy

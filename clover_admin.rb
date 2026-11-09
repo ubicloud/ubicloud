@@ -2154,6 +2154,18 @@ class CloverAdmin < Roda
       spill_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean)
       aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, nil)
 
+      gcp_pct_exprs = []
+      gcp_size_exprs = []
+      if @arch == "x64"
+        gcp_location_id = Config.github_runner_gcp_location_id
+        gcp_pct_exprs << Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("gcp_alien_runners_percentage").as(:gcp_pct)
+        gcp_size_exprs.concat([8, 16, 32].map { count_f.call(Sequel[:v][:location_id] => gcp_location_id, v_vcpus => it).as(:"g#{it}") })
+        @gcp_vcpus, @gcp_runners = Vm.where(location_id: gcp_location_id).get([
+          Sequel.function(:coalesce, Sequel.function(:sum, :vcpus), 0).as(:vcpus),
+          Sequel.function(:count).*.as(:runners),
+        ])
+      end
+
       @data = DB.from(runners.as(:r))
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:project].as(:p), id: Sequel[:i][:project_id])
@@ -2166,6 +2178,7 @@ class CloverAdmin < Roda
           Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:prem),
           quota_expr.as(:quota),
           aws_quota_display_expr.as(:aws_quota),
+          *gcp_pct_exprs,
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
@@ -2178,8 +2191,9 @@ class CloverAdmin < Roda
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
+          *gcp_size_exprs,
         )
-        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :quota, :aws_quota)
+        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :quota, :aws_quota, *gcp_pct_exprs.map(&:alias))
         .reverse(:runner_vcpus, :vm_vcpus)
         .all
 

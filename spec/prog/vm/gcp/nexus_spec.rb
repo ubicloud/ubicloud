@@ -58,6 +58,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     )
   end
 
+  def create_runner_for(vm)
+    installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+    runner = GithubRunner.create(label: "ubicloud-premium-8", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+    runner
+  end
+
   def ensure_vm_gcp_resource(vm, suffix)
     return if VmGcpResource[vm.id]
     VmGcpResource.create_with_id(vm,
@@ -117,6 +124,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       }.to raise_error(Validation::ValidationFailed) { |e|
         expect(e.details[:firewall]).to include("more than 9 firewalls")
       }
+    end
+
+    it "lets a VM join the GitHub runner subnet without checking the firewall cap" do
+      location_credential
+      gcp_vpc
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id).at_least(:once)
+      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME,
+        location_id: location.id).subject
+      9.times do |i|
+        Firewall.create(name: "runner-fw-#{i}", description: "d",
+          location_id: location.id, project_id: project.id)
+          .associate_with_private_subnet(subnet, apply_firewalls: false)
+      end
+      expect(subnet.reload.firewalls.count).to be > 9
+      v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+        location_id: location.id, unix_user: "test-user",
+        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+        name: "testvm-runner", size: "c4a-standard-8", arch: "arm64",
+        private_subnet_id: subnet.id).subject
+      expect(v.nics.map(&:private_subnet_id)).to eq([subnet.id])
     end
 
     # Lock-ordering and race behavior is covered by the real two-connection
@@ -184,6 +211,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(args[:instance_resource].machine_type).to end_with("machineTypes/c4a-standard-8")
 
         expect(args[:instance_resource].tags).to be_nil
+        expect(args[:instance_resource].params).to be_nil
         expect(args[:instance_resource].labels.to_h).to eq("ubicloud" => "555666777")
 
         ni = args[:instance_resource].network_interfaces.first
@@ -249,6 +277,90 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
+    it "binds the subnet and firewall tags at creation for a VM in the GitHub runner subnet" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      ps = nic.private_subnet
+      ps.update(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+      fw = ps.firewalls.first
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner-tags")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].params.resource_manager_tags.to_h).to eq(
+          "test-gcp-project/ubicloud-fw-#{fw.ubid}" => "active",
+          "test-gcp-project/ubicloud-subnet-#{ps.ubid}" => "active",
+        )
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "pins the Hyperdisk Balanced boot disk of a GitHub runner VM at the free baseline" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+      create_runner_for(vm)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner-disk")
+      expect(compute_client).to receive(:insert) do |args|
+        params = args[:instance_resource].disks.first.initialize_params
+        expect(params.disk_type).to eq("zones/us-central1-a/diskTypes/hyperdisk-balanced")
+        expect(params.provisioned_iops).to eq(3000)
+        expect(params.provisioned_throughput).to eq(140)
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "leaves the boot disk provisioning to GCE for a VM that is not a runner" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-plain-disk")
+      expect(compute_client).to receive(:insert) do |args|
+        params = args[:instance_resource].disks.first.initialize_params
+        expect(params.has_disk_type?).to be false
+        expect(params.has_provisioned_iops?).to be false
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "leaves the private IPv4 to GCE when the NIC has none" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      nic.update(private_ipv4: nil)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-gce-ip")
+      expect(compute_client).to receive(:insert) do |args|
+        ni = args[:instance_resource].network_interfaces.first
+        expect(ni.has_network_i_p?).to be false
+        expect(ni.subnetwork).to include("subnetworks/ubicloud-")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "leaves the AccessConfig NAT IP unset for an ephemeral address without a static IP" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-ephemeral")
+      expect(compute_client).to receive(:insert) do |args|
+        ac = args[:instance_resource].network_interfaces.first.access_configs.first
+        expect(ac.has_nat_i_p?).to be false
+        expect(Google::Cloud::Compute::V1::AccessConfig.encode_json(ac)).not_to include("natIP")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
     it "uses network config from NicGcpResource" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
@@ -266,17 +378,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     {
-      "ResourceExhaustedError" => Google::Cloud::ResourceExhaustedError.new("zone capacity"),
-      "UnavailableError" => Google::Cloud::UnavailableError.new("service unavailable"),
-      "InvalidArgumentError for missing machine type" => Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."),
-    }.each do |label, error|
-      it "retries in a different zone on #{label}" do
+      "ResourceExhaustedError" => [Google::Cloud::ResourceExhaustedError.new("zone capacity"), 5],
+      "UnavailableError" => [Google::Cloud::UnavailableError.new("service unavailable"), 5],
+      "InvalidArgumentError for missing machine type" => [Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."), 0],
+    }.each do |label, (error, delay)|
+      it "retries in a different zone on #{label} after #{delay} seconds" do
         nic.strand.update(label: "wait")
         ensure_nic_gcp_resource(nic)
         expect(compute_client).to receive(:insert).and_raise(error)
         expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-        expect { nx.start }.to nap(5)
+        expect { nx.start }.to nap(delay)
         stack = st.stack.first
         expect(stack["exclude_zones"]).to be_a(Array)
         expect(stack["exclude_zones"].length).to eq(1)
@@ -306,6 +418,116 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to nap(5 * 60)
       stack = st.stack.first
       expect(stack["exclude_zones"]).to eq([])
+    end
+
+    describe "for a GitHub runner VM" do
+      let(:runner) { create_runner_for(vm) }
+
+      before do
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+        ensure_vm_gcp_resource(vm, "c")
+        runner
+      end
+
+      it "moves to the next alternative family with a fresh zone sweep when all zones are exhausted" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => ["c4a-highmem"]})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: "c4a-standard", next_family: "c4a-highmem", error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(vm.reload.family).to eq("c4a-highmem")
+        expect(st.stack.first["exclude_zones"]).to eq([])
+      end
+
+      it "provisions a spare runner and destroys this one when no family is left" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => ["c4a-standard"]})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+          .and change { GithubRunner.where(installation_id: runner.installation_id).count }.from(1).to(2)
+        expect(runner.reload.destroy_set?).to be true
+        expect(runner.spare_runner_provisioned_set?).to be true
+        spare = GithubRunner.where(installation_id: runner.installation_id).exclude(id: runner.id).first
+        expect(spare.spill_over_set?).to be true
+        expect(vm.reload.family).to eq("c4a-standard")
+      end
+
+      it "still destroys this runner when its spare was already provisioned" do
+        runner.incr_spare_runner_provisioned
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => []})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+          .and not_change { GithubRunner.where(installation_id: runner.installation_id).count }
+        expect(runner.reload.destroy_set?).to be true
+      end
+
+      it "replaces the runner when the frame has no alternative families" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"], "alternative_families" => nil})
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+        expect { nx.start }.to hop("wait_runner_destroy")
+        expect(runner.reload.destroy_set?).to be true
+      end
+    end
+
+    describe "for a family GCE does not offer in every zone" do
+      let(:location) {
+        Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: project.id,
+          display_name: "gcp-europe-west3", ui_name: "GCP Europe West 3", visible: true)
+      }
+
+      let(:vm) {
+        location_credential
+        gcp_vpc
+        v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+          location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+          name: "testvm", size: "n4d-standard-8", arch: "x64").subject
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+        v
+      }
+
+      before do
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+      end
+
+      it "picks its first zone among the zones offering the family" do
+        expect(nx.send(:family_az_suffixes)).to eq(%w[a b])
+        refresh_frame(nx, new_values: {"exclude_zones" => ["a"]})
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
+        expect(compute_client).to receive(:insert) do |args|
+          expect(args[:zone]).to eq("europe-west3-b")
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(st.stack.first["gcp_zone_suffix"]).to eq("b")
+      end
+
+      it "retries only the zones offering the family" do
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+        ensure_vm_gcp_resource(vm, "a")
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE zone retry", {zone_retry: {failed_zone: "europe-west3-a", excluded: ["a"], remaining: ["b"], error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(st.stack.first["gcp_zone_suffix"]).to eq("b")
+      end
+
+      it "moves a runner to the next family, with every zone, once the zones offering its family are exhausted" do
+        create_runner_for(vm)
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "b", "exclude_zones" => ["a"], "alternative_families" => ["c4-standard"]})
+        ensure_vm_gcp_resource(vm, "b")
+        expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+        expect(Clog).to receive(:emit).with("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: "n4d-standard", next_family: "c4-standard", error: "zone capacity"}}).and_call_original
+
+        expect { nx.start }.to nap(5)
+        expect(vm.reload.family).to eq("c4-standard")
+        expect(st.stack.first["exclude_zones"]).to eq([])
+        expect(nx.send(:family_az_suffixes)).to eq(%w[a b c])
+      end
     end
 
     it "excludes failed zones on successive retries" do
@@ -451,6 +673,38 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         .to eq(vm.sshable.keys.map(&:public_key))
     end
 
+    it "asks cloud-init for a swap file when swap_size_bytes is set" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"swap_size_bytes" => 4294963200})
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-swap")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(YAML.safe_load(captured)["swap"]).to eq("filename" => "/swapfile", "size" => 4294963200)
+    end
+
+    it "leaves swap out of user-data when swap_size_bytes is nil" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      expect(st.stack.first.fetch("swap_size_bytes")).to be_nil
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-noswap")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(YAML.safe_load(captured).keys).to eq(["users"])
+    end
+
     it "creates a VmGcpResource row matching the chosen zone on first entry" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
@@ -532,6 +786,20 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ) do |_, req|
           yield req.policy
         end
+      end
+
+      it "creates no service account for a GitHub runner VM" do
+        create_runner_for(vm)
+        expect(iam_client).not_to receive(:get_project_service_account)
+
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-runner")
+        expect(compute_client).to receive(:insert) do |args|
+          expect(args[:instance_resource].service_accounts).to be_empty
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(VmGcpResource[vm.id].service_account_email).to be_nil
       end
 
       it "creates the service account when missing, grants actAs, and attaches it to the instance" do
@@ -645,7 +913,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
           )
           expect(Clog).to receive(:emit).with("GCP service account created", anything).and_call_original
           expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-          expect { nx.start }.to nap(5)
+          expect { nx.start }.to nap(0)
         end
 
         it "naps on PermissionDeniedError mentioning the service account email" do
@@ -695,6 +963,21 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(zone_ops_client).to receive(:get).and_return(op)
 
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
+    end
+
+    it "skips the remaining zones of a GitHub runner VM on QUOTA_EXCEEDED" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a", "alternative_families" => ["c4a-highmem"]})
+      ensure_vm_gcp_resource(vm, "a")
+      create_runner_for(vm)
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "Quota 'C4A_CPUS' exceeded.")
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE, error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]))
+      expect(zone_ops_client).to receive(:get).and_return(op)
+
+      expect { nx.wait_create_op }.to hop("start")
+      expect(vm.reload.family).to eq("c4a-highmem")
+      expect(st.stack.first["exclude_zones"]).to eq([])
+      expect(st.stack.first["retry_zone_delay"]).to eq(5)
     end
 
     it "reallocates the NIC private IP and resubmits when the IP is in use by another resource" do
@@ -838,6 +1121,48 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
     end
 
+    it "leaves the tags bound at creation alone for a VM in the GitHub runner subnet" do
+      nic.private_subnet.update(name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME)
+      expect(Config).to receive(:github_runner_service_project_id).and_return(project.id)
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [Google::Cloud::Compute::V1::NetworkInterface.new(network_i_p: "10.0.0.7")],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(vm.reload.update_firewall_rules_set?).to be false
+    end
+
+    it "records the private IPv4 GCE assigned to a NIC created without one" do
+      nic.update(private_ipv4: nil)
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [
+          Google::Cloud::Compute::V1::NetworkInterface.new(
+            network_i_p: "172.24.18.7",
+            access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")],
+          ),
+        ],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(nic.reload.private_ipv4.to_s).to eq("172.24.18.7/32")
+    end
+
+    it "keeps the private IPv4 a NIC was created with" do
+      ip = nic.private_ipv4.to_s
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "RUNNING",
+        network_interfaces: [Google::Cloud::Compute::V1::NetworkInterface.new(network_i_p: "172.24.18.7")],
+      )
+      expect(compute_client).to receive(:get).and_return(instance)
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(nic.reload.private_ipv4.to_s).to eq(ip)
+    end
+
     it "updates the sshable host" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "RUNNING",
@@ -935,6 +1260,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(page.resource_id).to eq(vm.id)
     end
 
+    it "replaces a GitHub runner without paging when its instance enters TERMINATED state" do
+      runner = create_runner_for(vm)
+      instance = Google::Cloud::Compute::V1::Instance.new(status: "TERMINATED", network_interfaces: [])
+      expect(compute_client).to receive(:get).and_return(instance)
+      expect(Clog).to receive(:emit).with("GCE runner VM entered terminal state during provisioning", {gcp_runner_terminal: {vm: vm.ubid, status: "TERMINATED"}}).and_call_original
+
+      expect { nx.wait_instance_created }.to hop("wait_runner_destroy")
+      expect(runner.reload.destroy_set?).to be true
+      expect(Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "TERMINATED")).to be_nil
+    end
+
     it "pages and naps if the instance enters SUSPENDED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "SUSPENDED",
@@ -952,28 +1288,59 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "pushes update_firewall_rules when semaphore is set" do
+    it "decrements the semaphore and pushes update_firewall_rules when it is set" do
+      nx.incr_update_firewall_rules
+      expect { nx.wait_sshable }.to hop("update_firewall_rules", "Vnet::Gcp::UpdateFirewallRules")
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
+    end
+
+    it "pushes update_firewall_rules again for a semaphore set while the rules were added" do
+      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       nx.incr_update_firewall_rules
       expect { nx.wait_sshable }.to hop("update_firewall_rules", "Vnet::Gcp::UpdateFirewallRules")
     end
 
-    it "decrements semaphore when firewall rules are added" do
-      nx.incr_update_firewall_rules
-      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
-      expect { nx.wait_sshable }.to hop("create_billing_record")
-        .and change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
-    end
+    context "with a public ipv4" do
+      before { AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32") }
 
-    it "naps if not sshable" do
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
-      expect { nx.wait_sshable }.to nap(1)
-    end
+      it "naps if the port is not open yet" do
+        expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+        expect { nx.wait_sshable }.to nap(1)
+        expect(nx.ssh_port_open).to be_nil
+      end
 
-    it "hops to create_billing_record if sshable" do
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+      it "hops to create_billing_record if sshable" do
+        expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+        expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
+        expect { nx.wait_sshable }.to hop("create_billing_record")
+      end
+
+      it "naps and remembers the open port if the ssh key is not installed yet" do
+        expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+        expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5).and_raise Net::SSH::AuthenticationFailed.new("runneradmin")
+        expect { nx.wait_sshable }.to nap(1)
+        expect(nx.ssh_port_open).to be true
+      end
+
+      it "does not check the port again once it answered" do
+        refresh_frame(nx, new_values: {"ssh_port_open" => true})
+        expect(Socket).not_to receive(:tcp)
+        expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
+        expect { nx.wait_sshable }.to hop("create_billing_record")
+      end
+
+      it "naps if the ssh command times out" do
+        expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+        expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5).and_raise Sshable::SshTimeout.new("true", "", "", nil, nil)
+        expect { nx.wait_sshable }.to nap(1)
+        expect(nx.ssh_port_open).to be true
+      end
+
+      it "naps if sshd drops the connection" do
+        refresh_frame(nx, new_values: {"ssh_port_open" => true})
+        expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5).and_raise Net::SSH::Disconnect
+        expect { nx.wait_sshable }.to nap(1)
+      end
     end
 
     it "hops to create_billing_record if ipv4 is not available" do
@@ -1027,6 +1394,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.incr_update_firewall_rules
       expect { nx.update_firewall_rules }.to hop(:update_firewall_rules, "Vnet::Gcp::UpdateFirewallRules") { it.strand_update_args[:stack].first["link"] == [st.prog, "wait"] }
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").all).to be_empty
+    end
+  end
+
+  describe "#wait_runner_destroy" do
+    it "naps until the runner destroys the VM" do
+      expect { nx.wait_runner_destroy }.to nap(60 * 60)
     end
   end
 
@@ -1142,6 +1515,15 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
       expect(Vm[vm.id]).to be_nil
+    end
+
+    it "skips service account deletion for a GitHub runner VM" do
+      ensure_vm_gcp_resource(vm, "a")
+      create_runner_for(vm)
+      expect(Config).to receive(:gcp_postgres_iam_access).and_return(true)
+      expect(nx.send(:credential)).not_to receive(:iam_client)
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
     end
 
     it "skips service account deletion when the VM never had one" do

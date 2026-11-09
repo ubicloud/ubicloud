@@ -33,8 +33,8 @@ class GithubRunner < Sequel::Model
 
     def metal_active_runner_vcpus
       ds = self
-      if (aws_location_id = Config.github_runner_aws_location_id)
-        ds = ds.where(Sequel.~(location_id: aws_location_id) | {location_id: nil})
+      unless (alien_location_ids = [Config.github_runner_aws_location_id, Config.github_runner_gcp_location_id].compact).empty?
+        ds = ds.where(Sequel.~(location_id: alien_location_ids) | {location_id: nil})
       end
       ds.total_active_runner_vcpus
     end

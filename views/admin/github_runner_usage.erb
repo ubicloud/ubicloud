@@ -3,6 +3,7 @@
 <% total = Hash.new(0)
 total[:quota] = 0
 total[:aws_quota] = 0
+total[:gcp_pct] = "" if @arch == "x64"
 types = %w[runner vm].freeze
 @data.each do |row|
     row[:name] = table_link(value: row[:name], link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}")
@@ -27,6 +28,8 @@ end
   <% if @arch == "x64" %>
     - <strong>premium:</strong>
     <%= "vcpu #{@family_utilization.dig("premium", 0) || 0}%, hugepage #{@family_utilization.dig("premium", 1) || 0}%" %>
+    - <strong>gcp:</strong>
+    <%= "vcpus #{@gcp_vcpus}, runners #{@gcp_runners}" %>
   <% end %>
 </p>
 
@@ -46,6 +49,13 @@ end
   spill_to_alien_runners feature flag isn't enabled for the project.
 </p>
 
+<% if @arch == "x64" %>
+  <p>
+    <strong>gcp_pct:</strong> Percentage of the project's spilled premium runners drawn for GCP, blank if the
+    gcp_alien_runners_percentage feature flag isn't set for the project.
+  </p>
+<% end %>
+
 <p><strong>r*:</strong> Number of requested runners with the specified vCPU count.</p>
 
 <p>
@@ -61,3 +71,6 @@ end
 <p><strong>s*:</strong> Number of runners with that standard family, including ones that fell back from premium.</p>
 <p><strong>p*:</strong> Number of runners with that premium family.</p>
 <p><strong>a*:</strong> Number of alien runners.</p>
+<% if @arch == "x64" %>
+  <p><strong>g*:</strong> Number of runners in the GCP runner location.</p>
+<% end %>
