@@ -39,10 +39,13 @@ RSpec.describe Prog::BootstrapRhizome do
       expect(Net::SSH).to receive(:start).and_yield(session)
       expect(session).to receive(:_exec!).with(<<'FIXTURE').and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 set -ueo pipefail
-if [ false = false ]; then
+if [ false = false ] || ! command -v git >/dev/null; then
   sudo apt-get update
+fi
+if [ false = false ]; then
   sudo apt-get -y install ruby-bundler
 fi
+command -v git >/dev/null || sudo apt-get -y install git netcat-openbsd
 sudo which bundle
 if id rhizome &>/dev/null; then
   procs=$(ps -u rhizome -o pid,comm,args --no-headers) || [ $? -eq 1 ]
