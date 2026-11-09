@@ -300,6 +300,19 @@ class CloverAdmin < Roda
     email ? "#{name} (#{email})" : name
   end
 
+  # SQL for a project's quota override, falling back to the default for its reputation.
+  def effective_quota_expr(quota_default, override_value, reputation)
+    Sequel.function(
+      :coalesce,
+      override_value,
+      Sequel.case(
+        {"new" => quota_default["new_value"], "verified" => quota_default["verified_value"], "limited" => quota_default["limited_value"]},
+        nil,
+        reputation,
+      ),
+    )
+  end
+
   ROLLOUT_SEMAPHORE_OPTIONS = Prog::RolloutSemaphore::ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.flat_map do |klass, semaphores|
     semaphores.map { "#{klass.name} - #{it}" }
   end.freeze
@@ -2131,26 +2144,10 @@ class CloverAdmin < Roda
       alien_sizes = [2, 4, 8, 16, 32]
 
       quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArm" : "GithubRunnerVCpu"]
-      quota_expr = Sequel.function(
-        :coalesce,
-        Sequel[:pq][:value],
-        Sequel.case(
-          {"new" => quota_default["new_value"], "verified" => quota_default["verified_value"], "limited" => quota_default["limited_value"]},
-          nil,
-          Sequel[:p][:reputation],
-        ),
-      )
+      quota_expr = effective_quota_expr(quota_default, Sequel[:pq][:value], Sequel[:p][:reputation])
 
       aws_quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArmAws" : "GithubRunnerVCpuAws"]
-      aws_quota_expr = Sequel.function(
-        :coalesce,
-        Sequel[:pq_aws][:value],
-        Sequel.case(
-          {"new" => aws_quota_default["new_value"], "verified" => aws_quota_default["verified_value"], "limited" => aws_quota_default["limited_value"]},
-          nil,
-          Sequel[:p][:reputation],
-        ),
-      )
+      aws_quota_expr = effective_quota_expr(aws_quota_default, Sequel[:pq_aws][:value], Sequel[:p][:reputation])
       spill_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean)
       aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, nil)
 
