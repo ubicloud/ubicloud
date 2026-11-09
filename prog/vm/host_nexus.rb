@@ -14,13 +14,15 @@ class Prog::Vm::HostNexus < Prog::Base
       Sshable.create_with_id(id, host: sshable_hostname)
       vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
 
-      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
+      if provider_name
         HostProvider.create do |hp|
           hp.id = id
           hp.provider_name = provider_name
           hp.server_identifier = server_identifier
         end
+      end
 
+      if HostProvider::API_PROVIDER_NAMES.include?(provider_name)
         # Renaming here fails the assemble for an unknown server identifier.
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name if set_server_name && !Config.development?
@@ -42,7 +44,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
-    hop_create_addresses if vm_host.provider
+    hop_create_addresses if vm_host.provider_api?
     hop_install_host_os if install_os
 
     hop_setup_ssh_keys

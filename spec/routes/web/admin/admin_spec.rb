@@ -1660,8 +1660,8 @@ RSpec.describe CloverAdmin do
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
 
-  it "does not offer provider-backed actions for VmHosts without a provider" do
-    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+  it "does not offer provider-backed actions for VmHosts without a provider api" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2", provider_name: "other", server_identifier: "1").subject
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
     click_button "Show Object"
     expect(find_by_id("action-list").all("a").map(&:text)).not_to include("Hardware Reset", "Power On", "Power Status")
