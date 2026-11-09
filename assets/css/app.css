@@ -1185,6 +1185,20 @@ button[role="switch"] {
 
 /* 4. Application layout */
 
+.logo-dark {
+  display: none;
+}
+
+@container style(--theme: dark) {
+  img:has(+ .logo-dark) {
+    display: none;
+  }
+
+  .logo-dark {
+    display: block;
+  }
+}
+
 #desktop-menu {
   display: none;
 

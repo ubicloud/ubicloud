@@ -8,7 +8,7 @@
   <div></div>
 
   <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-    <img src="/logo-primary.png" alt="Ubicloud">
+    <%== part("components/logo") %>
   </a>
 
   <nav>
