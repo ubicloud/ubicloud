@@ -191,8 +191,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def reset_blob_storage
-    register_deadline("wait", 60 * 60)
+    register_deadline("wait", cache_entry_deletion_budget)
+    hop_recreate_blob_storage
+  end
 
+  label def recreate_blob_storage
     if github_repository.access_key
       destroy_next_cache_entry_and_nap
       begin
