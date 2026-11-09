@@ -91,6 +91,28 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "create" do
+      it "with a private subnet IPv4 range" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-range", {
+          size: "standard-2",
+          storage_size: 64,
+          private_subnet_ipv4_range: "172.17.0.0/20",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(PostgresResource.first(name: "test-postgres-range").private_subnet.net4.to_s).to eq("172.17.0.0/20")
+      end
+
+      it "with an invalid private subnet IPv4 range" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-range", {
+          size: "standard-2",
+          storage_size: 64,
+          private_subnet_ipv4_range: "8.8.8.0/24",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_ipv4_range")
+        expect(PostgresResource.where(name: "test-postgres-range").count).to eq(0)
+      end
+
       it "success" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
@@ -465,6 +487,18 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "read-replica with a private subnet IPv4 range" do
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-range",
+          private_subnet_ipv4_range: "172.17.0.0/20",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(PostgresResource.first(name: "my-read-replica-with-range").private_subnet.net4.to_s).to eq("172.17.0.0/20")
+      end
+
       it "read-replica inherits init_script from parent" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
@@ -817,6 +851,22 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "restore with a private subnet IPv4 range" do
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        create_minio_cluster_for_blob_storage
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg-with-range",
+          restore_target: restore_target.to_datetime.rfc3339,
+          private_subnet_ipv4_range: "172.17.0.0/20",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(PostgresResource.first(name: "restored-pg-with-range").private_subnet.net4.to_s).to eq("172.17.0.0/20")
       end
 
       it "restore inherits init_script from parent" do

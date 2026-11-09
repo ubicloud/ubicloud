@@ -27,6 +27,7 @@ class Clover
     }
 
     validate_postgres_input(name, postgres_params)
+    private_subnet_ipv4_range = postgres_private_subnet_ipv4_range(@location)
 
     parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
     requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
@@ -47,6 +48,7 @@ class Clover
         ha_type:,
         with_firewall_rules:,
         private_subnet_name:,
+        private_subnet_ipv4_range:,
         user_config:,
         pgbouncer_user_config:,
         tags:,
@@ -60,6 +62,12 @@ class Clover
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
       request.redirect pg, "/overview"
+    end
+  end
+
+  def postgres_private_subnet_ipv4_range(location)
+    if (range = typecast_params.nonempty_str("private_subnet_ipv4_range"))
+      Validation.validate_private_subnet_ipv4_range(range, project: @project, location:, key: "private_subnet_ipv4_range")
     end
   end
 

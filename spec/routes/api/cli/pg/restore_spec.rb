@@ -30,5 +30,8 @@ RSpec.describe Clover, "cli pg restore" do
     expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "99"})
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])
     expect(body).to eq "Restored PostgreSQL database scheduled for creation with id: #{pg.ubid}\n"
+
+    cli(%w[pg eu-central-h1/test-pg restore -i 172.17.0.0/20 test-pg-3] << Time.now.utc.to_datetime.rfc3339)
+    expect(PostgresResource.first(name: "test-pg-3").private_subnet.net4.to_s).to eq "172.17.0.0/20"
   end
 end

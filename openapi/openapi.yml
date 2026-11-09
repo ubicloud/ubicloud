@@ -1384,6 +1384,10 @@ paths:
                 private_subnet_name:
                   description: Name for the private subnet (if not provided, a name will be auto-generated)
                   type: string
+                private_subnet_ipv4_range:
+                  description: IPv4 range of the database's private subnet, from /16 to /26 (/16 to /24 in AWS locations) inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16, not overlapping another private subnet of the project in the location. A random range is used if not provided.
+                  type: string
+                  example: 10.20.0.0/20
                 pg_config:
                   type: object
                   example:
@@ -2053,6 +2057,10 @@ paths:
                     max_client_conn: '100'
                   additionalProperties:
                     type: string
+                private_subnet_ipv4_range:
+                  description: IPv4 range of the read replica's private subnet, from /16 to /26 (/16 to /24 in AWS locations) inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16, not overlapping another private subnet of the project in the location. A random range is used if not provided.
+                  type: string
+                  example: 10.20.0.0/20
                 tags:
                   description: Tags for the read replica
                   type: array
@@ -2187,6 +2195,10 @@ paths:
                     max_client_conn: '100'
                   additionalProperties:
                     type: string
+                private_subnet_ipv4_range:
+                  description: IPv4 range of the restored database's private subnet, from /16 to /26 (/16 to /24 in AWS locations) inside 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16, not overlapping another private subnet of the project in the location. A random range is used if not provided.
+                  type: string
+                  example: 10.20.0.0/20
                 tags:
                   description: Tags for the Postgres Database
                   type: array

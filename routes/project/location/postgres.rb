@@ -419,6 +419,7 @@ class Clover
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
+        private_subnet_ipv4_range = postgres_private_subnet_ipv4_range(pg.location)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
         unless pg.ready_for_read_replica?
@@ -446,6 +447,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target: nil,
+            private_subnet_ipv4_range:,
             init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "create_replica", replica)
@@ -495,6 +497,7 @@ class Clover
         tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
+        private_subnet_ipv4_range = postgres_private_subnet_ipv4_range(pg.location)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
 
@@ -514,6 +517,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
+            private_subnet_ipv4_range:,
             init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "restore", restored)

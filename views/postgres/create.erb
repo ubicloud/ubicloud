@@ -43,6 +43,12 @@
      description_html: "<p class='mt-1 text-sm leading-6 text-gray-600'>Opening the database creates rules for ports 5432 and 6432 from any address. Ubicloud always requires a password and TLS, and you can change the rules later on the Networking tab.</p>"},
   ]
 
+  ipv4_range_open = typecast_body_params.str("private_subnet_ipv4_range") || flash.dig("errors", "private_subnet_ipv4_range")
+  form_elements << {name: "private_subnet_ipv4_range", type: "text", aria_label: "Private IPv4 range", placeholder: "10.20.0.0/20", extra_class: "sm:w-56",
+    opening_tag: "<details class='col-span-full'#{" open" if ipv4_range_open}><summary class='cursor-pointer text-sm font-medium leading-6 text-gray-900'>Private IPv4 range (optional)</summary><div class='mt-4 sm:w-1/2'>",
+    closing_tag: "</div></details>",
+    description_html: "<p class='text-sm leading-6 text-gray-600'>Leave empty for a random range. To peer the database with another network, enter a private range from /16 to /26 (/16 to /24 in AWS locations) that doesn't overlap it.</p>"}
+
   if @project.get_ff_postgres_init_script
     form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", placeholder: "Enter script to run on database creation"}
   end

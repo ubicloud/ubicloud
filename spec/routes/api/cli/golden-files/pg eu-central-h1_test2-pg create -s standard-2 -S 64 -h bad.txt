@@ -16,6 +16,7 @@ Options:
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
     -R, --restrict-by-default        restrict access by default (add firewall rules to allow access)
     -P, --private-subnet-name=name   override name of created private subnet
+    -i, --ipv4-range=cidr            private IPv4 range of the created private subnet (e.g. 10.20.0.0/20)
 
 Allowed Option Values:
     Replication Type: none async sync

@@ -122,6 +122,37 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.first.project_id).to eq(project.id)
       end
 
+      it "can create a PostgreSQL database with a private subnet IPv4 range" do
+        visit "#{project.path}/postgres/create"
+        fill_in "Name", with: "new-pg-db"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        find("summary", text: "Private IPv4 range").click
+        fill_in "private_subnet_ipv4_range", with: "172.17.0.0/20"
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'new-pg-db' will be ready in a few minutes")
+        expect(PostgresResource.first.private_subnet.net4.to_s).to eq("172.17.0.0/20")
+      end
+
+      it "shows an error for an invalid private subnet IPv4 range" do
+        visit "#{project.path}/postgres/create"
+        fill_in "Name", with: "new-pg-db"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        find("summary", text: "Private IPv4 range").click
+        fill_in "private_subnet_ipv4_range", with: "172.17.0.0/27"
+        click_button "Create"
+
+        expect(page).to have_flash_error("Validation failed for following fields: private_subnet_ipv4_range")
+        expect(page).to have_content "/27 is too small. Use /16 to /26."
+        expect(page).to have_css("details[open]")
+        expect(page).to have_css("input[name=private_subnet_ipv4_range][aria-label='Private IPv4 range']")
+        expect(PostgresResource.count).to eq(0)
+      end
+
       it "prices n2d storage from the family's own rate on the create page" do
         project.set_ff_enable_n2d_highmem(true)
         project.set_ff_visible_postgres_locations(["gcp-us-central1"])
