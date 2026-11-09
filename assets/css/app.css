@@ -1183,6 +1183,124 @@ button[role="switch"] {
   }
 }
 
+@container style(--theme: dark) {
+  body {
+    .flatpickr-calendar {
+      background: var(--surface);
+      box-shadow: 0 0 0 1px var(--border-strong), 0 3px 13px var(--shadow-color);
+
+      &.arrowTop::before {
+        border-bottom-color: var(--border-strong);
+      }
+
+      &.arrowTop::after {
+        border-bottom-color: var(--surface);
+      }
+
+      &.arrowBottom::before {
+        border-top-color: var(--border-strong);
+      }
+
+      &.arrowBottom::after {
+        border-top-color: var(--surface);
+      }
+
+      &.hasTime .flatpickr-time {
+        border-top-color: var(--border-strong);
+      }
+    }
+
+    .flatpickr-months {
+      .flatpickr-month,
+      .flatpickr-prev-month,
+      .flatpickr-next-month {
+        color: var(--text-strong);
+        fill: var(--text-strong);
+      }
+
+      .flatpickr-prev-month:hover,
+      .flatpickr-next-month:hover {
+        color: var(--text-muted);
+      }
+    }
+
+    .numInputWrapper {
+      &:hover {
+        background: var(--surface-hover);
+      }
+
+      span {
+        border-color: var(--border-strong);
+
+        &:hover {
+          background: var(--surface-hover);
+        }
+
+        svg path {
+          fill: var(--text-muted);
+        }
+      }
+    }
+
+    .flatpickr-current-month {
+      span.cur-month:hover {
+        background: var(--surface-hover);
+      }
+
+      input.cur-year[disabled] {
+        color: var(--text-muted);
+      }
+    }
+
+    :is(.flatpickr-current-month, .flatpickr-time) .numInputWrapper span {
+      &.arrowUp::after {
+        border-bottom-color: var(--text-strong);
+      }
+
+      &.arrowDown::after {
+        border-top-color: var(--text-strong);
+      }
+    }
+
+    span.flatpickr-weekday {
+      color: var(--text-muted);
+    }
+
+    .flatpickr-day {
+      color: var(--text-strong);
+
+      &:hover,
+      &:focus,
+      &.prevMonthDay:hover,
+      &.nextMonthDay:hover {
+        background: var(--surface-hover);
+        border-color: var(--surface-hover);
+      }
+
+      &.prevMonthDay,
+      &.nextMonthDay,
+      &.flatpickr-disabled {
+        color: var(--text-subtle);
+      }
+    }
+
+    .flatpickr-time {
+      input,
+      .flatpickr-time-separator,
+      .flatpickr-am-pm {
+        color: var(--text-strong);
+      }
+
+      input:hover,
+      input:focus,
+      .flatpickr-am-pm:hover,
+      .flatpickr-am-pm:focus {
+        background: var(--surface-hover);
+      }
+    }
+  }
+}
+
 /* 4. Application layout */
 
 .logo-dark {
