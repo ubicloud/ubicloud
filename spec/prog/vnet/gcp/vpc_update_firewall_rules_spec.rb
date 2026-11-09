@@ -83,7 +83,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     allow(v1::NetworkFirewallPolicies::Rest::Client).to receive(:new).and_return(nfp_client)
     allow(v1::GlobalOperations::Rest::Client).to receive(:new).and_return(global_ops_client)
     allow(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService).to receive(:new).and_return(crm_client)
-    allow(crm_client).to receive(:authorization=)
+    allow(crm_client).to receive_messages("authorization=": nil, client_options: Google::Apis::ClientOptions.new)
     allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
     stub_fetch_all_via_list(crm_client)
   end
