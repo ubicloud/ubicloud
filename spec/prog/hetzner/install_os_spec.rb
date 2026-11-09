@@ -67,6 +67,14 @@ RSpec.describe Prog::Hetzner::InstallOs do
       expect { prog.install }.to hop("wait_install")
     end
 
+    it "starts installimage with the image given in the frame without checking the architecture" do
+      st.stack.first["os_image_filename"] = "Debian-1300-trixie-amd64-base.tar.gz"
+      expect(session).not_to receive(:_exec!).with("uname -m")
+      expect(session).to receive(:_exec!).with("echo #{install_script.shellescape} > /root/ubicloud-install.sh").and_return(ssh_result(""))
+      expect(session).to receive(:_exec!).with("nohup bash /root/ubicloud-install.sh Debian-1300-trixie-amd64-base.tar.gz > /root/ubicloud-install.log 2>&1 < /dev/null & echo started").and_return(ssh_result("started\n"))
+      expect { prog.install }.to hop("wait_install")
+    end
+
     it "fails for an unexpected architecture" do
       expect(session).to receive(:_exec!).with("uname -m").and_return(ssh_result("riscv64\n"))
       expect { prog.install }.to raise_error RuntimeError, "Unexpected machine architecture \"riscv64\" reported by the rescue system"
