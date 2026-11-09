@@ -60,10 +60,13 @@ LOGIND
     no_bundler_install = (self.no_bundler_install == true).to_s
     Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"), no_bundler_install:)
 set -ueo pipefail
-if [ :no_bundler_install = false ]; then
+if [ :no_bundler_install = false ] || ! command -v git >/dev/null; then
   sudo apt-get update
+fi
+if [ :no_bundler_install = false ]; then
   sudo apt-get -y install ruby-bundler
 fi
+command -v git >/dev/null || sudo apt-get -y install git netcat-openbsd
 sudo which bundle
 if id rhizome &>/dev/null; then
   procs=$(ps -u rhizome -o pid,comm,args --no-headers) || [ $? -eq 1 ]
