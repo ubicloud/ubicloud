@@ -721,7 +721,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "requires an ubuntu-24.04 or later host when allocating a vm with a pinned CloudHypervisor version" do
+    it "requires an ubuntu-24.04+ or debian-13+ host when allocating a vm with a pinned CloudHypervisor version" do
       st.stack = [{
         "ch_version" => "53.0",
         "storage_volumes" => storage_volumes,
@@ -738,7 +738,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        os_filter: ["ubuntu-24.04", "ubuntu-26.04"],
+        os_filter: ["ubuntu-24.04", "ubuntu-26.04", "debian-13"],
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
