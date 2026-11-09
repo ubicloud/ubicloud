@@ -115,6 +115,93 @@ RSpec.describe Prog::Parseable::ParseableResourceNexus do
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
+
+    it "hops to recycle when semaphore is set" do
+      nx.incr_recycle
+      expect { nx.wait }.to hop("recycle")
+    end
+  end
+
+  describe "#recycle" do
+    it "provisions a new server, remembers the old servers and hops to wait_new_server" do
+      nx.incr_recycle
+      old_server = nx.parseable_resource.servers.first
+
+      expect { nx.recycle }.to hop("wait_new_server")
+
+      expect(nx.strand.stack[0]["old_server_ids"]).to eq([old_server.id])
+      expect(nx.strand.stack[0]["deadline_target"]).to eq("wait")
+      expect(nx.parseable_resource.reload.servers.count).to eq(2)
+      expect(nx.new_server.strand.label).to eq("start")
+      expect(Semaphore.where(strand_id: nx.strand.id, name: "recycle").count).to eq(0)
+    end
+  end
+
+  describe "recycle waits" do
+    let(:old_server) { nx.parseable_resource.servers.first }
+    let(:new_server) { ParseableServer[Prog::Parseable::ParseableServerNexus.assemble(nx.parseable_resource).id] }
+
+    before do
+      old_server
+      refresh_frame(nx, new_values: {"old_server_ids" => [old_server.id]})
+      add_ipv4_to_vm(new_server.vm, "1.2.3.4")
+    end
+
+    describe "#wait_new_server" do
+      it "naps while the new server is provisioning" do
+        expect { nx.wait_new_server }.to nap(10)
+      end
+
+      it "naps while the new server has not finished initial provisioning" do
+        new_server.strand.update(label: "wait")
+        expect { nx.wait_new_server }.to nap(10)
+      end
+
+      it "naps while the new server is not healthy" do
+        new_server.strand.update(label: "wait")
+        Semaphore.where(strand_id: new_server.id, name: "initial_provisioning").destroy
+        stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 503)
+        expect { nx.wait_new_server }.to nap(10)
+      end
+
+      it "destroys the old servers and hops to wait_old_servers_destroyed when the new server is healthy" do
+        new_server.strand.update(label: "wait")
+        Semaphore.where(strand_id: new_server.id, name: "initial_provisioning").destroy
+        stub_request(:get, "https://1.2.3.4:8000/api/v1/liveness").to_return(status: 200)
+
+        expect { nx.wait_new_server }.to hop("wait_old_servers_destroyed")
+
+        expect(Semaphore.where(strand_id: old_server.id, name: "destroy").count).to eq(1)
+        expect(Semaphore.where(strand_id: new_server.id, name: "destroy").count).to eq(0)
+      end
+
+      it "hops to destroy when the resource is destroyed" do
+        nx.incr_destroy
+        expect { nx.wait_new_server }.to hop("destroy")
+      end
+
+      it "hops to wait and keeps the old servers when the new server is gone" do
+        new_server.destroy
+
+        expect { nx.wait_new_server }.to hop("wait")
+
+        expect(Semaphore.where(strand_id: old_server.id, name: "destroy").count).to eq(0)
+      end
+    end
+
+    describe "#wait_old_servers_destroyed" do
+      it "naps while an old server exists" do
+        expect { nx.wait_old_servers_destroyed }.to nap(10)
+      end
+
+      it "restarts the new server and hops to wait when the old servers are gone" do
+        old_server.destroy
+
+        expect { nx.wait_old_servers_destroyed }.to hop("wait")
+
+        expect(Semaphore.where(strand_id: new_server.id, name: "restart").count).to eq(1)
+      end
+    end
   end
 
   describe "#refresh_certificates" do
