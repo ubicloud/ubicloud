@@ -721,6 +721,50 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
+    describe "stored allocation rules check" do
+      let(:old_arguments) do
+        {
+          allocation_state_filter: ["accepting"],
+          distinct_storage_devices: false,
+          host_filter: [],
+          host_exclusion_filter: [],
+          data_center_exclusion_filter: [],
+          location_filter: [Location::HETZNER_FSN1_ID],
+          location_preference: [],
+          gpu_count: 0,
+          gpu_device: nil,
+          os_filter: nil,
+          family_filter: ["standard"],
+        }
+      end
+
+      it "does not compare when the vm has no stored rules" do
+        expect(Clog).not_to receive(:emit)
+        expect(Scheduling::Allocator).to receive(:allocate).with(vm, storage_volumes, **old_arguments)
+        expect { nx.start }.to hop("create_unix_user")
+      end
+
+      it "logs nothing when the stored rules give the same request" do
+        vm.update(allocation_rules: {})
+        expect(Clog).not_to receive(:emit)
+        expect(Scheduling::Allocator).to receive(:allocate).with(vm, storage_volumes, **old_arguments)
+        expect { nx.start }.to hop("create_unix_user")
+      end
+
+      it "logs the differing request fields and still places with the frame arguments" do
+        vm.update(allocation_rules: {"location_filter" => [Location::HETZNER_HEL1_ID]})
+        expect(Clog).to receive(:emit).with(
+          "allocation rules mismatch",
+          {allocation_rules_mismatch: {
+            vm_ubid: vm.ubid,
+            differing: {location_filter: [[Location::HETZNER_FSN1_ID], [Location::HETZNER_HEL1_ID]]},
+          }},
+        )
+        expect(Scheduling::Allocator).to receive(:allocate).with(vm, storage_volumes, **old_arguments)
+        expect { nx.start }.to hop("create_unix_user")
+      end
+    end
+
     it "requires an ubuntu-24.04 or later host when allocating a vm with a pinned CloudHypervisor version" do
       st.stack = [{
         "ch_version" => "53.0",
