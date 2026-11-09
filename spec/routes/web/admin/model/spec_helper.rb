@@ -729,6 +729,12 @@ module AdminModelSpecHelper
       VpcPeeringAwsResource.create_with_id(vp, peer_region: "us-east-1", peering_connection_id: "pcx-0123456789abcdef0", requester_account_id: "999988887777", expires_at: Time.now + 7 * 24 * 60 * 60)
     end
 
+    def create_vpc_peering_gcp_resource
+      ps = create_private_subnet
+      vp = VpcPeering.create(private_subnet_id: ps.id, peer_account_id: "customer-project", peer_vpc_id: "projects/customer-project/global/networks/customer-vpc")
+      VpcPeeringGcpResource.create_with_id(vp, peering_name: "ubicloud-#{vp.ubid}")
+    end
+
     def create_network_volume
       NetworkVolume.create(location_id: Location::HETZNER_FSN1_ID, size_gib: 64)
     end
