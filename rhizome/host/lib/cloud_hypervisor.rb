@@ -108,8 +108,10 @@ module CloudHypervisor
       FileUtils.chmod "a+x", path
     end
 
-    def self.ubuntu_version
-      File.read("/etc/os-release")[/VERSION_ID="?(\d\d)/, 1]&.to_i or raise "unable to determine Ubuntu version"
+    # Ubuntu 22.04 hosts only support CloudHypervisor 35.1.
+    def self.ubuntu_22_04?
+      os_release = File.read("/etc/os-release")
+      os_release.match?(/^ID="?ubuntu"?$/) && os_release.match?(/^VERSION_ID="?22\.04"?$/)
     end
 
     SUPPORTED = {"35.1" => Arch.render(
@@ -119,7 +121,7 @@ module CloudHypervisor
     default = SUPPORTED["35.1"]
 
     # simplecov:disable
-    if ubuntu_version >= 24
+    unless ubuntu_22_04?
       SUPPORTED["46.0"] = Arch.render(
         x64: new("46.0", "00b5cf2976847d2f21d2b7266038c8fc40bd14f2a542115055e9e214867edc9e", "526c91cf6b2d30b24af6eb39511f4f562f7bbc50a4dfb17d486274057a162445"),
         arm64: new("46.0", "a5a19c7e7326a5ca5dcf83a7b895a03e81cdac8c7d0690d4e94133cc89d38561", "6395a86db76f1f50d8b8c0ae1debbbb6a08e572b6f8c57cfbd9511e9beb4126a"),
