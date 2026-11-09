@@ -10,6 +10,9 @@ require "googleauth"
 class LocationCredentialGcp < Sequel::Model
   V1 = Google::Cloud::Compute::V1
   CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
+  API_TIMEOUT = 8
+  TOKEN_TIMEOUT = 3
+  STORAGE_RETRY_WINDOW = 20
 
   plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:credentials_json]
 
@@ -46,11 +49,7 @@ class LocationCredentialGcp < Sequel::Model
   end
 
   def crm_client
-    @crm_client ||= begin
-      client = Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService.new
-      client.authorization = auth_credentials
-      client
-    end
+    @crm_client ||= api_service(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService.new)
   end
 
   def networks_client
@@ -60,9 +59,8 @@ class LocationCredentialGcp < Sequel::Model
   def regional_crm_client(region)
     @regional_crm_clients ||= {}
     @regional_crm_clients[region] ||= begin
-      client = Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService.new
+      client = api_service(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService.new)
       client.root_url = "https://#{region}-cloudresourcemanager.googleapis.com/"
-      client.authorization = auth_credentials
       client
     end
   end
@@ -71,21 +69,30 @@ class LocationCredentialGcp < Sequel::Model
     @storage_client ||= Google::Cloud::Storage.new(
       project_id:,
       credentials: auth_credentials,
+      timeout: API_TIMEOUT,
+      max_elapsed_time: STORAGE_RETRY_WINDOW,
     )
   end
 
   def iam_client
-    @iam_client ||= begin
-      client = Google::Apis::IamV1::IamService.new
-      client.authorization = auth_credentials
-      client
-    end
+    @iam_client ||= api_service(Google::Apis::IamV1::IamService.new)
   end
 
   private
 
   def config_block
-    @config_block ||= proc { |config| config.credentials = auth_credentials }
+    @config_block ||= proc do |config|
+      config.credentials = auth_credentials
+      config.rpcs.class.instance_methods(false).each { config.rpcs.public_send(it).timeout = API_TIMEOUT }
+    end
+  end
+
+  def api_service(service)
+    service.authorization = auth_credentials
+    service.client_options.open_timeout_sec = API_TIMEOUT
+    service.client_options.read_timeout_sec = API_TIMEOUT
+    service.client_options.send_timeout_sec = API_TIMEOUT
+    service
   end
 
   def auth_credentials
@@ -93,6 +100,7 @@ class LocationCredentialGcp < Sequel::Model
       Google::Auth::ServiceAccountCredentials.make_creds(
         json_key_io: StringIO.new(credentials_json),
         scope: CLOUD_PLATFORM_SCOPE,
+        default_connection: Faraday.new(request: {timeout: TOKEN_TIMEOUT}),
       )
     else
       # source_credentials, not base_credentials: base_credentials re-scopes the
