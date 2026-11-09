@@ -137,6 +137,25 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.192/26")
     end
 
+    it "finds a new subnet if the one it found is inside a larger subnet" do
+      expect(PrivateSubnet).to receive(:random_subnet).with(26).and_return("192.168.0.0/16", "10.0.0.0/8")
+      project = Project.create(name: "test-project")
+      taken = described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "192.168.0.0/16").subject
+      expect(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
+      expect(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
+      expect(Clog).to receive(:emit).with("Selected IPv4 subnet 192.168.0.128/26 overlaps #{taken.ubid}").and_call_original
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.128/26")
+    end
+
+    it "finds a new subnet if the one it found contains a smaller subnet" do
+      expect(PrivateSubnet).to receive(:random_subnet).with(16).twice.and_return("10.0.0.0/8")
+      project = Project.create(name: "test-project")
+      taken = described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.20.4.0/26").subject
+      expect(SecureRandom).to receive(:random_number).with(2**(16 - 8) - 1).and_return(19, 20)
+      expect(Clog).to receive(:emit).with("Selected IPv4 subnet 10.20.0.0/16 overlaps #{taken.ubid}").and_call_original
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 16).to_s).to eq("10.21.0.0/16")
+    end
+
     it "finds a new subnet if the one it found is banned" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
       project = Project.create(name: "test-project")
