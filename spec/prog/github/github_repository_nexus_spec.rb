@@ -429,9 +429,19 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#destroy" do
+    it "registers a deadline that scales with the cache entries and hops to destroy_cache_entries" do
+      GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-1", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      nx.incr_destroy
+      expect { nx.destroy }.to hop("destroy_cache_entries")
+      expect(Time.new(nx.deadline_at)).to be_within(5).of(now + 401)
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(0)
+    end
+  end
+
+  describe "#destroy_cache_entries" do
     it "does not destroy if has active runner" do
       GithubRunner.create(repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
-      expect { nx.destroy }.to nap(2 * 60)
+      expect { nx.destroy_cache_entries }.to nap(2 * 60)
     end
 
     it "destroys cache entries one at a time, then blob storage if has one" do
@@ -446,11 +456,11 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       end
       expect(nx.github_repository).to receive(:destroy_blob_storage)
 
-      expect { nx.destroy }.to nap(0)
+      expect { nx.destroy_cache_entries }.to nap(0)
       expect(repository.cache_entries_dataset.count).to eq 1
-      expect { nx.destroy }.to nap(0)
+      expect { nx.destroy_cache_entries }.to nap(0)
       expect(repository.cache_entries_dataset.count).to eq 0
-      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect { nx.destroy_cache_entries }.to exit({"msg" => "github repository destroyed"})
       expect(repository).not_to exist
     end
 
@@ -458,7 +468,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       repository.update_extra_cache_storage_gib(300)
       record = repository.reload.active_billing_record
       record.update(span: Sequel.pg_range((now - 60 * 60)..nil))
-      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect { nx.destroy_cache_entries }.to exit({"msg" => "github repository destroyed"})
       expect(record.reload.span.unbounded_end?).to be(false)
       expect(repository).not_to exist
     end
@@ -466,7 +476,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "deletes blob storage outside of the transaction and destroys records inside the transaction" do
       entry = GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
       st = nx.strand
-      st.update(label: "destroy")
+      st.update(label: "destroy_cache_entries")
       repository.incr_destroying
       in_transaction = false
       allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
@@ -503,9 +513,19 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "deletes resource and pops" do
-      expect(nx).to receive(:decr_destroy)
-      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect { nx.destroy_cache_entries }.to exit({"msg" => "github repository destroyed"})
       expect(repository.exists?).to be false
+    end
+  end
+
+  describe "#cache_entry_deletion_budget" do
+    it "allows 400 seconds plus a second per cache entry of the repository" do
+      other_repository = GithubRepository.create(name: "ubicloud/other", last_job_at: Time.now, installation_id: installation.id)
+      GithubCacheEntry.create(repository_id: other_repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-other", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      2.times do
+        GithubCacheEntry.create(repository_id: repository.id, key: "k#{it}", version: "v1", scope: "main", upload_id: "upload-#{it}", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      end
+      expect(nx.cache_entry_deletion_budget).to eq 402
     end
   end
 end
