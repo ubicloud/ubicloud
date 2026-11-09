@@ -1,4 +1,4 @@
-<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil, prefix: nil, id: name) %>
+<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil, prefix: nil, id: name, description_html: nil) %>
 <% value = typecast_body_params.str(name) || value if name
 error = rodauth.field_error(name) || flash.dig("errors", name) %>
 
@@ -36,4 +36,5 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
   </div>
 
   <%== part("components/form/error", name:, error:) if error %>
+  <%== description_html %>
 </div>

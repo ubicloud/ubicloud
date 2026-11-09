@@ -98,6 +98,32 @@ RSpec.describe Clover, "private subnet" do
         expect(PrivateSubnet.first.project_id).to eq(project.id)
       end
 
+      it "can create a private subnet with an IPv4 range" do
+        project
+        visit "#{project.path}/private-subnet/create"
+        fill_in "Name", with: "dummy-ps"
+        choose option: Location::HETZNER_FSN1_UBID
+        fill_in "IPv4 range (optional)", with: "10.20.0.0/20"
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'dummy-ps' will be ready in a few seconds")
+        expect(PrivateSubnet.first.net4.to_s).to eq("10.20.0.0/20")
+      end
+
+      it "shows an error for an invalid IPv4 range" do
+        project
+        visit "#{project.path}/private-subnet/create"
+        fill_in "Name", with: "dummy-ps"
+        choose option: Location::HETZNER_FSN1_UBID
+        fill_in "IPv4 range (optional)", with: "10.0.0.0/8"
+        click_button "Create"
+
+        expect(page).to have_flash_error("Validation failed for following fields: ipv4_range")
+        expect(page).to have_content "/8 is too large. Use /16 to /26."
+        expect(page).to have_field("IPv4 range (optional)", with: "10.0.0.0/8")
+        expect(PrivateSubnet.count).to eq(0)
+      end
+
       it "can not create private subnet with same name" do
         project
         visit "#{project.path}/private-subnet/create"

@@ -54,6 +54,10 @@ class Clover
       end
     end
 
+    if (ipv4_range = typecast_params.nonempty_str("ipv4_range"))
+      ipv4_range = Validation.validate_private_subnet_ipv4_range(ipv4_range, project: @project, location: @location, key: "ipv4_range")
+    end
+
     ps = nil
     DB.transaction do
       ps = Prog::Vnet::SubnetNexus.assemble(
@@ -61,6 +65,7 @@ class Clover
         name:,
         location_id: @location.id,
         firewall_id: firewall&.id,
+        ipv4_range:,
       ).subject
       audit_log(ps, "create")
     end
