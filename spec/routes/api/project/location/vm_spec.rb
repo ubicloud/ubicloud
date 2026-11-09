@@ -370,7 +370,8 @@ RSpec.describe Clover, "vm" do
         vm = Vm.first(name: "test-vm")
         expect(vm.values.slice(:vcpus, :memory_gib)).to eq(vcpus: 96, memory_gib: 864)
         frame = vm.strand.stack.first
-        expect(frame.slice("gpu_count", "gpu_device", "distinct_storage_devices")).to eq("gpu_count" => 4, "gpu_device" => "3182", "distinct_storage_devices" => true)
+        expect(frame.slice("gpu_count", "gpu_device")).to eq("gpu_count" => 4, "gpu_device" => "3182")
+        expect(vm.allocation_rules["distinct_storage_devices"]).to be true
         expect(frame["storage_volumes"].map { it["size_gib"] }).to eq([1600] * 4)
         expect(frame["storage_volumes"].map { it["boot"] }).to eq([true, false, false, false])
       end
