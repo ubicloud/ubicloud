@@ -1,0 +1,24 @@
+<% @page_title = "US Fleet" %>
+
+<%== part("components/table", title: "Quota vs Fleet", table_class: "us-fleet-quota-table", data: @quota_vs_fleet, use_admin_label: false) %>
+<%== part("components/table", title: "Installations", table_class: "us-fleet-installation-table", data: @installations, use_admin_label: false) %>
+<%== part("components/table", title: "Runner Capacity", table_class: "us-fleet-capacity-table", data: @runner_capacity, use_admin_label: false) %>
+<%== part("components/table", title: "VM Hosts", table_class: "us-fleet-host-table", data: @hosts, use_admin_label: false) %>
+
+<h3>Notes</h3>
+
+<p>
+  <strong>Installations:</strong> GitHub installations whose location filter or location preference includes
+  leaseweb-wdc02. <strong>US Only</strong> means the location filter is only leaseweb-wdc02, so runners can't be placed
+  elsewhere.
+</p>
+
+<p><strong>GithubRunnerVCpu Quota:</strong> Effective x64 runner quota. The total counts each project once.</p>
+
+<p>
+  <strong>Runner Capacity:</strong> Accepting hosts in leaseweb-wdc02 with an activated github-* boot image.
+</p>
+
+<p>
+  <strong>Quota vs Fleet:</strong> Total GithubRunnerVCpu quota of US installations compared to the x64 runner capacity.
+</p>
