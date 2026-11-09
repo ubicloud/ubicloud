@@ -13,7 +13,7 @@
   <div class="h-6 w-px bg-gray-200 lg:hidden"></div>
 
   <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-    <img class="h-5 w-auto lg:hidden" src="/logo-primary.png" alt="Ubicloud">
+    <%== part("components/logo", classes: "h-5 w-auto lg:hidden") %>
   </a>
 
   <div class="flex flex-1 gap-x-4 self-stretch justify-end lg:gap-x-6">

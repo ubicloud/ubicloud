@@ -1,7 +1,7 @@
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-sidebar-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
     <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-      <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
+      <%== part("components/logo", src: "/logo-white.png", classes: "h-6 w-auto") %>
     </a>
   </div>
 
