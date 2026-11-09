@@ -37,6 +37,13 @@ class PrivateSubnet < Sequel::Model
   GCP_MANAGEMENT_SUBNET_NAME = "ubicloud-pg-mgmt"
 
   dataset_module Pagination
+
+  dataset_module do
+    def overlapping_net4(net)
+      where(Sequel.pg_inet_op(:net4).contains_or_contained_by(net.to_s))
+    end
+  end
+
   include ObjectTag::Cleanup
 
   def connected_subnets
