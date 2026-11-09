@@ -20,13 +20,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
-    ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
     nic_ipv4_prefix_len ||= 32
     if nic_ipv4_prefix_len != 32 && !location.metal?
       fail "Only metal locations support a nic_ipv4_prefix_len other than 32"
     end
     ipv6_range ||= random_private_ipv6(location, project).to_s
-    ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
+    if ipv4_range
+      ipv4_range_size = NetAddr::IPv4Net.parse(ipv4_range.to_s).netmask.prefix_len
+      aws_subnet_ipv4_range_size ||= [ipv4_range_size + Math.log2(location.azs.count + 1).ceil, 28].min if location.aws?
+    else
+      ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
+      ipv4_range = random_private_ipv4(location, project, ipv4_range_size).to_s
+    end
     DB.transaction do
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, nic_ipv4_prefix_len:, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)

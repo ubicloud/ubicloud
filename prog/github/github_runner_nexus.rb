@@ -103,7 +103,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
             location_id:,
             allow_only_ssh: true,
             ipv4_range: "10.#{SecureRandom.random_number(1..255)}.0.0/17",
-            ipv4_range_size: 17,
             aws_subnet_ipv4_range_size: 20,
           ).subject
           installation.add_private_subnet(ps)
