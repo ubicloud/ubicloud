@@ -240,6 +240,10 @@ class Clover < Roda
     "#{(seconds / 86400).to_i} days ago"
   end
 
+  def current_theme
+    session["theme"] || "system"
+  end
+
   def money(amount)
     "$%0.02f" % amount
   end

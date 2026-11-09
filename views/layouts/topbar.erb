@@ -42,6 +42,20 @@
           <a href="/project" role="menuitem" tabindex="-1">Projects</a>
         </div>
 
+        <div class="theme-switcher">
+          <p>Theme</p>
+
+          <div>
+            <% %w[light dark system].each do |theme| %>
+              <% form(action: "/theme/#{theme}", method: :post) do %>
+                <button type="submit" role="menuitemradio" aria-checked="<%= theme == current_theme %>" tabindex="-1">
+                  <%= theme.capitalize %>
+                </button>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+
         <div>
           <% form(action: "/logout", method: :post) do %>
             <button type="submit" role="menuitem" tabindex="-1">Log out</button>
