@@ -21,6 +21,8 @@ module Rodauth
       return s unless timing_safe_eql?(api_key.key, key)
 
       set_session_value(session_key, api_key.owner_id)
+      return s.clear unless scope.current_account
+
       set_session_value(session_pat_key, uuid)
 
       s

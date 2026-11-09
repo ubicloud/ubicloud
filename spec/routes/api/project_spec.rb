@@ -40,6 +40,14 @@ RSpec.describe Clover, "project" do
       expect(last_response.status).to eq(401)
     end
 
+    it "does not recognize personal access tokens for accounts that no longer exist" do
+      pat = ApiKey.create(owner_table: "accounts", owner_id: Account.generate_uuid, used_for: "api", project_id: project.id)
+
+      header "Authorization", "Bearer pat-#{pat.ubid}-#{pat.key}"
+      get "/project"
+      expect(last_response).to have_api_error(401, "invalid personal access token provided in Authorization header")
+    end
+
     it "recognizes personal access tokens with case insensitive bearer" do
       project = user.create_project_with_default_policy("Default")
 
