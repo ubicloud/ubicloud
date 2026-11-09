@@ -486,10 +486,11 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#os_supports_slices?" do
-    it "returns true if the OS supports slices" do
+    it "returns true unless the OS is Ubuntu 22.04" do
       expect(nx.os_supports_slices?("ubuntu-22.04")).to be false
       expect(nx.os_supports_slices?("ubuntu-24.04")).to be true
       expect(nx.os_supports_slices?("ubuntu-26.04")).to be true
+      expect(nx.os_supports_slices?("debian-13")).to be true
     end
   end
 
