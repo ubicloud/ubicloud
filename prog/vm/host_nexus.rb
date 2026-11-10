@@ -5,14 +5,14 @@ class Prog::Vm::HostNexus < Prog::Base
   frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true, ipv4_subnets: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, ipv6_disabled: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true, ipv4_subnets: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
       end
 
       Sshable.create_with_id(id, host: sshable_hostname)
-      vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
+      vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:, ipv6_disabled:)
 
       if provider_name
         HostProvider.create do |hp|
@@ -99,7 +99,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def prep
     bud Prog::Vm::PrepHost
-    bud Prog::LearnNetwork unless vm_host.net6
+    bud Prog::LearnNetwork
     bud Prog::LearnMemory
     bud Prog::LearnOs
     bud Prog::LearnCpu

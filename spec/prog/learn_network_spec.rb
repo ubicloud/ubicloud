@@ -57,9 +57,27 @@ JSON
       expect(vm_host.net6.to_s).to eq("2a01:4f8:173:1ed3::/64")
     end
 
+    it "saves the ip6 address but keeps the given net6" do
+      vm_host.update(net6: "2a01:4f8:173:1ed3:8000::/80")
+      expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
+      expect { ln.learn_ip6 }.to exit({"msg" => "learned network information"})
+      vm_host.reload
+      expect(vm_host.ip6.to_s).to eq("2a01:4f8:173:1ed3::2")
+      expect(vm_host.net6.to_s).to eq("2a01:4f8:173:1ed3:8000::/80")
+    end
+
     it "pops if there is no global unique address prefix provided" do
       expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
       expect { ln.learn_ip6 }.to exit({"msg" => "learned network information"})
+    end
+
+    it "pops without learning when ipv6 is disabled" do
+      vm_host.update(ipv6_disabled: true)
+      expect(ln.sshable).not_to receive(:_cmd)
+      expect { ln.learn_ip6 }.to exit({"msg" => "ipv6 is disabled"})
+      vm_host.reload
+      expect(vm_host.ip6).to be_nil
+      expect(vm_host.net6).to be_nil
     end
   end
 
