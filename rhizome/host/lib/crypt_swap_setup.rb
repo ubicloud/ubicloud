@@ -13,6 +13,7 @@ module CryptSwapSetup
   FSTAB = "/etc/fstab"
   CRYPTTAB = "/etc/crypttab"
   CRYPTSWAP_DEVICE = "/dev/mapper/cryptswap"
+  PROC_SWAPS = "/proc/swaps"
 
   def run
     fstab = File.read(FSTAB).lines
@@ -34,7 +35,7 @@ module CryptSwapSetup
     # turn the swap file off instead.
     unless File.blockdev?(swap_real)
       puts "swap is a file (#{swap_real}); disabling it, as plaintext swap is not allowed"
-      r "swapoff", swap_real
+      r "swapoff", swap_real if active_swap?(swap_real)
       fstab.delete_at(swap_line_idx)
       update_fstab(fstab)
       rm_if_exists(swap_real)
@@ -59,6 +60,10 @@ module CryptSwapSetup
       .sub(/\AUUID=/, "/dev/disk/by-uuid/")
       .sub(/\ALABEL=/, "/dev/disk/by-label/")
     File.realpath(source)
+  end
+
+  def active_swap?(path)
+    File.readlines(PROC_SWAPS).drop(1).any? { |entry| entry.split.first == path }
   end
 
   def add_crypttab_entry(entry)
