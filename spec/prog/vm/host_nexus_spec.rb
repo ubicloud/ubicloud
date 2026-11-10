@@ -86,6 +86,11 @@ RSpec.describe Prog::Vm::HostNexus do
       st = described_class.assemble("1.2.3.4", install_os: true)
       expect(st.stack.first["install_os"]).to be true
     end
+
+    it "stores ipv6_disabled on the host" do
+      expect(described_class.assemble("127.0.0.1").subject.ipv6_disabled).to be false
+      expect(described_class.assemble("1.2.3.4", ipv6_disabled: true).subject.ipv6_disabled).to be true
+    end
   end
 
   def assemble_hetzner_host(**)
@@ -444,6 +449,7 @@ RSpec.describe Prog::Vm::HostNexus do
         "InstallDnsmasq",
         "LearnCpu",
         "LearnMemory",
+        "LearnNetwork",
         "LearnOs",
         "LearnPci",
         "LearnStorage",
@@ -463,22 +469,6 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.prep }.to hop("wait_prep")
 
       expect(Strand.where(parent_id: st.id).select_map(:prog)).to include("SetupNdpProxy")
-    end
-
-    it "sets up the ndp proxy alongside LearnNetwork when net6 is not known yet" do
-      vm_host.update(ndp_needed: true)
-
-      expect { nx.prep }.to hop("wait_prep")
-
-      child_progs = Strand.where(parent_id: st.id).select_map(:prog)
-      expect(child_progs).to include("SetupNdpProxy", "LearnNetwork")
-    end
-
-    it "learns the network from the host if it is not set a-priori" do
-      expect { nx.prep }.to hop("wait_prep")
-
-      child_progs = Strand.where(parent_id: st.id).select_map(:prog)
-      expect(child_progs).to include("LearnNetwork")
     end
 
     it "passes format_storage to LearnStorage when assembled with install_os, regardless of provider" do

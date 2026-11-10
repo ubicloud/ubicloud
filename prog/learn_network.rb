@@ -15,6 +15,8 @@ class Prog::LearnNetwork < Prog::Base
   end
 
   label def learn_ip6
+    pop "ipv6 is disabled" if vm_host.ipv6_disabled
+
     ip6 = parse_ip_addr_j(sshable.cmd_json("/usr/sbin/ip -j -6 addr show scope global"))
 
     # While it would be ideal for NetAddr's IPv6 support to convey
@@ -33,7 +35,7 @@ class Prog::LearnNetwork < Prog::Base
     if ip6
       vm_host.update(
         ip6: ip6.addr,
-        net6: NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s,
+        net6: vm_host.net6 || NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s,
       )
     end
     pop "learned network information"
