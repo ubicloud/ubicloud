@@ -1,5 +1,6 @@
 <% @page_title = @project.name
-hard_runner_limit = @project.reputation == "limited" || @project.get_ff_hard_runner_concurrency_limit
+limited = @project.reputation == "limited"
+hard_runner_limit = limited || @project.get_ff_hard_runner_concurrency_limit
 resource_types = ["VmVCpu", "PostgresVCpu", "KubernetesVCpu", "MachineImageVersion"]
 resource_types.push("GithubRunnerVCpu", "GithubRunnerVCpuArm") if hard_runner_limit
 @quotas = resource_types.map {
@@ -77,13 +78,19 @@ resource_types.push("GithubRunnerVCpu", "GithubRunnerVCpuArm") if hard_runner_li
       </div>
     </div>
 
-    <% unless hard_runner_limit %>
+    <% if limited || !hard_runner_limit %>
       <div class="px-4 py-5 sm:p-6">
         <h4 class="text-sm font-semibold leading-6 text-gray-900">GitHub Runners</h4>
 
         <p class="mt-2 text-sm text-gray-500">
-          GitHub Actions runners do not count toward your VmVCpu quota. You can think of our runner concurrency limits
-          as soft limits. When we have spare capacity in the fleet, your jobs can run well past the limit.
+          <% if limited %>
+            Company emails have higher concurrency limits, so we recommend
+            <a href="/account/change-login" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">updating your account email</a>
+            to your company email address.
+          <% else %>
+            GitHub Actions runners do not count toward your VmVCpu quota. You can think of our runner concurrency limits
+            as soft limits. When we have spare capacity in the fleet, your jobs can run well past the limit.
+          <% end %>
         </p>
       </div>
     <% end %>
