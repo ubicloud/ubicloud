@@ -45,6 +45,8 @@ SSH_SESSION_LOCK_NAME = "respirate"
 
 clover_freeze
 
+MetricsReporter.new(metrics: ControlPlaneMetrics, name: "respirate").run_thread if Config.control_plane_metrics_report_enabled
+
 if partition_number
   # Start with a random offset, so that multiple respirate processes are unlikely
   # to run the old strand scan at the same time.
