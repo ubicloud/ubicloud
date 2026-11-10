@@ -3,6 +3,10 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::GithubRunner do
+  def sawyer_resource(data)
+    Sawyer::Resource.new(Sawyer::Agent.new("https://api.github.com"), data)
+  end
+
   subject(:gr_test) {
     described_class.new(described_class.assemble([{"name" => "github_runner_ubuntu_2204"}]))
   }
@@ -175,25 +179,25 @@ RSpec.describe Prog::Test::GithubRunner do
 
     it "hops to clean_resources on success" do
       expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
-        .and_return({conclusion: "success"})
+        .and_return(sawyer_resource({conclusion: "success"}))
       expect { gr_test.check_test_run }.to hop("clean_resources")
     end
 
     it "naps when conclusion is nil" do
       expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
-        .and_return({conclusion: nil})
+        .and_return(sawyer_resource({conclusion: nil}))
       expect { gr_test.check_test_run }.to nap(15)
     end
 
     it "naps when conclusion is in_progress" do
       expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
-        .and_return({conclusion: "in_progress"})
+        .and_return(sawyer_resource({conclusion: "in_progress"}))
       expect { gr_test.check_test_run }.to nap(15)
     end
 
     it "hops to clean_resources on failure" do
       expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
-        .and_return({conclusion: "failure"})
+        .and_return(sawyer_resource({conclusion: "failure"}))
       expect { gr_test.check_test_run }.to hop("clean_resources")
     end
   end

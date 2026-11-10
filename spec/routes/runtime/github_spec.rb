@@ -6,6 +6,10 @@ require "aws-sdk-s3"
 require "octokit"
 
 RSpec.describe Clover, "github" do
+  def sawyer_resource(data)
+    Sawyer::Resource.new(Sawyer::Agent.new("https://api.github.com"), data)
+  end
+
   describe "authentication" do
     let(:vm) { create_vm }
 
@@ -194,8 +198,8 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         client = instance_double(Octokit::Client)
         expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
-        expect(client).to receive(:workflow_run).and_return({event: "push"})
+        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: runner.ubid}]}))
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push"}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id"))
 
@@ -221,7 +225,7 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         client = instance_double(Octokit::Client)
         expect(Github).to receive(:installation_client).and_return(client).once
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]})
+        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]}))
         expect(client).not_to receive(:workflow_run)
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
@@ -240,8 +244,8 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         client = instance_double(Octokit::Client)
         expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return({jobs: [{id: 789, run_id: 111, run_attempt: 2, head_branch: "dev", runner_name: runner.ubid}]})
-        expect(client).to receive(:workflow_run).with("test", 111).and_return({event: "push"})
+        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 2, head_branch: "dev", runner_name: runner.ubid}]}))
+        expect(client).to receive(:workflow_run).with("test", 111).and_return(sawyer_resource({event: "push"}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
 
@@ -256,7 +260,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).with("test", 555).and_return({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]})
+        expect(client).to receive(:workflow_run).with("test", 555).and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
 
@@ -270,7 +274,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return({event: "workflow_run", head_repository: {full_name: "other/test"}, pull_requests: []})
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "workflow_run", head_repository: {full_name: "other/test"}, pull_requests: []}))
         expect(blob_storage_client).not_to receive(:create_multipart_upload)
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
@@ -284,7 +288,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return({event: "pull_request", head_repository: {full_name: "other/test"}})
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}}))
         expect(blob_storage_client).not_to receive(:create_multipart_upload)
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
@@ -298,7 +302,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "dev", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return({event: "push", head_repository: {full_name: "test"}})
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push", head_repository: {full_name: "test"}}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
 
@@ -312,7 +316,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).once.and_return({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]})
+        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]}))
         upload_ids = ["upload-id-1", "upload-id-2"]
         expect(blob_storage_client).to receive(:create_multipart_upload).twice { instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: upload_ids.shift) }
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything).twice
@@ -327,7 +331,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: nil, run_id: 777, head_branch: "dev", installation_id: installation.id)
-        expect(client).to receive(:workflow_run).with("test", 777).and_return({event: "push"})
+        expect(client).to receive(:workflow_run).with("test", 777).and_return(sawyer_resource({event: "push"}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
 
@@ -352,7 +356,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).once.and_return({event: "push"})
+        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "push"}))
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
         expect(last_response).to have_runtime_error(400, "No workflow job data available")
@@ -544,7 +548,7 @@ RSpec.describe Clover, "github" do
         GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
-        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]})
+        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]}))
         get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
 
         expect(last_response.status).to eq(204)
@@ -566,8 +570,8 @@ RSpec.describe Clover, "github" do
         entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
-        expect(client).to receive(:workflow_run).and_return({event: "push"})
+        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: runner.ubid}]}))
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push"}))
         expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
 
@@ -594,7 +598,7 @@ RSpec.describe Clover, "github" do
         entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "refs/pull/7/merge", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         expect(Github).to receive(:installation_client).and_return(client).once
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]})
+        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]}))
         expect(client).not_to receive(:workflow_run)
         expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
 
@@ -613,7 +617,7 @@ RSpec.describe Clover, "github" do
         vm = create_vm
         runner = GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "main", run_id: 999}, installation_id: installation.id)
         login_runtime(vm)
-        expect(client).to receive(:workflow_run).with("test", 999).and_return({event: "push"})
+        expect(client).to receive(:workflow_run).with("test", 999).and_return(sawyer_resource({event: "push"}))
 
         get "/runtime/github/cache", {keys: "k1", version: "v1"}
 

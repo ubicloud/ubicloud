@@ -42,7 +42,7 @@ class Clover < Roda
       end
 
       if (job = jobs.find { it[:runner_name] == runner.ubid })
-        update_github_runner_from_workflow_job(runner, JSON.parse(JSON.generate(job)))
+        update_github_runner_from_workflow_job(runner, JSON.parse(JSON.generate(job.to_h)))
         runner.reload
         if (cache_scope = runner.active_workflow_run&.cache_scope)
           runner.this.update(cache_scope:)
@@ -65,7 +65,7 @@ class Clover < Roda
     end
 
     # Deep convert to string keys
-    run = JSON.parse(JSON.generate(run))
+    run = JSON.parse(JSON.generate(run.to_h))
 
     cache_scope = runner.cache_scope = github_workflow_run_cache_scope(run, repository_name: runner.repository_name, run_id: runner.run_id, head_branch: runner.head_branch)
     runner.this.update(cache_scope:)
