@@ -11,8 +11,8 @@ class VmHost < Sequel::Model
   one_to_one :provider, key: :id, class: :HostProvider, read_only: true
   one_to_one :inventory, key: :id, class: :VmHostInventory, read_only: true
   one_to_many :assigned_host_addresses, key: :host_id, read_only: true
-  one_to_many :spdk_installations, remover: nil, clearer: nil
-  one_to_many :vhost_block_backends, remover: nil, clearer: nil
+  one_to_many :spdk_installations, adder: nil, remover: nil, clearer: nil
+  one_to_many :vhost_block_backends, adder: nil, remover: nil, clearer: nil
   one_to_many :storage_devices, remover: nil, clearer: nil
   one_to_many :pci_devices, read_only: true
   one_to_many :boot_images, read_only: true

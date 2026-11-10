@@ -20,6 +20,11 @@ RSpec.describe VmHost do
     vm_host.provider.api
   }
 
+  it "does not expose adders for storage backend associations" do
+    expect(vm_host).not_to respond_to(:add_spdk_installation)
+    expect(vm_host).not_to respond_to(:add_vhost_block_backend)
+  end
+
   describe "#ip6_random_vm_network" do
     it "can generate random ipv6 subnets" do
       expect(vm_host.ip6_random_vm_network.contains(vm_host.ip6)).to be false
