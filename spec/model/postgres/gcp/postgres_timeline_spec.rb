@@ -102,6 +102,20 @@ PGDATA=/dat/17/data
       end
     end
 
+    describe "#get_object" do
+      it "returns the downloaded body" do
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        bucket = instance_double(Google::Cloud::Storage::Bucket)
+        file = instance_double(Google::Cloud::Storage::File)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid, skip_lookup: true).and_return(bucket)
+        expect(bucket).to receive(:file).with("basebackups_005/x_backup_stop_sentinel.json", skip_lookup: true).and_return(file)
+        expect(file).to receive(:download).and_return(StringIO.new("{}"))
+
+        expect(postgres_timeline.get_object("basebackups_005/x_backup_stop_sentinel.json")).to eq("{}")
+      end
+    end
+
     describe "#list_objects" do
       it "returns wrapped GCS file objects with key and last_modified converted to Time" do
         bucket = instance_double(Google::Cloud::Storage::Bucket)
@@ -109,8 +123,8 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
         updated_datetime = Time.now
-        file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime)
+        file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime, size: 392)
+        file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime, size: 392)
         file_list = instance_double(Google::Cloud::Storage::File::List, to_a: [file1, file2], token: nil)
 
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
@@ -136,8 +150,8 @@ PGDATA=/dat/17/data
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
-        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now)
+        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now, size: 392)
+        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now, size: 392)
         page1 = instance_double(Google::Cloud::Storage::File::List, to_a: [file1], token: "next-page")
         page2 = instance_double(Google::Cloud::Storage::File::List, to_a: [file2], token: nil)
 
@@ -155,8 +169,8 @@ PGDATA=/dat/17/data
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
-        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now)
+        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now, size: 392)
+        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now, size: 392)
         page1 = instance_double(Google::Cloud::Storage::File::List, to_a: [file1], token: "next-page")
         page2 = instance_double(Google::Cloud::Storage::File::List, to_a: [file2], token: nil)
 

@@ -554,6 +554,10 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
+  def self.int2lsn(int)
+    format("%X/%08X", int >> 32, int & 0xFFFFFFFF)
+  end
+
   # psql reads a -d value that contains "=" or starts with a URI prefix as a
   # connection string. Database names are customer-controlled, so a caller
   # that connects to one passes it in as a quoted conninfo value.

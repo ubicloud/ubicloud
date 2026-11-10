@@ -49,6 +49,10 @@ PGDATA=/dat/#{version}/data
       )
     end
 
+    def metal_get_object(key)
+      blob_storage_client.get_object(ubid, key)
+    end
+
     def metal_list_objects(prefix, delimiter: "")
       blob_storage_client.list_objects(ubid, prefix, delimiter:)
     end
