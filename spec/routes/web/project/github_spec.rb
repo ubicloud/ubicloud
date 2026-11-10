@@ -394,6 +394,8 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/#{installation.ubid}/runner"
       expect(page.status_code).to eq(200)
       expect(page).to have_content "You've reached your vCPU concurrency limit"
+      expect(page).to have_content "we recommend updating your account email to your company email address"
+      expect(page).to have_link "updating your account email", href: "/account/change-login"
     end
   end
 

@@ -427,6 +427,7 @@ RSpec.describe Clover, "project" do
         end
         expect(page).to have_no_content "GithubRunnerVCpu"
         expect(page).to have_content "You can think of our runner concurrency limits as soft limits."
+        expect(page).to have_no_content "company email"
       end
 
       it "shows runner quotas when project has limited reputation" do
@@ -436,6 +437,8 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "GithubRunnerVCpu"
         expect(page).to have_content "GithubRunnerVCpuArm"
         expect(page).to have_no_content "soft limits"
+        expect(page).to have_content "we recommend updating your account email to your company email address"
+        expect(page).to have_link "updating your account email", href: "/account/change-login"
       end
 
       it "shows runner quotas when project has hard runner concurrency limit" do
@@ -445,6 +448,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "GithubRunnerVCpu"
         expect(page).to have_content "GithubRunnerVCpuArm"
         expect(page).to have_no_content "soft limits"
+        expect(page).to have_no_content "company email"
       end
 
       it "raises forbidden when does not have permissions" do
