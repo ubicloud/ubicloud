@@ -122,12 +122,12 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_encrypted_swap" do
     it "hops to wait if swap is on dm-crypt" do
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/dm-0\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo swapon --show=NAME --noheadings").and_return("/dev/dm-0\n")
       expect { hs_test.verify_encrypted_swap }.to hop("wait")
     end
 
     it "fails if swap is not on dm-crypt" do
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/nvme0n1p2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo swapon --show=NAME --noheadings").and_return("/dev/nvme0n1p2\n")
       expect(hs_test.strand).to receive(:update).with(hash_including(exitval: {msg: "swap is not on a dm-crypt device: /dev/nvme0n1p2"}))
       expect { hs_test.verify_encrypted_swap }.to hop("failed")
     end

@@ -91,7 +91,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def verify_encrypted_swap
     sshable = vm_host.sshable
-    swap_device = sshable.cmd("swapon --show=NAME --noheadings").strip
+    swap_device = sshable.cmd("sudo swapon --show=NAME --noheadings").strip
     fail_test "swap is not on a dm-crypt device: #{swap_device}" unless swap_device.start_with?("/dev/dm-")
     hop_wait
   end
