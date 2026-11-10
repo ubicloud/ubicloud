@@ -86,7 +86,7 @@ module NetSsh
         end
       # simplecov:enable
       elsif Config.test?
-        def _cmd(command, stdin: nil, log: true, timeout: :default, session: nil)
+        def _cmd(command, stdin: nil, log: :on_error_or_slow, timeout: :default, session: nil)
           raise MissingMock, "Sshable#_cmd not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
         end
 

@@ -345,7 +345,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#mount_data_disk" do
     it "formats data disk if format command is not sent yet or failed" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/vdb", {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/vdb", {log: :on_error_or_slow, stdin: nil})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
@@ -354,7 +354,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "formats data disk correctly when there are multiple storage volumes" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
       expect(sshable).to receive(:_cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/md0", {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/md0", {log: :on_error_or_slow, stdin: nil})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
@@ -506,7 +506,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#initialize_empty_database" do
     it "triggers initialize_empty_database if initialize_empty_database command is not sent yet or failed" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_empty_database sudo postgres/bin/initialize-empty-database 18 true", {log: true, stdin: nil}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_empty_database sudo postgres/bin/initialize-empty-database 18 true", {log: :on_error_or_slow, stdin: nil}).twice
 
       # NotStarted
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_empty_database").and_return("NotStarted")
@@ -530,7 +530,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "passes false for strict overcommit when skip_strict_memory_overcommit semaphore is set" do
       postgres_resource.incr_skip_strict_memory_overcommit
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_empty_database").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_empty_database sudo postgres/bin/initialize-empty-database 18 false", {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_empty_database sudo postgres/bin/initialize-empty-database 18 false", {log: :on_error_or_slow, stdin: nil})
       expect { nx.initialize_empty_database }.to nap(5)
     end
   end
@@ -539,7 +539,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
       postgres_resource.update(restore_target: Time.now)
       expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 backup-label true recovery", {log: true, stdin: nil}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 backup-label true recovery", {log: :on_error_or_slow, stdin: nil}).twice
 
       # NotStarted
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
@@ -583,7 +583,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_resource.incr_skip_strict_memory_overcommit
       expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 backup-label false recovery", {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 backup-label false recovery", {log: :on_error_or_slow, stdin: nil})
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
@@ -593,7 +593,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
-      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 LATEST true standby", {log: true, stdin: nil})
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 18 LATEST true standby", {log: :on_error_or_slow, stdin: nil})
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
     end
 
@@ -1002,7 +1002,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
       expect(server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 18", {log: true, stdin: JSON.generate("dummy-configure-hash")}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 18", {log: :on_error_or_slow, stdin: JSON.generate("dummy-configure-hash")}).twice
 
       # NotStarted
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("NotStarted")
@@ -1016,7 +1016,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "handles use_physical_slot semaphore" do
       expect(server).to receive(:configure_hash).and_return("dummy-configure-hash")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 18", {log: true, stdin: JSON.generate("dummy-configure-hash")})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 18", {log: :on_error_or_slow, stdin: JSON.generate("dummy-configure-hash")})
       server.incr_use_physical_slot
       expect { nx.configure }.to nap(5)
       expect(server.use_physical_slot_set?).to be true
@@ -1661,7 +1661,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "starts the stop" do
       expect_stop_state("NotStarted")
-      expect(sshable).to receive(:_cmd).with(stop_cmd, {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with(stop_cmd, {log: :on_error_or_slow, stdin: nil})
       expect { nx.wait_fence_stop }.to nap(5)
     end
 
