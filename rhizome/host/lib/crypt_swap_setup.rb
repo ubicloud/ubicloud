@@ -17,12 +17,22 @@ module CryptSwapSetup
 
   def run
     fstab = File.read(FSTAB).lines
+    swap_line_idxs = fstab.each_index.select { |i| fstab[i].split[2] == "swap" && !fstab[i].lstrip.start_with?("#") }
+
+    # Only one swap device can be encrypted here. Turn them all off rather
+    # than leave any of them in plaintext.
+    if swap_line_idxs.size > 1
+      puts "#{swap_line_idxs.size} swap entries in #{FSTAB}; disabling all of them, as plaintext swap is not allowed"
+      disable_swaps(fstab, swap_line_idxs)
+      return
+    end
+
     if fstab.any? { |l| l.include?(CRYPTSWAP_DEVICE) }
       puts "cryptswap already configured, skipping"
       return
     end
 
-    swap_line_idx = fstab.find_index { |l| l.split[2] == "swap" }
+    swap_line_idx = swap_line_idxs.first
     unless swap_line_idx
       puts "no swap entry in #{FSTAB}; skipping cryptswap setup"
       return
@@ -35,10 +45,7 @@ module CryptSwapSetup
     # turn the swap file off instead.
     unless File.blockdev?(swap_real)
       puts "swap is a file (#{swap_real}); disabling it, as plaintext swap is not allowed"
-      r "swapoff", swap_real if active_swap?(swap_real)
-      fstab.delete_at(swap_line_idx)
-      update_fstab(fstab)
-      rm_if_exists(swap_real)
+      disable_swaps(fstab, [swap_line_idx])
       return
     end
 
@@ -60,6 +67,14 @@ module CryptSwapSetup
       .sub(/\AUUID=/, "/dev/disk/by-uuid/")
       .sub(/\ALABEL=/, "/dev/disk/by-label/")
     File.realpath(source)
+  end
+
+  def disable_swaps(fstab, swap_line_idxs)
+    swaps = swap_line_idxs.map { |i| resolve_swap_device(fstab[i]) }
+    swaps.each { |swap| r "swapoff", swap if active_swap?(swap) }
+    swap_line_idxs.reverse_each { |i| fstab.delete_at(i) }
+    update_fstab(fstab)
+    swaps.each { |swap| rm_if_exists(swap) unless File.blockdev?(swap) }
   end
 
   def active_swap?(path)
