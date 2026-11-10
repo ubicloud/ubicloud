@@ -2,14 +2,15 @@
 
 require "socket"
 
-# Reports the ApiMetrics registry to VictoriaMetrics on a fixed interval,
-# from a thread started by puma's before_worker_boot hook.
-class ApiMetricsReporter
+# Reports a metrics registry to VictoriaMetrics on a fixed interval, from a
+# thread started by the owning process.
+class MetricsReporter
   # Direct access to the shutdown queue. Only designed for use by the tests.
   attr_reader :shutdown_queue
 
-  def initialize(metrics: ApiMetrics, interval: 15, instance: Socket.gethostname)
+  def initialize(name:, metrics:, interval: 15, instance: ENV["DYNO"] || Socket.gethostname)
     @metrics = metrics
+    @name = name
     @interval = interval
     @extra_labels = {instance:}.freeze
     @shutdown_queue = Queue.new
@@ -36,7 +37,7 @@ class ApiMetricsReporter
       run
       true
     rescue => e
-      Clog.emit("api metrics reporter thread exiting due to unexpected error", Util.exception_to_hash(e))
+      Clog.emit("#{@name} metrics reporter thread exiting due to unexpected error", Util.exception_to_hash(e))
       false
     end
   end
@@ -50,13 +51,13 @@ class ApiMetricsReporter
 
   def report
     unless (client = VictoriaMetricsResource.client_for_project(Config.victoria_metrics_service_project_id))
-      Clog.emit("api metrics report skipped because VictoriaMetrics is not configured")
+      Clog.emit("#{@name} metrics report skipped because VictoriaMetrics is not configured")
       return
     end
 
     client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: Time.now, samples: @metrics.render), @extra_labels)
   rescue VictoriaMetrics::ClientError, Sequel::Error => e
     # Sequel included: the client lookup queries the database.
-    Clog.emit("api metrics report failed", Util.exception_to_hash(e))
+    Clog.emit("#{@name} metrics report failed", Util.exception_to_hash(e))
   end
 end

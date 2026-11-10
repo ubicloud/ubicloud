@@ -2,8 +2,8 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe ApiMetricsReporter do
-  let(:reporter) { described_class.new(interval: @interval || 15) }
+RSpec.describe MetricsReporter do
+  let(:reporter) { described_class.new(name: "api", metrics: ApiMetrics, interval: @interval || 15) }
 
   after do
     expect(reporter.shutdown!).to be_nil
@@ -55,7 +55,7 @@ RSpec.describe ApiMetricsReporter do
   end
 
   it "#report uses the instance keyword argument for the instance label" do
-    custom = described_class.new(instance: "spec-instance")
+    custom = described_class.new(name: "api", metrics: ApiMetrics, instance: "spec-instance")
     expect(Config).to receive(:victoria_metrics_endpoint_override).twice.and_return("https://vm.example")
     client = instance_double(VictoriaMetrics::Client)
     expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "https://vm.example").and_return(client)
@@ -63,6 +63,14 @@ RSpec.describe ApiMetricsReporter do
       expect(extra_labels).to eq({instance: "spec-instance"})
     end
     custom.report
+  ensure
+    custom.shutdown!
+  end
+
+  it "#report uses the name keyword argument in log messages" do
+    custom = described_class.new(name: "respirate", metrics: ApiMetrics)
+    expect(Clog).to receive(:emit).with("respirate metrics report skipped because VictoriaMetrics is not configured").and_call_original
+    expect(custom.report).to be_nil
   ensure
     custom.shutdown!
   end
