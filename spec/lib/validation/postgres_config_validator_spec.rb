@@ -370,4 +370,32 @@ RSpec.describe Validation::PostgresConfigValidator do
       expect(validator.valid_config?("not_a_real_guc")).to be false
     end
   end
+
+  describe "PG 19" do
+    let(:pg19_validator) { described_class.new("19") }
+
+    it "drops params removed in PG 19" do
+      expect(described_class.new("18").valid_config?("io_workers")).to be true
+      expect(pg19_validator.valid_config?("io_workers")).to be false
+      expect(pg19_validator.valid_config?("escape_string_warning")).to be false
+      expect(pg19_validator.valid_config?("io_min_workers")).to be true
+    end
+
+    it "uses the PG 19 defaults" do
+      expect(pg19_validator.default("max_locks_per_transaction")).to eq 128
+      expect(pg19_validator.default("jit")).to eq "off"
+      expect(pg19_validator.default("log_lock_waits")).to eq "on"
+    end
+
+    it "only allows standard_conforming_strings to be on" do
+      expect(pg19_validator.validation_errors("standard_conforming_strings" => "on")).to be_empty
+      expect(pg19_validator.validation_errors("standard_conforming_strings" => "off")).to have_key("standard_conforming_strings")
+    end
+
+    it "accepts per-process-type log_min_messages levels" do
+      expect(pg19_validator.validation_errors("log_min_messages" => "warning, autovacuum:debug1")).to be_empty
+      expect(pg19_validator.validation_errors("log_min_messages" => "loud")).to have_key("log_min_messages")
+      expect(described_class.new("18").validation_errors("log_min_messages" => "warning, autovacuum:debug1")).to have_key("log_min_messages")
+    end
+  end
 end

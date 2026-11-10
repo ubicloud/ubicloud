@@ -8,7 +8,9 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
       expect(Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA.select { |k, v| v[:type] == :integer and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA.select { |k, v| v[:type] == :float and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |k, v| v[:type] == :integer and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_19_CONFIG_SCHEMA.select { |k, v| v[:type] == :integer and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |k, v| v[:type] == :float and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_19_CONFIG_SCHEMA.select { |k, v| v[:type] == :float and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |k, v| v[:type] == :integer and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |k, v| v[:type] == :float and (v[:max].nil? or v[:min].nil?) }.keys).to be_empty
     end
@@ -17,6 +19,7 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
       expect(Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_19_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
     end
 
@@ -24,6 +27,7 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
       expect(Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_19_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
     end
 
@@ -32,6 +36,7 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
         Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA,
         Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA,
         Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA,
+        Validation::PostgresConfigValidatorSchema::PG_19_CONFIG_SCHEMA,
       ].each do |schema|
         PostgresServer::RESTART_SENSITIVE_PARAMS.each do |param|
           expect(schema[param]).not_to be_nil
