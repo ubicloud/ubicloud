@@ -467,6 +467,15 @@ class PostgresResource < Sequel::Model
     parent_id && restore_target.nil?
   end
 
+  # A backup_from_standby tag of "true" or "false" overrides the project default.
+  def backup_from_standby?
+    case tags.find { it["key"] == "backup_from_standby" }&.dig("value")
+    when "true" then true
+    when "false" then false
+    else !!project.get_ff_postgres_backup_from_standby_default
+    end
+  end
+
   # nil when backup downloads are available; otherwise a user-facing message explaining
   # why, which the route raises and the view branches on, so the two never drift.
   def backup_download_unavailable_message
