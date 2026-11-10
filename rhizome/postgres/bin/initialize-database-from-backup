@@ -34,6 +34,9 @@ r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/postgresql.conf"
 # standby.signal: stay in recovery forever, follow streaming primary (HA replica,
 # read replica). recovery.signal: replay all available WAL, then exit recovery
 # and promote (PITR, unarchive from cold archive -- no live primary to follow).
+# A backup taken on a standby can carry its standby.signal, which would keep a
+# PITR restore in recovery forever, so drop whatever the backup brought.
+r "sudo", "-u", "postgres", "rm", "-f", "/dat/#{v}/data/standby.signal", "/dat/#{v}/data/recovery.signal"
 if recovery_mode == "standby"
   r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/standby.signal"
 else

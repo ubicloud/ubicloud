@@ -1,0 +1,10 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/standby_backup"
+
+if ARGV.count < 1 || ARGV.count > 2
+  fail "Wrong number of arguments. Expected 1 or 2, Given #{ARGV.count}"
+end
+
+StandbyBackup.run(ARGV[0], ARGV[1])
