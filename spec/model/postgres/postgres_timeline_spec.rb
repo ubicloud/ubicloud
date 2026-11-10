@@ -237,6 +237,91 @@ PGDATA=/dat/17/data
     end
   end
 
+  describe "#backup_candidate_server" do
+    let(:project) { Project.create(name: "test-project") }
+    let(:resource) { create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID) }
+    let(:leader) { create_postgres_server(resource:, timeline: postgres_timeline) }
+
+    def create_standby(created_at:, label: "wait", synchronization_status: "ready", timeline: postgres_timeline)
+      server = create_postgres_server(resource:, timeline:, is_representative: false)
+      server.update(created_at:, synchronization_status:)
+      server.strand.update(label:)
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: server.id, last_known_lsn: "1/0")
+      server
+    end
+
+    before do
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: leader.id, last_known_lsn: "1/0")
+    end
+
+    after do
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: resource.servers_dataset.select(:id)).delete
+    end
+
+    it "picks the newest eligible standby, skipping ones not ready, on another timeline, or scheduled to go away" do
+      project.set_ff_postgres_backup_from_standby_default(true)
+      create_standby(created_at: Time.now - 500)
+      eligible = create_standby(created_at: Time.now - 400)
+      create_standby(created_at: Time.now - 300, synchronization_status: "catching_up")
+      create_standby(created_at: Time.now - 290, label: "wait_catch_up")
+      create_standby(created_at: Time.now - 280, timeline: create_postgres_timeline(location_id: Location::HETZNER_FSN1_ID))
+      %w[destroy recycle recycle_unavailable_server recycle_by_user_request].each_with_index do |semaphore, i|
+        create_standby(created_at: Time.now - 200 + i).send(:"incr_#{semaphore}")
+      end
+
+      expect(postgres_timeline.backup_candidate_server.id).to eq(eligible.id)
+    end
+
+    it "prefers a standby converge keeps over a newer one recycled for drift, but uses the drifted one when alone" do
+      project.set_ff_postgres_backup_from_standby_default(true)
+      drifted = create_standby(created_at: Time.now).tap { it.update(version: "17") }
+      expect(drifted.needs_recycling?).to be(true)
+      expect(postgres_timeline.backup_candidate_server.id).to eq(drifted.id)
+
+      kept = create_standby(created_at: Time.now - 100)
+      expect(kept.needs_recycling?).to be(false)
+      expect(postgres_timeline.reload.backup_candidate_server.id).to eq(kept.id)
+    end
+
+    it "picks the leader unless the project opts in" do
+      create_standby(created_at: Time.now)
+
+      expect(postgres_timeline.backup_candidate_server.id).to eq(leader.id)
+    end
+
+    it "picks the leader while the surviving standby re-syncs after a failover, and the standby once it is ready again" do
+      project.set_ff_postgres_backup_from_standby_default(true)
+      standby = create_standby(created_at: Time.now, label: "wait_catch_up", synchronization_status: "catching_up")
+      expect(postgres_timeline.backup_candidate_server.id).to eq(leader.id)
+
+      standby.update(synchronization_status: "ready")
+      standby.strand.update(label: "wait")
+      expect(postgres_timeline.reload.backup_candidate_server.id).to eq(standby.id)
+    end
+
+    it "returns nil to wait while the leader is fenced or locked out, or a standby is taking over" do
+      project.set_ff_postgres_backup_from_standby_default(true)
+      standby = create_standby(created_at: Time.now)
+      expect(postgres_timeline.backup_candidate_server.id).to eq(standby.id)
+
+      leader.incr_fence
+      expect(postgres_timeline.reload.backup_candidate_server).to be_nil
+      Semaphore.where(strand_id: leader.id).delete
+
+      leader.strand.update(label: "wait_in_fence")
+      expect(postgres_timeline.reload.backup_candidate_server).to be_nil
+      leader.strand.update(label: "wait")
+
+      standby.incr_planned_take_over
+      expect(postgres_timeline.reload.backup_candidate_server).to be_nil
+    end
+
+    it "never waits unless the project opts in" do
+      leader.incr_fence
+      expect(postgres_timeline.backup_candidate_server.id).to eq(leader.id)
+    end
+  end
+
   it "#provider_dispatcher_group_name delegates to location" do
     expect(postgres_timeline.provider_dispatcher_group_name).to eq("metal")
   end

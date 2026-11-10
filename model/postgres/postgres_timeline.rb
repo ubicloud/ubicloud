@@ -7,6 +7,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :parent, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}, is_used: true
+  many_to_one :backup_inprogress_server, class: :PostgresServer, read_only: true
   many_to_one :location, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :secret_key
@@ -43,7 +44,30 @@ class PostgresTimeline < Sequel::Model
     return true if take_backup_for_converge_set?
     return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
 
-    leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+    backup_status_server.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+  end
+
+  def backup_status_server
+    backup_inprogress_server || leader
+  end
+
+  # nil while a failover or fence is under way, so the caller waits.
+  def backup_candidate_server
+    resource = leader.resource
+    return leader unless resource.backup_from_standby?
+    return if resource.ongoing_failover? || leader.fenced_or_locked_out?
+
+    resource.servers(eager: [:semaphores, :strand]).select {
+      it.standby? &&
+        it.timeline_id == id &&
+        it.synchronization_status == "ready" &&
+        it.strand.label == "wait" &&
+        !it.destroy_set? &&
+        !it.recycle_set? &&
+        !it.recycle_unavailable_server_set? &&
+        !it.recycle_by_user_request_set? &&
+        it.lsn_caught_up
+    }.min_by { [it.needs_recycling? ? 1 : 0, -it.created_at.to_f] } || leader
   end
 
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
