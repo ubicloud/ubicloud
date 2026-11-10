@@ -2,47 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-config_json = JSON.parse($stdin.read)
+require_relative "../lib/minio_configure"
 
-unless (minio_config = config_json["minio_config"])
-  puts "need minio_config as argument"
-  exit 1
-end
-
-unless (hosts = config_json["hosts"])
-  puts "need hosts as argument"
-  exit 1
-end
-
-cert = config_json["cert"]
-cert_key = config_json["cert_key"]
-ca_bundle = config_json["ca_bundle"]
-peer_cert = config_json["peer_cert"]
-peer_cert_key = config_json["peer_cert_key"]
-
-require_relative "../../common/lib/util"
-
-safe_write_to_file("/etc/default/minio", minio_config)
-safe_write_to_file("/etc/hosts", hosts)
-r "sudo chown -R minio-user:minio-user /etc/default/minio"
-
-# MinIO reuses pooled connections for the shard reads a heal issues, and each of
-# those goes idle between reads. Letting the kernel reset the congestion window
-# to its initial value every time held a heal to a few MB/s per connection.
-safe_write_to_file("/etc/sysctl.d/70-minio.conf", "net.ipv4.tcp_slow_start_after_idle=0\n")
-r "sudo sysctl --quiet --load /etc/sysctl.d/70-minio.conf"
-
-if cert && cert_key && !cert.empty? && !cert_key.empty?
-  r "sudo mkdir -p /home/minio-user/.minio/certs/CAs"
-  safe_write_to_file("/home/minio-user/.minio/certs/public.crt", cert)
-  safe_write_to_file("/home/minio-user/.minio/certs/private.key", cert_key)
-  if ca_bundle && !ca_bundle.empty?
-    safe_write_to_file("/home/minio-user/.minio/certs/CAs/public.crt", ca_bundle)
-  end
-  if peer_cert && peer_cert_key && !peer_cert.empty? && !peer_cert_key.empty?
-    r "sudo mkdir -p /home/minio-user/.minio/certs/peer"
-    safe_write_to_file("/home/minio-user/.minio/certs/peer/public.crt", peer_cert)
-    safe_write_to_file("/home/minio-user/.minio/certs/peer/private.key", peer_cert_key)
-  end
-  r "sudo chown -R minio-user:minio-user /home/minio-user/.minio/certs"
-end
+MinioConfigure.new(JSON.parse($stdin.read)).run
