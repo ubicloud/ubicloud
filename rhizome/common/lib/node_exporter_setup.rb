@@ -2,6 +2,7 @@
 
 require_relative "util"
 require_relative "arch"
+require "fileutils"
 
 class NodeExporterSetup
   VERSION = "1.12.1"
@@ -9,6 +10,10 @@ class NodeExporterSetup
     x64: "b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63",
     arm64: "ad35b605f9954b9f1ffddf5ba054bdc5a98d790b9eae5291e1eeb83f1ecbd0e7",
   )
+
+  UNIT_PATH = "/etc/systemd/system/node_exporter.service"
+
+  TEXTFILE_DIR = "/var/lib/node_exporter"
 
   # ubicni names the host side of each pod veth pair veth_<id>, and containerd
   # and kubelet mount a sandbox and a token volume per pod. Without excluding
@@ -26,7 +31,7 @@ class NodeExporterSetup
   end
 
   def service
-    flags = ["--web.listen-address=127.0.0.1:9100"]
+    flags = ["--web.listen-address=127.0.0.1:9100", "--collector.textfile.directory=#{TEXTFILE_DIR}"]
     flags.concat(KUBERNETES_FLAGS) if @kubernetes
 
     <<~SERVICE
@@ -67,13 +72,20 @@ class NodeExporterSetup
     r "tar", "xfz", tarball, "-C", "/usr/local/bin", "--no-same-owner", "--strip-components=1", "#{file_name}/node_exporter"
     r "rm", tarball
 
+    configure
+  end
+
+  def configure
     r "groupadd -f --system node_exporter"
     r "useradd --no-create-home --system -g node_exporter node_exporter", expect: [0, 9] # 9 is "already exists"
+    FileUtils.mkdir_p(TEXTFILE_DIR)
 
-    safe_write_to_file("/etc/systemd/system/node_exporter.service", service)
+    unit = service
+    changed = !File.exist?(UNIT_PATH) || File.read(UNIT_PATH) != unit
+    safe_write_to_file(UNIT_PATH, unit) if changed
 
     r "systemctl daemon-reload"
     r "systemctl enable node_exporter"
-    r "systemctl start node_exporter"
+    r(changed ? "systemctl restart node_exporter" : "systemctl start node_exporter")
   end
 end
