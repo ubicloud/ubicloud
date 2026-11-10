@@ -13,11 +13,20 @@ module CryptSwapSetup
   FSTAB = "/etc/fstab"
   CRYPTTAB = "/etc/crypttab"
   CRYPTSWAP_DEVICE = "/dev/mapper/cryptswap"
+  CRYPTSETUP_GENERATOR = "/usr/lib/systemd/system-generators/systemd-cryptsetup-generator"
 
   def run
     fstab = File.read(FSTAB).lines
     if fstab.any? { |l| l.include?(CRYPTSWAP_DEVICE) }
-      puts "cryptswap already configured, skipping"
+      if cryptswap_active?
+        puts "cryptswap already configured, skipping"
+      else
+        # A previous run configured crypttab/fstab but failed before swap was
+        # activated, so finish activation.
+        puts "cryptswap configured but not active, activating"
+        ensure_cryptsetup_generator
+        activate_cryptswap
+      end
       return
     end
 
@@ -36,6 +45,11 @@ module CryptSwapSetup
     end
 
     by_id = persistent_device_id(swap_real, device_node: true)
+
+    # Without the generator, systemd ignores /etc/crypttab. It is a separate
+    # package on Debian 13 and not part of the base image. Install it before
+    # making any changes, so a failure leaves the original swap in place.
+    ensure_cryptsetup_generator
 
     r "swapoff", swap_real
 
@@ -69,9 +83,23 @@ module CryptSwapSetup
     safe_write_to_file(FSTAB, fstab.join)
   end
 
+  def ensure_cryptsetup_generator
+    r "apt-get", "-y", "install", "systemd-cryptsetup" unless File.exist?(CRYPTSETUP_GENERATOR)
+  end
+
+  def cryptswap_active?
+    return false unless File.exist?(CRYPTSWAP_DEVICE)
+    cryptswap = File.realpath(CRYPTSWAP_DEVICE)
+    File.read("/proc/swaps").lines.drop(1).any? { |l| File.realpath(l.split.first) == cryptswap }
+  end
+
   def activate(swap_real)
     # Prevent interactive prompt about existing swap signature on the backing device.
     r "wipefs", "-a", swap_real
+    activate_cryptswap
+  end
+
+  def activate_cryptswap
     r "systemctl", "daemon-reload"
     r "systemctl", "restart", "systemd-cryptsetup@cryptswap.service"
     r "mkswap", "-f", CRYPTSWAP_DEVICE
