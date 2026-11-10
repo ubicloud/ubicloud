@@ -227,10 +227,13 @@ SQL
   end
 
   POSTGRES_SERVER_WITH_RESOURCE = ->(s) { s.is_a?(PostgresServer) && s.resource }
+  SLOW_RUN_LOG_SECONDS = 10
 
   def unsynchronized_run
     start_time = Time.now
-    prog_label = "#{prog}.#{label}"
+    run_prog = prog
+    run_label = label
+    prog_label = "#{run_prog}.#{run_label}"
     top_frame = stack.first
 
     if label == top_frame["deadline_target"]
@@ -320,11 +323,11 @@ SQL
           save_changes(validate: false)
         when Prog::Base::Hop
           hp = prog_action
-          last_changed_at = Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
-          top_frame["last_label_changed_at"] = time_string(Time.now)
-          modified!(:stack)
+          label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", duration: label_duration)
           set(**hp.strand_update_args, try: 0)
+          stack.first["last_label_changed_at"] = time_string(Time.now)
+          modified!(:stack)
           raise validation_failed_error unless valid?
 
           values[:schedule] = hp.schedule
@@ -332,8 +335,8 @@ SQL
           save_changes(validate: false)
         when Prog::Base::Exit
           ext = prog_action
-          last_changed_at = Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
+          label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", duration: label_duration)
 
           self.exitval = ext.exitval
           self.retval = nil
@@ -370,7 +373,8 @@ SQL
     end
   ensure
     duration = Time.now - start_time
-    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > 1
+    ControlPlaneMetrics.observe_strand_run(prog: run_prog, label: run_label, duration:)
+    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > SLOW_RUN_LOG_SECONDS
   end
 
   def run(seconds = 0)

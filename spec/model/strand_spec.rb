@@ -121,6 +121,19 @@ RSpec.describe Strand do
     expect(st.stack[0]["last_label_changed_at"]).to match(/\.\d{6} /)
   end
 
+  it "starts timing the frame that is on top after a push or pop" do
+    st = described_class.create(prog: "Test", label: "hop_pusher")
+    before_push = Time.now
+    st.unsynchronized_run
+    st.reload
+    expect(Time.new(st.stack.first["last_label_changed_at"])).to be >= before_push
+    before_pop = Time.now
+    st.unsynchronized_run
+    st.reload
+    expect(st.label).to eq "hop_pushed"
+    expect(Time.new(st.stack.first["last_label_changed_at"])).to be >= before_pop
+  end
+
   it "rejects prog names that are not in the right module" do
     expect {
       described_class.prog_verify(Object)
@@ -253,8 +266,9 @@ RSpec.describe Strand do
     now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now - 11)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(ControlPlaneMetrics).to receive(:observe_strand_run).with(prog: "Test", label: "napper", duration: 11).and_call_original
     expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
     st.unsynchronized_run
   end

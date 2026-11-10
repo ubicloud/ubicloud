@@ -504,7 +504,7 @@ RSpec.describe Scheduling::Dispatcher do
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
 
-      expect(msgs).to eq ["hopped", "exception terminates strand run"]
+      expect(msgs).to eq ["exception terminates strand run"]
     end
   end
 end
