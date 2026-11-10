@@ -90,41 +90,37 @@ RSpec.describe MonitorRunner do
     end
   end
 
-  describe "#emit_metrics" do
-    it "emits metrics" do
-      q = Queue.new
-      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, a, b|
-        if a == "monitor metrics"
-          m.call(a, b)
-          q.push(b)
-        end
+  describe "#update_metrics" do
+    it "sets monitor state metrics" do
+      states = []
+      expect(ControlPlaneMetrics).to receive(:set_monitor_state).twice.and_wrap_original do |m, **kwargs|
+        states << kwargs
+        m.call(**kwargs)
       end
 
-      monitor_runner.emit_metrics
-      hash = q.pop(timeout: 1)
-      expect(hash.keys).to eq [:monitor_metrics, :message, :time]
-      hash = hash[:monitor_metrics]
-      expect(hash.delete(:active_threads_count)).to be_a Integer
-      expect(hash.delete(:monitor_idle_worker_threads)).to be <= 1
-      expect(hash.delete(:metric_export_idle_worker_threads)).to be <= 1
-      expect(hash).to eq({
-        threads_waiting_for_db_connection: 0,
-        total_monitor_resources: 0,
-        total_monitor_attached_resources: 0,
-        total_metric_export_resources: 0,
-        monitor_submit_queue_length: 0,
-        metric_export_submit_queue_length: 0,
+      monitor_runner.update_metrics
+      state = states.last
+      expect(state.delete(:active_threads)).to be_a Integer
+      expect(state.delete(:idle_workers).values).to all(be <= 1)
+      expect(state).to eq({
+        resources: {},
+        export_resources: {},
+        queue_lengths: {{kind: "pulse"} => 0, {kind: "export"} => 0},
+        threads_waiting_for_db: 0,
       })
 
       vmh = VmHost.new_with_id
       vm = Vm.new_with_id
       pg = PostgresResource.new_with_id
       mvmh = MonitorableResource.new(vmh)
-      mvmh.attached_resources[vm.id] = MonitorableResource.new(vm)
+      mvmh.instance_variable_set(:@pulse, {reading: "up"})
+      mvm = MonitorableResource.new(vm)
+      mvm.instance_variable_set(:@pulse, {reading: "down"})
+      mvmh.attached_resources[vm.id] = mvm
       monitor_resources.resources[vmh.id] = mvmh
       monitor_resources.resources[pg.id] = MonitorableResource.new(pg)
-      metric_export_resources.resources["90000000-0000-0000-0000-000000000000"] = true
-      metric_export_resources.resources["a0000000-0000-0000-0000-000000000000"] = true
+      metric_export_resources.resources["90000000-0000-0000-0000-000000000000"] = instance_double(MetricsTargetResource, resource: vmh)
+      metric_export_resources.resources["a0000000-0000-0000-0000-000000000000"] = instance_double(MetricsTargetResource, resource: vmh)
 
       mr = MonitorableResource.new(nil)
       q2 = Queue.new
@@ -133,21 +129,21 @@ RSpec.describe MonitorRunner do
       end
       2.times { monitor_resources.submit_queue.push(mr) }
 
-      monitor_runner.emit_metrics
-      hash = q.pop(timeout: 1)
-      expect(hash.keys).to eq [:monitor_metrics, :message, :time]
-      hash = hash[:monitor_metrics]
-      expect(hash.delete(:active_threads_count)).to be_a Integer
-      expect(hash).to eq({
-        threads_waiting_for_db_connection: 0,
-        total_monitor_resources: 2,
-        total_metric_export_resources: 2,
-        total_monitor_attached_resources: 1,
-        monitor_submit_queue_length: 1,
-        metric_export_submit_queue_length: 0,
-        monitor_idle_worker_threads: 0,
-        metric_export_idle_worker_threads: 1,
+      monitor_runner.update_metrics
+      state = states.last
+      expect(state.delete(:active_threads)).to be_a Integer
+      expect(state).to eq({
+        resources: {
+          {resource_type: "VmHost", reading: "up"} => 1,
+          {resource_type: "Vm", reading: "down"} => 1,
+          {resource_type: "PostgresResource", reading: ""} => 1,
+        },
+        export_resources: {{resource_type: "VmHost"} => 2},
+        queue_lengths: {{kind: "pulse"} => 1, {kind: "export"} => 0},
+        idle_workers: {{kind: "pulse"} => 0, {kind: "export"} => 1},
+        threads_waiting_for_db: 0,
       })
+      expect(ControlPlaneMetrics.render).to include 'monitor_resources{resource_type="Vm",reading="down"} 1.0'
       2.times { q2.push nil }
     end
   end

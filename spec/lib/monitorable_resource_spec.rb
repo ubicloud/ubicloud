@@ -305,8 +305,21 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.check_pulse
     end
 
-    it "logs the pulse if reading is not up" do
+    it "does not log the pulse if reading is down and reading_rpt is not every 20th and reading_rpt is large enough" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "down", reading_rpt: 13})
+      expect(ControlPlaneMetrics).to receive(:observe_monitor_pulse).with(resource_type: "PostgresServer", duration: Float).and_call_original
+      expect(Clog).not_to receive(:emit)
+      r_w_event_loop.check_pulse
+    end
+
+    it "logs the pulse if reading is down and reading_rpt is recent enough" do
+      expect(postgres_server).to receive(:check_pulse).and_return({reading: "down", reading_rpt: 2})
+      expect(Clog).to receive(:emit).and_call_original
+      r_w_event_loop.check_pulse
+    end
+
+    it "logs the pulse if reading is not up and there is no reading_rpt" do
+      expect(postgres_server).to receive(:check_pulse).and_return({reading: "down"})
       expect(Clog).to receive(:emit).and_call_original
       r_w_event_loop.check_pulse
     end

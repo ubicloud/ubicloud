@@ -10,6 +10,11 @@ module ControlPlaneMetrics
   MONITOR_PULSE_BUCKETS = [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120].freeze
   METRICS_EXPORT_BUCKETS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 100].freeze
 
+  UNLABELED_GAUGES = {
+    monitor_active_threads: "Threads in the monitor process beyond its fixed worker and internal threads.",
+    monitor_threads_waiting_for_db: "Threads waiting for a database connection in the monitor process.",
+  }.freeze
+
   def initialize
     @registry = Prometheus::Client::Registry.new
     @strand_run_duration = @registry.histogram(
@@ -62,14 +67,7 @@ module ControlPlaneMetrics
       docstring: "Monitor worker threads waiting for a job.",
       labels: [:kind],
     )
-    @monitor_active_threads = @registry.gauge(
-      :monitor_active_threads,
-      docstring: "Threads in the monitor process beyond its fixed worker and internal threads.",
-    )
-    @monitor_threads_waiting_for_db = @registry.gauge(
-      :monitor_threads_waiting_for_db,
-      docstring: "Threads waiting for a database connection in the monitor process.",
-    )
+    @unlabeled_gauges = {}
   end
 
   def observe_strand_run(prog:, label:, duration:)
@@ -97,12 +95,16 @@ module ControlPlaneMetrics
     set_labeled(@metrics_export_resources, export_resources)
     set_labeled(@monitor_queue_length, queue_lengths)
     set_labeled(@monitor_idle_workers, idle_workers)
-    @monitor_active_threads.set(active_threads)
-    @monitor_threads_waiting_for_db.set(threads_waiting_for_db)
+    unlabeled_gauge(:monitor_active_threads).set(active_threads)
+    unlabeled_gauge(:monitor_threads_waiting_for_db).set(threads_waiting_for_db)
   end
 
   def render
     Prometheus::Client::Formats::Text.marshal(@registry)
+  end
+
+  private def unlabeled_gauge(name)
+    @unlabeled_gauges[name] ||= @registry.gauge(name, docstring: UNLABELED_GAUGES.fetch(name))
   end
 
   private def set_labeled(gauge, values)

@@ -28,6 +28,12 @@ RSpec.describe ControlPlaneMetrics do
     expect(described_class.render).to include 'metrics_export_duration_seconds_count{resource_type="SpecExport",outcome="failure"} 1.0'
   end
 
+  it "renders unlabeled gauges only once they are set" do
+    metrics = Object.new.extend(described_class)
+    metrics.send(:initialize)
+    expect(metrics.render.lines.reject { it.start_with?("#") }).to be_empty
+  end
+
   it "sets monitor state gauges and zeroes label sets that are no longer present" do
     state = {
       export_resources: {{resource_type: "SpecExport"} => 4},
