@@ -828,6 +828,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: "[Unit]\nDescription=Run VmHost Metrics Collection Periodically\n\n[Timer]\nOnBootSec=30s\nOnUnitActiveSec=15s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n")
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now vmhost-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-nvme-write-metrics")
       expect { nx.configure_metrics }.to hop("wait")
     end
   end
