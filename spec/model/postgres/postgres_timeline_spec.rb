@@ -322,6 +322,57 @@ PGDATA=/dat/17/data
     end
   end
 
+  describe "#cancel_ongoing_backup" do
+    let(:project) { Project.create(name: "test-project") }
+    let(:resource) { create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID) }
+    let(:standby) { create_postgres_server(resource:, timeline: postgres_timeline, is_representative: false) }
+
+    let(:cancel_cmd) { "if test -x postgres/bin/cancel-ongoing-backup; then sudo postgres/bin/cancel-ongoing-backup; else echo absent; fi" }
+
+    def backup_sshable
+      postgres_timeline.backup_inprogress_server.vm.sshable
+    end
+
+    before do
+      postgres_timeline.update(backup_inprogress_server_id: standby.id)
+    end
+
+    it "cancels and cleans the backup unit on the server that runs it and stops tracking it, flag or not" do
+      expect(backup_sshable).to receive(:_cmd).with(cancel_cmd).and_return("")
+      expect(Clog).not_to receive(:emit)
+
+      postgres_timeline.cancel_ongoing_backup
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
+    it "logs and stops tracking the backup on a server without the cancel script yet" do
+      expect(backup_sshable).to receive(:_cmd).with(cancel_cmd).and_return("absent\n")
+      expect(Clog).to receive(:emit).with("cancel-ongoing-backup is not installed; leaving the postgres backup to fail", [instance_of(described_class), {backup_server: standby.ubid}]).and_call_original
+
+      postgres_timeline.cancel_ongoing_backup
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
+    it "logs and stops tracking the backup when the server cannot be reached" do
+      expect(backup_sshable).to receive(:_cmd).with(cancel_cmd).and_raise(Sshable::SshError.new("cancel", "", "unreachable", 255, nil))
+      expect(Clog).to receive(:emit).with("Could not stop the postgres backup", hash_including(ubid: postgres_timeline.ubid, exception: hash_including(class: "Sshable::SshError", stderr: "unreachable"))).and_call_original
+
+      postgres_timeline.cancel_ongoing_backup
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
+    it "stops tracking without SSH for a server being destroyed" do
+      standby.incr_destroy
+      postgres_timeline.cancel_ongoing_backup
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
+    it "does nothing without a backup server" do
+      postgres_timeline.update(backup_inprogress_server_id: nil)
+      expect(postgres_timeline.cancel_ongoing_backup).to be_nil
+    end
+  end
+
   it "#provider_dispatcher_group_name delegates to location" do
     expect(postgres_timeline.provider_dispatcher_group_name).to eq("metal")
   end

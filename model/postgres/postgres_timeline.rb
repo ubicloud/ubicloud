@@ -70,6 +70,20 @@ class PostgresTimeline < Sequel::Model
     }.min_by { [it.needs_recycling? ? 1 : 0, -it.created_at.to_f] } || leader
   end
 
+  # Best effort: must not block the failover or upgrade calling it.
+  def cancel_ongoing_backup
+    return unless (server = backup_inprogress_server)
+
+    update(backup_inprogress_server_id: nil)
+    return if server.destroy_set?
+
+    # A server whose rhizome predates cancel-ongoing-backup leaves its backup to fail.
+    output = server.vm.sshable.cmd("if test -x :script; then sudo :script; else echo absent; fi", script: "postgres/bin/cancel-ongoing-backup")
+    Clog.emit("cancel-ongoing-backup is not installed; leaving the postgres backup to fail", [self, {backup_server: server.ubid}]) if output.strip == "absent"
+  rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => ex
+    Clog.emit("Could not stop the postgres backup", Util.exception_to_hash(ex, into: {ubid:}))
+  end
+
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
   # & other objects don't match
   WAL_SEGMENT_RE = /\A[0-9A-F]{24}\z/
