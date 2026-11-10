@@ -576,6 +576,53 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#trim_storage" do
+    let(:started_at) { (Time.now - 90).utc.iso8601 }
+    let(:log_cmd) { "cat /var/log/storage-trim.log" }
+
+    it "starts fstrim under a deadline and naps" do
+      expect(sshable).to receive(:d_check).with("trim_storage").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("trim_storage", "sudo", "bash", "-c", "fstrim --all --verbose --quiet-unsupported &> /var/log/storage-trim.log")
+
+      expect { nx.trim_storage }.to nap(60)
+      expect(nx.strand.stack[0]["storage_trim_started_at"]).to match(/\A\d{4}-\d{2}-\d{2}T/)
+      expect(nx.strand.stack[0]["deadline_target"]).to eq("wait")
+    end
+
+    it "naps while fstrim runs" do
+      expect(sshable).to receive(:d_check).with("trim_storage").and_return("InProgress")
+
+      expect { nx.trim_storage }.to nap(60)
+    end
+
+    it "logs what was trimmed and how long it took, then hops to wait" do
+      refresh_frame(nx, new_values: {"storage_trim_started_at" => started_at})
+      expect(sshable).to receive(:d_check).with("trim_storage").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with(log_cmd).and_return(<<~LOG)
+        /var/storage/devices/disk1: 1.5 TiB (1649267441664 bytes) trimmed on /dev/nvme1n1
+        /boot/efi: 0 B (0 bytes) trimmed on /dev/nvme0n1p1
+        /: 512 GiB (549755813888 bytes) trimmed on /dev/nvme0n1p2
+      LOG
+      expect(Clog).to receive(:emit).with("storage trimmed", storage_trim: {vm_host_ubid: vm_host.ubid, duration: a_value_within(2).of(90), trimmed_bytes: 2199023255552, mounts: {"/var/storage/devices/disk1" => 1649267441664, "/boot/efi" => 0, "/" => 549755813888}})
+      expect(sshable).to receive(:d_clean).with("trim_storage")
+
+      expect { nx.trim_storage }.to hop("wait")
+      expect(nx.strand.stack[0]).not_to have_key("storage_trim_started_at")
+      expect(Time.iso8601(nx.strand.stack[0]["storage_trimmed_at"])).to be_within(5).of(Time.now)
+    end
+
+    it "logs a failed trim and still hops to wait so it is retried a day later" do
+      refresh_frame(nx, new_values: {"storage_trim_started_at" => started_at})
+      expect(sshable).to receive(:d_check).with("trim_storage").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with(log_cmd).and_return("fstrim: /var/storage: FITRIM ioctl failed: Input/output error\n")
+      expect(Clog).to receive(:emit).with("storage trim failed", storage_trim_failed: {vm_host_ubid: vm_host.ubid, duration: a_value_within(2).of(90), logs: "fstrim: /var/storage: FITRIM ioctl failed: Input/output error\n"})
+      expect(sshable).to receive(:d_clean).with("trim_storage")
+
+      expect { nx.trim_storage }.to hop("wait")
+      expect(nx.strand.stack[0]["storage_trimmed_at"]).not_to be_nil
+    end
+  end
+
   describe "#patch" do
     it "runs apply_patches if not running" do
       expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("NotStarted")
@@ -603,7 +650,17 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait" do
     it "naps" do
+      refresh_frame(nx, new_values: {"storage_trimmed_at" => (Time.now - 60).utc.iso8601})
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to trim_storage when the host was never trimmed" do
+      expect { nx.wait }.to hop("trim_storage")
+    end
+
+    it "hops to trim_storage when the last trim is older than a day" do
+      refresh_frame(nx, new_values: {"storage_trimmed_at" => (Time.now - 25 * 60 * 60).utc.iso8601})
+      expect { nx.wait }.to hop("trim_storage")
     end
 
     it "hops to prep_graceful_reboot when needed" do
@@ -653,6 +710,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to hop("unavailable")
 
       nx.incr_checkup
+      refresh_frame(nx, new_values: {"storage_trimmed_at" => Time.now.utc.iso8601})
       expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:get_boot_id).and_return("someboot")
       expect { nx.wait }.to nap(6 * 60 * 60)

@@ -3,7 +3,10 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
-  frame_accessor :accepting_before_patch
+  frame_accessor :accepting_before_patch, :storage_trim_started_at, :storage_trimmed_at
+
+  STORAGE_TRIM_INTERVAL = 24 * 60 * 60
+  STORAGE_TRIM_LOG = "/var/log/storage-trim.log"
 
   def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true)
     DB.transaction do
@@ -432,7 +435,49 @@ TIMER
       nap 60
     end
 
+    hop_trim_storage if storage_trim_due?
+
     nap 6 * 60 * 60
+  end
+
+  def storage_trim_due?
+    storage_trimmed_at.nil? || Time.iso8601(storage_trimmed_at) < Time.now - STORAGE_TRIM_INTERVAL
+  end
+
+  # Deleted VM images free filesystem blocks that the drive keeps treating
+  # as live data until they are trimmed; ext4 mounts without online
+  # discard, so a trim is the only time the drive learns about free space.
+  label def trim_storage
+    case sshable.d_check("trim_storage")
+    when "Succeeded"
+      trimmed = storage_trim_log.scan(/^(\S+): .*?\((\d+) bytes\) trimmed/).to_h { [it[0], Integer(it[1], 10)] }
+      Clog.emit("storage trimmed", storage_trim: {vm_host_ubid: vm_host.ubid, duration: storage_trim_duration, trimmed_bytes: trimmed.values.sum, mounts: trimmed})
+      finish_storage_trim
+    when "Failed"
+      Clog.emit("storage trim failed", storage_trim_failed: {vm_host_ubid: vm_host.ubid, duration: storage_trim_duration, logs: storage_trim_log})
+      finish_storage_trim
+    when "NotStarted"
+      register_deadline("wait", 60 * 60)
+      self.storage_trim_started_at = Time.now.utc.iso8601
+      sshable.d_run("trim_storage", "sudo", "bash", "-c", "fstrim --all --verbose --quiet-unsupported &> #{STORAGE_TRIM_LOG}")
+    end
+
+    nap 60
+  end
+
+  def storage_trim_log
+    sshable.cmd("cat :path", path: STORAGE_TRIM_LOG)
+  end
+
+  def storage_trim_duration
+    (Time.now - Time.iso8601(storage_trim_started_at)).round
+  end
+
+  def finish_storage_trim
+    sshable.d_clean("trim_storage")
+    delete_from_stack("storage_trim_started_at")
+    self.storage_trimmed_at = Time.now.utc.iso8601
+    hop_wait
   end
 
   # Decremented even when the setup paged, so a rollout moves past a
