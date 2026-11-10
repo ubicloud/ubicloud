@@ -366,6 +366,7 @@ TIMER
 
     sshable.cmd("sudo systemctl daemon-reload")
     sshable.cmd("sudo systemctl enable --now vmhost-metrics.timer")
+    sshable.cmd("sudo host/bin/setup-nvme-write-metrics")
 
     hop_wait
   end
