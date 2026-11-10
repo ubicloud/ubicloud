@@ -33,6 +33,10 @@ class MinioConfigure
   private
 
   def write_certs
+    # MinIO only installs its SIGHUP handler when it starts with TLS. A process
+    # that started without certs would exit on the signal instead.
+    tls_was_configured = File.exist?("#{CERTS_DIR}/public.crt")
+
     r "sudo mkdir -p :dir", dir: "#{CERTS_DIR}/CAs"
     safe_write_to_file("#{CERTS_DIR}/public.crt", @cert)
     safe_write_to_file("#{CERTS_DIR}/private.key", @cert_key)
@@ -45,6 +49,14 @@ class MinioConfigure
       safe_write_to_file("#{CERTS_DIR}/peer/private.key", @peer_cert_key)
     end
     r "sudo chown -R minio-user:minio-user :dir", dir: CERTS_DIR
+
+    # MinIO's cert watcher misses the rename safe_write_to_file does, so tell it
+    # to reload. This does not reload certs/CAs, which only a restart picks up.
+    r "sudo systemctl kill --signal=SIGHUP minio" if tls_was_configured && minio_active?
+  end
+
+  def minio_active?
+    r("systemctl is-active minio", expect: [0, 3]).strip == "active"
   end
 
   def present?(value)

@@ -17,10 +17,19 @@ RSpec.describe MinioConfigure do
   }
   let(:commands) { [] }
   let(:written) { {} }
+  let(:tls_configured) { false }
+  let(:minio_state) { "active\n" }
 
   before do
-    allow(configure).to receive(:_run_command) { |*command| commands << command.join(" ") }
+    allow(configure).to receive(:_run_command) do |*command, **kw|
+      commands << command.join(" ")
+      next "" unless command == ["systemctl is-active minio"]
+
+      expect(kw[:expect]).to eq [0, 3]
+      minio_state
+    end
     allow(configure).to receive(:safe_write_to_file) { |path, content| written[path] = content }
+    allow(File).to receive(:exist?).with("#{certs}/public.crt").and_return(tls_configured)
   end
 
   describe "#initialize" do
@@ -79,6 +88,33 @@ RSpec.describe MinioConfigure do
           "sudo mkdir -p #{certs}/peer",
           "sudo chown -R minio-user:minio-user #{certs}",
         ]
+      end
+    end
+
+    context "when MinIO already serves TLS" do
+      let(:tls_configured) { true }
+
+      it "sends SIGHUP so MinIO reloads the certs" do
+        configure.run
+
+        expect(commands.last(3)).to eq [
+          "sudo chown -R minio-user:minio-user #{certs}",
+          "systemctl is-active minio",
+          "sudo systemctl kill --signal=SIGHUP minio",
+        ]
+      end
+
+      context "when MinIO is not running" do
+        let(:minio_state) { "inactive\n" }
+
+        it "does not send SIGHUP" do
+          configure.run
+
+          expect(commands.last(2)).to eq [
+            "sudo chown -R minio-user:minio-user #{certs}",
+            "systemctl is-active minio",
+          ]
+        end
       end
     end
 
