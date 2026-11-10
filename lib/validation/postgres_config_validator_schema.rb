@@ -2763,6 +2763,169 @@ module Validation
       schema.merge!(added_or_modified)
     end.freeze
 
-    PG_19_CONFIG_SCHEMA = PG_18_CONFIG_SCHEMA
+    PG_19_CONFIG_SCHEMA = begin
+      removed = ["escape_string_warning", "io_workers"]
+      log_level = "(?:[a-z_]+:)?(?:debug[1-5]|info|notice|warning|error|log|fatal|panic)"
+      added_or_modified = {
+        "autovacuum_analyze_score_weight" => {
+          description: "Scaling factor of analyze score for autovacuum prioritization.",
+          type: :float,
+          default: 1.0,
+          min: 0.0,
+          max: 10.0,
+        },
+        "autovacuum_freeze_score_weight" => {
+          description: "Scaling factor of freeze score for autovacuum prioritization.",
+          type: :float,
+          default: 1.0,
+          min: 0.0,
+          max: 10.0,
+        },
+        "autovacuum_max_parallel_workers" => {
+          description: "Maximum number of parallel workers that can be used by a single autovacuum worker.",
+          type: :integer,
+          default: 0,
+          min: 0,
+          max: 1024,
+        },
+        "autovacuum_multixact_freeze_score_weight" => {
+          description: "Scaling factor of multixact freeze score for autovacuum prioritization.",
+          type: :float,
+          default: 1.0,
+          min: 0.0,
+          max: 10.0,
+        },
+        "autovacuum_vacuum_insert_score_weight" => {
+          description: "Scaling factor of vacuum insert score for autovacuum prioritization.",
+          type: :float,
+          default: 1.0,
+          min: 0.0,
+          max: 10.0,
+        },
+        "autovacuum_vacuum_score_weight" => {
+          description: "Scaling factor of vacuum score for autovacuum prioritization.",
+          type: :float,
+          default: 1.0,
+          min: 0.0,
+          max: 10.0,
+        },
+        "debug_print_raw_parse" => {
+          description: "Logs each query's raw parse tree.",
+          type: :bool,
+          default: "off",
+        },
+        "default_toast_compression" => {
+          description: "Sets the default compression method for compressible values.",
+          type: :enum,
+          allowed_values: ["pglz", "lz4"],
+          default: "lz4",
+        },
+        "enable_eager_aggregate" => {
+          description: "Enables eager aggregation.",
+          type: :bool,
+          default: "on",
+        },
+        "io_max_workers" => {
+          description: "Maximum number of I/O worker processes, for io_method=worker.",
+          type: :integer,
+          default: 8,
+          min: 1,
+          max: 32,
+        },
+        "io_min_workers" => {
+          description: "Minimum number of I/O worker processes, for io_method=worker.",
+          type: :integer,
+          default: 2,
+          min: 1,
+          max: 32,
+        },
+        "io_worker_idle_timeout" => {
+          description: "Maximum time before idle I/O worker processes time out, for io_method=worker.",
+          type: :string,
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
+          default: "1min",
+        },
+        "io_worker_launch_interval" => {
+          description: "Minimum time before launching a new I/O worker process, for io_method=worker.",
+          type: :string,
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
+          default: "100ms",
+        },
+        "jit" => {
+          description: "Allow JIT compilation.",
+          type: :bool,
+          default: "off",
+        },
+        "log_autoanalyze_min_duration" => {
+          description: "Sets the minimum execution time above which analyze actions by autovacuum will be logged.",
+          type: :string,
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
+          default: "10min",
+        },
+        "log_lock_waits" => {
+          description: "Logs long lock waits.",
+          type: :bool,
+          default: "on",
+        },
+        "log_min_messages" => {
+          description: "Sets the message levels that are logged, optionally per process type (e.g. \"warning, autovacuum:debug1\").",
+          type: :string,
+          pattern: /\A\s*#{log_level}\s*(?:,\s*#{log_level}\s*)*\z/,
+          default: "warning",
+        },
+        "max_locks_per_transaction" => {
+          description: "Sets the maximum number of locks per transaction.",
+          type: :integer,
+          min: 10,
+          max: 2147483647,
+          default: 128,
+          requires_restart: true,
+        },
+        "max_repack_replication_slots" => {
+          description: "Sets the maximum number of replication slots for use by REPACK.",
+          type: :integer,
+          default: 5,
+          min: 0,
+          max: 262143,
+          requires_restart: true,
+        },
+        "min_eager_agg_group_size" => {
+          description: "Sets the minimum average group size required to consider applying eager aggregation.",
+          type: :float,
+          default: 8.0,
+          min: 0.0,
+          max: 1.79769e+308,
+        },
+        "password_expiration_warning_threshold" => {
+          description: "Threshold for password expiration warnings.",
+          type: :string,
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
+          default: "7d",
+        },
+        "standard_conforming_strings" => {
+          description: "Nonstandard strings are no longer supported; this can only be on.",
+          type: :enum,
+          allowed_values: ["on"],
+          default: "on",
+        },
+        "timing_clock_source" => {
+          description: "Controls the clock source used for collecting timing measurements.",
+          type: :enum,
+          allowed_values: ["auto", "system", "tsc"],
+          default: "auto",
+        },
+        "wal_sender_shutdown_timeout" => {
+          description: "Sets the maximum time in milliseconds the server waits during shutdown for all WAL data to be replicated to the receiver.",
+          type: :integer,
+          default: -1,
+          min: -1,
+          max: 2147483647,
+        },
+      }
+
+      schema = PG_18_CONFIG_SCHEMA.dup
+      removed.each { |key| schema.delete(key) }
+      schema.merge!(added_or_modified)
+    end.freeze
   end
 end
