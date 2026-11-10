@@ -14,6 +14,14 @@ class VmStorageVolume < Sequel::Model
   many_to_one :machine_image_version, read_only: true
   many_to_one :remote_storage_server, read_only: true
 
+  # From this version the GitHub runner images carry an init that mounts the
+  # image read-only and joins it with a blank device.
+  TWO_LAYER_IMAGE_VERSION = "20261108.1.2"
+
+  def two_layer_boot?
+    boot && boot_image&.name&.start_with?("github-") && boot_image.version >= TWO_LAYER_IMAGE_VERSION
+  end
+
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
   plugin ResourceMethods

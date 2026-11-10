@@ -169,30 +169,36 @@ class Prog::DownloadBootImage < Prog::Base
       "x64" => {
         "20260901.1.0" => "e3ea65f2d998e7a9bf7b3278bb927c3b1f5ab140f1b9055c189e5092ad1ed27b",
         "20261021.1.0" => "6fffd2f7c365f4bcd788860670ce2d0ba50e7bcf76d6303da3375c2486d659a3",
+        "20261108.1.2" => "9ac7bdc61057e372c698a45e9fcf2ccbb7987b998920273c9eab822d5db1a0f2",
       },
       "arm64" => {
         "20260901.1.0" => "0c28ab59c6e395448b384a052af1e52e99c026d9505090b7131dba40bb0eb659",
         "20261021.1.0" => "91815f08bb49a98f8981cec03ff5581337e58f32a6b269397693455f8bf4aa73",
+        "20261108.1.2" => "f0fd3027dfe4dc614ae663f460ea414f23a84628fb25c767694948bc99ab630a",
       },
     },
     "github-ubuntu-2404" => {
       "x64" => {
         "20260901.1.0" => "44ac3a4d0b80a79a7c6b4ea790bd7715101cc7fe1272ecaf6ab78e9d18a3f8fc",
         "20261021.1.0" => "9c0c39e384b4b54cc377920be2c4b291204aae1599f8c756ae33f6124da29689",
+        "20261108.1.2" => "a4635061ebc7c4ff5d25dae8603dc619b88e1e2ccf170291bdc8b61fef30c9e2",
       },
       "arm64" => {
         "20260901.1.0" => "74f6b0cf95aa8c219561c2266d234518167f5a2bb63359db679dcadb792995c1",
         "20261021.1.0" => "e3113fac8df5eb508c5af08380c51575404e9df75820d304cf0c9171d8e5364d",
+        "20261108.1.2" => "6b6bc29079d51200d84f55a8ebd3471af8c88fa70cc020de2f53944c954fddad",
       },
     },
     "github-ubuntu-2204" => {
       "x64" => {
         "20260901.1.0" => "db5f9699f6e5bb7fb8421d950416f85c00f6fb10f563e8390c4ecd43c571e6ec",
         "20261021.1.0" => "3463b55b3766f81466f36fc947662ec3cf6cfb8be6c34b41ffe3af881994c0f2",
+        "20261108.1.2" => "6b418a6bc3ccc493f39d6d93569d81c2a49892f2021cfdd03bbf9301a3dfc5d0",
       },
       "arm64" => {
         "20260901.1.0" => "3fd96907abcc8ca840da49c657ef72243b9b36b0e8567d3514369deb45b9de42",
         "20261021.1.0" => "66b9b343f2258f1619c2409b8fc3d3836add8b8e75b91d3a6b4e649a5efbc675",
+        "20261108.1.2" => "b0c5a45b2b3ae8cd6c861d7ef91b0f34c4ff7adf6f13d88a40b1d8ab28edc4f7",
       },
     },
     "postgres-ubuntu-2204" => {
