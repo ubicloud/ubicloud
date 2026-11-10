@@ -971,7 +971,8 @@ SQL
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_send_failover_notification
-      hop_backfill_wal_archive unless upgraded
+      # An in-place upgrade already cancelled its backup before pg_upgrade.
+      hop_cancel_ongoing_backup unless upgraded
 
       register_deadline("wait", 10 * 60)
       hop_finalize_taking_over
@@ -984,6 +985,12 @@ SQL
     end
 
     nap 5
+  end
+
+  # Before the backfill, so a backup that cannot finish does not compete with it.
+  label def cancel_ongoing_backup
+    postgres_server.timeline.cancel_ongoing_backup
+    hop_backfill_wal_archive
   end
 
   label def backfill_wal_archive

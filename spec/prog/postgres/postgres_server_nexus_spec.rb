@@ -1940,6 +1940,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
+  describe "#cancel_ongoing_backup" do
+    it "cancels the timeline's ongoing backup and hops to backfill_wal_archive" do
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      postgres_timeline.update(backup_inprogress_server_id: standby.id)
+      expect(nx.postgres_server.timeline.backup_inprogress_server.vm.sshable).to receive(:_cmd)
+        .with("if test -x postgres/bin/cancel-ongoing-backup; then sudo postgres/bin/cancel-ongoing-backup; else echo absent; fi").and_return("")
+
+      expect { nx.cancel_ongoing_backup }.to hop("backfill_wal_archive")
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+  end
+
   describe "#finalize_taking_over" do
     it "hops to configure" do
       expect { nx.finalize_taking_over }.to hop("configure")
@@ -1968,7 +1980,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.taking_over }.to nap(0)
     end
 
-    it "updates the metadata and hops to backfill_wal_archive if promote command is succeeded" do
+    it "updates the metadata and hops to cancel_ongoing_backup if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby.strand.update(stack: [{"take_over_mode" => "planned"}])
@@ -1977,7 +1989,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
-      expect { standby_nx.taking_over }.to hop("backfill_wal_archive")
+      expect { standby_nx.taking_over }.to hop("cancel_ongoing_backup")
 
       expect(Semaphore.where(strand_id: standby.id, name: "send_failover_notification").count).to eq(1)
 
@@ -2011,7 +2023,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(pls.reconcile_set?).to be false
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-      expect { standby_nx.taking_over }.to hop("backfill_wal_archive")
+      expect { standby_nx.taking_over }.to hop("cancel_ongoing_backup")
       expect(standby.reload.is_representative).to be true
       expect(pls.reload.reconcile_set?).to be true
     end

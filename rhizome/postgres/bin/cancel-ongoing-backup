@@ -1,0 +1,19 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+daemonizer = File.expand_path("../../common/bin/daemonizer2", __dir__)
+state = -> { r(daemonizer, "check", "take_postgres_backup").strip }
+
+if state.call == "InProgress"
+  r "systemctl", "kill", "--signal=SIGKILL", "take_postgres_backup.service"
+  r "pkill", "--signal", "KILL", "--full", "wal-g backup-push", expect: [0, 1]
+
+  30.times do
+    break if %w[Succeeded Failed NotStarted].include?(state.call)
+    sleep 1
+  end
+end
+
+r daemonizer, "clean", "take_postgres_backup"

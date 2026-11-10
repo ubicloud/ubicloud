@@ -161,6 +161,31 @@ RSpec.describe PostgresResource do
     )
   end
 
+  describe "#backup_from_standby?" do
+    def tag(value) = [{"key" => "other", "value" => "x"}, {"key" => "backup_from_standby", "value" => value}]
+
+    it "follows the project default without a tag" do
+      expect(postgres_resource.backup_from_standby?).to be(false)
+      project.set_ff_postgres_backup_from_standby_default(true)
+      expect(postgres_resource.reload.backup_from_standby?).to be(true)
+    end
+
+    it "lets a true or false tag override the project default either way" do
+      postgres_resource.update(tags: tag("true"))
+      expect(postgres_resource.backup_from_standby?).to be(true)
+
+      project.set_ff_postgres_backup_from_standby_default(true)
+      postgres_resource.update(tags: tag("false"))
+      expect(postgres_resource.reload.backup_from_standby?).to be(false)
+    end
+
+    it "ignores a tag value other than true or false" do
+      project.set_ff_postgres_backup_from_standby_default(true)
+      postgres_resource.update(tags: tag("yes"))
+      expect(postgres_resource.reload.backup_from_standby?).to be(true)
+    end
+  end
+
   describe "#mgmt_ssh_via_user_security_group?" do
     it "is true off AWS, keeping port 22 in the internal firewall" do
       postgres_resource.update(private_subnet_id: private_subnet.id)
