@@ -31,6 +31,7 @@ RSpec.describe CryptSwapSetup do
       expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.12345678").and_return("/dev/nvme0n1p2")
       expect(File).to receive(:stat).with("/dev/nvme0n1p2").twice.and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 2))
 
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSETUP_GENERATOR).and_return(true)
       expect(described_class).to receive(:_run_command).with("swapoff", "/dev/nvme0n1p2")
       expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTTAB).and_return(false)
       expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::CRYPTTAB, "cryptswap /dev/disk/by-id/nvme-eui.12345678 /dev/urandom cipher=aes-xts-plain64,size=512,swap,discard\n")
@@ -47,6 +48,31 @@ RSpec.describe CryptSwapSetup do
       described_class.run
     end
 
+    it "installs systemd-cryptsetup before making changes if the cryptsetup generator is missing" do
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(fstab.dup)
+      expect(File).to receive(:realpath).with("/dev/disk/by-uuid/4c4fe278-d132-4136-8073-b1242eacf5eb").and_return("/dev/nvme0n1p2")
+      expect(File).to receive(:blockdev?).with("/dev/nvme0n1p2").and_return(true)
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(["/dev/disk/by-id/nvme-eui.12345678"])
+      expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.12345678").and_return("/dev/nvme0n1p2")
+      expect(File).to receive(:stat).with("/dev/nvme0n1p2").twice.and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 2))
+
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSETUP_GENERATOR).and_return(false)
+      expect(described_class).to receive(:_run_command).with("apt-get", "-y", "install", "systemd-cryptsetup").ordered
+      expect(described_class).to receive(:_run_command).with("swapoff", "/dev/nvme0n1p2").ordered
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTTAB).and_return(false)
+      expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::CRYPTTAB, "cryptswap /dev/disk/by-id/nvme-eui.12345678 /dev/urandom cipher=aes-xts-plain64,size=512,swap,discard\n")
+      expect(Time).to receive(:now).and_return(Time.at(1_700_000_000))
+      expect(FileUtils).to receive(:cp).with(CryptSwapSetup::FSTAB, "#{CryptSwapSetup::FSTAB}.bak.1700000000")
+      expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::FSTAB, fstab.sub("UUID=4c4fe278-d132-4136-8073-b1242eacf5eb none swap sw 0 0\n", "/dev/mapper/cryptswap none swap sw 0 0\n"))
+      expect(described_class).to receive(:_run_command).with("wipefs", "-a", "/dev/nvme0n1p2").ordered
+      expect(described_class).to receive(:_run_command).with("systemctl", "daemon-reload").ordered
+      expect(described_class).to receive(:_run_command).with("systemctl", "restart", "systemd-cryptsetup@cryptswap.service").ordered
+      expect(described_class).to receive(:_run_command).with("mkswap", "-f", CryptSwapSetup::CRYPTSWAP_DEVICE).ordered
+      expect(described_class).to receive(:_run_command).with("swapon", "-a").ordered
+
+      described_class.run
+    end
+
     it "skips cryptswap setup when swap is a swapfile" do
       expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
             UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
@@ -58,11 +84,30 @@ RSpec.describe CryptSwapSetup do
       expect { described_class.run }.to output(/skipping cryptswap setup/).to_stdout
     end
 
-    it "skips if cryptswap is already configured in fstab" do
+    it "skips if cryptswap is already configured in fstab and active" do
       expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
         /dev/mapper/cryptswap none swap sw 0 0
       FSTAB
-      expect { described_class.run }.to output(/already configured/).to_stdout
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return(true)
+      expect(File).to receive(:realpath).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return("/dev/dm-0")
+      expect(File).to receive(:read).with("/proc/swaps").and_return("Filename\tType\tSize\tUsed\tPriority\n/dev/dm-0 partition 33554428 0 -2\n")
+      expect(File).to receive(:realpath).with("/dev/dm-0").and_return("/dev/dm-0")
+      expect(described_class).not_to receive(:_run_command)
+      expect { described_class.run }.to output(/already configured, skipping/).to_stdout
+    end
+
+    it "activates cryptswap if it is configured in fstab but not active" do
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
+        /dev/mapper/cryptswap none swap sw 0 0
+      FSTAB
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return(false)
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSETUP_GENERATOR).and_return(false)
+      expect(described_class).to receive(:_run_command).with("apt-get", "-y", "install", "systemd-cryptsetup").ordered
+      expect(described_class).to receive(:_run_command).with("systemctl", "daemon-reload").ordered
+      expect(described_class).to receive(:_run_command).with("systemctl", "restart", "systemd-cryptsetup@cryptswap.service").ordered
+      expect(described_class).to receive(:_run_command).with("mkswap", "-f", CryptSwapSetup::CRYPTSWAP_DEVICE).ordered
+      expect(described_class).to receive(:_run_command).with("swapon", "-a").ordered
+      expect { described_class.run }.to output(/configured but not active, activating/).to_stdout
     end
 
     it "skips cryptswap setup when there is no swap" do
@@ -70,6 +115,29 @@ RSpec.describe CryptSwapSetup do
         UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
       FSTAB
       expect { described_class.run }.to output(/no swap entry in \/etc\/fstab; skipping cryptswap setup/).to_stdout
+    end
+  end
+
+  describe ".cryptswap_active?" do
+    it "returns false if the cryptswap device does not exist" do
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return(false)
+      expect(described_class.cryptswap_active?).to be false
+    end
+
+    it "returns false if the cryptswap device is not an active swap device" do
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return(true)
+      expect(File).to receive(:realpath).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return("/dev/dm-0")
+      expect(File).to receive(:read).with("/proc/swaps").and_return("Filename\tType\tSize\tUsed\tPriority\n/dev/nvme0n1p2 partition 33554428 0 -2\n")
+      expect(File).to receive(:realpath).with("/dev/nvme0n1p2").and_return("/dev/nvme0n1p2")
+      expect(described_class.cryptswap_active?).to be false
+    end
+
+    it "returns true if the cryptswap device is an active swap device" do
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return(true)
+      expect(File).to receive(:realpath).with(CryptSwapSetup::CRYPTSWAP_DEVICE).and_return("/dev/dm-0")
+      expect(File).to receive(:read).with("/proc/swaps").and_return("Filename\tType\tSize\tUsed\tPriority\n/dev/dm-0 partition 33554428 0 -2\n")
+      expect(File).to receive(:realpath).with("/dev/dm-0").and_return("/dev/dm-0")
+      expect(described_class.cryptswap_active?).to be true
     end
   end
 
