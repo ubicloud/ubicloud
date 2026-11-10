@@ -82,22 +82,28 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   label def take_backup
     hop_wait unless postgres_timeline.leader
 
-    sshable = postgres_timeline.leader.vm.sshable
-    case sshable.d_check("take_postgres_backup")
+    sshable = postgres_timeline.backup_status_server.vm.sshable
+    case (state = sshable.d_check("take_postgres_backup"))
     when "Succeeded"
+      postgres_timeline.update(backup_inprogress_server_id: nil)
       sshable.d_clean("take_postgres_backup")
       decr_take_backup_for_converge
       hop_wait
     when "InProgress"
       nap 60
     else # "Failed", "NotStarted"
-      size_gib = postgres_timeline.leader.data_disk_usage(raise_on_error: true).fdiv(1024 * 1024).ceil
+      # The retry may run on another server, which would leave this unit behind.
+      sshable.d_clean("take_postgres_backup") if state == "Failed"
+      nap 60 unless (source = postgres_timeline.backup_candidate_server)
 
-      args = ["sudo", "postgres/bin/take-backup", postgres_timeline.leader.version]
+      size_gib = source.data_disk_usage(raise_on_error: true).fdiv(1024 * 1024).ceil
+
+      args = ["sudo", source.standby? ? "postgres/bin/take-backup-standby" : "postgres/bin/take-backup", source.version]
       args << BACKUP_CPU_WEIGHT.to_s if postgres_timeline.walg_optimized_config_enabled?
 
-      sshable.d_run("take_postgres_backup", *args)
-      postgres_timeline.update(latest_backup_started_at: Time.now, latest_backup_size_in_gib: size_gib)
+      source.vm.sshable.d_run("take_postgres_backup", *args)
+      postgres_timeline.update(latest_backup_started_at: Time.now, latest_backup_size_in_gib: size_gib, backup_inprogress_server_id: source.id)
+      Clog.emit("Started postgres backup", [postgres_timeline, {backup_server: source.ubid, backup_from_standby: source.standby?}])
       nap 60
     end
   end
