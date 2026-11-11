@@ -25,6 +25,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         location_id:,
         firewall_id: customer_firewall.id,
         ipv4_range_size: 16,
+        # Each node hands out pod addresses from its NIC block (ubicni).
+        nic_ipv4_prefix_len: 24,
       ).subject
 
       port_range = Sequel.pg_range(0..65535)
