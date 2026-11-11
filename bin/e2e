@@ -43,7 +43,7 @@ def test_metal(options, test_cases)
     wait_until(base_machine_images_st, "wait")
   end
 
-  if options[:test_cases].include?("postgres_ha") || options[:test_cases].include?("postgres_upgrade") || options[:test_cases].include?("postgres_unarchive")
+  if options[:test_cases].intersect?(%w[postgres_ha postgres_upgrade postgres_upgrade18 postgres_unarchive])
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id, name: "Postgres-Service-Project")
     minio_cluster_st = Prog::Test::MinioCluster.assemble(Config.postgres_service_project_id)
@@ -107,6 +107,9 @@ def test_metal(options, test_cases)
   end
   if options[:test_cases].include?("postgres_upgrade16")
     tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(start_version: "16")
+  end
+  if options[:test_cases].include?("postgres_upgrade18")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(start_version: "18")
   end
   if options[:test_cases].include?("postgres_unarchive")
     tests_to_wait << Prog::Test::UnarchivePostgresResource.assemble

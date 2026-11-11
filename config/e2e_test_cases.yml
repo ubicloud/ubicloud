@@ -7,6 +7,7 @@
 - { name: postgres_ha,               images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
 - { name: postgres_upgrade,          images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
 - { name: postgres_upgrade16,        images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
+- { name: postgres_upgrade18,        images: ["postgres-ubuntu-2604", "ubuntu-jammy"] }
 - { name: postgres_firewall,         images: ["postgres-ubuntu-2204"] }
 - { name: postgres_unarchive,        images: ["postgres-ubuntu-2204"] }
 - { name: kubernetes,                images: ["ubuntu-resolute"] }
