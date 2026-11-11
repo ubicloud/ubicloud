@@ -138,7 +138,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     total_usage = dataset.sum(:size).to_i
     storage_limit = github_repository.cache_storage_gib * 1024 * 1024 * 1024
     if total_usage > storage_limit
-      dataset.order(Sequel.function(:coalesce, :last_accessed_at, :created_at)).limit(200).all do |oldest_entry|
+      dataset.order(Sequel.function(:coalesce, :last_accessed_at, :created_at)).limit(200).eager(:repository).all do |oldest_entry|
         oldest_entry.destroy
         total_usage -= oldest_entry.size
         break if total_usage <= storage_limit
