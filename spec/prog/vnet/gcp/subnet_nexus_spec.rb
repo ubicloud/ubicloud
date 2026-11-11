@@ -63,9 +63,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       mgmt_ps = st.subject
       expect(mgmt_ps.gcp_management?).to be true
       expect(mgmt_ps.location_id).to eq(location.id)
-      expect(mgmt_ps.net4.to_s).to eq("100.64.0.0/20")
+      expect(mgmt_ps.net4.to_s).to eq("100.64.32.0/19")
       expect(mgmt_ps.net6.to_s).to end_with("::/64")
       expect(mgmt_ps.firewalls).to be_empty
+    end
+
+    it "takes the management range from gcp_postgres_mgmt_net4" do
+      expect(Config).to receive(:gcp_postgres_mgmt_net4).and_return("100.127.0.0/20")
+
+      expect(described_class.assemble_management(location.id).subject.net4.to_s).to eq("100.127.0.0/20")
     end
 
     it "returns the existing strand when the management subnet exists" do
