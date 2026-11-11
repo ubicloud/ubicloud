@@ -23,6 +23,15 @@ RSpec.describe Scheduling::Dispatcher do
     described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, telemetry_db:, **)
   end
 
+  describe "#initialize" do
+    it "reserves a database connection for the metrics reporter" do
+      expect(Config).to receive(:control_plane_metrics_report_enabled).and_return(true)
+      expect(Config).to receive(:db_pool_respirate).and_return(4)
+      @di = described_class.new(pool_size: 8, telemetry_db:)
+      expect(@di.instance_variable_get(:@thread_data).size).to eq 1
+    end
+  end
+
   describe "#handle_disconnects" do
     it "automatically retries block on disconnect error" do
       i = 0
