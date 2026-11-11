@@ -5,6 +5,20 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   frame_reader :start_version
   frame_accessor :pre_upgrade_postgres_timeline_id, :read_replica_id
 
+  CREATE_EXTENSIONS_SQL = <<~SQL
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS vector;
+  SQL
+
+  # postgis is expected at its default version, since the upgrade runs
+  # postgis_extensions_upgrade. vector has no post-upgrade script, so only
+  # check that its library loads.
+  CHECK_EXTENSIONS_SQL = <<~SQL
+    SELECT ST_AsText(ST_MakePoint(1, 2)),
+      '[1,2]'::vector <-> '[1,3]'::vector,
+      (SELECT extversion = default_version FROM pg_extension JOIN pg_available_extensions ON name = extname WHERE extname = 'postgis');
+  SQL
+
   def self.assemble(provider: "metal", start_version: "17", **)
     st = super(provider:, project_name: "Postgres-Upgrade-Test-Project", **)
     st.update(stack: [st.stack.first.merge("start_version" => start_version)])
@@ -75,6 +89,11 @@ SQL
     Clog.emit("Testing Postgres before read replica creation")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       self.fail_message = "Failed to run test queries before read replica"
+      hop_destroy
+    end
+
+    unless representative_server.run_query(CREATE_EXTENSIONS_SQL) == "CREATE EXTENSION\nCREATE EXTENSION"
+      self.fail_message = "Failed to create extensions before upgrade"
       hop_destroy
     end
 
@@ -256,6 +275,14 @@ SQL
     unless slot_row == expected_row
       self.fail_message = "Unexpected slot state after upgrade from v#{start_version}: expected #{expected_row.inspect}, got #{slot_row.inspect}"
       hop_destroy
+    end
+
+    Clog.emit("Verifying extensions after upgrade")
+    [representative_server, read_replica.representative_server].each do |server|
+      unless (result = server.run_query(CHECK_EXTENSIONS_SQL)) == "POINT(1 2),1,t"
+        self.fail_message = "Unexpected extension state on #{server.ubid} after upgrade: #{result.inspect}"
+        hop_destroy
+      end
     end
 
     Clog.emit("All upgrade tests passed successfully!")
