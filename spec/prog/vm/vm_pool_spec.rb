@@ -45,6 +45,22 @@ RSpec.describe Prog::Vm::VmPool do
       expect(vm.vm_storage_volumes.first.track_written).to be(false)
     end
 
+    it "lets pool vms in the github runners location go to the overflow locations" do
+      pool.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(Config).to receive(:vm_pool_project_id).and_return(project_id).at_least(:once)
+      expect { nx.create_new_vm }.to hop("wait")
+      expect(pool.vms.first.allocation_rules).to eq(
+        "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        "location_preference" => [Location::GITHUB_RUNNERS_ID],
+      )
+    end
+
+    it "stores no placement preferences for pool vms elsewhere" do
+      expect(Config).to receive(:vm_pool_project_id).and_return(project_id).at_least(:once)
+      expect { nx.create_new_vm }.to hop("wait")
+      expect(pool.vms.first.allocation_rules).to eq({})
+    end
+
     it "uses ch_version 53.0 if randomly selected" do
       expect(Config).to receive(:vm_pool_project_id).and_return(project_id).at_least(:once)
       expect(Config).to receive(:github_actions_ch_53_percent).and_return(100)

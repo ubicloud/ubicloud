@@ -139,9 +139,30 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       waiting_strand_id: strand.id,
       allocated_waiting_strand_id: strand.id,
       ch_version:,
+      allocation_rules: (vm_allocation_rules if location_id == Location::GITHUB_RUNNERS_ID),
     )
 
     vm_st.subject
+  end
+
+  def vm_allocation_rules
+    prefs = installation.allocator_preferences
+    family = label_data["family"]
+
+    family_filter = if github_runner.not_upgrade_premium_set? || family == "premium"
+      [family]
+    elsif installation.free_runner_upgrade?
+      prefs["family_filter"] || [family, "premium"]
+    else
+      prefs["family_filter"] || [family]
+    end
+
+    {
+      "family_filter" => family_filter,
+      "host_exclusion_filter" => prefs["host_exclusion_filter"],
+      "location_filter" => prefs["location_filter"] || Location::GITHUB_RUNNERS_ALLOCATION_RULES["location_filter"],
+      "location_preference" => prefs["location_preference"] || Location::GITHUB_RUNNERS_ALLOCATION_RULES["location_preference"],
+    }.compact
   end
 
   def installation_private_subnet(location_id)

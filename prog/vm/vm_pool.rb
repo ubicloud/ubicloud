@@ -43,6 +43,7 @@ class Prog::Vm::VmPool < Prog::Base
       swap_size_bytes: 4294963200,
       private_subnet_id: ps.id,
       ch_version:,
+      allocation_rules: (Location::GITHUB_RUNNERS_ALLOCATION_RULES if vm_pool.location_id == Location::GITHUB_RUNNERS_ID),
     )
 
     hop_wait
