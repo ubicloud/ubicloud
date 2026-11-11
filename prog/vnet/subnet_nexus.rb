@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, aws_subnet_ipv4_range_size: nil, nic_ipv4_prefix_len: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -21,10 +21,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     Validation.validate_name(name)
     ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
+    nic_ipv4_prefix_len ||= 32
+    if nic_ipv4_prefix_len != 32 && !location.metal?
+      fail "Only metal locations support a nic_ipv4_prefix_len other than 32"
+    end
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do
-      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
+      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, nic_ipv4_prefix_len:, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
       if firewall_id
