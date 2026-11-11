@@ -45,7 +45,7 @@ SSH_SESSION_LOCK_NAME = "respirate"
 
 clover_freeze
 
-MetricsReporter.new(metrics: ControlPlaneMetrics, name: "respirate").run_thread if Config.control_plane_metrics_report_enabled
+metrics_reporter = MetricsReporter.new(metrics: ControlPlaneMetrics, name: "respirate").tap(&:run_thread) if Config.control_plane_metrics_report_enabled
 
 if partition_number
   # Start with a random offset, so that multiple respirate processes are unlikely
@@ -92,5 +92,7 @@ Thread.new do
   d.shutdown_and_cleanup_threads
   exit_status = 0
 end.join(2)
+
+metrics_reporter&.shutdown!
 
 exit exit_status
