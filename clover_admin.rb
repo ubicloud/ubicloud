@@ -1050,7 +1050,7 @@ class CloverAdmin < Roda
 
       action "reset", "Hardware Reset" do
         flash "Hardware reset scheduled for VmHost"
-        allow_if { it.provider }
+        allow_if { it.provider_api? }
         run(&:incr_hardware_reset)
       end
 
@@ -1061,13 +1061,13 @@ class CloverAdmin < Roda
 
       action "power_on", "Power On" do
         flash "Power on requested for VmHost"
-        allow_if { it.provider }
+        allow_if { it.provider_api? }
         run(&:power_on)
       end
 
       action "power_status", "Power Status" do
         type :content
-        allow_if { it.provider }
+        allow_if { it.provider_api? }
         run do |obj|
           "Power status: #{Erubi.h(obj.power_status)}"
         end
@@ -1211,7 +1211,7 @@ class CloverAdmin < Roda
     metal
   ].freeze
 
-  SETUP_VM_HOST_PROVIDERS = [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].freeze
+  SETUP_VM_HOST_PROVIDERS = HostProvider::API_PROVIDER_NAMES
 
   plugin :autoforme do
     # simplecov:disable

@@ -7,6 +7,10 @@ rules:
       # require_e2e listens for E2E CI completions to post commit statuses.
       # The job does not check out or run any code from the triggering run.
       - require_e2e.yml
+      # The /run-e2e PR comment command requires issue_comment. Only users
+      # with write access can trigger it. The job does not check out PR
+      # code; it dispatches e2e.yml on a branch of this repository.
+      - trigger-e2e.yml
   archived-uses:
     ignore:
       # contributor-assistant/github-action is archived upstream but still

@@ -18,13 +18,13 @@ jobs:
           uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
           with:
             script: |
-              // Check if the comment is from a contributor
-              const contributors = await github.rest.repos.listContributors({
+              // Check if the commenter has write access
+              const { data: { permission } } = await github.rest.repos.getCollaboratorPermissionLevel({
                 owner: context.repo.owner,
-                repo: context.repo.repo
+                repo: context.repo.repo,
+                username: context.payload.comment.user.login
               });
-              const contributorIds = contributors.data.map(c => c.id);
-              const isContributor = contributorIds.includes(context.payload.comment.user.id);
+              const hasWriteAccess = ['admin', 'write'].includes(permission);
 
               // Parse arguments: /run-e2e [providers] [test_cases]
               const args = context.payload.comment.body.trim().split(/\s+/);
@@ -36,7 +36,7 @@ jobs:
               const isValid = (!providers || inputPattern.test(providers)) && (!testCases || inputPattern.test(testCases));
               console.log(`Is valid: ${isValid}`);
 
-              const allowedToRun = isContributor && isValid;
+              const allowedToRun = hasWriteAccess && isValid;
 
               // Add a reaction to the comment
               await github.rest.reactions.createForIssueComment({

@@ -260,6 +260,35 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#provider_api?" do
+    def make_provider(name)
+      HostProvider.create do
+        it.id = vm_host.id
+        it.server_identifier = "123"
+        it.provider_name = name
+      end
+    end
+
+    it "is false without a provider" do
+      expect(vm_host.provider_api?).to be false
+    end
+
+    it "is false for a provider without an api" do
+      make_provider("other")
+      expect(vm_host.provider_api?).to be false
+    end
+
+    it "is true for hetzner" do
+      make_provider(HostProvider::HETZNER_PROVIDER_NAME)
+      expect(vm_host.provider_api?).to be true
+    end
+
+    it "is true for leaseweb" do
+      make_provider(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
+      expect(vm_host.provider_api?).to be true
+    end
+  end
+
   describe "#power_on" do
     it "powers on the server" do
       expect(provider_api).to receive(:power_on).with(no_args)

@@ -45,6 +45,8 @@ class VmHost < Sequel::Model
 
   def leaseweb? = HostProvider::LEASEWEB_PROVIDER_NAMES.include?(provider_name)
 
+  def provider_api? = HostProvider::API_PROVIDER_NAMES.include?(provider_name)
+
   def sshable_host
     sshable.host
   end

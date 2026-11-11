@@ -324,6 +324,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
+      expect(vs).to receive(:purge_prep_stdin)
       expect(vs).to receive(:unmount_hugepages)
       expect(vs).to receive(:_run_command).with("deluser", "--remove-home", "test")
       expect(vs).to receive(:block_ip4)
@@ -910,8 +911,19 @@ NFTABLES_CONF
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
+      expect(vs).to receive(:purge_prep_stdin)
       expect(vs).to receive(:unmount_hugepages)
       vs.purge_without_network
+    end
+  end
+
+  describe "#purge_prep_stdin" do
+    it "removes every copy of the prep unit's stdin" do
+      expect(vs).to receive(:rm_if_exists).with("/dev/shm/prep_test.stdin")
+      expect(vs).to receive(:rm_if_exists).with("/dev/shm/prep_test.stdin.tmp")
+      expect(vs).to receive(:rm_if_exists).with("/home/rhizome/var/proc/prep_test.stdin")
+      expect(vs).to receive(:rm_if_exists).with("/home/rhizome/var/proc/prep_test.stdin.tmp")
+      vs.purge_prep_stdin
     end
   end
 

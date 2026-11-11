@@ -32,6 +32,21 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.provider).to be_nil
     end
 
+    it "creates the given ipv4 subnets and populates their addresses" do
+      st = described_class.assemble("127.0.0.1", ipv4_subnets: ["89.117.242.160/28", "89.117.243.8/30"])
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }).to contain_exactly("127.0.0.1/32", "89.117.242.160/28", "89.117.243.8/30")
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq(["127.0.0.1/32"])
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((160..175).map { "89.117.242.#{it}" } + (8..11).map { "89.117.243.#{it}" })
+    end
+
+    it "creates the provider and the host address for a provider without an api" do
+      st = described_class.assemble("127.0.0.1", provider_name: "other", server_identifier: "1")
+      expect(st.subject.provider_name).to eq("other")
+      expect(st.subject.provider.server_identifier).to eq("1")
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }).to eq(["127.0.0.1/32"])
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq(["127.0.0.1/32"])
+    end
+
     it "sets the server name and leaves the other provider api pulls to the strand for a hetzner host" do
       rename = stub_request(:post, "https://robot-ws.your-server.de/server/1").to_return(status: 200, body: "{}")
       st = described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
@@ -70,6 +85,11 @@ RSpec.describe Prog::Vm::HostNexus do
 
       st = described_class.assemble("1.2.3.4", install_os: true)
       expect(st.stack.first["install_os"]).to be true
+    end
+
+    it "stores ipv6_disabled on the host" do
+      expect(described_class.assemble("127.0.0.1").subject.ipv6_disabled).to be false
+      expect(described_class.assemble("1.2.3.4", ipv6_disabled: true).subject.ipv6_disabled).to be true
     end
   end
 
@@ -231,6 +251,11 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to create_addresses for a host with a provider" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
       expect { nx.start }.to hop("create_addresses")
+    end
+
+    it "hops to setup_ssh_keys for a host whose provider has no api" do
+      st = described_class.assemble("192.168.0.2", provider_name: "other", server_identifier: "1")
+      expect { described_class.new(st).start }.to hop("setup_ssh_keys")
     end
 
     it "hops to install_host_os when assembled with install_os" do
@@ -424,6 +449,7 @@ RSpec.describe Prog::Vm::HostNexus do
         "InstallDnsmasq",
         "LearnCpu",
         "LearnMemory",
+        "LearnNetwork",
         "LearnOs",
         "LearnPci",
         "LearnStorage",
@@ -443,22 +469,6 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.prep }.to hop("wait_prep")
 
       expect(Strand.where(parent_id: st.id).select_map(:prog)).to include("SetupNdpProxy")
-    end
-
-    it "sets up the ndp proxy alongside LearnNetwork when net6 is not known yet" do
-      vm_host.update(ndp_needed: true)
-
-      expect { nx.prep }.to hop("wait_prep")
-
-      child_progs = Strand.where(parent_id: st.id).select_map(:prog)
-      expect(child_progs).to include("SetupNdpProxy", "LearnNetwork")
-    end
-
-    it "learns the network from the host if it is not set a-priori" do
-      expect { nx.prep }.to hop("wait_prep")
-
-      child_progs = Strand.where(parent_id: st.id).select_map(:prog)
-      expect(child_progs).to include("LearnNetwork")
     end
 
     it "passes format_storage to LearnStorage when assembled with install_os, regardless of provider" do
