@@ -2,10 +2,10 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
-  frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
+  frame_reader :vhost_block_backend_version, :default_boot_images, :install_os, :ipv4_subnet_prefix
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true)
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, ipv4_subnet_prefix: nil, id: VmHost.generate_uuid, set_server_name: true)
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -32,11 +32,40 @@ class Prog::Vm::HostNexus < Prog::Base
       Strand.create_with_id(vmh,
         prog: "Vm::HostNexus",
         label: "start",
-        stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images, "install_os" => install_os}])
+        stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images, "install_os" => install_os, "ipv4_subnet_prefix" => ipv4_subnet_prefix}])
     end
   end
 
   label def start
+    register_deadline("setup", 2 * 60 * 60)
+    hop_order_ipv4_subnet if ipv4_subnet_prefix
+
+    hop_setup
+  end
+
+  label def order_ipv4_subnet
+    api = vm_host.provider.api
+    if api.pull_ipv4_subnets.empty? && api.pull_open_ipv4_subnet_orders.empty?
+      begin
+        transaction_id = api.order_ipv4_subnet(ipv4_subnet_prefix)
+      rescue Excon::Error::BadRequest, Excon::Error::Conflict, Excon::Error::PreconditionFailed => ex
+        Clog.emit("ipv4 subnet order rejected", {ipv4_subnet_order_rejected: Util.exception_to_hash(ex, into: {vm_host: vm_host.ubid, prefix: ipv4_subnet_prefix})})
+        nap 65536
+      else
+        Clog.emit("ordered ipv4 subnet", {ipv4_subnet_order: {vm_host: vm_host.ubid, prefix: ipv4_subnet_prefix, transaction_id:}})
+      end
+    end
+
+    hop_wait_ipv4_subnet
+  end
+
+  label def wait_ipv4_subnet
+    hop_setup unless vm_host.provider.api.pull_ipv4_subnets.empty?
+
+    nap 60
+  end
+
+  label def setup
     hop_create_addresses if vm_host.provider
     hop_install_host_os if install_os
 
@@ -306,7 +335,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     if vm_host.allocation_state == "unprepared"
       vm_host.update(allocation_state: "accepting")
-      delete_from_stack("install_os", "default_boot_images", "vhost_block_backend_version")
+      delete_from_stack("install_os", "default_boot_images", "vhost_block_backend_version", "ipv4_subnet_prefix")
     end
 
     hop_configure_metrics
