@@ -216,8 +216,15 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run test queries before read replica")
     end
 
+    it "fails if creating the extensions fails" do
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "")
+      expect { pgr_test.test_postgres_before_read_replica }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to create extensions before upgrade")
+    end
+
     it "hops to create_read_replica if the postgres test passes" do
-      allow(pgr_test.representative_server).to receive(:_run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "CREATE EXTENSION\nCREATE EXTENSION")
       expect { pgr_test.test_postgres_before_read_replica }.to hop("create_read_replica")
     end
   end
@@ -483,11 +490,19 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "hops to destroy if all tests pass" do
-      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "t")
-      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "t", "POINT(1 2),1,t")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1", "POINT(1 2),1,t")
       expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
       refresh_frame(pgr_test)
       expect(frame_value(pgr_test, "fail_message")).to be_nil
+    end
+
+    it "fails if an extension is not usable on the replica after upgrade" do
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "t", "POINT(1 2),1,t")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1", "POINT(1 2),1,f")
+      expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to eq("Unexpected extension state on #{pgr_test.read_replica.representative_server.ubid} after upgrade: \"POINT(1 2),1,f\"")
     end
 
     it "fails if the failover slot is missing after PG17+ upgrade" do
@@ -500,8 +515,8 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "passes when PG16 upgrade drops the logical slot" do
       refresh_frame(pgr_test, new_values: {"start_version" => "16"})
-      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "")
-      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "", "POINT(1 2),1,t")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1", "POINT(1 2),1,t")
       pgr_test.postgres_resource.servers.each { |s| s.update(version: "17") }
       pgr_test.read_replica.servers.each { |s| s.update(version: "17") }
       expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
