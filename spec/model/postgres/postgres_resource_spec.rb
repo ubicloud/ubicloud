@@ -359,7 +359,7 @@ RSpec.describe PostgresResource do
       expect(new_server.resource_id).to eq(postgres_resource.id)
       expect(new_server.timeline_access).to eq("fetch")
       expect(new_server.vm.vm_firewalls).to eq([postgres_resource.internal_firewall])
-      expect(new_server.vm.strand.stack[0]["exclude_data_centers"]).to eq([])
+      expect(new_server.vm.allocation_rules["data_center_exclusion_filter"]).to be_nil
     end
 
     it "reuses the existing timeline rather than creating a new one (HA reprovision keeps a single timeline)" do
@@ -538,7 +538,7 @@ RSpec.describe PostgresResource do
       new_server = postgres_resource.provision_new_standby.subject
       expect(new_server).not_to be_nil
       expect(new_server.timeline_id).to eq(timeline.id)
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+      expect(new_server.vm.allocation_rules["host_exclusion_filter"]).to be_nil
     end
 
     it "provisions a new server with the correct timeline for a read replica" do
@@ -554,7 +554,7 @@ RSpec.describe PostgresResource do
       expect { postgres_resource.provision_new_standby }.to change(PostgresServer, :count).by(1)
       new_server = PostgresServer.exclude(id: ps1.id).order(:created_at).last
       expect(new_server.timeline_id).to eq(parent_timeline.id)
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+      expect(new_server.vm.allocation_rules["host_exclusion_filter"]).to be_nil
     end
 
     it "provisions a new server excluding the representative server's host for leaseweb" do
@@ -569,7 +569,7 @@ RSpec.describe PostgresResource do
       postgres_resource.provision_new_standby
       expect(postgres_resource.reload.servers.count).to eq(2)
       new_server = PostgresServer.exclude(id: ps1.id).first
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([vm_host.id])
+      expect(new_server.vm.allocation_rules["host_exclusion_filter"]).to eq([vm_host.id])
     end
   end
 

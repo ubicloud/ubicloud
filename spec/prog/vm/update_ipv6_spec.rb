@@ -46,10 +46,10 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
       parent_id: vm_strand.id,
       stack: [
         {"subject_id" => vm.id, "gpu_count" => 0, "hugepages" => true, "ch_version" => nil,
-         "gpu_device" => nil, "hypervisor" => nil, "force_host_id" => nil, "swap_size_bytes" => nil,
-         "exclude_host_ids" => [], "firmware_version" => nil, "alternative_families" => [],
+         "gpu_device" => nil, "hypervisor" => nil, "swap_size_bytes" => nil,
+         "firmware_version" => nil, "alternative_families" => [],
          "unsupported_azs" => [], "exclude_availability_zones" => [],
-         "last_label_changed_at" => Time.now.to_s, "distinct_storage_devices" => true},
+         "last_label_changed_at" => Time.now.to_s},
       ],
     )
   }

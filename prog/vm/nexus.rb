@@ -196,10 +196,6 @@ class Prog::Vm::Nexus < Prog::Base
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
-          "distinct_storage_devices" => distinct_storage_devices,
-          "force_host_id" => force_host_id,
-          "exclude_host_ids" => exclude_host_ids,
-          "exclude_data_centers" => exclude_data_centers,
           "gpu_count" => gpu_count,
           "gpu_device" => gpu_device,
           "hugepages" => hugepages,

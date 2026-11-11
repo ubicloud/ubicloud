@@ -119,7 +119,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       new_volume = new_vm.vm_storage_volumes.first
       expect(new_volume.size_gib).to eq(old_volume.size_gib)
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
-      expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+      expect(new_vm.allocation_rules["force_host_id"]).to eq(vm_host.id)
       expect(new_vm.prevent_destroy_set?).to be true
 
       expect(st.parent_id).to be_nil
@@ -178,7 +178,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       new_volume = new_vm.vm_storage_volumes.first
       expect(new_volume.size_gib).to eq(old_volume.size_gib)
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
-      expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+      expect(new_vm.allocation_rules["force_host_id"]).to eq(vm_host.id)
       expect(new_vm.prevent_destroy_set?).to be true
 
       new_sshable = Sshable[new_vm.id]
