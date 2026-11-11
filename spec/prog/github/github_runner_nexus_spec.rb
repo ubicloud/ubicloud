@@ -1159,6 +1159,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -1196,6 +1197,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
         echo 10.0.0.5" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
       COMMAND
 
@@ -1210,6 +1212,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
         sudo systemctl stop cache-proxy.service
         curl -fsSL -o /tmp/cache-proxy.tar.gz https://example.com/cache-proxy-x64.tar.gz
         sudo tar xzf /tmp/cache-proxy.tar.gz -C /usr/local/share/cache-proxy
@@ -1227,6 +1230,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -1240,6 +1244,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
