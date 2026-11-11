@@ -136,4 +136,6 @@ Thread.new do
   exit_status = 0
 end.join(2)
 
+metrics_reporter&.shutdown!
+
 exit exit_status
