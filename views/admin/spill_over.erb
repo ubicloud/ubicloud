@@ -1,0 +1,17 @@
+<% @page_title = "Spill Over" %>
+
+<%== part("components/table", title: "Quota vs Capacity", table_class: "spill-over-quota-table", data: @quota_vs_capacity, use_admin_label: false) %>
+<%== part("components/table", title: "Projects", table_class: "spill-over-project-table", data: @projects, use_admin_label: false) %>
+
+<h3>Notes</h3>
+
+<p>
+  <strong>Quota vs Capacity:</strong> Total effective GithubRunnerVCpuAws and GithubRunnerVCpuArmAws quota of the
+  projects below, compared to the AWS runner vCPUs at which runners stop spilling over.
+</p>
+
+<p>
+  <strong>Projects:</strong> Projects with the spill_to_alien_runners feature flag. GithubRunnerVCpuAws and
+  GithubRunnerVCpuArmAws show AWS runner vCPUs against the effective quota. AWS has no 30 vCPU instance, so 30 vCPU
+  runners count as 32.
+</p>

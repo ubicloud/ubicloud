@@ -2290,6 +2290,59 @@ class CloverAdmin < Roda
       view("us_fleet")
     end
 
+    r.get "spill-over" do
+      vm = Sequel[:vm]
+      vcpus_sum = Sequel.function(:sum, vm[:vcpus])
+      aws_usage = DB[:vm]
+        .join(:github_runner, vm_id: :id)
+        .join(:github_installation, id: :installation_id)
+        .where(vm[:boot_image] => GithubRunner::AWS_AMI_VERSIONS)
+        .select_group(Sequel[:github_installation][:project_id])
+        .select_append(
+          vcpus_sum.as(:vcpus),
+          vcpus_sum.filter(vm[:arch] => "x64").as(:x64_vcpus),
+          vcpus_sum.filter(vm[:arch] => "arm64").as(:arm64_vcpus),
+        )
+
+      x64_quota_default = ProjectQuota.default_quotas["GithubRunnerVCpuAws"]
+      arm64_quota_default = ProjectQuota.default_quotas["GithubRunnerVCpuArmAws"]
+      proj = Sequel[:project]
+      usage = Sequel[:u]
+      projects = DB[:project]
+        .left_join(aws_usage.as(:u), project_id: :id)
+        .left_join(Sequel[:project_quota].as(:pq_x64), project_id: proj[:id], quota_id: x64_quota_default["id"])
+        .left_join(Sequel[:project_quota].as(:pq_arm64), project_id: proj[:id], quota_id: arm64_quota_default["id"])
+        .where(proj[:visible])
+        .where(Sequel.pg_jsonb_op(proj[:feature_flags]).contains("spill_to_alien_runners" => true))
+        .select(
+          proj[:id],
+          proj[:name],
+          proj[:reputation],
+          Sequel.function(:coalesce, usage[:x64_vcpus], 0).as(:x64_vcpus),
+          Sequel.function(:coalesce, usage[:arm64_vcpus], 0).as(:arm64_vcpus),
+          effective_quota_expr(x64_quota_default, Sequel[:pq_x64][:value], proj[:reputation]).as(:x64_quota),
+          effective_quota_expr(arm64_quota_default, Sequel[:pq_arm64][:value], proj[:reputation]).as(:arm64_quota),
+        )
+        .order(Sequel.desc(usage[:vcpus], nulls: :last), proj[:name])
+        .all
+
+      @quota_vs_capacity = [{
+        "AWS Quota" => projects.sum { it[:x64_quota] + it[:arm64_quota] },
+        "AWS vCPU Capacity" => Config.github_runner_aws_spill_vcpu_capacity,
+      }]
+
+      @projects = projects.map do |row|
+        {
+          "Project" => table_link(row[:name], "/model/Project/#{UBID.to_ubid(row[:id])}"),
+          "Reputation" => row[:reputation],
+          "GithubRunnerVCpuAws" => "#{row[:x64_vcpus]} / #{row[:x64_quota]}",
+          "GithubRunnerVCpuArmAws" => "#{row[:arm64_vcpus]} / #{row[:arm64_quota]}",
+        }
+      end
+
+      view("spill_over")
+    end
+
     r.get "cogs" do
       @rate = BigDecimal(typecast_params.nonempty_str("rate") || "1.14", exception: false)
       fail CloverError.new(400, "InvalidRequest", "invalid conversion rate") unless @rate&.positive?

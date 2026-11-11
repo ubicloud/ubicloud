@@ -3513,6 +3513,38 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
   end
 
+  it "shows AWS quota against capacity and AWS runner usage of projects with spill_to_alien_runners" do
+    spiller = Project.create(name: "spiller", reputation: "limited")
+    spiller.set_ff_spill_to_alien_runners(true)
+    spiller.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpuAws"]["id"], value: 1000)
+    Project.create(name: "idle").set_ff_spill_to_alien_runners(true)
+    Project.create(name: "disabled").set_ff_spill_to_alien_runners(false)
+    Project.create(name: "deleted", visible: false).set_ff_spill_to_alien_runners(true)
+    spiller_installation = GithubInstallation.create(installation_id: 1, name: "spiller-installation", type: "Organization", project_id: spiller.id)
+
+    x64_vm = create_vm(boot_image: Config.github_ubuntu_2404_x64_aws_ami_version, vcpus: 32)
+    GithubRunner.create(installation_id: spiller_installation.id, repository_name: "spiller/repo", label: "ubicloud-standard-30", vm_id: x64_vm.id, location_id: x64_vm.location_id)
+    arm64_vm = create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2404_arm64_aws_ami_version, vcpus: 8)
+    GithubRunner.create(installation_id: spiller_installation.id, repository_name: "spiller/repo", label: "ubicloud-standard-8-arm", vm_id: arm64_vm.id, location_id: arm64_vm.location_id)
+    metal_vm = create_vm(vcpus: 4)
+    GithubRunner.create(installation_id: spiller_installation.id, repository_name: "spiller/repo", label: "ubicloud-standard-4", vm_id: metal_vm.id, location_id: metal_vm.location_id)
+
+    rows = ->(table) { page.all(".#{table} tbody tr").map { it.all("td").map(&:text) } }
+
+    click_link "Spill Over"
+    expect(page.title).to eq "Ubicloud Admin - Spill Over"
+    expect(page.all(".spill-over-quota-table thead th").map(&:text)).to eq ["AWS Quota", "AWS vCPU Capacity"]
+    expect(rows.call("spill-over-quota-table")).to eq [["2000", "100"]]
+    expect(page.all(".spill-over-project-table thead th").map(&:text)).to eq ["Project", "Reputation", "GithubRunnerVCpuAws", "GithubRunnerVCpuArmAws"]
+    expect(rows.call("spill-over-project-table")).to eq [
+      ["spiller", "limited", "32 / 1000", "8 / 0"],
+      ["idle", "new", "0 / 500", "0 / 500"],
+    ]
+
+    click_link "spiller"
+    expect(page.title).to eq "Ubicloud Admin - Project #{spiller.ubid}"
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")
