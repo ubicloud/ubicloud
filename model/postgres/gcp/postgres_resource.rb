@@ -41,7 +41,11 @@ class PostgresResource < Sequel::Model
     end
 
     def gcp_lockout_mechanisms
-      ["pg_stop", "hba"].freeze
+      if representative_server.vm.management_nic
+        ["pg_stop", "hba", "delete_nic"].freeze
+      else
+        ["pg_stop", "hba"].freeze
+      end
     end
 
     def gcp_use_separate_management_nic?
