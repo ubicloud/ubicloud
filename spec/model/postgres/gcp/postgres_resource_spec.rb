@@ -218,8 +218,24 @@ RSpec.describe PostgresResource do
     end
 
     describe "#lockout_mechanisms" do
-      it "returns pg_stop and hba" do
+      def make_representative(vm)
+        PostgresServer.create(timeline: PostgresTimeline.create(location_id: location.id), resource: postgres_resource, vm_id: vm.id,
+          is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
+      end
+
+      it "returns pg_stop and hba for a primary with one NIC" do
+        make_representative(create_gcp_vm_with_nic("pg-vm-single", zone_suffix: "a"))
         expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba"])
+      end
+
+      it "adds delete_nic for a primary with a management NIC" do
+        vm = create_gcp_vm_with_nic("pg-vm-dual", zone_suffix: "a")
+        mgmt_subnet = PrivateSubnet.create(name: PrivateSubnet::GCP_MANAGEMENT_SUBNET_NAME, location_id: location.id, project_id: project.id,
+          net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "100.64.32.0/19", state: "active")
+        Nic.create(private_ipv6: "fd10:9b0b:6b4b:8fbc::1", private_ipv4: "100.64.32.5", name: "pg-vm-dual-mgmt-nic",
+          private_subnet_id: mgmt_subnet.id, state: "active", is_management: true, vm_id: vm.id)
+        make_representative(vm)
+        expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "delete_nic"])
       end
     end
 
