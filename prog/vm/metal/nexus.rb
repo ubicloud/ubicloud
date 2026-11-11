@@ -55,6 +55,16 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
   end
 
+  def log_stored_rules_mismatch(frame_args, stored_args, gpu_count:, gpu_device:)
+    differing = Scheduling::VmJob.differing_request_fields(
+      Scheduling::Allocator.build_request(vm, storage_volumes, gpu_count:, gpu_device:, **frame_args),
+      Scheduling::Allocator.build_request(vm, storage_volumes, gpu_count:, gpu_device:, **stored_args),
+    )
+    return if differing.empty?
+
+    Clog.emit("allocation rules mismatch", {allocation_rules_mismatch: {vm_ubid: vm.ubid, differing:}})
+  end
+
   def queued_vms
     Vm.where(location_id: vm.location_id, arch: vm.arch, vm_host_id: nil)
   end
@@ -104,8 +114,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
       os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
-      Scheduling::Allocator.allocate(
-        vm, storage_volumes,
+      frame_args = {
         distinct_storage_devices:,
         allocation_state_filter:,
         location_filter:,
@@ -113,11 +122,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         host_filter:,
         host_exclusion_filter:,
         data_center_exclusion_filter:,
-        gpu_count:,
-        gpu_device:,
         os_filter:,
         family_filter:,
-      )
+      }
+      if vm.allocation_rules
+        stored_args = Scheduling::VmJob.allocator_args(vm, os_filter:)
+        log_stored_rules_mismatch(frame_args, stored_args, gpu_count:, gpu_device:)
+      end
+
+      Scheduling::Allocator.allocate(vm, storage_volumes, gpu_count:, gpu_device:, **frame_args)
     rescue Scheduling::Allocator::HostsBusy
       Clog.emit("Hosts busy", {hosts_busy: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family}})
 

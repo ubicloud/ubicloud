@@ -82,6 +82,12 @@ RSpec.describe Scheduling::Allocator do
       expect { described_class.allocate(vm, storage_volumes) }.to raise_error Scheduling::Allocator::NoSpaceLeft, "Vm[\"#{vm.ubid}\"] no space left on any eligible host"
     end
 
+    it "ranks the request that build_request returns" do
+      request = described_class.build_request(vm, storage_volumes, family_filter: ["standard"])
+      expect(Al::Allocation).to receive(:ranked_allocations).with(request).and_return([])
+      expect { described_class.allocate(vm, storage_volumes, family_filter: ["standard"]) }.to raise_error Scheduling::Allocator::NoSpaceLeft
+    end
+
     it "allocates on the next candidate if the better ones are busy" do
       busy = instance_double(Al::Allocation, allocate: nil)
       free = instance_double(Al::Allocation, to_s: "free allocation")
