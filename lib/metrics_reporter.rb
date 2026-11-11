@@ -8,10 +8,11 @@ class MetricsReporter
   # Direct access to the shutdown queue. Only designed for use by the tests.
   attr_reader :shutdown_queue
 
-  def initialize(name:, metrics:, interval: 15, instance: ENV["DYNO"] || Socket.gethostname)
+  def initialize(name:, metrics:, interval: 15, shutdown_timeout: 5, instance: ENV["DYNO"] || Socket.gethostname)
     @metrics = metrics
     @name = name
     @interval = interval
+    @shutdown_timeout = shutdown_timeout
     @extra_labels = {instance:}.freeze
     @shutdown_queue = Queue.new
     @thread = nil
@@ -25,7 +26,7 @@ class MetricsReporter
 
     @shutdown = true
     @shutdown_queue.push(true)
-    @thread&.join
+    @thread&.join(@shutdown_timeout)
 
     nil
   end
@@ -42,11 +43,12 @@ class MetricsReporter
     end
   end
 
-  # Report once per interval until shutdown! is called.
+  # Report once per interval until shutdown! is called, then report a final time.
   def run
     until @shutdown_queue.pop(timeout: @interval)
       report
     end
+    report
   end
 
   def report
