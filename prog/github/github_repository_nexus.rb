@@ -45,7 +45,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     client = github_repository.installation.client(auto_paginate: true)
     created_after = (Time.now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d")
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued", created: ">=#{created_after}"})[:workflow_runs]
-    Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count, oldest_run_at: queued_runs.map { it[:created_at] }.min}})
+    Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count, oldest_run_at: queued_runs.map { it[:created_at] }.min}}) unless queued_runs.empty?
 
     # We check the rate limit after the first API call to avoid unnecessary API
     # calls to fetch only the rate limit. Every response includes the rate limit
