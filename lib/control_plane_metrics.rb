@@ -10,6 +10,7 @@ module ControlPlaneMetrics
   MONITOR_PULSE_BUCKETS = [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120].freeze
   METRICS_EXPORT_BUCKETS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 100].freeze
   VM_PROVISION_BUCKETS = [1, 2.5, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 1800, 3600].freeze
+  GITHUB_RUNNER_BUCKETS = [0.5, 1, 2.5, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 1800, 3600, 7200, 21600].freeze
   RESPIRATE_DELAY_BUCKETS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60].freeze
 
   UNLABELED_GAUGES = {
@@ -94,6 +95,12 @@ module ControlPlaneMetrics
       labels: [:provider, :stage, :arch, :runner],
       buckets: VM_PROVISION_BUCKETS,
     )
+    @github_runner_duration = @registry.histogram(
+      :github_runner_duration_seconds,
+      docstring: "GitHub runner lifecycle durations by stage and requested VM size and architecture.",
+      labels: [:stage, :vm_size, :arch],
+      buckets: GITHUB_RUNNER_BUCKETS,
+    )
     @unlabeled_gauges = {}
   end
 
@@ -134,6 +141,10 @@ module ControlPlaneMetrics
   def observe_vm_provision(provider:, arch:, runner:, allocation:, provisioning:)
     @vm_provision_duration.observe(allocation, labels: {provider:, stage: "allocation", arch:, runner: runner.to_s})
     @vm_provision_duration.observe(provisioning, labels: {provider:, stage: "provisioning", arch:, runner: runner.to_s})
+  end
+
+  def observe_github_runner(stage:, vm_size:, arch:, duration:)
+    @github_runner_duration.observe(duration, labels: {stage:, vm_size:, arch:})
   end
 
   def count_runner_admission(decision:)

@@ -67,6 +67,10 @@ class GithubRunner < Sequel::Model
     "#{repository_url}/settings/actions/runners/#{runner_id}" if runner_id
   end
 
+  def observe_duration(stage, duration)
+    ControlPlaneMetrics.observe_github_runner(stage:, vm_size: label_data.fetch("vm_size"), arch: label_data.fetch("arch"), duration:)
+  end
+
   def log_duration(message, duration)
     values = {ubid:, label:, repository_name:, duration: duration.round(3), conclusion: workflow_job&.dig("conclusion")}
     if vm

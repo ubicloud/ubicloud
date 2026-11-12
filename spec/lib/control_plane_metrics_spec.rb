@@ -79,4 +79,9 @@ RSpec.describe ControlPlaneMetrics do
     expect(rendered).to include 'vm_provision_duration_seconds_bucket{provider="spec",stage="allocation",arch="arm64",runner="true",le="5"} 1.0'
     expect(rendered).to include 'vm_provision_duration_seconds_sum{provider="spec",stage="provisioning",arch="arm64",runner="true"} 40.0'
   end
+
+  it "renders github runner durations" do
+    described_class.observe_github_runner(stage: "allocation", vm_size: "standard-2", arch: "x64", duration: 12)
+    expect(described_class.render).to include 'github_runner_duration_seconds_bucket{stage="allocation",vm_size="standard-2",arch="x64",le="15"} 1.0'
+  end
 end

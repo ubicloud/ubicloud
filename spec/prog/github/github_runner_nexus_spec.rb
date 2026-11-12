@@ -391,7 +391,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "bills from the job start when the runner waited for a job" do
-      runner.update(ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:55:00Z"})
+      runner.update(created_at: now - 12 * 60, ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:55:00Z"})
+      expect(runner).to receive(:observe_duration).with("pickup", 5 * 60).and_call_original
+      expect(runner).to receive(:observe_duration).with("wait", 7 * 60).and_call_original
+      expect(runner).to receive(:observe_duration).with("job", 5 * 60).and_call_original
       nx.update_billing_record
 
       expect(BillingRecord[resource_id: installation.id].amount).to eq(5)
