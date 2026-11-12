@@ -15,7 +15,7 @@ CONF
     sshable.write_file("/etc/systemd/system/fstrim.service.d/minimum.conf", <<CONF)
 [Service]
 ExecStart=
-ExecStart=/sbin/fstrim --listed-in /etc/fstab:/proc/self/mountinfo --verbose --quiet-unsupported --minimum 2M
+ExecStart=/sbin/fstrim --all --verbose --quiet-unsupported --minimum 2M
 CONF
     sshable.cmd("sudo systemctl daemon-reload")
     sshable.cmd("sudo systemctl enable fstrim.timer")
