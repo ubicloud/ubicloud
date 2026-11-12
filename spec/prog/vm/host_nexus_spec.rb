@@ -456,6 +456,7 @@ RSpec.describe Prog::Vm::HostNexus do
         "SetupCsumGuard",
         "SetupNftables",
         "SetupNodeExporter",
+        "SetupStorageTrim",
         "SetupSysstat",
         "Vm::PrepHost",
       ])
