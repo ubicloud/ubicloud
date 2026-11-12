@@ -37,6 +37,20 @@ RSpec.describe PgBouncerSetup do
       expect(config).to include("pool_mode = transaction")
     end
 
+    it "ignores extra_float_digits in client startup packets by default" do
+      expect(config).to include("ignore_startup_parameters = extra_float_digits")
+    end
+
+    it "lets customer pgbouncer_config override pool_mode when appended last" do
+      setup_with_user_config = described_class.new(
+        version, max_connections, num_instances, {"pool_mode" => "session"}
+      )
+      config = setup_with_user_config.pgbouncer_ini_content(1)
+
+      expect(config.scan(/^pool_mode = /).length).to eq(2)
+      expect(config.index("pool_mode = session")).to be > config.index("pool_mode = transaction")
+    end
+
     it "sets peer_id based on instance_id" do
       config_1 = pgbouncer_setup.pgbouncer_ini_content(1)
       config_2 = pgbouncer_setup.pgbouncer_ini_content(2)
