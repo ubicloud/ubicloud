@@ -14,7 +14,25 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
       hop_refresh_dns_servers
     end
 
+    when_rectify_apex_set? do
+      register_deadline("wait", 5 * 60, message: "finish rectifying the zone apex")
+      hop_rectify_apex
+    end
+
     nap 10
+  end
+
+  # The apex NS and SOA come from the zone file written when a VM is set
+  # up, so later changes to the configured values are pushed here, to every
+  # VM of every server of the zone.
+  label def rectify_apex
+    decr_rectify_apex
+
+    dns_zone.dns_servers.each do |dns_server|
+      dns_server.vms.each { dns_zone.rectify_apex(dns_server, it) }
+    end
+
+    hop_wait
   end
 
   label def refresh_dns_servers

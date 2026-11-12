@@ -31,8 +31,65 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
       expect { nx.wait }.to hop("purge_obsolete_records")
     end
 
+    it "hops to rectify_apex if rectify_apex semaphore is set" do
+      nx.incr_rectify_apex
+      expect { nx.wait }.to hop("rectify_apex")
+    end
+
     it "naps if there is nothing to do" do
       expect { nx.wait }.to nap(10)
+    end
+  end
+
+  describe "#rectify_apex" do
+    let(:read_stdin) { "zone-read postgres.ubicloud.com @ NS\nzone-read postgres.ubicloud.com @ SOA" }
+
+    def default_apex(server_name)
+      "postgres.ubicloud.com. 3600 NS #{server_name}.\npostgres.ubicloud.com. 3600 SOA ns.postgres.ubicloud.com. postgres.ubicloud.com. 41 86400 7200 1209600 3600\n"
+    end
+
+    def update_stdin(server_name)
+      [
+        "zone-abort postgres.ubicloud.com",
+        "zone-begin postgres.ubicloud.com",
+        "zone-unset postgres.ubicloud.com @ NS #{server_name}.",
+        "zone-set postgres.ubicloud.com @ 3600 NS ns1.example.net.",
+        "zone-set postgres.ubicloud.com @ 3600 SOA ns1.example.net. postgres.ubicloud.com. 42 86400 7200 1209600 3600",
+        "zone-commit postgres.ubicloud.com",
+      ].join("\n")
+    end
+
+    before do
+      dns_zone.update(apex_nameservers: ["ns1.example.net"])
+      nx.incr_rectify_apex
+    end
+
+    it "rectifies the apex on every VM of every server of the zone" do
+      vm
+      other_server = DnsServer.create(name: "ns2.ubicloud.com")
+      dns_zone.add_dns_server(other_server)
+      other_vm = create_vm(project_id: prj.id, name: "dns-vm-2")
+      Sshable.create_with_id(other_vm, unix_user: "root", host: "test-host-2")
+      other_server.add_vm(other_vm)
+
+      nx.dns_zone.dns_servers.each do |server|
+        server.vms.each do |target|
+          expect(target.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex(server.name))
+          expect(target.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: update_stdin(server.name)).and_return("OK\n" * 6)
+        end
+      end
+      expect(nx.dns_zone.dns_servers.flat_map(&:vms).map(&:id)).to contain_exactly(vm.id, other_vm.id)
+
+      expect { nx.rectify_apex }.to hop("wait")
+      expect(Semaphore.where(strand_id: dns_zone.id, name: "rectify_apex")).to be_empty
+    end
+
+    it "keeps the request when a VM fails, so the strand retries" do
+      vm
+      expect(nx.dns_zone.dns_servers.first.vms.first.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_raise(Errno::ECONNREFUSED)
+
+      expect { DB.transaction(savepoint: true) { nx.rectify_apex } }.to raise_error(Errno::ECONNREFUSED)
+      expect(Semaphore.where(strand_id: dns_zone.id, name: "rectify_apex").count).to eq 1
     end
   end
 

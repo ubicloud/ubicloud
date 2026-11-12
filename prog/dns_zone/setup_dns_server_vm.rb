@@ -123,14 +123,14 @@ sudo systemctl reboot
   end
 
   label def sync_zones
-    nap 5 if ds.dns_zones.any?(&:refresh_dns_servers_set?)
+    nap 5 if ds.dns_zones.any? { it.refresh_dns_servers_set? || it.rectify_apex_set? }
 
     sshable.cmd "sudo rm -f /var/lib/knot/*.zone /var/lib/knot/journal/*"
 
     ds.dns_zones.each do |dz|
       zone_config = <<-CONF
-#{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
-#{dz.name}.          3600    NS      #{ds.name}.
+#{dz.name}.          3600    SOA     #{dz.soa_mname} #{dz.soa_rname} 37 86400 7200 1209600 #{dz.neg_ttl}
+#{dz.apex_ns_names(ds).map { "#{dz.name}.          3600    NS      #{it}" }.join("\n")}
       CONF
       sshable.write_file("/var/lib/knot/#{dz.name}.zone", zone_config, user: "knot")
     end
