@@ -31,8 +31,8 @@ module ControlPlaneMetrics
     )
     @ssh_command_duration = @registry.histogram(
       :ssh_command_duration_seconds,
-      docstring: "Duration of commands run over SSH.",
-      labels: [:outcome],
+      docstring: "Duration of commands run over SSH, by the strand prog and label that ran them.",
+      labels: [:prog, :label, :outcome],
       buckets: SSH_COMMAND_BUCKETS,
     )
     @monitor_pulse_duration = @registry.histogram(
@@ -78,8 +78,8 @@ module ControlPlaneMetrics
     @strand_label_duration.observe(duration, labels: {prog:, label:, outcome:, to:})
   end
 
-  def observe_ssh_command(outcome:, duration:)
-    @ssh_command_duration.observe(duration, labels: {outcome:})
+  def observe_ssh_command(prog:, label:, outcome:, duration:)
+    @ssh_command_duration.observe(duration, labels: {prog:, label:, outcome:})
   end
 
   def observe_monitor_pulse(resource_type:, duration:)

@@ -234,6 +234,8 @@ SQL
     run_prog = prog
     run_label = label
     prog_label = "#{run_prog}.#{run_label}"
+    outer_strand_run = Thread.current[:strand_run]
+    Thread.current[:strand_run] = [run_prog, run_label]
     top_frame = stack.first
 
     if label == top_frame["deadline_target"]
@@ -383,6 +385,7 @@ SQL
       raise RunError.new(self)
     end
   ensure
+    Thread.current[:strand_run] = outer_strand_run
     duration = Time.now - start_time
     ControlPlaneMetrics.observe_strand_run(prog: run_prog, label: run_label, duration:)
     Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > SLOW_RUN_LOG_SECONDS

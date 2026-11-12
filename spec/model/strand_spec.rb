@@ -262,6 +262,21 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
+  describe "strand run context" do
+    it "exposes the running prog and label to the thread and restores the outer value" do
+      Thread.current[:strand_run] = ["Outer", "label"]
+      st = described_class.create(prog: "Test", label: "deferred_transaction_hopper")
+      seen = nil
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("deferred_transaction_hopper outside transaction") { seen = Thread.current[:strand_run] }
+      st.unsynchronized_run
+      expect(seen).to eq ["Test", "deferred_transaction_hopper"]
+      expect(Thread.current[:strand_run]).to eq ["Outer", "label"]
+    ensure
+      Thread.current[:strand_run] = nil
+    end
+  end
+
   describe "label duration metric" do
     it "records the target label of a hop within the same prog" do
       st = described_class.create(prog: "Test", label: "hop_entry")

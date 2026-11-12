@@ -14,8 +14,8 @@ RSpec.describe ControlPlaneMetrics do
   end
 
   it "renders ssh command durations" do
-    described_class.observe_ssh_command(outcome: "spec_timeout", duration: 1.5)
-    expect(described_class.render).to include 'ssh_command_duration_seconds_sum{outcome="spec_timeout"} 1.5'
+    described_class.observe_ssh_command(prog: "SpecSsh", label: "run", outcome: "timeout", duration: 1.5)
+    expect(described_class.render).to include 'ssh_command_duration_seconds_sum{prog="SpecSsh",label="run",outcome="timeout"} 1.5'
   end
 
   it "renders monitor pulse durations" do
