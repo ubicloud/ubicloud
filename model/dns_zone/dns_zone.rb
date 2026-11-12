@@ -78,15 +78,21 @@ end
 
 # Table: dns_zone
 # Columns:
-#  id             | uuid                     | PRIMARY KEY
-#  created_at     | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id     | uuid                     | NOT NULL
-#  name           | text                     | NOT NULL
-#  last_purged_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  neg_ttl        | integer                  | NOT NULL DEFAULT 3600
+#  id               | uuid                     | PRIMARY KEY
+#  created_at       | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id       | uuid                     | NOT NULL
+#  name             | text                     | NOT NULL
+#  last_purged_at   | timestamp with time zone | NOT NULL DEFAULT now()
+#  neg_ttl          | integer                  | NOT NULL DEFAULT 3600
+#  apex_nameservers | text[]                   |
+#  soa_email        | text                     |
 # Indexes:
 #  dns_zone_pkey                 | PRIMARY KEY btree (id)
 #  dns_zone_project_id_name_uidx | UNIQUE btree (project_id, name)
+# Check constraints:
+#  apex_nameservers_hostnames | (array_position(apex_nameservers, NULL::text) IS NULL AND array_to_string(apex_nameservers, ''::text) !~ ' '::text AND array_to_string(apex_nameservers, ' '::text) ~* '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+\.?( [a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+\.?)*$'::text)
+#  apex_nameservers_not_empty | (cardinality(apex_nameservers) > 0)
+#  soa_email_format           | (soa_email ~* '^[a-z0-9_+-]+(\.[a-z0-9_+-]+)*@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'::text)
 # Foreign key constraints:
 #  dns_zone_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
