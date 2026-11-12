@@ -35,7 +35,7 @@ elsif (suite = ENV.delete("COVERAGE"))
     else
       skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
-        path.match?(/\A\/(rhizome|kubernetes|migrate|ruby_lsp|spec|var|(db|model|loader|\.env)\.rb)/) ||
+        path.match?(/\A\/(rhizome|kubernetes|migrate|ruby_lsp|spec|terraform|var|(db|model|loader|\.env)\.rb)/) ||
           (file.relevant_lines.zero? && file.no_branches?)
       end
 

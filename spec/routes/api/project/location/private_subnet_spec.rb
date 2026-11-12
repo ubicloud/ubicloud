@@ -90,6 +90,13 @@ RSpec.describe Clover, "private_subnet" do
         expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
       end
 
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
       it "not authorized" do
         project
         post "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/foo-subnet"
@@ -106,10 +113,11 @@ RSpec.describe Clover, "private_subnet" do
         resp_body = JSON.parse(last_response.body)
         expect(resp_body["name"]).to eq("test-ps")
         expect(resp_body["firewalls"].first["id"]).to eq(fw.ubid)
+        expect(resp_body["firewalls"].first["path"]).to eq("/location/#{TEST_LOCATION}/firewall/default-firewall")
       end
 
       it "with invalid firewall id" do
-        firewall_id = "a" * 25 + "b"
+        firewall_id = Firewall.generate_ubid.to_s
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id:}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"#{firewall_id}\" and location \"eu-central-h1\" is not found"})
@@ -134,7 +142,9 @@ RSpec.describe Clover, "private_subnet" do
         get "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq(ps.name)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq(ps.name)
+        expect(body["firewalls"].map { it["path"] }).to eq(["/location/#{ps.display_location}/firewall/dummy-ps-1-default"])
       end
 
       it "success id" do

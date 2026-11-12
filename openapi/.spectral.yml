@@ -44,3 +44,13 @@ rules:
       functionOptions:
         schema:
           $ref: '#/components/responses/Error'
+  allof-members-typed:
+    description: "Every allOf member has type object, since openapi_parser does not validate an untyped member"
+    given: $..allOf[*]
+    severity: error
+    then:
+      field: type
+      function: schema
+      functionOptions:
+        schema:
+          const: object

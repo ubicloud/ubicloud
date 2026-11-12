@@ -14,7 +14,7 @@ module ContentGenerator
       private_subnet[:display_name]
     end
 
-    def self.enable_ip4(location, value)
+    def self.ip4_enabled(location, value)
       unit_price = BillingRate.unit_price_from_resource_properties("IPAddress", "IPv4", location.name)
 
       "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
@@ -153,14 +153,14 @@ module ContentGenerator
       location.ui_name
     end
 
-    def self.cp_nodes(location, cp_nodes)
+    def self.cp_node_count(location, cp_node_count)
       cp_node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
-      data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_nodes }
+      data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_node_count }
       [
         data.title,
         data.explanation,
-        "$#{"%.2f" % (cp_nodes * cp_node_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour",
+        "$#{"%.2f" % (cp_node_count * cp_node_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (cp_node_count * cp_node_price * 60)}/hour",
       ]
     end
 

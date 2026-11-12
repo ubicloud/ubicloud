@@ -142,6 +142,49 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
+      it "creates the database at target_version, in both API versions" do
+        ["application/json", "application/vnd.ubicloud+json; version=2"].each_with_index do |accept, i|
+          header "Accept", accept
+          post "/project/#{project.ubid}/location/eu-central-h1/postgres/pg-#{i}", {size: "standard-2", storage_size: 64, target_version: "17"}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(last_response["deprecation"]).to be_nil
+          expect(JSON.parse(last_response.body)["target_version"]).to eq("17")
+        end
+      end
+
+      it "takes the deprecated version as target_version in API version 1, with a warning" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(last_response["warning"]).to eq('299 - "version is deprecated: use target_version instead"')
+        expect(JSON.parse(last_response.body)["target_version"]).to eq("17")
+      end
+
+      it "refuses version together with target_version" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17", target_version: "16"}.to_json
+
+        expect(last_response).to have_api_error(400, "version and target_version name one value; send only target_version", {"version" => "send only target_version"})
+        expect(PostgresResource.count).to eq(0)
+      end
+
+      it "refuses version in API version 2" do
+        header "Accept", "application/vnd.ubicloud+json; version=2"
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {size: "standard-2", storage_size: 64, version: "17"}.to_json
+
+        expect(last_response).to have_api_error(400, "version was removed in API version 2: use target_version instead")
+      end
+
+      it "names the colliding columns when the name is taken" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-2",
+          storage_size: 64,
+        }.to_json
+
+        message = "project_id and location_id and name is already taken"
+        expect(last_response).to have_api_error(400, message, {"name" => message})
+      end
+
       it "ignores submitted flavor" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
           size: "standard-2",
@@ -180,6 +223,29 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
+      end
+
+      it "refuses the legacy burstable sizes on create" do
+        {"burstable-1" => "hobby-1", "burstable-2" => "hobby-2"}.each do |size, hobby|
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+            size:,
+            storage_size: 64,
+          }.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size. Use #{hobby} instead."})
+        end
+        expect(PostgresResource.where(name: "test-postgres").count).to eq 0
+      end
+
+      it "refuses the legacy burstable sizes on update" do
+        {"burstable-1" => "hobby-1", "burstable-2" => "hobby-2"}.each do |size, hobby|
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size:,
+          }.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size. Use #{hobby} instead."})
+        end
+        expect(pg.reload.target_vm_size).to eq "standard-2"
       end
 
       it "invalid config values" do
@@ -275,6 +341,63 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.target_storage_size_gib).to eq(256)
         expect(pg.reload.ha_type).to eq("async")
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("size", "storage_size")).to eq("size" => "standard-8", "storage_size" => 256)
+      end
+
+      describe "after storage auto-scale raised the targets" do
+        before do
+          allow(Util).to receive(:send_email)
+          expect(pg.representative_server).to receive(:disk_usage_percent).and_return(92)
+          pg.handle_storage_auto_scale
+          expect(pg.reload.values.slice(:target_vm_size, :target_storage_size_gib)).to eq(target_vm_size: "standard-2", target_storage_size_gib: 256)
+        end
+
+        it "leaves them raised when a PATCH resends the requested size" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-2",
+            storage_size: 128,
+            ha_type: "async",
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("size", "storage_size", "target_vm_size", "target_storage_size_gib", "ha_type")).to eq(
+            "size" => "standard-2", "storage_size" => 128, "target_vm_size" => "standard-2", "target_storage_size_gib" => 256, "ha_type" => "async",
+          )
+          expect(pg.reload.storage_auto_scale_action_performed_90_set?).to be true
+        end
+
+        it "moves them when a PATCH requests a new size" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-4",
+            storage_size: 512,
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body).slice("size", "storage_size", "target_vm_size", "target_storage_size_gib")).to eq(
+            "size" => "standard-4", "storage_size" => 512, "target_vm_size" => "standard-4", "target_storage_size_gib" => 512,
+          )
+          expect(pg.reload.storage_auto_scale_action_performed_90_set?).to be false
+        end
+
+        it "moves only the target whose request changes" do
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+            size: "standard-4",
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(pg.reload.values.slice(:target_vm_size, :target_storage_size_gib)).to eq(target_vm_size: "standard-4", target_storage_size_gib: 256)
+        end
+      end
+
+      it "records the request of a database created before requests were recorded" do
+        pg.update(requested_vm_size: nil, requested_storage_size_gib: nil)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          ha_type: "async",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.values.slice(:requested_vm_size, :requested_storage_size_gib)).to eq(requested_vm_size: "standard-2", requested_storage_size_gib: 128)
       end
 
       it "logs scale and high availability changes" do
@@ -347,13 +470,13 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
-      it "clears storage auto-scale semaphores on update" do
+      it "clears storage auto-scale semaphores on a resize" do
         pg.incr_storage_auto_scale_action_performed_80
         pg.incr_storage_auto_scale_action_performed_85
         pg.incr_storage_auto_scale_action_performed_90
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          size: "standard-2",
+          size: "standard-4",
           storage_size: 128,
           ha_type: "none",
         }.to_json
@@ -480,10 +603,10 @@ RSpec.describe Clover, "postgres" do
         expect(replica.init_script.init_script).to eq("sudo whoami")
       end
 
-      it "read-replica inherits and merges config from parent" do
+      it "read-replica inherits and merges config from parent, storing its numbers as strings" do
         pg.update(
-          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
-          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+          user_config: {"max_connections" => 3000, "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => 150, "pool_mode" => "transaction"},
         )
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
@@ -560,6 +683,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).keys).to include("connection_string", "password", "firewall_rules", "read_replicas")
       end
 
       it "promote-read-replica via deprecated promote endpoint" do
@@ -570,6 +694,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).keys).to include("connection_string", "password", "firewall_rules", "read_replicas")
       end
 
       it "fails to promote if not read_replica" do
@@ -613,8 +738,22 @@ RSpec.describe Clover, "postgres" do
           description: "Updated rule",
         }.to_json
 
-        expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
         expect(last_response.status).to eq(200)
+        expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
+        expect(pg.pg_firewall_rules_dataset.all.select { it.cidr.to_s.start_with?("0.") }.map { [it.cidr.to_s, it.port_range.begin, it.description] })
+          .to eq([["0.0.0.0/1", 5432, "Updated rule"], ["0.0.0.0/1", 6432, "Updated rule"]])
+      end
+
+      it "firewall-rule edit changes neither row when the twin's new CIDR is taken" do
+        pg.customer_firewall.add_firewall_rule(cidr: "1.2.3.4/32", port_range: 6432..6432)
+        fwr = pg.pg_firewall_rules.first
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}", {
+          cidr: "1.2.3.4/32",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id and protocol is already taken")
+        expect(pg.pg_firewall_rules_dataset.all.map { [it.cidr.to_s, it.port_range.begin] })
+          .to eq([["0.0.0.0/0", 5432], ["0.0.0.0/0", 6432], ["1.2.3.4/32", 6432], ["::/0", 5432], ["::/0", 6432]])
       end
 
       it "metric-destination" do
@@ -625,6 +764,8 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(JSON.parse(last_response.body)).to eq({"id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "username", "url" => "https://example.com"})
       end
 
       it "metric-destination invalid url" do
@@ -702,27 +843,27 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with unsupported options key" do
-        post_metric_destination(url: "https://example.com", options: {oauth2: {client_id: "id"}})
-
-        expect(metric_destination_error["options"]).to eq("options may only contain 'authorization' and 'headers'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {oauth2: {client_id: "id"}})
+        }.to raise_error(Committee::InvalidRequest, /options does not define properties: oauth2/)
       end
 
       it "metric-destination with malformed authorization" do
-        post_metric_destination(url: "https://example.com", options: {authorization: {type: "Bearer"}})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: {type: "Bearer"}})
+        }.to raise_error(Committee::InvalidRequest, /authorization missing required parameters: credentials/)
       end
 
       it "metric-destination with null authorization" do
-        post_metric_destination(url: "https://example.com", options: {authorization: nil})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: nil})
+        }.to raise_error(Committee::InvalidRequest, /authorization does not allow null values/)
       end
 
       it "metric-destination with empty credentials" do
-        post_metric_destination(url: "https://example.com", options: {authorization: {credentials: ""}})
-
-        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {authorization: {credentials: ""}})
+        }.to raise_error(Committee::InvalidRequest, /credentials "" is shorter than min length/)
       end
 
       it "metric-destination with blank authorization type" do
@@ -738,9 +879,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with null headers" do
-        post_metric_destination(url: "https://example.com", username: "username", password: "password", options: {headers: nil})
-
-        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+        expect {
+          post_metric_destination(url: "https://example.com", username: "username", password: "password", options: {headers: nil})
+        }.to raise_error(Committee::InvalidRequest, /headers does not allow null values/)
       end
 
       it "metric-destination setting a prometheus remote_write version header" do
@@ -750,9 +891,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination with non-string header values" do
-        post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => 1}})
-
-        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+        expect {
+          post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => 1}})
+        }.to raise_error(Committee::InvalidRequest, /headers\/additionalProperties expected string, but received Integer: 1/)
       end
 
       it "metric-destination setting a header prometheus reserves" do
@@ -781,6 +922,30 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)).to include("type" => "otlp", "url" => "https://otlp.nr-data.net")
+      end
+
+      def post_log_destination(params)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination", params.to_json
+      end
+
+      it "log-destination (otlp) with headers" do
+        post_log_destination(name: "nr", type: "otlp", url: "https://otlp.nr-data.net", options: {headers: {"api-key" => "secret"}})
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).not_to have_key("options")
+        expect(pg.log_destinations.first.options).to eq({"headers" => {"api-key" => "secret"}})
+      end
+
+      it "log-destination (syslog) with headers" do
+        post_log_destination(name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514", options: {headers: {"api-key" => "secret"}})
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: options", {"options" => "options may only contain 'structured_data' for syslog"})
+      end
+
+      it "log-destination with structured data that is not a map of maps" do
+        expect {
+          post_log_destination(name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514", options: {structured_data: {"token@41058" => "my-token"}})
+        }.to raise_error(Committee::InvalidRequest, /structured_data\/additionalProperties expected object, but received String: "my-token"/)
       end
 
       it "log-destination invalid syslog port" do
@@ -838,10 +1003,10 @@ RSpec.describe Clover, "postgres" do
         expect(restored.init_script.init_script).to eq("sudo whoami")
       end
 
-      it "restore inherits and merges config from parent" do
+      it "restore inherits and merges config from parent, storing its numbers as strings" do
         pg.update(
-          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
-          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+          user_config: {"max_connections" => 3000, "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => 150, "pool_mode" => "transaction"},
         )
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
@@ -974,18 +1139,26 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
+        pg.update(maintenance_window_start_at: 12)
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: 25,
+          maintenance_window_start_at: nil,
         }.to_json
 
-        expect(last_response.status).to eq(400)
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to be_nil
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: -2,
-        }.to_json
+        expect do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+            maintenance_window_start_at: 24,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at 24 is more than maximum value/)
 
-        expect(last_response.status).to eq(400)
+        expect do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+            maintenance_window_start_at: -1,
+          }.to_json
+        end.to raise_error(Committee::InvalidRequest, /maintenance_window_start_at -1 is less than minimum value/)
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
 
@@ -1027,6 +1200,17 @@ RSpec.describe Clover, "postgres" do
             maintenance_window_days: ["funday"],
           }.to_json
         }.to raise_error(Committee::InvalidRequest, /isn't part of the enum/)
+      end
+
+      it "accepts empty maintenance window days without the feature enabled" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+          maintenance_window_days: [],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("maintenance_window_start_at", "maintenance_window_days")).to eq("maintenance_window_start_at" => 9, "maintenance_window_days" => [])
+        expect(pg.reload.maintenance_window_start_at).to eq(9)
       end
 
       it "returns an error when maintenance window days are set without the feature enabled" do
@@ -1197,6 +1381,124 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["private_connection_string"]).to eq(pg.private_connection_string)
       end
 
+      it "names the private subnet and firewall the database uses" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("private_subnet_id", "firewall_id")).to eq("private_subnet_id" => pg.private_subnet.ubid, "firewall_id" => pg.customer_firewall.ubid)
+      end
+
+      it "lists each firewall rule once, by its 5432 row" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        ids = pg.pg_firewall_rules_dataset.where(port_range: Sequel.pg_range(5432..5432)).map(&:ubid)
+        expect(JSON.parse(last_response.body)["firewall_rules"].map { it.values_at("id", "cidr", "port") }).to eq([[ids[0], "0.0.0.0/0", 5432], [ids[1], "::/0", 5432]])
+      end
+
+      it "shows a null firewall_id once the firewall is detached from the private subnet" do
+        pg.customer_firewall.remove_all_private_subnets
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.slice("private_subnet_id", "firewall_id")).to eq("private_subnet_id" => pg.private_subnet.ubid, "firewall_id" => nil)
+        expect(body["firewall_rules"]).to eq([])
+      end
+
+      it "success with destinations, a read replica and restore times" do
+        md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+        backup_at = Time.now - 60 * 60
+        pg.timeline.update(cached_earliest_backup_at: backup_at)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["metric_destinations"]).to eq([{"id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "user", "url" => "https://metrics.example.com"}])
+        expect(body["log_destinations"]).to eq([{"id" => ld.ubid, "name" => "graylog", "type" => "syslog", "url" => "tcp://logs.example.com:6514"}])
+        expect(body["read_replicas"].map { it.slice("id", "read_replica", "parent") }).to eq([{"id" => replica.ubid, "read_replica" => true, "parent" => pg.path}])
+        expect(body["earliest_restore_time"]).to eq((backup_at + 5 * 60).utc.iso8601)
+        expect(body).to have_key("latest_restore_time")
+      end
+
+      it "success for a read replica, which has no restore times" do
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+
+        get "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body).to include("read_replica" => true, "primary" => false)
+        expect(body.keys).not_to include("earliest_restore_time", "latest_restore_time")
+      end
+
+      it "success without the maintenance window days flag" do
+        pg.update(maintenance_window_start_at: 9)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("maintenance_window_start_at", "maintenance_window_days")).to eq("maintenance_window_start_at" => 9, "maintenance_window_days" => [])
+      end
+
+      it "success without the maintenance window days flag, showing days stored while it was on" do
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["tue"]))
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_days"]).to eq(["tue"])
+      end
+
+      it "success with the maintenance window days flag" do
+        project.set_ff_postgres_enable_maintenance_window_days(true)
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["mon", "thu"]))
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_days"]).to eq(["mon", "thu"])
+      end
+
+      it "checks the detailed part of the response against the schema" do
+        expect(Serializers::Postgres).to receive(:serialize_internal).and_wrap_original { |m, *args| m.call(*args).merge(undocumented: true) }
+
+        expect {
+          get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: undocumented/)
+      end
+
+      it "checks the metric destinations in the response against the schema" do
+        PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        expect(Serializers::Postgres).to receive(:serialize_internal).and_wrap_original do |m, *args|
+          body = m.call(*args)
+          body[:metric_destinations] = body[:metric_destinations].map { it.merge(password: "pass") }
+          body
+        end
+
+        expect {
+          get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        }.to raise_error(Committee::InvalidResponse, /does not define properties: password/)
+      end
+
       it "success ubid" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"
 
@@ -1223,23 +1525,14 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{pg.ubid}-subnet private subnet (id: #{pg.private_subnet.ubid})")
       end
 
-      it "show firewall" do
+      it "show firewall lists each rule once, by its 5432 row" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["count"]).to eq(4)
+        body = JSON.parse(last_response.body)
+        ids = pg.pg_firewall_rules_dataset.where(port_range: Sequel.pg_range(5432..5432)).map(&:ubid)
+        expect(body["items"].map { it.values_at("id", "cidr", "port", "description") }).to eq([[ids[0], "0.0.0.0/0", 5432, ""], [ids[1], "::/0", 5432, ""]])
+        expect(body["count"]).to eq(2)
       end
 
       it "does not include firewall rules for port ranges other than only 5432 or only 6432" do
@@ -1248,28 +1541,81 @@ RSpec.describe Clover, "postgres" do
         pg.customer_firewall.add_firewall_rule(cidr: "3.2.3.4/32", port_range: 6432..16432)
         pg.customer_firewall.add_firewall_rule(cidr: "4.2.3.4/32", port_range: 5432..5432, description: "my-host")
         pg.customer_firewall.add_firewall_rule(cidr: "5.2.3.4/32", port_range: 6432..6432)
+        pg.customer_firewall.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 6432..6432, protocol: "udp")
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("4.2.3.4/32")
-        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("5.2.3.4/32")
-        expect(JSON.parse(last_response.body)["items"][4]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][5]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][4]["port"]).to eq 5432
-        expect(JSON.parse(last_response.body)["items"][5]["port"]).to eq 6432
-        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("my-host")
-        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][4]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["items"][5]["description"]).to eq("")
-        expect(JSON.parse(last_response.body)["count"]).to eq(6)
+        body = JSON.parse(last_response.body)
+        expect(body["items"].map { it.values_at("cidr", "port", "description") }).to eq([
+          ["0.0.0.0/0", 5432, ""],
+          ["0.0.0.0/0", 6432, ""],
+          ["4.2.3.4/32", 5432, "my-host"],
+          ["5.2.3.4/32", 6432, ""],
+          ["::/0", 5432, ""],
+        ])
+        expect(body["count"]).to eq(5)
+      end
+
+      it "firewall-rule" do
+        fwr = pg.pg_firewall_rules.first
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => fwr.ubid, "cidr" => "0.0.0.0/0", "port" => 5432, "description" => "")
+      end
+
+      it "firewall-rule by the id of its 6432 twin" do
+        twin = pg.pg_firewall_rules_dataset.first(cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432))
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{twin.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => twin.ubid, "cidr" => "0.0.0.0/0", "port" => 6432, "description" => "")
+      end
+
+      it "firewall-rule not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/fr000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "metric-destination" do
+        md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "user", password: "pass")
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/#{md.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => md.ubid, "auth_methods" => ["basic_auth"], "username" => "user", "url" => "https://metrics.example.com")
+      end
+
+      it "metric-destination not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/et000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "log-destination" do
+        ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination/#{ld.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("id" => ld.ubid, "name" => "graylog", "type" => "syslog", "url" => "tcp://logs.example.com:6514")
+      end
+
+      it "log-destination not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination/1d000000000000000000000000"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+    end
+
+    describe "rename" do
+      it "answers with the detailed database" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/rename", {name: "new-name"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("new-name")
+        expect(body["connection_string"]).to eq(pg.reload.connection_string)
+        expect(body.keys).to include("password", "hostname", "primary", "firewall_rules", "read_replicas")
       end
     end
 
@@ -1420,6 +1766,22 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(204)
       end
 
+      it "firewall-rule deletes the twin, so the CIDR can be added again" do
+        pg.customer_firewall.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 5432..5432, protocol: "udp")
+        fwr = pg.pg_firewall_rules_dataset.all.find { it.cidr.to_s == "0.0.0.0/0" && it.port_range.begin == 6432 }
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}"
+
+        expect(last_response.status).to eq(204)
+        expect(pg.pg_firewall_rules_dataset.all.map { [it.cidr.to_s, it.protocol] }).to eq([["0.0.0.0/0", "udp"], ["::/0", "tcp"], ["::/0", "tcp"]])
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
+          cidr: "0.0.0.0/0",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.pg_firewall_rules_dataset.count).to eq(5)
+      end
+
       it "firewall-rule not exist" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/fr000000000000000000000000"
 
@@ -1477,15 +1839,52 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["default_pg_config"]).to include("shared_buffers", "work_mem", "max_connections", "effective_cache_size")
       end
 
-      it "serializes numeric config values without failing response validation" do
-        pg.update(user_config: {"max_connections" => 100}, pgbouncer_user_config: {"max_client_conn" => 100})
+      it "returns stored numbers as strings, and stores them as strings on the next update" do
+        pg.update(user_config: {"max_connections" => 100, "work_mem" => "8MB"}, pgbouncer_user_config: {"max_client_conn" => 100})
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
-
         expect(last_response.status).to eq(200)
         response_body = JSON.parse(last_response.body)
-        expect(response_body["pg_config"]).to eq({"max_connections" => 100})
-        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => 100})
+        expect(response_body["pg_config"]).to eq({"max_connections" => "100", "work_mem" => "8MB"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"max_connections" => "100", "work_mem" => "8MB"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"work_mem" => "16MB"},
+        }.to_json
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["message"]).to be_nil
+        expect(pg.reload.user_config).to eq({"max_connections" => "100", "work_mem" => "16MB"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "100"})
+      end
+
+      it "stores a number sent to the full update as a string" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"max_connections" => 200, "ubicloud.shared_memory_percent" => 50},
+          pgbouncer_config: {"max_client_conn" => 300},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("pg_config", "pgbouncer_config")).to eq(
+          "pg_config" => {"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"},
+          "pgbouncer_config" => {"max_client_conn" => "300"},
+        )
+        expect(pg.reload.user_config).to eq({"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "300"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
+        expect(JSON.parse(last_response.body)["pg_config"]).to eq({"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+        expect(JSON.parse(last_response.body).slice("pg_config", "pgbouncer_config")).to eq(
+          "pg_config" => {"max_connections" => "200", "ubicloud.shared_memory_percent" => "50"},
+          "pgbouncer_config" => {"max_client_conn" => "300"},
+        )
       end
 
       it "full update" do
@@ -1581,6 +1980,23 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
       end
 
+      it "partial update of pgbouncer_config alone" do
+        pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pgbouncer_config: {"max_client_conn" => "200"},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.user_config).to eq({"max_connections" => "100"})
+        expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "200"})
+      end
+
+      it "partial update with an empty body" do
+        expect {
+          patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {}.to_json
+        }.to raise_error(Committee::InvalidRequest, /less than minProperties/)
+      end
+
       it "rejects increasing a restart-sensitive param beyond a read replica's value" do
         pg.update(user_config: {"max_connections" => "100"})
         replica = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -1642,6 +2058,31 @@ RSpec.describe Clover, "postgres" do
         expect(response["current_version"]).to eq(pg.version)
         expect(response["target_version"]).to eq(pg.reload.target_version)
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "upgrades to target_version when it is the next version, and does nothing when resent" do
+        2.times do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "17"}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)).to include("current_version" => "16", "target_version" => "17", "upgrade_status" => "running")
+        end
+        expect(DB[:audit_log].where(action: "upgrade").count).to eq(1)
+      end
+
+      it "does nothing when target_version is the current version" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "16"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("target_version" => "16", "upgrade_status" => "not_running")
+        expect(pg.reload.target_version).to eq("16")
+      end
+
+      it "refuses a target_version that skips a version" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "18"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: target_version", {"target_version" => "Database can only be upgraded to the next version, 17"})
+        expect(pg.reload.target_version).to eq("16")
       end
 
       it "logs the upgrade request" do

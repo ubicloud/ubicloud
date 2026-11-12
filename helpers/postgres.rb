@@ -6,10 +6,13 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
     check_cutoff
 
-    size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
+    size = typecast_params.nonempty_str!("size")
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
-    version = typecast_params.nonempty_str("version", PostgresResource.default_version)
+    # The web form still sends version: its fields take the names of the
+    # option tree's levels, and renaming that level would change the
+    # capabilities response.
+    version = typecast_params.nonempty_str(api? ? "target_version" : "version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
@@ -79,7 +82,7 @@ class Clover
   end
 
   def postgres_list(tags_param: nil)
-    dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:project, :timeline, representative_server: [:semaphores, :strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
+    dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:timeline, representative_server: [:semaphores, :strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
 
     if tags_param
       tags_param = tags_param.split(",")
@@ -163,7 +166,10 @@ class Clover
     begin
       Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
     rescue Validation::ValidationFailed => e
-      fail Validation::ValidationFailed.new({size: "Invalid size."}) if e.details.key?(:family)
+      if e.details.key?(:family)
+        renamed = Option::POSTGRES_RENAMED_SIZES[postgres_params["size"]]
+        fail Validation::ValidationFailed.new({size: renamed ? "Invalid size. Use #{renamed} instead." : "Invalid size."})
+      end
 
       raise e
     end

@@ -50,13 +50,24 @@ RSpec.describe Clover, "firewall" do
       expect(rule.description).to be_nil
     end
 
+    it "create firewall rule for a bare IPv6 address" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
+        cidr: "2001:db8::5",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["cidr"]).to eq "2001:db8::5/128"
+      expect(FirewallRule.first.cidr.to_s).to eq "2001:db8::5/128"
+    end
+
     it "can not create same firewall rule" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: firewall_rule.cidr,
         port_range: "80..5432",
       }.to_json
 
-      expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id and protocol is already taken")
+      message = "cidr and port_range and firewall_id and protocol is already taken"
+      expect(last_response).to have_api_error(400, message, {"cidr" => message, "port_range" => message, "protocol" => message})
     end
 
     it "firewall rule no port range" do
@@ -130,6 +141,12 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
       rule.reload
       expect(rule.protocol).to eq "udp"
+    end
+
+    it "fails to modify with an empty body" do
+      expect {
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}", {}.to_json
+      }.to raise_error(Committee::InvalidRequest, /less than minProperties/)
     end
 
     it "fails with invalid protocol" do

@@ -57,16 +57,20 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "Read replicas cannot be modified directly! Please modify the parent database instead.")
         end
 
-        size = typecast_params.nonempty_str("size", pg.target_vm_size).gsub("burstable", "hobby")
-        target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
+        size = typecast_params.nonempty_str("size", pg.requested_vm_size)
+        storage_size = typecast_params.pos_int("storage_size", pg.requested_storage_size_gib)
+        # Move a target only when its request changes, so that a client
+        # resending the same request does not undo a storage auto-scale.
+        target_vm_size = (size == pg.requested_vm_size) ? pg.target_vm_size : size
+        target_storage_size_gib = (storage_size == pg.requested_storage_size_gib) ? pg.target_storage_size_gib : storage_size
         ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
         init_script = typecast_params.nonempty_str("init_script") || pg.init_script&.init_script
 
         postgres_params = {
           "location" => pg.location,
-          "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
-          "size" => size,
+          "family" => Option::POSTGRES_SIZE_OPTIONS[target_vm_size]&.family,
+          "size" => target_vm_size,
           "storage_size" => target_storage_size_gib,
           "ha_type" => ha_type,
           "version" => pg.version,
@@ -97,17 +101,19 @@ class Clover
         current_storage_size_gib = pg.target_storage_size_gib
         current_ha_type = pg.ha_type
         current_standby_count = pg.target_standby_count
+        resizing = current_vm_size != target_vm_size || current_storage_size_gib != target_storage_size_gib
 
         DB.transaction do
-          pg.update_target_sizes_with_replicas(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
+          pg.update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:, ha_type:, tags:,
+            requested_vm_size: size, requested_storage_size_gib: storage_size)
 
-          # Updating target_vm_size and target_storage_size_gib might undo what
-          # we did in auto-scaling, so we are decrementing related semaphores
-          # here to give the system another chance to auto-scale if needed
-          # after this update.
-          pg.decr_storage_auto_scale_action_performed_80
-          pg.decr_storage_auto_scale_action_performed_85
-          pg.decr_storage_auto_scale_action_performed_90
+          if resizing
+            # Moving the targets might undo an auto-scale, so clear the
+            # auto-scale semaphores to let the next check act again if needed.
+            pg.decr_storage_auto_scale_action_performed_80
+            pg.decr_storage_auto_scale_action_performed_85
+            pg.decr_storage_auto_scale_action_performed_90
+          end
 
           if init_script
             if (pg_init_script = pg.init_script)
@@ -119,7 +125,7 @@ class Clover
           audit_log(pg, "update")
         end
 
-        if current_vm_size != pg.target_vm_size || current_storage_size_gib != pg.target_storage_size_gib
+        if resizing
           postgres_action_log(pg, :postgres_scale,
             current_vm_size:, target_vm_size: pg.target_vm_size,
             current_storage_size_gib:, target_storage_size_gib: pg.target_storage_size_gib,
@@ -141,7 +147,7 @@ class Clover
         end
       end
 
-      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, serializer_options: {detailed: true}, template_prefix: "postgres" do
         pg.incr_refresh_dns_record
         pg.incr_refresh_certificates unless pg.hostname_version == "v3"
         pg.server_incr("configure_metrics")
@@ -226,10 +232,17 @@ class Clover
         end
 
         r.is :ubid_uuid do |id|
-          authorize("Postgres:edit", pg)
+          authorize(r.get? ? "Postgres:view" : "Postgres:edit", pg)
           firewall = postgres_require_customer_firewall!
           fwr = pg.pg_firewall_rule(id, firewall:)
           check_found_object(fwr)
+          # The create inserts a row for each of ports 5432 and 6432, so a
+          # PATCH or DELETE must act on the other row too.
+          twins = pg.pg_firewall_rules_dataset(firewall:).where(cidr: fwr.cidr.to_s, protocol: fwr.protocol).exclude(port_range: fwr.port_range)
+
+          r.get do
+            Serializers::PostgresFirewallRule.serialize(fwr)
+          end
 
           r.patch do
             current_cidr = fwr.cidr.to_s
@@ -237,12 +250,13 @@ class Clover
             description = typecast_params.str("description")&.strip || fwr.description
 
             DB.transaction do
-              fwr.update(
-                cidr: new_cidr,
-                description:,
-              )
+              DB.ignore_duplicate_queries do
+                [fwr, *twins.all].each do |rule|
+                  rule.update(cidr: new_cidr, description:)
+                  audit_log(rule, "update")
+                end
+              end
               firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
-              audit_log(fwr, "update")
             end
 
             Serializers::PostgresFirewallRule.serialize(fwr)
@@ -250,9 +264,13 @@ class Clover
 
           r.delete do
             DB.transaction do
-              fwr.destroy
+              DB.ignore_duplicate_queries do
+                [fwr, *twins.all].each do |rule|
+                  rule.destroy
+                  audit_log(rule, "destroy")
+                end
+              end
               firewall.update_private_subnet_firewall_rules
-              audit_log(fwr, "destroy")
             end
 
             204
@@ -295,18 +313,26 @@ class Clover
           Validation.validate_url(url)
           Validation.validate_metric_destination_auth(username, password, options)
 
-          DB.transaction do
+          md = DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, options:)
             pg.server_incr("configure_metrics")
             audit_log(md, "create", pg)
+            md
           end
 
           if api?
-            Serializers::Postgres.serialize(pg, {detailed: true})
+            Serializers::PostgresMetricDestination.serialize(md)
           else
             flash["notice"] = "Metric destination is created"
             r.redirect pg, "/charts"
           end
+        end
+
+        r.get api?, :ubid_uuid do |id|
+          authorize("Postgres:view", pg)
+          md = pg.metric_destinations_dataset[id:]
+          check_found_object(md)
+          Serializers::PostgresMetricDestination.serialize(md)
         end
 
         r.delete :ubid_uuid do |id|
@@ -379,11 +405,18 @@ class Clover
           end
 
           if api?
-            {id: ld.ubid, name: ld.name, type: ld.type, url: ld.url}
+            Serializers::PostgresLogDestination.serialize(ld)
           else
             flash["notice"] = "Log destination is created"
             r.redirect pg, "/logs"
           end
+        end
+
+        r.get api?, :ubid_uuid do |id|
+          authorize("Postgres:view", pg)
+          ld = pg.log_destinations_dataset[id:]
+          check_found_object(ld)
+          Serializers::PostgresLogDestination.serialize(ld)
         end
 
         r.delete :ubid_uuid do |id|
@@ -414,8 +447,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
-        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
-        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {})).transform_values(&:to_s)
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {})).transform_values(&:to_s)
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
@@ -476,7 +509,7 @@ class Clover
         end
 
         if api?
-          Serializers::Postgres.serialize(pg)
+          Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "'#{pg.name}' will be promoted in a few minutes, please refresh the page"
           r.redirect pg, "/settings"
@@ -490,8 +523,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
-        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
-        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {})).transform_values(&:to_s)
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {})).transform_values(&:to_s)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
@@ -577,7 +610,7 @@ class Clover
         maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
         if @project.get_ff_postgres_enable_maintenance_window_days
           update_params[:maintenance_window_days_bitmask] = PostgresResource.maintenance_window_days_mask(maintenance_window_days)
-        elsif maintenance_window_days
+        elsif maintenance_window_days&.any?
           raise CloverError.new(400, "InvalidRequest", "Maintenance window days are not enabled for this project.")
         end
 
@@ -894,8 +927,8 @@ class Clover
           authorize("Postgres:view", pg)
 
           {
-            pg_config: pg.user_config,
-            pgbouncer_config: pg.pgbouncer_user_config,
+            pg_config: pg.user_config.transform_values(&:to_s),
+            pgbouncer_config: pg.pgbouncer_user_config.transform_values(&:to_s),
             default_pg_config: pg.representative_server.configure_hash[:configs],
           }
         end
@@ -913,15 +946,17 @@ class Clover
             pgbouncer_values = typecast_params.array(:str, "pgbouncer_config_values") || []
             pgbouncer_config = config_hash_from_kvs(pgbouncer_keys, pgbouncer_values)
           elsif r.patch?
-            pg_config = typecast_params.Hash("pg_config") || {}
-            pgbouncer_config = typecast_params.Hash("pgbouncer_config") || {}
-            # For PATCH requests, merge with existing config
-            pg_config = pg.user_config.merge(pg_config).compact
-            pgbouncer_config = pg.pgbouncer_user_config.merge(pgbouncer_config).compact
+            pg_config = pg.user_config.merge(typecast_params.Hash("pg_config") || {})
+            pgbouncer_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config") || {})
           else
             pg_config = typecast_params.Hash!("pg_config")
             pgbouncer_config = typecast_params.Hash!("pgbouncer_config")
           end
+
+          # A PATCH deletes a key by sending null. Store values as strings,
+          # since a POST may send numbers and older rows may hold them.
+          pg_config = pg_config.compact.transform_values(&:to_s)
+          pgbouncer_config = pgbouncer_config.compact.transform_values(&:to_s)
 
           validate_postgres_config(pg.version, pg_config, pgbouncer_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
@@ -931,7 +966,7 @@ class Clover
             pg.lock!
             Validation.validate_postgres_restart_sensitive_params(pg.version, pg_config, parent:, children: pg.read_replicas)
 
-            old_config = pg.user_config
+            old_config = pg.user_config.transform_values(&:to_s)
             pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
             pg.server_incr("configure")
@@ -981,10 +1016,23 @@ class Clover
           authorize("Postgres:edit", pg.id)
           handle_validation_failure("postgres/show") { @page = "upgrade" }
 
+          # Check this before validating, so that a client can resend a
+          # request whose response it lost. Validation would refuse it,
+          # since the database is by then waiting for convergence.
+          target_version = typecast_params.nonempty_str("target_version") if api?
+          if target_version == pg.target_version
+            no_audit_log
+            next Serializers::PostgresUpgrade.serialize(pg)
+          end
+
           Validation.validate_postgres_upgrade(pg)
+          next_version = (pg.version.to_i + 1).to_s
+          if target_version && target_version != next_version
+            fail Validation::ValidationFailed.new({target_version: "Database can only be upgraded to the next version, #{next_version}"})
+          end
 
           read_replica_count = DB.transaction do
-            pg.update(target_version: pg.version.to_i + 1)
+            pg.update(target_version: next_version)
             audit_log(pg, "upgrade")
 
             pg.read_replicas_dataset.update(target_version: pg.target_version)

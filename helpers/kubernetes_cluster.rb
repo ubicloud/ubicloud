@@ -6,15 +6,26 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
     check_cutoff
 
-    version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
-    Validation.validate_kubernetes_version(version)
-    node_count = typecast_params.pos_int("worker_nodes", 1)
-    cp_node_count = typecast_params.pos_int("cp_nodes", 1)
-    node_size = Validation.validate_vm_size(target_node_size, "x64")
+    # The default nodepool is named after the cluster with "-np" appended,
+    # and that name is also limited to 40 characters.
+    if name && name.length > 37
+      fail Validation::ValidationFailed.new({name: "Kubernetes cluster name must have max length 37."})
+    end
 
+    version = typecast_params.nonempty_str!("version")
+    Validation.validate_kubernetes_version(version)
+    cp_node_count = typecast_params.pos_int("cp_node_count", 1)
     requested_kubernetes_vcpu_count = cp_node_count * 2 # since default control plane size is standard-2
-    requested_kubernetes_vcpu_count += node_count * node_size.vcpus
-    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: :worker_nodes)
+
+    # The deprecated worker inputs ask for a default nodepool; without them,
+    # the cluster starts with none.
+    if typecast_params.present?("worker_size") || typecast_params.present?("worker_nodes")
+      target_node_size = typecast_params.nonempty_str!("worker_size")
+      node_count = typecast_params.pos_int("worker_nodes", 1)
+      node_size = Validation.validate_vm_size(target_node_size, "x64")
+      requested_kubernetes_vcpu_count += node_count * node_size.vcpus
+    end
+    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: node_count ? :worker_nodes : :cp_node_count)
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -25,12 +36,14 @@ class Clover
         version:,
       ).subject
 
-      Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-        name: name + "-np",
-        node_count:,
-        kubernetes_cluster_id: kc.id,
-        target_node_size:,
-      )
+      if node_count
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+          name: name + "-np",
+          node_count:,
+          kubernetes_cluster_id: kc.id,
+          target_node_size:,
+        )
+      end
       audit_log(kc, "create")
 
       if api?
@@ -46,18 +59,31 @@ class Clover
     raise CloverError.new(422, "UnprocessableContent", message)
   end
 
+  # Use this only for a refusal that ends once the cluster and its
+  # nodepools are idle again, so that a client may resend the request. A
+  # cluster or nodepool being deleted will never be idle again, so its
+  # refusal is final.
+  def fail_kubernetes_busy(message)
+    retry_after = 10 unless @kc.destroying? || @kn&.destroying?
+    raise CloverError.new(422, "UnprocessableContent", message, retry_after:)
+  end
+
   def kubernetes_nodepool_post(name)
     authorize("KubernetesCluster:edit", @kc.id)
     check_cutoff
 
     unless @kc.idle?
-      fail_kubernetes_unprocessable("Cluster is not ready to add a nodepool")
+      fail_kubernetes_busy("Cluster is not ready to add a nodepool")
     end
 
     target_node_size = typecast_params.nonempty_str!("node_size")
     node_count = typecast_params.pos_int!("node_count")
     node_size = Validation.validate_vm_size(target_node_size, "x64")
     Validation.validate_vcpu_quota(@project, "KubernetesVCpu", node_count * node_size.vcpus, name: :node_count)
+
+    if (version = typecast_params.nonempty_str("version")) && version != @kc.version
+      fail Validation::ValidationFailed.new({version: "Nodepool can only be created at the cluster's version, #{@kc.version}"})
+    end
 
     unless @kc.nodepools_dataset.where(name:).empty?
       fail Validation::ValidationFailed.new({name: "A nodepool with the name \"#{name}\" already exists in this cluster"})
@@ -70,7 +96,7 @@ class Clover
     end
 
     if api?
-      Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+      Serializers::KubernetesNodepool.serialize(kn)
     else
       flash["notice"] = "'#{name}' nodepool will be added to the cluster"
       request.redirect kn, "/overview"
@@ -82,7 +108,7 @@ class Clover
     dataset = dataset.where(location_id: @location.id) if @location
     dataset = dataset_authorize(dataset, "KubernetesCluster:view")
     if api?
-      paginated_result(dataset, Serializers::KubernetesCluster)
+      paginated_result(dataset.eager(:location, :strand, :semaphores, services_lb: :private_subnet), Serializers::KubernetesCluster)
     else
       @kcs = dataset.all
       if @kcs.empty? && has_project_permission("KubernetesCluster:create")
@@ -109,7 +135,7 @@ class Clover
     options.add_option(name: "name")
     options.add_option(name: "location", values: Option.kubernetes_locations)
     options.add_option(name: "version", values: Option.selectable_kubernetes_versions)
-    options.add_option(name: "cp_nodes", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
+    options.add_option(name: "cp_node_count", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
     options.add_option(name: "worker_size", values: Option::VmSizes.select { it.visible && it.vcpus <= 16 }.map { it.display_name }, parent: "location") do |location, size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == "standard"

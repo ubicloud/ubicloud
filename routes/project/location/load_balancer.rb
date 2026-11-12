@@ -43,7 +43,12 @@ class Clover
               fail Validation::ValidationFailed.new("vm_id" => "You cannot attach a VM to a load balancer with IPv4 enabled if the VM does not have IPv4 enabled") unless vm.ip4_enabled
             end
 
-            lb.add_vm(vm)
+            begin
+              lb.add_vm(vm)
+            rescue Sequel::UniqueConstraintViolation
+              # A concurrent request attached the VM after the check above.
+              fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
+            end
             audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
           else
@@ -90,8 +95,8 @@ class Clover
         algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint].freeze)
         src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port].freeze)
         vm_ids = typecast_params.array(:ubid_uuid, "vms")
-        cert_enabled = typecast_params.bool!("cert_enabled")
-        cert_enablement_changed = lb.cert_enabled != cert_enabled
+        cert_enabled = typecast_params.bool("cert_enabled")
+        cert_enablement_changed = !cert_enabled.nil? && lb.cert_enabled != cert_enabled
 
         DB.transaction do
           lb.update(algorithm:, health_check_endpoint:)
@@ -103,20 +108,21 @@ class Clover
             fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
 
-          new_vms.each do |vm|
-            if (lb_id = vm.load_balancer&.id)
-              next if lb_id == lb.id
-
-              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
-            end
-            lb.add_vm(vm)
+          attached_vms, vms_to_attach = new_vms.partition(&:load_balancer)
+          if attached_vms.any? { it.load_balancer.id != lb.id }
+            fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+          end
+          begin
+            lb.add_vms(vms_to_attach) unless vms_to_attach.empty?
+          rescue Sequel::UniqueConstraintViolation => e
+            # A concurrent request attached the VM after the check above.
+            vm = vms_to_attach.find { e.message.include?(it.id) }
+            fail Validation::ValidationFailed.new("vms" => "VM #{vm.ubid} is already attached to a load balancer")
           end
 
-          lb.vms.each do |vm|
-            next if new_vms.any? { it.id == vm.id }
-
-            lb.evacuate_vm(vm)
-            lb.remove_vm(vm)
+          unless (removed_vms = lb.vms.reject { vm_ids.include?(it.id) }).empty?
+            lb.evacuate_vms(removed_vms)
+            lb.remove_vms(removed_vms)
           end
 
           lb.incr_update_load_balancer
@@ -128,7 +134,7 @@ class Clover
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
 
-      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
+      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, serializer_options: {detailed: true}, template_prefix: "networking/load_balancer" do
         lb.incr_rewrite_dns_records
         lb.incr_refresh_cert if lb.hostname_version == 1 && lb.cert_enabled
       end

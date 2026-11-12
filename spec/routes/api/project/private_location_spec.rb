@@ -95,6 +95,19 @@ RSpec.describe Clover, "private-location" do
         expect(JSON.parse(last_response.body)["name"]).to eq("us-west-2")
         expect(Strand[Location[ui_name: "hello"].id].prog).to eq("LocationNexus")
       end
+
+      it "names the colliding column of each unique index" do
+        post "/project/#{project.ubid}/private-location", {
+          name: private_location.ui_name,
+          provider_location_name: "us-west-2",
+          access_key: "access-key-id",
+          secret_key: "secret-access-key",
+        }.to_json
+
+        display_name = "project_id and display_name is already taken"
+        ui_name = "project_id and ui_name is already taken"
+        expect(last_response).to have_api_error(400, "#{display_name}, #{ui_name}", {"display_name" => display_name, "ui_name" => ui_name})
+      end
     end
 
     describe "delete" do

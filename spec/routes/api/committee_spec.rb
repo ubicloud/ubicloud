@@ -88,6 +88,35 @@ RSpec.describe Clover, "committee infrastructure" do
     }.to raise_error Committee::InvalidRequest, /schema does not define properties: missing_stuff/
   end
 
+  it "passes a refusal's Retry-After header through response validation" do
+    expect(Serializers::Vm).to receive(:serialize_internal).and_raise(CloverError.new(422, "UnprocessableContent", "VM is busy", retry_after: 5))
+    post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+      public_key: "ssh key",
+      unix_user: "ubi",
+      size: "standard-2",
+      boot_image: "ubuntu-jammy",
+      storage_size: "40",
+    }.to_json
+
+    expect(last_response.status).to eq(422)
+    expect(last_response.headers["retry-after"]).to eq("5")
+    expect(JSON.parse(last_response.body)["error"]).to eq({"code" => 422, "type" => "UnprocessableContent", "message" => "VM is busy", "details" => nil})
+  end
+
+  it "sends no Retry-After header with a refusal that sets no delay" do
+    expect(Serializers::Vm).to receive(:serialize_internal).and_raise(CloverError.new(422, "UnprocessableContent", "VM is broken"))
+    post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+      public_key: "ssh key",
+      unix_user: "ubi",
+      size: "standard-2",
+      boot_image: "ubuntu-jammy",
+      storage_size: "40",
+    }.to_json
+
+    expect(last_response.status).to eq(422)
+    expect(last_response.headers).not_to have_key("retry-after")
+  end
+
   it "reports if response body is not valid JSON" do
     allow_any_instance_of(Committee::SchemaValidator::OpenAPI3).to receive(:response_validate) do
       raise JSON::ParserError.new("injected parser error")

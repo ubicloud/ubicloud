@@ -51,7 +51,6 @@ lb eu-central-h1/test2-lb create -s bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test-lb show -f bad
 lb eu-central-h1/test-lb attach-vm vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb attach-vm foo/vmdzyppz6j166jh5e9t2dwrfas
-lb eu-central-h1/test-lb update bad 1234 54321 /up2 true vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb update https a 54321 /up2 true vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb update https 54321 a /up2 false vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 bad vmdzyppz6j166jh5e9t2dwrfas
@@ -86,6 +85,7 @@ pg list -f invalid
 pg list invalid
 ps eu-central-h1/test-ps connect psfzm3e26xky5m9ggetw4dpqe2
 ps eu-central-h1/test-ps disconnect psfzm3e26xky5m9ggetw4dpqe2
+ps eu-central-h1/test-ps create
 ps eu-central-h1/test2-ps create invalid
 ps eu-central-h1/test-ps destroy invalid
 ps list -f invalid

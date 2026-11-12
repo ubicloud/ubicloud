@@ -8,7 +8,7 @@ class Clover < Roda
 
   class RodaRequest
     def accepts_json?
-      env["HTTP_ACCEPT"]&.include?("application/json")
+      (accept = env["HTTP_ACCEPT"]) && (accept.include?("application/json") || accept.include?("application/vnd.ubicloud+json"))
     end
 
     # Accept PATCH for API, but POST for web, so web requests to the
@@ -31,7 +31,7 @@ class Clover < Roda
       end
     end
 
-    def rename(object, perm:, serializer:, template_prefix:)
+    def rename(object, perm:, serializer:, template_prefix:, serializer_options: {})
       post "rename" do
         scope.instance_exec do
           authorize(perm, object)
@@ -57,7 +57,7 @@ class Clover < Roda
           end
 
           if api?
-            serializer.serialize(object)
+            serializer.serialize(object, serializer_options)
           else
             flash["notice"] = "Name updated"
             request.redirect object, "/settings"

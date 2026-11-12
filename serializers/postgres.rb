@@ -11,6 +11,8 @@ class Serializers::Postgres < Serializers::Base
       target_vm_size: pg.target_vm_size,
       storage_size_gib: pg.storage_size_gib,
       target_storage_size_gib: pg.target_storage_size_gib,
+      size: pg.requested_vm_size,
+      storage_size: pg.requested_storage_size_gib,
       target_version: pg.target_version,
       version: pg.version,
       ha_type: pg.ha_type,
@@ -18,6 +20,7 @@ class Serializers::Postgres < Serializers::Base
       flavor: PostgresResource::STANDARD_FLAVOR,
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
+      maintenance_window_days: pg.maintenance_window_day_names,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
       fallback_active: pg.representative_server.fallback_active?,
@@ -25,11 +28,8 @@ class Serializers::Postgres < Serializers::Base
       created_at: pg.created_at.iso8601,
     }
 
-    if pg.project.get_ff_postgres_enable_maintenance_window_days
-      base[:maintenance_window_days] = pg.maintenance_window_day_names
-    end
-
     if options[:detailed]
+      firewall = pg.customer_firewall
       base.merge!(
         connection_string: pg.connection_string,
         private_connection_string: pg.private_connection_string,
@@ -37,10 +37,14 @@ class Serializers::Postgres < Serializers::Base
         password: pg.superuser_password,
         hostname: pg.hostname,
         primary: pg.representative_server.primary?,
-        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
-        metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_methods: it.auth_methods, username: it.username, url: it.url} },
-        read_replicas: Serializers::Postgres.serialize(pg.read_replicas_dataset.eager(:project).all, {include_path: true}),
-        log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
+        private_subnet_id: pg.private_subnet.ubid,
+        firewall_id: firewall&.ubid,
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules(firewall:)),
+        metric_destinations: Serializers::PostgresMetricDestination.serialize(pg.metric_destinations),
+        read_replicas: Serializers::Postgres.serialize(pg.read_replicas),
+        log_destinations: Serializers::PostgresLogDestination.serialize(pg.log_destinations),
+        pg_config: pg.user_config.transform_values(&:to_s),
+        pgbouncer_config: pg.pgbouncer_user_config.transform_values(&:to_s),
       )
 
       if pg.timeline && pg.representative_server.primary?

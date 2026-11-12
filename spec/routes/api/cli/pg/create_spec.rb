@@ -19,7 +19,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.target_storage_size_gib).to eq 64
     expect(pg.ha_type).to eq "none"
     expect(pg.version).to eq "18"
-    expect(pg.pg_firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+    expect(pg.pg_firewall_rules_dataset.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
       "0.0.0.0/0:5432...5433",
       "0.0.0.0/0:6432...6433",
       "::/0:5432...5433",
@@ -27,6 +27,11 @@ RSpec.describe Clover, "cli pg create" do
     ]
     expect(pg.tags).to eq([])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
+  end
+
+  it "sends a legacy burstable size as the hobby size" do
+    cli(%w[pg eu-central-h1/test-pg create -s burstable-1 -S 64])
+    expect(PostgresResource.first.target_vm_size).to eq "hobby-1"
   end
 
   it "creates PostgreSQL database with all options" do
