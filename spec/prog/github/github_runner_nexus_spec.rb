@@ -1802,11 +1802,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits and cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 98;w=21600\nratelimit-remaining: 98;w=21600\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 10;w=21600\nratelimit-remaining: 10;w=21600\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 10, remaining_window: 21600, source: "192.168.1.1"}})
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
         Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172_27_211_181:51123
         Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172.27.211.182:51123
@@ -1857,23 +1857,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits and empty cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 98;w=21600\nratelimit-remaining: 98;w=21600\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 10;w=21600\nratelimit-remaining: 10;w=21600\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 10, remaining_window: 21600, source: "192.168.1.1"}})
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
 
       nx.collect_final_telemetry
     end
 
-    it "Logs docker limits and nil cache proxy log if workflow_job is successful" do
+    it "does not log docker limits when most of the limit remains, and handles a nil cache proxy log" do
       runner.update(workflow_job: {"conclusion" => "success"})
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 98;w=21600\nratelimit-remaining: 98;w=21600\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
+      expect(Clog).not_to receive(:emit).with("Remaining DockerHub rate limits", anything)
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
 
       nx.collect_final_telemetry
@@ -1881,11 +1881,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits whatever the header order is, and without the source header" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-remaining: 98;w=21600\nratelimit-limit: 100;w=21600\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-remaining: 10;w=21600\nratelimit-limit: 100;w=21600\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: nil}})
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 10, remaining_window: 21600, source: nil}})
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
 
       nx.collect_final_telemetry
