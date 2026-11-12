@@ -11,6 +11,104 @@ class DnsZone < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :refresh_dns_servers
 
+  # Values are interpolated into knotc commands, so the patterns also keep
+  # whitespace and other knotc syntax out.
+  APEX_HOSTNAME = /\A(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.?\z/i
+  APEX_EMAIL = /\A[a-z0-9_+-]+(?:\.[a-z0-9_+-]+)*@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z/i
+
+  def validate
+    super
+    if nameservers
+      errors.add(:nameservers, "must not be empty") if nameservers.empty?
+      errors.add(:nameservers, "must be hostnames") unless nameservers.all? { it.match?(APEX_HOSTNAME) }
+    end
+    errors.add(:soa_email, "must be an email address") if soa_email && !soa_email.match?(APEX_EMAIL)
+  end
+
+  def update_apex(nameservers:, soa_email:)
+    set(nameservers:, soa_email:)
+    return unless modified? || revert_apex
+
+    self.revert_apex = !custom_apex?
+    save_changes
+    Clog.emit("DNS zone apex changed", {dns_zone_apex: {ubid:, name:, nameservers:, soa_email:, revert_apex:}})
+    dns_servers.each(&:incr_configure)
+  end
+
+  def custom_apex?
+    !nameservers.nil? || !soa_email.nil?
+  end
+
+  # revert_apex marks a zone whose configured values were removed: its VMs
+  # may still serve them until the defaults are written back.
+  def manages_apex?
+    custom_apex? || revert_apex
+  end
+
+  def apex_nameservers(dns_server)
+    (nameservers || [dns_server.name]).map { add_dot_if_missing(it.downcase) }
+  end
+
+  def soa_mname
+    nameservers ? add_dot_if_missing(nameservers.first.downcase) : "ns.#{name}."
+  end
+
+  # RFC 1035 RNAME: the mailbox with "@" turned into a label separator, and
+  # dots inside the local part escaped.
+  def soa_rname
+    return "#{name}." unless soa_email
+
+    local, domain = soa_email.downcase.split("@", 2)
+    "#{local.gsub(".") { "\\." }}.#{domain}."
+  end
+
+  def apex_commands(dns_server, zone_read)
+    current_ns = []
+    soa = nil
+    zone_read.each_line do |line|
+      fields = line.split
+      # Older knotc prefixes each record with "[zone.]" even for a single zone.
+      fields.shift if fields.first == "[#{name}.]"
+      owner, _ttl, type, *rdata = fields
+      next unless owner == "#{name}."
+
+      current_ns << rdata.first if type == "NS"
+      soa = rdata if type == "SOA"
+    end
+    fail "Zone #{name} has no SOA record" unless soa
+
+    desired_ns = apex_nameservers(dns_server)
+    commands = (current_ns - desired_ns).map { "zone-unset #{name} @ NS #{it}" }
+    commands.concat((desired_ns - current_ns).map { "zone-set #{name} @ 3600 NS #{it}" })
+
+    mname, rname, serial, *timers = soa
+    unless mname == soa_mname && rname == soa_rname
+      # knot rejects an SOA whose serial does not increase, and its knotc
+      # parser consumes one level of backslash escaping.
+      commands << "zone-set #{name} @ 3600 SOA #{soa_mname} #{soa_rname.gsub("\\") { "\\\\" }} #{Integer(serial, 10) + 1} #{timers.join(" ")}"
+    end
+
+    commands
+  end
+
+  def rectify_apex(dns_server, vm)
+    return unless manages_apex?
+
+    sshable = vm.sshable
+    current = sshable.cmd("sudo -u knot knotc", stdin: "zone-read #{name} @ NS\nzone-read #{name} @ SOA", log: false)
+    changes = apex_commands(dns_server, current)
+    return if changes.empty?
+
+    commands = ["zone-abort #{name}", "zone-begin #{name}", *changes, "zone-commit #{name}"]
+    Clog.emit("Updating DNS zone apex", {dns_zone: name, vm_ubid: vm.ubid, commands:})
+    sshable.cmd("sudo -u knot knotc", stdin: commands.join("\n")).split("\n").each_with_index do |output, index|
+      next if output == "OK"
+      next if index == 0 && output.include?("no active transaction")
+
+      fail "Updating apex of #{name} failed on #{vm.ubid}. Command: #{commands[index]}. Output: #{output}"
+    end
+  end
+
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
     add_record(name: record_name, type:, ttl:, data:)

@@ -24,6 +24,20 @@ class Prog::DnsZone::DnsServerNexus < Prog::Base
   end
 
   label def configure
+    zones = dns_server.dns_zones.select(&:manages_apex?)
+    unless zones.empty?
+      all_reached = dns_server.vms.map do |vm|
+        next false unless vm.sshable.available?
+
+        zones.each { it.rectify_apex(dns_server, vm) }
+        true
+      rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError, Net::SSH::Exception => ex
+        Clog.emit("dns server vm apex update failed, retrying", Util.exception_to_hash(ex, into: {vm_ubid: vm.ubid}))
+        nap 5
+      end.all?
+      DnsZone.where(id: zones.select(&:revert_apex).map(&:id)).update(revert_apex: false) if all_reached
+    end
+
     config = dns_server.knot_config
     dns_server.vms.each do |vm|
       next unless dns_server.vms_dataset.where(id: vm.id).any?
