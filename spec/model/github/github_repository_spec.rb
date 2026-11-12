@@ -11,10 +11,37 @@ RSpec.describe GithubRepository do
 
   let(:blob_storage_client) { instance_double(Aws::S3::Client) }
   let(:cloudflare_client) { instance_double(CloudflareClient) }
+  let(:now) { Time.now }
+  let(:s3_client_options) { {request_checksum_calculation: "when_required", response_checksum_validation: "when_required", http_open_timeout: 5, http_read_timeout: 8, retry_limit: 2} }
+  let(:expected_claims) {
+    {"sub" => "123", "iss" => "parent-key", "aud" => "123.r2.cloudflarestorage.com", "iat" => now.to_i, "exp" => now.to_i + GithubCacheEntry.presigned_url_expires_in, "bucket" => github_repository.bucket_name}
+  }
 
   before do
     allow(CloudflareClient).to receive(:new).and_return(cloudflare_client)
     allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+  end
+
+  def expect_temporary_credentials
+    github_repository.update(access_key: described_class::TEMPORARY_CREDENTIALS)
+    expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(Config).to receive_messages(github_cache_blob_storage_endpoint: "https://123.r2.cloudflarestorage.com", github_cache_blob_storage_access_key: "parent-key", github_cache_blob_storage_secret_key: "parent-secret", github_cache_blob_storage_account_id: "123")
+    client_args = {}
+    expect(Aws::S3::Client).to receive(:new) do |**args|
+      client_args.merge!(args)
+      blob_storage_client
+    end
+    client_args
+  end
+
+  def temporary_credential_claims(client_args)
+    session_token = client_args[:session_token]
+    prefix, jwt = Base64.strict_decode64(session_token).split("/", 2)
+    expect(prefix).to eq("jwt")
+    expect(client_args).to eq(endpoint: "https://123.r2.cloudflarestorage.com", access_key_id: "parent-key", secret_access_key: Digest::SHA256.hexdigest(jwt), session_token:, region: Config.github_cache_blob_storage_region, **s3_client_options)
+    claims, header = JWT.decode(jwt, "parent-secret", true, algorithm: "HS256")
+    expect(header).to eq("alg" => "HS256", "typ" => "JWT")
+    claims
   end
 
   describe "#blob_storage_client" do
@@ -26,6 +53,29 @@ RSpec.describe GithubRepository do
       )).and_return(blob_storage_client)
 
       expect(github_repository.blob_storage_client).to eq(blob_storage_client)
+    end
+
+    it "builds the S3 client with temporary credentials for the bucket if the repository uses them" do
+      client_args = expect_temporary_credentials
+      expect(github_repository.blob_storage_client).to eq(blob_storage_client)
+      expect(temporary_credential_claims(client_args)).to eq(expected_claims.merge("scope" => "object-read-write"))
+    end
+  end
+
+  describe "#url_presigner" do
+    let(:url_presigner) { instance_double(Aws::S3::Presigner) }
+
+    it "presigns with the repository token" do
+      expect(Aws::S3::Client).to receive(:new).with(endpoint: Config.github_cache_blob_storage_endpoint, access_key_id: "my-token-id", secret_access_key: nil, session_token: nil, region: Config.github_cache_blob_storage_region, **s3_client_options).and_return(blob_storage_client)
+      expect(Aws::S3::Presigner).to receive(:new).with(client: blob_storage_client).and_return(url_presigner)
+      expect(github_repository.url_presigner("GetObject", "cache/key")).to eq(url_presigner)
+    end
+
+    it "presigns with temporary credentials for one action on one object if the repository uses them" do
+      client_args = expect_temporary_credentials
+      expect(Aws::S3::Presigner).to receive(:new).with(client: blob_storage_client).and_return(url_presigner)
+      expect(github_repository.url_presigner("GetObject", "cache/key")).to eq(url_presigner)
+      expect(temporary_credential_claims(client_args)).to eq(expected_claims.merge("actions" => ["GetObject"], "paths" => {"prefixPaths" => [], "objectPaths" => ["cache/key"]}))
     end
   end
 
@@ -118,6 +168,49 @@ RSpec.describe GithubRepository do
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
       github_repository.destroy_blob_storage
       expect(github_repository.reload.access_key).to be_nil
+    end
+
+    it "deletes only the bucket if the repository uses temporary credentials" do
+      github_repository.update(access_key: described_class::TEMPORARY_CREDENTIALS)
+      expect(Config).to receive_messages(github_cache_blob_storage_endpoint: "https://123.r2.cloudflarestorage.com", github_cache_blob_storage_secret_key: "parent-secret")
+      expect(blob_storage_client).to receive(:list_multipart_uploads).with(bucket: github_repository.bucket_name).and_return(instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: []))
+      expect(blob_storage_client).to receive(:delete_bucket).with(bucket: github_repository.bucket_name)
+      expect(cloudflare_client).not_to receive(:delete_token)
+      github_repository.destroy_blob_storage
+      expect(github_repository.reload.access_key).to be_nil
+    end
+  end
+
+  describe "#switch_to_temporary_credentials" do
+    it "deletes the token and marks the repository as using temporary credentials" do
+      github_repository.update(secret_key: "my-token-secret")
+      expect(cloudflare_client).to receive(:delete_token).with("my-token-id")
+      github_repository.switch_to_temporary_credentials
+      github_repository.reload
+      expect(github_repository.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
+      expect(github_repository.secret_key).to be_nil
+    end
+
+    it "leaves the repository alone if its blob storage is destroyed while deleting the token" do
+      expect(cloudflare_client).to receive(:delete_token).with("my-token-id") do
+        github_repository.this.update(access_key: nil)
+      end
+      github_repository.switch_to_temporary_credentials
+      expect(github_repository.reload.access_key).to be_nil
+    end
+
+    it "does nothing for a repository without blob storage" do
+      github_repository.update(access_key: nil)
+      expect(cloudflare_client).not_to receive(:delete_token)
+      github_repository.switch_to_temporary_credentials
+      expect(github_repository.reload.access_key).to be_nil
+    end
+
+    it "does nothing for a repository already using temporary credentials" do
+      github_repository.update(access_key: described_class::TEMPORARY_CREDENTIALS)
+      expect(cloudflare_client).not_to receive(:delete_token)
+      github_repository.switch_to_temporary_credentials
+      expect(github_repository.reload.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
     end
   end
 

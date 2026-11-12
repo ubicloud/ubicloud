@@ -17,6 +17,8 @@ class GithubRepository < Sequel::Model
   plugin SemaphoreMethods, :destroy, :reset_blob_storage
   dataset_module Pagination
 
+  TEMPORARY_CREDENTIALS = "temp-creds"
+
   def self.cache_size_limit
     10_737_418_240 # 10GB
   end
@@ -53,12 +55,41 @@ class GithubRepository < Sequel::Model
     end
   end
 
-  def blob_storage_client
-    @blob_storage_client ||= s3_client(access_key, secret_key)
+  def use_temporary_credentials?
+    access_key == TEMPORARY_CREDENTIALS
   end
 
-  def url_presigner
-    @url_presigner ||= Aws::S3::Presigner.new(client: blob_storage_client)
+  def blob_storage_client
+    @blob_storage_client ||= if use_temporary_credentials?
+      temporary_credentials_client(scope: "object-read-write")
+    else
+      s3_client(access_key, secret_key)
+    end
+  end
+
+  def url_presigner(action, key)
+    client = if use_temporary_credentials?
+      temporary_credentials_client(actions: [action], paths: {prefixPaths: [], objectPaths: [key]})
+    else
+      blob_storage_client
+    end
+    Aws::S3::Presigner.new(client:)
+  end
+
+  private def temporary_credentials_client(**claims)
+    now = Time.now.to_i
+    access_key_id = Config.github_cache_blob_storage_access_key
+    payload = {
+      sub: Config.github_cache_blob_storage_account_id,
+      iss: access_key_id,
+      aud: URI(Config.github_cache_blob_storage_endpoint).host,
+      iat: now,
+      exp: now + GithubCacheEntry.presigned_url_expires_in,
+      bucket: bucket_name,
+      **claims,
+    }
+    jwt = JWT.encode(payload, Config.github_cache_blob_storage_secret_key, "HS256", {typ: "JWT"})
+    s3_client(access_key_id, Digest::SHA256.hexdigest(jwt), session_token: Base64.strict_encode64("jwt/#{jwt}"))
   end
 
   def self.admin_client
@@ -87,12 +118,18 @@ class GithubRepository < Sequel::Model
     end
 
     begin
-      CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
+      CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key) unless use_temporary_credentials?
     rescue Excon::Error::HTTPStatus
       Clog.emit("Repository credentials failed to delete Cloudflare token", {failed_cloudflare_token_delete: {bucket_name:}})
     end
 
     this.update(bucket_name: nil, access_key: nil, secret_key: nil)
+  end
+
+  def switch_to_temporary_credentials
+    return if !access_key || use_temporary_credentials?
+    CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
+    this.where(access_key:).update(access_key: TEMPORARY_CREDENTIALS, secret_key: nil)
   end
 
   def self.create_bucket(bucket_name, rescue_bucket_already_owned: true, location: nil)
@@ -147,11 +184,12 @@ class GithubRepository < Sequel::Model
     end
   end
 
-  def self.s3_client(access_key_id, secret_access_key)
+  def self.s3_client(access_key_id, secret_access_key, session_token: nil)
     Aws::S3::Client.new(
       endpoint: Config.github_cache_blob_storage_endpoint,
       access_key_id:,
       secret_access_key:,
+      session_token:,
       region: Config.github_cache_blob_storage_region,
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required",
@@ -168,8 +206,8 @@ class GithubRepository < Sequel::Model
     )
   end
 
-  def s3_client(access_key_id, secret_access_key)
-    self.class.s3_client(access_key_id, secret_access_key)
+  def s3_client(access_key_id, secret_access_key, session_token: nil)
+    self.class.s3_client(access_key_id, secret_access_key, session_token:)
   end
 end
 
