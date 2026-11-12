@@ -78,6 +78,22 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#observe_provisioned" do
+    it "records allocation and provisioning durations and returns them for logging" do
+      now = Time.now
+      vm = described_class.new(arch: "arm64", boot_image: "github-ubuntu-2404", created_at: now - 50, allocated_at: now - 40, provisioned_at: now)
+      expect(ControlPlaneMetrics).to receive(:observe_vm_provision).with(provider: "metal", arch: "arm64", runner: true, allocation: 10, provisioning: 40)
+      expect(vm.observe_provisioned("metal")).to eq(duration: 40, allocation_duration: 10)
+    end
+
+    it "does not count other images as runners" do
+      now = Time.now
+      vm = described_class.new(arch: "x64", boot_image: "ubuntu-noble", created_at: now - 1, allocated_at: now - 1, provisioned_at: now)
+      expect(ControlPlaneMetrics).to receive(:observe_vm_provision).with(hash_including(runner: false))
+      vm.observe_provisioned("aws")
+    end
+  end
+
   describe "#load_balancer_state" do
     it "returns nil if there is no related object" do
       expect(vm.load_balancer_state).to be_nil

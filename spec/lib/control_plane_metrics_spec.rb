@@ -72,4 +72,11 @@ RSpec.describe ControlPlaneMetrics do
     described_class.count_runner_admission(decision: "spec_decision")
     expect(described_class.render).to include 'runner_admissions_total{decision="spec_decision"} 1.0'
   end
+
+  it "renders vm provision durations by stage" do
+    described_class.observe_vm_provision(provider: "spec", arch: "arm64", runner: true, allocation: 3, provisioning: 40)
+    rendered = described_class.render
+    expect(rendered).to include 'vm_provision_duration_seconds_bucket{provider="spec",stage="allocation",arch="arm64",runner="true",le="5"} 1.0'
+    expect(rendered).to include 'vm_provision_duration_seconds_sum{provider="spec",stage="provisioning",arch="arm64",runner="true"} 40.0'
+  end
 end
