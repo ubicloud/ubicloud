@@ -12,7 +12,7 @@ RSpec.describe Prog::InstallRhizome do
   describe "#start" do
     it "writes tar" do
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
-        expect(args).to eq ["tar xf -"]
+        expect(args).to eq [described_class::EXTRACT]
 
         expect(kwargs[:stdin].scan("Gemfile.lock").count).to be < 2
 
@@ -26,7 +26,7 @@ RSpec.describe Prog::InstallRhizome do
 
     it "handles non-ascii content in tar" do
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
-        expect(args).to eq ["tar xf -"]
+        expect(args).to eq [described_class::EXTRACT]
         expect(kwargs[:stdin].encoding).to eq(Encoding::BINARY)
       end
       expect { ir.start }.to hop("install_gems")
