@@ -54,7 +54,8 @@ class Clover
       # If was not found or entry no longer exists, return 204 to indicate so to GitHub.
       next 204 unless entry_updated
 
-      signed_url = repository.url_presigner.presigned_url(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: GithubCacheEntry.presigned_url_expires_in)
+      blob_key = entry.blob_key
+      signed_url = repository.url_presigner("GetObject", blob_key).presigned_url(:get_object, bucket: repository.bucket_name, key: blob_key, expires_in: GithubCacheEntry.presigned_url_expires_in)
 
       {
         scope: entry.scope,
@@ -156,8 +157,9 @@ class Clover
           size ||= GithubRepository.cache_size_limit
 
           max_chunk_size = 32 * 1024 * 1024 # 32MB
+          url_presigner = repository.url_presigner("UploadPart", blob_key)
           presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
-            repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id:, part_number: it, expires_in: GithubCacheEntry.presigned_url_expires_in)
+            url_presigner.presigned_url(:upload_part, bucket:, key: blob_key, upload_id:, part_number: it, expires_in: GithubCacheEntry.presigned_url_expires_in)
           end
 
           {
