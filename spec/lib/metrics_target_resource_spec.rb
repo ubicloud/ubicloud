@@ -147,11 +147,11 @@ RSpec.describe MetricsTargetResource do
       expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
     end
 
-    it "only logs a sampled subset of consecutive successful exports" do
+    it "records successful exports as metrics without logging them" do
       session = {ssh_session: Net::SSH::Connection::Session.allocate}
       resource.instance_variable_set(:@session, session)
       expect(postgres_server).to receive(:export_metrics).with(session:, tsdb_client: "tsdb_client").twice
-      expect(Clog).to receive(:emit).with("Metrics export has finished.", instance_of(Hash)).once.and_call_original
+      expect(Clog).not_to receive(:emit)
       expect(ControlPlaneMetrics).to receive(:observe_metrics_export).with(resource_type: "PostgresServer", outcome: "success", duration: Float).twice.and_call_original
       resource.export_metrics
       resource.export_metrics
