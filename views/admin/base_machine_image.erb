@@ -1,0 +1,34 @@
+<% @page_title = "Base Machine Image #{@machine_image.name}" %>
+
+<h2><%= @machine_image.name %> <small>(<%= @machine_image.arch %>, <%= @machine_image.display_location %>)</small></h2>
+
+<% versions_data = @machine_image.versions_dataset.eager(:metal).order(Sequel.desc(:created_at)).all.map do |miv|
+  {
+    version: miv.version,
+    status: miv.metal&.display_state,
+    latest: (miv.id == @machine_image.latest_version_id) ? "yes" : "",
+    created_at: miv.created_at,
+  }
+end %>
+
+<%== part("components/table", title: "Versions", table_class: "base-machine-image-versions-table", data: versions_data) %>
+
+<% build_data = @strands.map do |st|
+  {
+    id: st.ubid,
+    version: st.stack[0]["version"],
+    label: st.label,
+  }
+end %>
+
+<%== part("components/table", title: "In-progress builds", table_class: "base-machine-image-builds-table", data: build_data) %>
+
+<h2>Download New Version</h2>
+
+<% if @available_versions.empty? %>
+  <p>No new versions available in the boot image catalog.</p>
+<% else %>
+  <% form({method: "post", action: "/base-machine-images/#{@machine_image.ubid}/download-version", id: "download-base-machine-image-version"}, button: "Download New Version", wrapper: :div) do |f| %>
+    <%== f.input(:select, key: :version, label: "Version", required: true, add_blank: true, options: @available_versions) %>
+  <% end %>
+<% end %>

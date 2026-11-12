@@ -1,0 +1,13 @@
+<% @page_title = "Base Machine Images" %>
+
+<% data = @machine_images.map do |mi|
+  {
+    name: table_link(mi.name, "/base-machine-images/#{mi.ubid}"),
+    arch: mi.arch,
+    location: mi.display_location,
+    latest_version: mi.latest_version&.version,
+    versions: mi.versions_dataset.count,
+  }
+end %>
+
+<%== part("components/table", title: "Base Machine Images", table_class: "base-machine-images-table", data:) %>
