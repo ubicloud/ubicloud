@@ -10,9 +10,10 @@ RSpec.describe Prog::SetupStorageTrim do
   let(:sshable) { Sshable.create }
 
   describe "#start" do
-    it "makes the stock fstrim timer run every three hours, restarts it, and pops" do
-      expect(st.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/fstrim.timer.d")
+    it "makes the stock fstrim timer run every three hours on extents of 2 MiB and more, restarts it, and pops" do
+      expect(st.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/fstrim.timer.d /etc/systemd/system/fstrim.service.d")
       expect(st.sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/fstrim.timer.d/schedule.conf > /dev/null", stdin: "[Timer]\nOnCalendar=\nOnCalendar=*-*-* 00/3:00:00\nAccuracySec=1min\nRandomizedDelaySec=10min\n")
+      expect(st.sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/fstrim.service.d/minimum.conf > /dev/null", stdin: "[Service]\nExecStart=\nExecStart=/sbin/fstrim --listed-in /etc/fstab:/proc/self/mountinfo --verbose --quiet-unsupported --minimum 2M\n")
       expect(st.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(st.sshable).to receive(:_cmd).with("sudo systemctl enable fstrim.timer")
       expect(st.sshable).to receive(:_cmd).with("sudo systemctl restart fstrim.timer")
