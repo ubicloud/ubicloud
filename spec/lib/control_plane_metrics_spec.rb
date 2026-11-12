@@ -56,4 +56,15 @@ RSpec.describe ControlPlaneMetrics do
     expect(rendered).to include 'monitor_resources{resource_type="SpecGauge",reading="down"} 0.0'
     expect(rendered).to include 'monitor_resources{resource_type="SpecGauge",reading="up"} 5.0'
   end
+
+  it "renders respirate dispatch metrics" do
+    described_class.observe_respirate_dispatch(scan_delay: 0.2, queue_delay: 0.003, lease_delay: 0.002, total_delay: 0.205, queue_size: 3, available_workers: 2, lease_acquired: true, old_strand: nil, lease_expired: nil)
+    described_class.set_respirate_current_strand_delay(0.9)
+    rendered = described_class.render
+    expect(rendered).to include 'respirate_strand_delay_seconds_bucket{stage="scan",le="0.25"}'
+    expect(rendered).to include 'respirate_dispatches_total{lease_acquired="true",old_strand="false",lease_expired="false"}'
+    expect(rendered).to include "respirate_queue_size 3.0"
+    expect(rendered).to include "respirate_available_workers 2.0"
+    expect(rendered).to include "respirate_current_strand_delay_seconds 0.9"
+  end
 end

@@ -9,10 +9,14 @@ module ControlPlaneMetrics
   SSH_COMMAND_BUCKETS = [0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10, 20, 30, 60].freeze
   MONITOR_PULSE_BUCKETS = [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120].freeze
   METRICS_EXPORT_BUCKETS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 100].freeze
+  RESPIRATE_DELAY_BUCKETS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60].freeze
 
   UNLABELED_GAUGES = {
     monitor_active_threads: "Threads in the monitor process beyond its fixed worker and internal threads.",
     monitor_threads_waiting_for_db: "Threads waiting for a database connection in the monitor process.",
+    respirate_queue_size: "Strands waiting in the respirate queue when the last strand was dispatched.",
+    respirate_available_workers: "Idle strand threads when the last strand was dispatched.",
+    respirate_current_strand_delay_seconds: "The p95 delay of recent current-partition strands, used to pick up old strands from other partitions.",
   }.freeze
 
   def initialize
@@ -67,6 +71,17 @@ module ControlPlaneMetrics
       docstring: "Monitor worker threads waiting for a job.",
       labels: [:kind],
     )
+    @respirate_strand_delay = @registry.histogram(
+      :respirate_strand_delay_seconds,
+      docstring: "Delay between a strand becoming due and respirate running it, by stage.",
+      labels: [:stage],
+      buckets: RESPIRATE_DELAY_BUCKETS,
+    )
+    @respirate_dispatches = @registry.counter(
+      :respirate_dispatches_total,
+      docstring: "Strands dispatched by respirate, by whether the lease was acquired, the strand was from the old strand scan, and its lease had expired.",
+      labels: [:lease_acquired, :old_strand, :lease_expired],
+    )
     @unlabeled_gauges = {}
   end
 
@@ -88,6 +103,20 @@ module ControlPlaneMetrics
 
   def observe_metrics_export(resource_type:, outcome:, duration:)
     @metrics_export_duration.observe(duration, labels: {resource_type:, outcome:})
+  end
+
+  def observe_respirate_dispatch(scan_delay:, queue_delay:, lease_delay:, total_delay:, queue_size:, available_workers:, lease_acquired:, old_strand:, lease_expired:)
+    @respirate_strand_delay.observe(scan_delay, labels: {stage: "scan"})
+    @respirate_strand_delay.observe(queue_delay, labels: {stage: "queue"})
+    @respirate_strand_delay.observe(lease_delay, labels: {stage: "lease"})
+    @respirate_strand_delay.observe(total_delay, labels: {stage: "total"})
+    @respirate_dispatches.increment(labels: {lease_acquired: (!!lease_acquired).to_s, old_strand: (!!old_strand).to_s, lease_expired: (!!lease_expired).to_s})
+    unlabeled_gauge(:respirate_queue_size).set(queue_size)
+    unlabeled_gauge(:respirate_available_workers).set(available_workers)
+  end
+
+  def set_respirate_current_strand_delay(delay)
+    unlabeled_gauge(:respirate_current_strand_delay_seconds).set(delay)
   end
 
   def set_monitor_state(resources:, export_resources:, queue_lengths:, idle_workers:, active_threads:, threads_waiting_for_db:)

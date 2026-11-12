@@ -340,13 +340,18 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#metrics_thread" do
-    it "emits metrics every 200 queue entries" do
+    it "records each complete strand dispatch and updates scheduling metrics every 200 entries" do
+      t = Time.now
+      metric = Strand::RespirateMetrics.new(t, t + 1, t + 2, t + 3, true, 4, 5)
+      incomplete = Strand::RespirateMetrics.new(t, t + 1)
       q = Queue.new
       n = described_class::METRICS_EVERY
-      n.times { q.push 1 }
+      n.times { q.push metric }
+      q.push incomplete
       q.push nil
-      expect(di).to receive(:metrics_hash).with([1] * n, instance_of(Float)).and_return({})
-      expect(Clog).to receive(:emit).and_call_original
+      expect(ControlPlaneMetrics).to receive(:observe_respirate_dispatch).with(scan_delay: 1.0, queue_delay: 1.0, lease_delay: 1.0, total_delay: 3.0, queue_size: 4, available_workers: 5, lease_acquired: true, old_strand: nil, lease_expired: nil).exactly(n).times.and_call_original
+      expect(ControlPlaneMetrics).to receive(:set_respirate_current_strand_delay).with(3.0).and_call_original
+      expect(Clog).not_to receive(:emit)
       di.metrics_thread(q)
     end
   end
