@@ -52,6 +52,10 @@ class PostgresResource < Sequel::Model
       !mgmt_subnet.nil? && mgmt_subnet.strand.label == "wait"
     end
 
+    def gcp_mgmt_ssh_via_user_security_group?
+      !use_separate_management_nic? || servers.any? { it.vm.management_nic.nil? }
+    end
+
     def gcp_management_nic_use_eip?
       !project.get_ff_postgres_gcp_ssh_ipv6
     end
