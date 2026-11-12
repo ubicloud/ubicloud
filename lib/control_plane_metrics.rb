@@ -82,6 +82,11 @@ module ControlPlaneMetrics
       docstring: "Strands dispatched by respirate, by whether the lease was acquired, the strand was from the old strand scan, and its lease had expired.",
       labels: [:lease_acquired, :old_strand, :lease_expired],
     )
+    @runner_admissions = @registry.counter(
+      :runner_admissions_total,
+      docstring: "GitHub runner concurrency limit checks by decision.",
+      labels: [:decision],
+    )
     @unlabeled_gauges = {}
   end
 
@@ -117,6 +122,10 @@ module ControlPlaneMetrics
 
   def set_respirate_current_strand_delay(delay)
     unlabeled_gauge(:respirate_current_strand_delay_seconds).set(delay)
+  end
+
+  def count_runner_admission(decision:)
+    @runner_admissions.increment(labels: {decision:})
   end
 
   def set_monitor_state(resources:, export_resources:, queue_lengths:, idle_workers:, active_threads:, threads_waiting_for_db:)

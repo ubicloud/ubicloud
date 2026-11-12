@@ -67,4 +67,9 @@ RSpec.describe ControlPlaneMetrics do
     expect(rendered).to include "respirate_available_workers 2.0"
     expect(rendered).to include "respirate_current_strand_delay_seconds 0.9"
   end
+
+  it "counts runner admissions" do
+    described_class.count_runner_admission(decision: "spec_decision")
+    expect(described_class.render).to include 'runner_admissions_total{decision="spec_decision"} 1.0'
+  end
 end

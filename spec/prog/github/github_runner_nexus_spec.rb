@@ -606,6 +606,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "hops to wait_allocation_slot when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
+      expect(Clog).not_to receive(:emit).with("runner admitted after waiting", anything)
+      expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+    end
+
+    it "logs how long the runner waited when it is admitted after being held" do
+      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
+      expect(nx).to receive(:seconds_in_label).and_return(42.34)
+      expect(Clog).to receive(:emit).with("runner admitted after waiting", {runner_admitted: {installation_ubid: installation.ubid, installation_name: installation.name, repository_name: "test-repo", label: "ubicloud-standard-4", admission: "quota_available", waited: 42.3}})
       expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
     end
 
@@ -623,17 +631,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_concurrency_limit }.to nap
       end
 
-      it "waits if reputation is limited" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+      it "waits if reputation is limited and logs it only on the first check" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false).twice
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         project.update(reputation: "limited")
+        expect(Clog).to receive(:emit).with("not allowed because of limited reputation", {limited_reputation: hash_including(installation_ubid: installation.ubid, label: "ubicloud-standard-4")}).once
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(nx).to receive(:seconds_in_label).and_return(10)
         expect { nx.wait_concurrency_limit }.to nap
       end
 
-      it "waits if the project has a hard concurrency limit" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+      it "waits if the project has a hard concurrency limit and logs it only on the first check" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false).twice
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         project.set_ff_hard_runner_concurrency_limit(true)
+        expect(Clog).to receive(:emit).with("not allowed because of hard concurrency limit", {hard_concurrency_limit: hash_including(repository_name: "test-repo")}).once
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(nx).to receive(:seconds_in_label).and_return(10)
         expect { nx.wait_concurrency_limit }.to nap
       end
 
