@@ -341,6 +341,14 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "fails if there are active resources" do
       nic.update(vm_id: vm.id)
+      expect(Clog).not_to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", anything)
+
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "logs active resources once the subnet has been waiting for more than 5 minutes" do
+      nic.update(vm_id: vm.id)
+      expect(nx).to receive(:seconds_in_label).and_return(6 * 60)
       expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", instance_of(PrivateSubnet)).and_call_original
 
       expect { nx.destroy }.to nap(5)
