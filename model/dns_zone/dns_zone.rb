@@ -9,7 +9,85 @@ class DnsZone < Sequel::Model
   one_to_many :records, class: :DnsRecord, remover: nil, clearer: nil
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :refresh_dns_servers
+  plugin SemaphoreMethods, :refresh_dns_servers, :rectify_apex
+
+  def validate
+    super
+    errors.add(:apex_nameservers, "must be unique") if apex_nameservers && apex_nameservers.map { it.to_s.downcase.delete_suffix(".") }.uniq.size != apex_nameservers.size
+  end
+
+  def update_apex(apex_nameservers:, soa_email:)
+    set(apex_nameservers:, soa_email:)
+    return unless modified?
+
+    DB.transaction do
+      save_changes
+      incr_rectify_apex
+    end
+    Clog.emit("DNS zone apex changed", {dns_zone_apex: {ubid:, name:, apex_nameservers:, soa_email:}})
+  end
+
+  def apex_ns_names(dns_server)
+    (apex_nameservers || [dns_server.name]).map { add_dot_if_missing(it.downcase) }
+  end
+
+  def soa_mname
+    apex_nameservers ? add_dot_if_missing(apex_nameservers.first.downcase) : "ns.#{name}."
+  end
+
+  # RFC 1035 RNAME: the mailbox with "@" turned into a label separator, and
+  # dots inside the local part escaped.
+  def soa_rname
+    return "#{name}." unless soa_email
+
+    local, domain = soa_email.downcase.split("@", 2)
+    "#{local.gsub(".") { "\\." }}.#{domain}."
+  end
+
+  def apex_commands(dns_server, zone_read)
+    current_ns = []
+    soa = nil
+    zone_read.each_line do |line|
+      fields = line.split
+      # Older knotc prefixes each record with "[zone.]" even for a single zone.
+      fields.shift if fields.first == "[#{name}.]"
+      owner, _ttl, type, *rdata = fields
+      next unless owner == "#{name}."
+
+      current_ns << rdata.first if type == "NS"
+      soa = rdata if type == "SOA"
+    end
+    fail "Zone #{name} has no SOA record" unless soa
+
+    desired_ns = apex_ns_names(dns_server)
+    commands = (current_ns - desired_ns).map { "zone-unset #{name} @ NS #{it}" }
+    commands.concat((desired_ns - current_ns).map { "zone-set #{name} @ 3600 NS #{it}" })
+
+    mname, rname, serial, *timers = soa
+    unless mname == soa_mname && rname == soa_rname
+      # knot rejects an SOA whose serial does not increase, and its knotc
+      # parser consumes one level of backslash escaping.
+      commands << "zone-set #{name} @ 3600 SOA #{soa_mname} #{soa_rname.gsub("\\") { "\\\\" }} #{Integer(serial, 10) + 1} #{timers.join(" ")}"
+    end
+
+    commands
+  end
+
+  def rectify_apex(dns_server, vm)
+    sshable = vm.sshable
+    current = sshable.cmd("sudo -u knot knotc", stdin: "zone-read #{name} @ NS\nzone-read #{name} @ SOA", log: false)
+    changes = apex_commands(dns_server, current)
+    return if changes.empty?
+
+    commands = ["zone-abort #{name}", "zone-begin #{name}", *changes, "zone-commit #{name}"]
+    Clog.emit("Updating DNS zone apex", {dns_zone: name, vm_ubid: vm.ubid, commands:})
+    sshable.cmd("sudo -u knot knotc", stdin: commands.join("\n")).split("\n").each_with_index do |output, index|
+      next if output == "OK"
+      next if index == 0 && output.include?("no active transaction")
+
+      fail "Updating apex of #{name} failed on #{vm.ubid}. Command: #{commands[index]}. Output: #{output}"
+    end
+  end
 
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
