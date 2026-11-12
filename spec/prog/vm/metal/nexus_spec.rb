@@ -416,6 +416,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-noble", "latest", 10, true)).to be_nil
     end
 
+    it "returns nil without logging for GitHub runner images, which are always boot images" do
+      expect(Clog).not_to receive(:emit)
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "github-ubuntu-2404", "latest", 10, true)).to be_nil
+    end
+
     it "returns nil if is_base_boot_image and the requested version is destroying" do
       miv.metal.update(status: "destroying")
       expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
