@@ -407,6 +407,11 @@ TIMER
       hop_configure_metrics
     end
 
+    when_configure_storage_trim_set? do
+      decr_configure_storage_trim
+      hop_configure_storage_trim
+    end
+
     when_enable_csum_guard_set? do
       hop_enable_csum_guard
     end
@@ -442,6 +447,10 @@ TIMER
     end
 
     nap 6 * 60 * 60
+  end
+
+  label def configure_storage_trim
+    hop_push :wait, Prog::SetupStorageTrim
   end
 
   # Decremented even when the setup paged, so a rollout moves past a
