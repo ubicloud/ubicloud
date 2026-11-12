@@ -324,7 +324,8 @@ SQL
         when Prog::Base::Hop
           hp = prog_action
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
-          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", duration: label_duration)
+          to = (hp.new_prog == run_prog) ? hp.new_label.to_s : "#{hp.new_prog}.#{hp.new_label}"
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", to:, duration: label_duration)
           record_timeline(label_duration)
           set(**hp.strand_update_args, try: 0)
           stack.first["last_label_changed_at"] = time_string(Time.now)
@@ -337,7 +338,7 @@ SQL
         when Prog::Base::Exit
           ext = prog_action
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
-          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", duration: label_duration)
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", to: "", duration: label_duration)
           if (timeline = record_timeline(label_duration))
             Clog.emit("strand timeline", {strand_timeline: {
               strand: ubid,

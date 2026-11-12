@@ -10,7 +10,7 @@ RSpec.describe Prog::Base do
     Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
 
     messages = []
-    expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "popper", outcome: "exit", duration: Float).and_call_original
+    expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "popper", outcome: "exit", to: "", duration: Float).and_call_original
     expect(Clog).to receive(:emit).once.and_wrap_original do |method, message, metadata = {}|
       messages << [message, metadata.dig(:strand_exited, :strand)]
       method.call(message, metadata)

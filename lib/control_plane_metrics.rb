@@ -26,7 +26,7 @@ module ControlPlaneMetrics
     @strand_label_duration = @registry.histogram(
       :strand_label_duration_seconds,
       docstring: "Time a strand spent in a label before hopping out of it or exiting.",
-      labels: [:prog, :label, :outcome],
+      labels: [:prog, :label, :outcome, :to],
       buckets: STRAND_LABEL_BUCKETS,
     )
     @ssh_command_duration = @registry.histogram(
@@ -74,8 +74,8 @@ module ControlPlaneMetrics
     @strand_run_duration.observe(duration, labels: {prog:, label:})
   end
 
-  def observe_strand_label(prog:, label:, outcome:, duration:)
-    @strand_label_duration.observe(duration, labels: {prog:, label:, outcome:})
+  def observe_strand_label(prog:, label:, outcome:, to:, duration:)
+    @strand_label_duration.observe(duration, labels: {prog:, label:, outcome:, to:})
   end
 
   def observe_ssh_command(outcome:, duration:)

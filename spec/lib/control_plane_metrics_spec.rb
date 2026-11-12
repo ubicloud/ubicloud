@@ -9,8 +9,8 @@ RSpec.describe ControlPlaneMetrics do
   end
 
   it "renders strand label durations" do
-    described_class.observe_strand_label(prog: "SpecLabel", label: "start", outcome: "hop", duration: 3)
-    expect(described_class.render).to include 'strand_label_duration_seconds_bucket{prog="SpecLabel",label="start",outcome="hop",le="5"} 1.0'
+    described_class.observe_strand_label(prog: "SpecLabel", label: "start", outcome: "hop", to: "wait", duration: 3)
+    expect(described_class.render).to include 'strand_label_duration_seconds_bucket{prog="SpecLabel",label="start",outcome="hop",to="wait",le="5"} 1.0'
   end
 
   it "renders ssh command durations" do

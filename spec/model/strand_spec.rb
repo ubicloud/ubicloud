@@ -262,6 +262,26 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
+  describe "label duration metric" do
+    it "records the target label of a hop within the same prog" do
+      st = described_class.create(prog: "Test", label: "hop_entry")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "hop_entry", outcome: "hop", to: "hop_exit", duration: Float)
+      st.unsynchronized_run
+    end
+
+    it "records the target prog and label of a push into another prog" do
+      st = described_class.create(prog: "Test2", label: "pusher1")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test2", label: "pusher1", outcome: "hop", to: "Test.pusher2", duration: Float)
+      st.unsynchronized_run
+    end
+
+    it "records an empty target on exit" do
+      st = described_class.create(prog: "Test", label: "hop_exit")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "hop_exit", outcome: "exit", to: "", duration: Float)
+      st.unsynchronized_run
+    end
+  end
+
   describe "timeline" do
     it "records label durations through push and pop and logs the timeline on exit" do
       st = described_class.create(prog: "Test", label: "hop_pusher")
