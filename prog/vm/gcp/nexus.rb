@@ -235,7 +235,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     time = Time.now
     vm.update(display_state: "running", provisioned_at: time)
 
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
+    Clog.emit("vm provisioned", {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}})
 
     project = vm.project
     hop_wait_and_wakeup_waiting_strand unless project.billable

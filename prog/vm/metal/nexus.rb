@@ -237,7 +237,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     vm.update(display_state: "running", provisioned_at: Time.now)
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
+    Clog.emit("vm provisioned", {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}})
 
     hop_wait_and_wakeup_waiting_strand
   end
