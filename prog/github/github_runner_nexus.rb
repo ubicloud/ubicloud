@@ -16,6 +16,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   HELD_RUNNER_SECONDS = 5
 
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
+  DOCKERHUB_LOW_REMAINING_RATIO = 0.2
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
   KNOWN_KERNEL_BOOT_BUG_SIGNATURES = [
@@ -940,7 +941,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         remaining_window: remaining_window.to_i,
         source: quota_output[/^docker-ratelimit-source:\s*(\S+)/, 1],
       }
-      Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
+      Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:}) if remaining.to_i < limit.to_i * DOCKERHUB_LOW_REMAINING_RATIO
     end
 
     if (cache_proxy_log = vm.sshable.cmd(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false))
