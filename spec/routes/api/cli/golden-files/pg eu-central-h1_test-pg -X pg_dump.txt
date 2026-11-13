@@ -44,6 +44,7 @@ Post Commands:
     reset-superuser-password           Reset the superuser password for a PostgreSQL database
     restart                            Restart a PostgreSQL database cluster
     restore                            Restore a PostgreSQL database backup to a new database
+    set-backup-schedule                Set the backup schedule for a PostgreSQL database
     set-maintenance-window             Set the maintenance window for a PostgreSQL database
     show                               Show details for a PostgreSQL database
     show-config                        Show configuration for a PostgreSQL database

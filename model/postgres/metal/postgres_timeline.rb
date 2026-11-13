@@ -59,7 +59,7 @@ PGDATA=/dat/#{version}/data
       raise unless e.message.include?("BucketAlreadyOwnedByYou")
     end
 
-    def metal_set_lifecycle_policy(expiration_days: BACKUP_BUCKET_EXPIRATION_DAYS)
+    def metal_set_lifecycle_policy(expiration_days: backup_bucket_expiration_days)
       blob_storage_client.set_lifecycle_policy(ubid, ubid, expiration_days)
     end
 

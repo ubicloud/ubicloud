@@ -68,9 +68,10 @@ PGDATA=/dat/#{version}/data
       nil
     end
 
-    def gcp_set_lifecycle_policy(expiration_days: BACKUP_BUCKET_EXPIRATION_DAYS)
+    def gcp_set_lifecycle_policy(expiration_days: backup_bucket_expiration_days)
       bucket = blob_storage_client.bucket(ubid)
       bucket.lifecycle do |l|
+        l.clear
         l.add_delete_rule(age: expiration_days)
       end
     end
