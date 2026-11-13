@@ -672,7 +672,7 @@ module AdminModelSpecHelper
       vm = Vm.create(
         unix_user: "ubi", public_key: "ssh-ed25519 key",
         name: "vmgcpres-vm",
-        family: "c4a-standard", cores: 0, vcpus: 8,
+        family: "c4a-standard-lssd", cores: 0, vcpus: 8,
         memory_gib: 32, arch: "arm64",
         location_id: location.id, project_id: project.id,
         boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",

@@ -15,7 +15,7 @@ RSpec.describe VmStorageVolume do
       location_id: location.id,
       name: "gcp-storage-test",
       memory_gib: 8,
-      family: "c4a-standard",
+      family: "c4a-standard-lssd",
       vcpus: 8,
     )
   }

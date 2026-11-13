@@ -26,7 +26,7 @@ RSpec.describe BillingRate do
 
     it "falls back to the flavor row for families priced with storage included" do
       location = Location[name: "gcp-us-central1"]
-      expect(described_class.postgres_storage_rate("PostgresStorage", "c4a-standard", location)["resource_family"]).to eq("standard")
+      expect(described_class.postgres_storage_rate("PostgresStorage", "c4a-standard-lssd", location)["resource_family"]).to eq("standard")
       expect(described_class.postgres_storage_rate("PostgresStandbyStorage", "standard", Location[Location::HETZNER_FSN1_ID])["resource_family"]).to eq("standard")
     end
   end

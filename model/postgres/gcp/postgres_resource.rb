@@ -3,7 +3,7 @@
 class PostgresResource < Sequel::Model
   module Gcp
     # c4a predates per-family gating and stays on unless a project opts out.
-    DEFAULT_ENABLED_FAMILIES = ["c4a-standard", "c4a-highmem"].freeze
+    DEFAULT_ENABLED_FAMILIES = ["c4a-standard-lssd", "c4a-highmem-lssd"].freeze
 
     def self.available_families_and_sizes(location, project)
       Set.new(

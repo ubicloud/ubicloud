@@ -63,7 +63,7 @@ PGDATA=/dat/17/data
           resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false, get_ff_postgres_walg_direct_io_disabled: false))))
         server = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 8, memory_gib: 32),
           storage_device_paths: ["/dev/nvme0n1", "/dev/nvme1n1"],
-          resource: instance_double(PostgresResource, target_vm_size: "c4a-standard-8"))
+          resource: instance_double(PostgresResource, target_vm_size: "c4a-standard-lssd-8"))
 
         config = postgres_timeline.generate_walg_config(17, server)
         expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=4")   # floor(0.50*8)

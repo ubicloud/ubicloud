@@ -41,7 +41,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     when "gcp"
       location = Location[provider: "gcp", project_id: nil, name: gcp_location_name]
       Prog::Test::Base.ensure_gcp_e2e_credential(location)
-      family ||= "c4a-standard"
+      family ||= "c4a-standard-lssd"
       vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
       [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     else

@@ -201,8 +201,8 @@ def test_gcp(options, test_cases)
   if options[:test_cases].include?("postgres_z3")
     # One transaction, so the flag is in place before the strand can run.
     tests_to_wait << DB.transaction do
-      st = Prog::Test::PostgresResource.assemble(provider: "gcp", family: "z3-highlssd", gcp_location_name: "gcp-us-east4")
-      Project[st.stack.first["postgres_test_project_id"]].set_ff_enable_z3_highlssd(true)
+      st = Prog::Test::PostgresResource.assemble(provider: "gcp", family: "z3-highmem-highlssd", gcp_location_name: "gcp-us-east4")
+      Project[st.stack.first["postgres_test_project_id"]].set_ff_enable_z3_highmem_highlssd(true)
       st
     end
   end

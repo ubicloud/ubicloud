@@ -42,27 +42,35 @@ Allowed Option Values:
           r7gd.4xlarge r7gd.8xlarge r7gd.12xlarge r7gd.16xlarge r8gd.medium
           r8gd.large r8gd.xlarge r8gd.2xlarge r8gd.4xlarge r8gd.8xlarge
           r8gd.12xlarge r8gd.16xlarge r8id.large r8id.xlarge r8id.2xlarge
-          r8id.4xlarge r8id.8xlarge r8id.12xlarge r8id.16xlarge c4a-standard-4
-          c4a-standard-8 c4a-standard-16 c4a-standard-32 c4a-standard-48
-          c4a-standard-64 c4a-standard-72 c4a-highmem-4 c4a-highmem-8
-          c4a-highmem-16 c4a-highmem-32 c4a-highmem-48 c4a-highmem-64
-          c4a-highmem-72 c4-standard-4 c4-standard-8 c4-standard-16
-          c4-standard-24 c4-standard-32 c4-standard-48 c4-standard-96
-          c4-standard-144 c4-standard-192 c4-standard-288 c4-highmem-4
-          c4-highmem-8 c4-highmem-16 c4-highmem-24 c4-highmem-32 c4-highmem-48
-          c4-highmem-96 c4-highmem-144 c4-highmem-192 c4-highmem-288
-          c4d-standard-8 c4d-standard-16 c4d-standard-32 c4d-standard-48
-          c4d-standard-64 c4d-standard-96 c4d-standard-192 c4d-standard-384
-          c4d-highmem-8 c4d-highmem-16 c4d-highmem-32 c4d-highmem-48
-          c4d-highmem-64 c4d-highmem-96 c4d-highmem-192 c4d-highmem-384
-          c3-standard-4 c3-standard-8 c3-standard-22 c3-standard-44
-          c3-standard-88 c3-standard-176 c3d-standard-8 c3d-standard-16
-          c3d-standard-30 c3d-standard-60 c3d-standard-90 c3d-standard-180
-          c3d-standard-360 c3d-highmem-8 c3d-highmem-16 c3d-highmem-30
-          c3d-highmem-60 c3d-highmem-90 c3d-highmem-180 c3d-highmem-360
-          z3-standardlssd-14 z3-standardlssd-22 z3-standardlssd-44
-          z3-standardlssd-88 z3-standardlssd-176 z3-highlssd-8 z3-highlssd-16
-          z3-highlssd-22 z3-highlssd-32 z3-highlssd-44 z3-highlssd-88
+          r8id.4xlarge r8id.8xlarge r8id.12xlarge r8id.16xlarge
+          c4a-standard-lssd-4 c4a-standard-lssd-8 c4a-standard-lssd-16
+          c4a-standard-lssd-32 c4a-standard-lssd-48 c4a-standard-lssd-64
+          c4a-standard-lssd-72 c4a-highmem-lssd-4 c4a-highmem-lssd-8
+          c4a-highmem-lssd-16 c4a-highmem-lssd-32 c4a-highmem-lssd-48
+          c4a-highmem-lssd-64 c4a-highmem-lssd-72 c4-standard-lssd-4
+          c4-standard-lssd-8 c4-standard-lssd-16 c4-standard-lssd-24
+          c4-standard-lssd-32 c4-standard-lssd-48 c4-standard-lssd-96
+          c4-standard-lssd-144 c4-standard-lssd-192 c4-standard-lssd-288
+          c4-highmem-lssd-4 c4-highmem-lssd-8 c4-highmem-lssd-16
+          c4-highmem-lssd-24 c4-highmem-lssd-32 c4-highmem-lssd-48
+          c4-highmem-lssd-96 c4-highmem-lssd-144 c4-highmem-lssd-192
+          c4-highmem-lssd-288 c4d-standard-lssd-8 c4d-standard-lssd-16
+          c4d-standard-lssd-32 c4d-standard-lssd-48 c4d-standard-lssd-64
+          c4d-standard-lssd-96 c4d-standard-lssd-192 c4d-standard-lssd-384
+          c4d-highmem-lssd-8 c4d-highmem-lssd-16 c4d-highmem-lssd-32
+          c4d-highmem-lssd-48 c4d-highmem-lssd-64 c4d-highmem-lssd-96
+          c4d-highmem-lssd-192 c4d-highmem-lssd-384 c3-standard-lssd-4
+          c3-standard-lssd-8 c3-standard-lssd-22 c3-standard-lssd-44
+          c3-standard-lssd-88 c3-standard-lssd-176 c3d-standard-lssd-8
+          c3d-standard-lssd-16 c3d-standard-lssd-30 c3d-standard-lssd-60
+          c3d-standard-lssd-90 c3d-standard-lssd-180 c3d-standard-lssd-360
+          c3d-highmem-lssd-8 c3d-highmem-lssd-16 c3d-highmem-lssd-30
+          c3d-highmem-lssd-60 c3d-highmem-lssd-90 c3d-highmem-lssd-180
+          c3d-highmem-lssd-360 z3-highmem-standardlssd-14
+          z3-highmem-standardlssd-22 z3-highmem-standardlssd-44
+          z3-highmem-standardlssd-88 z3-highmem-standardlssd-176
+          z3-highmem-highlssd-8 z3-highmem-highlssd-16 z3-highmem-highlssd-22
+          z3-highmem-highlssd-32 z3-highmem-highlssd-44 z3-highmem-highlssd-88
           n2d-standard-2 n2d-standard-4 n2d-standard-8 n2d-standard-16
           n2d-standard-32 n2d-standard-48 n2d-standard-64 n2d-standard-80
           n2d-standard-96 n2d-standard-128 n2d-standard-224 n2d-highmem-2
