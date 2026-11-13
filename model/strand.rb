@@ -241,6 +241,7 @@ SQL
       top_frame.delete("deadline_start")
       top_frame.delete("deadline_page")
       top_frame.delete("deadline_notified")
+      top_frame.delete("deadline_message")
 
       modified!(:stack)
     end
@@ -266,7 +267,8 @@ SQL
           {}
         end
         extra_data.compact!
-        summary = "#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time"
+        deadline_message = frame["deadline_message"]
+        summary = "#{ubid} #{deadline_message ? "did not #{deadline_message} within deadline" : "has an expired deadline"}! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time"
         if frame["deadline_page"] == false
           Clog.emit(summary, {expired_deadline: {strand: ubid, prog: effective_prog, label:, deadline_target: frame["deadline_target"]}.merge(extra_data)})
         else
