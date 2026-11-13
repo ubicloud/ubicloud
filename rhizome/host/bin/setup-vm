@@ -127,7 +127,12 @@ when "reassign-ip6"
     swap_size_bytes, pci_devices, boot_image, dns_ipv4,
     slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 when "restart"
-  vm_setup.restart(slice_name, cpu_burst_percent_limit)
+  secrets = JSON.parse($stdin.read)
+  unless (storage_secrets = secrets["storage"])
+    puts "need storage secrets in secrets json"
+    exit 1
+  end
+  vm_setup.restart(slice_name, cpu_burst_percent_limit, storage_volumes, storage_secrets)
 when "apply-storage-io-limits"
   vm_setup.apply_storage_io_limits(storage_volumes)
 else

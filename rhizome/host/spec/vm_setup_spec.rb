@@ -607,18 +607,43 @@ RSpec.describe VmSetup do
   end
 
   describe "#restart" do
-    it "can restart a VM" do
-      expect(vs).to receive(:restart_systemd_unit)
-      expect(vs).to receive(:enable_bursting).with("some_slice.slice", 50)
+    it "stops the VM, restarts what it depends on, and starts it again" do
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test").ordered
+      expect(vs).to receive(:restart_vhost_backends).with(["volume"], {"test_0" => "kek"}).ordered
+      expect(vs).to receive(:_run_command).with("systemctl", "restart", "test-dnsmasq.service").ordered
+      expect(vs).to receive(:start_systemd_unit).ordered
+      expect(vs).to receive(:enable_bursting).with("some_slice.slice", 50).ordered
 
-      vs.restart("some_slice.slice", 50)
+      vs.restart("some_slice.slice", 50, ["volume"], {"test_0" => "kek"})
     end
 
     it "skips enable_bursting when cpu_burst_percent_limit is 0" do
-      expect(vs).to receive(:restart_systemd_unit)
+      expect(vs).to receive(:_run_command).with("systemctl", "stop", "test")
+      expect(vs).to receive(:_run_command).with("systemctl", "restart", "test-dnsmasq.service")
+      expect(vs).to receive(:start_systemd_unit)
       expect(vs).not_to receive(:enable_bursting)
 
-      vs.restart("some_slice.slice", 0)
+      vs.restart("some_slice.slice", 0, [], {})
+    end
+  end
+
+  describe "#restart_vhost_backends" do
+    it "restarts only the vhost block backends of writable volumes" do
+      params = [
+        {"device_id" => "test_0", "disk_index" => 0, "encrypted" => true, "vhost_block_backend_version" => "v0.4.0"},
+        {"device_id" => "test_1", "disk_index" => 1, "encrypted" => true, "spdk_version" => "v23.09"},
+        {"device_id" => "test_2", "disk_index" => 2, "encrypted" => false, "spdk_version" => "v23.09"},
+        {"device_id" => "test_3", "disk_index" => 3, "read_only" => true, "vhost_block_backend_version" => "v0.4.0"},
+      ]
+      started = []
+      expect(StorageVolume).to receive(:new).once.and_wrap_original do |original, vm_name, volume_params|
+        volume = original.call(vm_name, volume_params)
+        expect(volume).to receive(:vhost_backend_start) { |secrets| started << [volume_params["device_id"], secrets] }
+        volume
+      end
+
+      vs.restart_vhost_backends(params, {"test_0" => "kek"})
+      expect(started).to eq([["test_0", "kek"]])
     end
   end
 
@@ -847,13 +872,6 @@ NFTABLES_CONF
     it "can start systemd unit" do
       expect(vs).to receive(:_run_command).with("systemctl", "start", "test")
       vs.start_systemd_unit
-    end
-  end
-
-  describe "#restart_systemd_unit" do
-    it "can restart systemd unit" do
-      expect(vs).to receive(:_run_command).with("systemctl", "restart", "test")
-      vs.restart_systemd_unit
     end
   end
 

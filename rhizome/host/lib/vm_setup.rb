@@ -75,9 +75,21 @@ class VmSetup
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
-  def restart(slice_name, cpu_burst_percent_limit)
-    restart_systemd_unit
+  def restart(slice_name, cpu_burst_percent_limit, storage_params, storage_secrets)
+    r "systemctl", "stop", @vm_name
+    restart_vhost_backends(storage_params, storage_secrets)
+    r "systemctl", "restart", "#{@vm_name}-dnsmasq.service"
+    start_systemd_unit
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
+  end
+
+  # A backend that stopped answering keeps the old VM's connection and never
+  # listens for the new one, so a restart has to replace it too.
+  def restart_vhost_backends(storage_params, storage_secrets)
+    storage_params.each do |params|
+      next if params["read_only"] || !params["vhost_block_backend_version"]
+      StorageVolume.new(@vm_name, params).vhost_backend_start(storage_secrets[params["device_id"]])
+    end
   end
 
   def apply_storage_io_limits(storage_params)
@@ -804,10 +816,6 @@ DNSMASQ_SERVICE
 
   def start_systemd_unit
     r "systemctl", "start", @vm_name
-  end
-
-  def restart_systemd_unit
-    r "systemctl", "restart", @vm_name
   end
 
   def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, boot_image:)

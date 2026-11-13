@@ -1413,11 +1413,61 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#restart" do
-    it "hops to wait after restarting the vm" do
+    let(:restart_unit) { "restart_#{vm.inhost_name}" }
+
+    def create_volume(**)
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+      dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id, **)
+    end
+
+    it "starts a daemonized restart of the vm and its storage daemons" do
       vm.incr_restart
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
-      expect { nx.restart }.to hop("wait")
+      create_volume
+      secrets = {storage: {"#{vm.inhost_name}_0" => {key: "key", init_vector: "iv", algorithm: "aes-256-gcm", auth_data: "somedata"}}}
+
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with(
+        "common/bin/daemonizer2 run #{restart_unit} sudo timeout --kill-after\\=60 300 host/bin/setup-vm restart #{vm.inhost_name}",
+        {stdin: JSON.generate(secrets), log: :on_error},
+      )
+      expect { nx.restart }.to nap(1)
         .and change { vm.restart_set?(cached: false) }.from(true).to(false)
+    end
+
+    it "starts the restart again if it failed" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with(/daemonizer2 run #{restart_unit} .*setup-vm restart/, {stdin: '{"storage":{}}', log: :on_error})
+      expect { nx.restart }.to nap(1)
+    end
+
+    it "waits for an in-progress storage KEK rotation before restarting the vm" do
+      vm.incr_restart
+      kek2 = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key2", init_vector: "iv2", auth_data: "somedata")
+      create_volume(key_encryption_key_2_id: kek2.id)
+
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("NotStarted")
+      expect { nx.restart }.to nap(5)
+      expect(vm.restart_set?(cached: false)).to be(true)
+    end
+
+    it "naps while the restart is in progress" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("InProgress")
+      expect { nx.restart }.to nap(1)
+    end
+
+    it "resolves the exit page and hops to wait once the restart succeeded" do
+      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly (unknown)", ["VmExit", vm.ubid], vm.ubid, resource_id: vm.id).subject
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{restart_unit}")
+      expect { nx.restart }.to hop("wait")
+        .and change { page.resolve_set?(cached: false) }.from(false).to(true)
+    end
+
+    it "hops to wait without a page to resolve" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{restart_unit}").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{restart_unit}")
+      expect { nx.restart }.to hop("wait")
     end
   end
 
@@ -1549,9 +1599,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "restarts the VM when needed" do
       vm.incr_restart
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
-      expect { nx.unavailable }.to nap(0)
-        .and change { vm.restart_set?(cached: false) }.from(true).to(false)
+      expect { nx.unavailable }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
     end
 
     it "hops to start_after_stop when needed" do

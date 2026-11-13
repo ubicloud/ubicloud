@@ -388,9 +388,29 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def restart
-    decr_restart
-    host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
-    hop_wait
+    case host.sshable.d_check(restart_unit_name)
+    when "Succeeded"
+      host.sshable.d_clean(restart_unit_name)
+      Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
+      hop_wait
+    when "NotStarted", "Failed"
+      # Wait out any in-progress storage KEK rotation, to avoid restarting the
+      # storage daemons with the wrong key.
+      nap 5 if vm.vm_storage_volumes.any?(&:key_encryption_key_2_id)
+
+      decr_restart
+      secrets_json = JSON.generate({storage: vm.storage_secrets})
+
+      # Stopping a VM whose storage daemon is stuck takes longer than an ssh
+      # command may run, so the restart is daemonized.
+      host.sshable.d_run(restart_unit_name, "sudo", "timeout", "--kill-after=60", "300", "host/bin/setup-vm", "restart", vm_name, stdin: secrets_json, log: :on_error)
+    end
+
+    nap 1
+  end
+
+  def restart_unit_name
+    "restart_#{vm_name}"
   end
 
   label def start_after_stop
@@ -493,9 +513,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_restart_set? do
-      decr_restart
-      host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
-      nap 0
+      register_deadline("wait", 5 * 60)
+      hop_restart
     end
 
     begin
