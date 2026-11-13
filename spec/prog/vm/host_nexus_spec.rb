@@ -764,7 +764,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "registers a short deadline if host is unavailable" do
-      expect(nx).to receive(:register_deadline).with("wait", 90)
+      expect(nx).to receive(:register_deadline).with("wait", 90, message: "become available")
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
