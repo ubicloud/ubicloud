@@ -395,7 +395,7 @@ GEM
       pry (>= 0.13, < 0.17)
     pstore (0.2.1)
     public_suffix (7.0.5)
-    puma (8.0.2)
+    puma (8.0.3)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.8)
