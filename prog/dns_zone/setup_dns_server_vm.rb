@@ -78,7 +78,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
 
   label def start
     nap 5 unless vm.strand.label == "wait"
-    register_deadline(nil, 15 * 60)
+    register_deadline(nil, 15 * 60, message: "finish setting up DNS server VM")
     if vm.location.aws? || vm.location.gcp?
       # Open UDP & TCP port 53 for DNS queries on AWS & GCP
       fw = Firewall[name: "dns", project_id: Config.dns_service_project_id, location_id: vm.location_id]

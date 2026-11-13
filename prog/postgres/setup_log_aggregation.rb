@@ -17,7 +17,7 @@ class Prog::Postgres::SetupLogAggregation < Prog::Base
   # Registering the deadline in its own label persists it before #setup gets a
   # chance to fail, as a failing label rolls back its own stack changes.
   label def start
-    register_deadline(nil, 60 * 60, page: "warning")
+    register_deadline(nil, 60 * 60, page: "warning", message: "finish setting up log aggregation")
     hop_setup
   end
 

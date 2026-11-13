@@ -39,7 +39,7 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
     incr_initial_provisioning
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
 
     resource.dns_zone&.insert_record(record_name: resource.hostname, type: "A", ttl: 10, data: vm.ip4_string)
     resource.dns_zone&.insert_record(record_name: resource.hostname, type: "AAAA", ttl: 10, data: vm.ip6_string)
@@ -209,7 +209,7 @@ TIMER
   end
 
   label def unavailable
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "become available")
 
     if available?
       decr_checkup
@@ -229,7 +229,7 @@ TIMER
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
 
     resource.dns_zone&.delete_record(record_name: resource.hostname, type: "A", data: vm.ip4_string)

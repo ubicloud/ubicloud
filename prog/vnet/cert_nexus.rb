@@ -57,19 +57,19 @@ class Prog::Vnet::CertNexus < Prog::Base
     if AUTO_RESTART_LABELS.include?(strand.label)
       if last_restart_time&.<(Time.now.to_i - AUTO_RESTART_SECONDS) && remaining_auto_restarts&.>(0)
         self.remaining_auto_restarts -= 1
-        register_deadline("wait", wait_deadline, allow_extension: true)
+        register_deadline("wait", wait_deadline, allow_extension: true, message: "finish restarting certificate request")
         hop_restart
       end
     end
   end
 
   def before_destroy
-    register_deadline(nil, 3 * 60 * 60, page: "warning")
+    register_deadline(nil, 3 * 60 * 60, page: "warning", message: "finish destroying")
   end
 
   label def start
     self.last_restart_time = Time.now.to_i
-    register_deadline("wait", wait_deadline || 10 * 60)
+    register_deadline("wait", wait_deadline || 10 * 60, message: "finish certificate request")
 
     if Config.development? && cert.dns_zone_id.nil?
       san = "subjectAltName=DNS:#{cert.hostname}"

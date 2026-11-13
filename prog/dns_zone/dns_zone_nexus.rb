@@ -5,12 +5,12 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
 
   label def wait
     if dns_zone.last_purged_at < Time.now - 60 * 60 * 1 # ~1 hour
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish purging obsolete records")
       hop_purge_obsolete_records
     end
 
     when_refresh_dns_servers_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish refreshing DNS servers")
       hop_refresh_dns_servers
     end
 

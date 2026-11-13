@@ -42,7 +42,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish setting up vhost block backend")
     hop_install_vhost_backend
   end
 

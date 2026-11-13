@@ -16,7 +16,7 @@ class Prog::DeletedRecordArchiver < Prog::Base
     nap 60 * 60 unless Config.deleted_record_archive_bucket
 
     if next_action
-      register_deadline("wait", STALL_DEADLINE)
+      register_deadline("wait", STALL_DEADLINE, message: "finish archiving deleted records")
       hop_archive
     end
 

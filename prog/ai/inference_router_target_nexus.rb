@@ -36,7 +36,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
   end
 
   label def setup
-    register_deadline("wait", 30 * 60)
+    register_deadline("wait", 30 * 60, message: "finish setup")
 
     pod_config = default_runpod_config
     overlay_config!(pod_config, inference_router_target.config)

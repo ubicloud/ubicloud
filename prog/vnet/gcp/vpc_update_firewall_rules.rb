@@ -48,7 +48,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   label def update_firewall_rules
     # Extends per entry, capped 30 minutes from the first, so a legacy
     # migration does not page but a stuck sync still does.
-    register_deadline(nil, 5 * 60, allow_extension: 30 * 60)
+    register_deadline(nil, 5 * 60, allow_extension: 30 * 60, message: "update firewall rules")
 
     poll_policy_mutations
 

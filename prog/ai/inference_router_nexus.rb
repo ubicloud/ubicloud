@@ -49,7 +49,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
   label def start
     reconcile_replicas
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish provisioning replicas")
     hop_wait_replicas
   end
 
@@ -65,7 +65,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish destroying")
     decr_destroy
 
     replicas.each(&:incr_destroy)

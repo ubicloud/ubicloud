@@ -35,7 +35,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
           connected_leader: connected_leader?.to_s,
         }})
       decr_refresh_keys
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish refreshing keys")
       hop_refresh_keys
     end
 
@@ -175,14 +175,14 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
     if private_subnet.nics.any?(&:vm_id)
       unless Semaphore.where(strand_id: private_subnet.nics.filter_map(&:vm_id), name: "prevent_destroy").empty?
-        register_deadline(nil, 10 * 60, allow_extension: true)
+        register_deadline(nil, 10 * 60, allow_extension: true, message: "finish destroying")
       end
 
       Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet)
 
       nap 5
     end
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
     private_subnet.remove_all_firewalls
 
