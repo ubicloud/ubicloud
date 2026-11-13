@@ -2132,7 +2132,7 @@ class CloverAdmin < Roda
       )
 
       runners = DB[:github_runner]
-        .select(Sequel[:github_runner][:id], :installation_id, :vm_id, :allocated_at, vcpus_expr.as(:vcpus))
+        .select(Sequel[:github_runner][:id], :installation_id, :vm_id, :location_id, :allocated_at, vcpus_expr.as(:vcpus))
         .send((@arch == "arm64") ? :where : :exclude, Sequel[:label].like("%-arm%"))
 
       r_vcpus = Sequel[:r][:vcpus]
@@ -2149,8 +2149,10 @@ class CloverAdmin < Roda
       aws_quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArmAws" : "GithubRunnerVCpuAws"]
       aws_quota_expr = effective_quota_expr(aws_quota_default, Sequel[:pq_aws][:value], Sequel[:p][:reputation])
       spill_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean)
-      aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, nil)
+      aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, 0)
       family_expr = Sequel.case({Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]) => "premium"}, "standard")
+      aws_location_id = Config.github_runner_aws_location_id
+      aws_vcpus_expr = aws_location_id ? Sequel.function(:coalesce, Sequel.function(:sum, r_vcpus).filter(Sequel[:r][:location_id] => aws_location_id), 0) : Sequel.cast(0, Integer)
       no_alien_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("no_alien_runners"), :boolean)
 
       @data = DB.from(runners.as(:r))
@@ -2175,6 +2177,7 @@ class CloverAdmin < Roda
               Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0).as(:"#{prefix}_vcpus"),
             ]
           },
+          aws_vcpus_expr.as(:aws_vcpus),
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },

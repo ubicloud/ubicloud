@@ -8,10 +8,13 @@ types = %w[runner vm].freeze
     row[:name] = table_link(value: row[:name], link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}")
     row[:aws_quota] = "X" if row.delete(:no_alien)
     row.each { |k, v| total[k] += v if v.is_a?(Numeric) }
+    aws_quota = row.delete(:aws_quota)
+    row[:aws_vcpus] = (aws_quota == "X") ? "X" : "#{row[:aws_vcpus]} / #{aws_quota}"
     types.each do |type|
       row[:"#{type}_vcpus"] = "#{row.delete(:"allocated_#{type}_vcpus")} / #{row[:"#{type}_vcpus"]}"
     end
 end
+total[:aws_vcpus] = "#{total[:aws_vcpus]} / #{total.delete(:aws_quota)}"
 types.each do |type|
   total[:"#{type}_vcpus"] = "#{total.delete(:"allocated_#{type}_vcpus")} / #{total[:"#{type}_vcpus"]}"
 end
@@ -50,12 +53,6 @@ end
 
 <p><strong>quota:</strong> Effective GithubRunnerVCpu quota for the project.</p>
 
-<p>
-  <strong>aws_quota:</strong> Effective GithubRunnerVCpuAws (spill) quota for the project, blank if the
-  spill_to_alien_runners feature flag isn't enabled for the project, X if the no_alien_runners feature flag is
-  enabled for the project.
-</p>
-
 <p><strong>r*:</strong> Number of requested runners with the specified vCPU count.</p>
 
 <p>
@@ -66,6 +63,12 @@ end
 <p>
   <strong>vm_vcpus:</strong> Total allocated vCPUs / total vCPUs. Unallocated VMs have passed the concurrency limit but
   haven't found an available VM host yet.
+</p>
+
+<p>
+  <strong>aws_vcpus:</strong> Total spilled AWS vCPUs / AWS vCPUs quota for the project. The quota is 0 if the
+  spill_to_alien_runners feature flag isn't enabled for the project. X if the no_alien_runners feature flag is enabled
+  for the project.
 </p>
 
 <p><strong>s*:</strong> Number of runners with that standard family, including ones that fell back from premium.</p>

@@ -3397,7 +3397,8 @@ RSpec.describe CloverAdmin do
     vm8 = create_vm(vcpus: 8, family: "m7a")
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: vm8.id, location_id: vm8.location_id)
     vm30 = create_vm(vcpus: 32, family: "m7a", allocated_at: Time.now)
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30", allocated_at: Time.now, vm_id: vm30.id, location_id: vm30.location_id)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30", allocated_at: Time.now, vm_id: vm30.id, location_id: Location::HETZNER_HEL1_ID)
+    expect(Config).to receive(:github_runner_aws_location_id).and_return(Location::HETZNER_HEL1_ID)
     create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
     create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
     create_vm(boot_image: Config.github_ubuntu_2204_x64_aws_ami_version, vcpus: 4)
@@ -3410,15 +3411,15 @@ RSpec.describe CloverAdmin do
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
     expect(page).to have_css(".github-runner-usage details#github-runner-usage-family-sizes:not([open]) summary", text: "Show sizes")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "400", "500",
+      "TOTAL", "", "400",
       "2", "1", "1", "0", "1", "0",
-      "46 / 46", "34 / 46",
+      "46 / 46", "34 / 46", "30 / 500",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
-      "test-installation", "premium", "400", "500",
+      "test-installation", "premium", "400",
       "2", "1", "1", "0", "1", "0",
-      "46 / 46", "34 / 46",
+      "46 / 46", "34 / 46", "30 / 500",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
@@ -3437,6 +3438,8 @@ RSpec.describe CloverAdmin do
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id, allocator_preferences: {"family_filter" => ["standard"]})
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
+    other_installation = GithubInstallation.create(installation_id: 456, name: "other-installation", type: "User", project_id: Project.create(name: "other-project").id)
+    2.times { GithubRunner.create(installation_id: other_installation.id, repository_name: "test-repo", label: "ubicloud-arm") }
     create_vm_host(arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 6, total_cores: 24)
     create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2204_arm64_aws_ami_version, vcpus: 8)
 
@@ -3446,15 +3449,21 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link "Show x64"
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8, spilled runners 1")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "100", "0",
-      "1", "0", "0", "0", "0", "0",
-      "0 / 2", "0 / 0",
+      "TOTAL", "", "200",
+      "3", "0", "0", "0", "0", "0",
+      "0 / 6", "0 / 0", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "test-installation", "standard", "100", "X",
+      "other-installation", "premium", "100",
+      "2", "0", "0", "0", "0", "0",
+      "0 / 4", "0 / 0", "0 / 0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "test-installation", "standard", "100",
       "1", "0", "0", "0", "0", "0",
-      "0 / 2", "0 / 0",
+      "0 / 2", "0 / 0", "X",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
