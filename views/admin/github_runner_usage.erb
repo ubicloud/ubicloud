@@ -30,7 +30,15 @@ end
   <% end %>
 </p>
 
-<%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
+<div class="github-runner-usage">
+  <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
+
+  <% if @data.any? %>
+    <details id="github-runner-usage-family-sizes">
+      <summary title="Toggle s*, p* and a* columns"><span class="show-label">Show sizes &rsaquo;</span><span class="hide-label">&lsaquo; Hide sizes</span></summary>
+    </details>
+  <% end %>
+</div>
 
 <h3>Columns</h3>
 
