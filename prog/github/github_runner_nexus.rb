@@ -411,16 +411,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       DB[:github_installation_private_subnet].where(location_id:).count < Config.github_runner_aws_spill_installation_capacity
   end
 
-  # Large runners may not fit on a fragmented metal fleet even at low
-  # utilization, so spill them over to AWS once, after a short wait.
+  # If the metal allocator has no host for the VM 45 seconds after it was
+  # created, start the runner on AWS instead of letting the job wait longer.
   def spill_unallocated_vm?
-    ([8, 16, 30].include?(label_data["vcpus"]) || !x64?) &&
-      vm.location_id == Location::GITHUB_RUNNERS_ID &&
+    vm.location_id == Location::GITHUB_RUNNERS_ID &&
       !vm.allocated_at &&
+      Time.now - vm.created_at > 45 &&
+      support_alien? &&
       vm.waiting_for_capacity_set? &&
-      Time.now - vm.created_at > 60 &&
       alien_allowed? &&
-      project.get_ff_spill_to_alien_runners &&
       aws_quota_available? &&
       aws_spill_capacity_available?
   end
