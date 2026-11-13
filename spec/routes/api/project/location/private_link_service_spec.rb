@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "aws-sdk-ec2"
 require_relative "../../spec_helper"
 
 RSpec.describe Clover, "private-link-service" do
