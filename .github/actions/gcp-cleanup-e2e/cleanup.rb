@@ -135,10 +135,11 @@ puts "#{FOREMAN_LOG} not found; skipping log-grep phase" unless File.exist?(FORE
 #   4. tag values, then tag keys (values must be empty before keys; firewall
 #      tag keys reference the VPC via purpose_data so they must clear first)
 #   5. static IPs             (now unattached)
-#   6. subnets                (block VPC delete)
-#   7. VPCs                   (need subnets + fw policies gone)
-#   8. service accounts       (independent)
-#   9. GCS buckets            (independent)
+#   6. network peerings       (block VPC delete)
+#   7. subnets                (block VPC delete)
+#   8. VPCs                   (need peerings, subnets + fw policies gone)
+#   9. service accounts       (independent)
+#  10. GCS buckets            (independent)
 jobs = []
 
 instances = extract_names("gcp_instance_created")
@@ -201,6 +202,17 @@ if section("Static IPs", ips)
   end
 end
 
+peerings = extract_names("gcp_network_peering_created")
+if section("Network peerings", peerings)
+  peerings.each do |entry|
+    parts = split_scoped(entry)
+    next puts "  WARN: skipping malformed peering entry: #{entry}" unless parts
+    peering_name, network = parts
+    jobs << {desc: "Deleting peering #{peering_name} on #{network}",
+             args: ["compute", "networks", "peerings", "delete", peering_name, "--network=#{network}", "--project=#{PROJECT}"]}
+  end
+end
+
 subnets = extract_names("gcp_subnet_created")
 if section("Subnets", subnets)
   subnets.each do |entry|
@@ -247,6 +259,8 @@ UBID_NAME = /\A(?:vm|pv|nc)[0-9a-z]{20,}\z/
 # A postgres timeline's GCS bucket is named for the timeline ubid, and so is
 # its service account once the pg-tl- names are retired.
 TIMELINE_UBID = /\Apt[0-9a-z]{20,}\z/
+# The VPC peering e2e names its customer network, subnet and client this way.
+PEERING_E2E_PREFIX = "vpc-peering-e2e-"
 
 require "json"
 require "time"
@@ -281,7 +295,7 @@ sweep = []
 
 pick_stale(
   gcloud_json("compute", "instances", "list", "--project=#{PROJECT}")
-    .select { |i| i["name"].match?(UBID_NAME) }, "creationTimestamp",
+    .select { |i| i["name"].match?(UBID_NAME) || i["name"].start_with?(PEERING_E2E_PREFIX) }, "creationTimestamp",
 ).each do |i|
   zone = i["zone"].split("/").last
   sweep << {desc: "Sweeping stale instance #{i["name"]} in #{zone}",
@@ -328,7 +342,7 @@ end
 
 pick_stale(
   gcloud_json("compute", "networks", "subnets", "list", "--project=#{PROJECT}")
-    .select { |s| s["name"].start_with?("ubicloud-") }, "creationTimestamp",
+    .select { |s| s["name"].start_with?("ubicloud-", PEERING_E2E_PREFIX) }, "creationTimestamp",
 ).each do |s|
   region = s["region"].split("/").last
   sweep << {desc: "Sweeping stale subnet #{s["name"]} in #{region}",
@@ -337,8 +351,13 @@ end
 
 pick_stale(
   gcloud_json("compute", "networks", "list", "--project=#{PROJECT}")
-    .select { |n| n["name"].start_with?("ubicloud-") }, "creationTimestamp",
+    .select { |n| n["name"].start_with?("ubicloud-", PEERING_E2E_PREFIX) }, "creationTimestamp",
 ).each do |n|
+  # The sweep drains in list order, so each peering goes before its network.
+  (n["peerings"] || []).each do |p|
+    sweep << {desc: "Sweeping stale peering #{p["name"]} on #{n["name"]}",
+              args: ["compute", "networks", "peerings", "delete", p["name"], "--network=#{n["name"]}", "--project=#{PROJECT}"]}
+  end
   sweep << {desc: "Sweeping stale VPC #{n["name"]}",
             args: ["compute", "networks", "delete", n["name"], "--project=#{PROJECT}"]}
 end
