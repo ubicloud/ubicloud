@@ -344,6 +344,7 @@ class Project < Sequel::Model
     :ipv6_disabled,
     :no_alien_runner_repositories,
     :no_alien_runners,
+    :postgres_backup_schedule,
     :postgres_enable_maintenance_window_days,
     :postgres_hostname_override,
     :postgres_init_script,
