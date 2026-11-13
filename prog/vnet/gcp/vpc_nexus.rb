@@ -49,7 +49,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish setup")
     hop_create_vpc
   end
 
@@ -242,7 +242,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_wait
     end
 
-    register_deadline("destroy", 10 * 60)
+    register_deadline("destroy", 10 * 60, message: "finish destroying")
     hop_enumerate_destroy_state
   end
 

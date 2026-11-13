@@ -329,13 +329,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       )
       remaining_seconds = rate_limit.resets_at - Time.now
       if destroying_set?
-        register_deadline(nil, 15 * 60, allow_extension: true)
+        register_deadline(nil, 15 * 60, allow_extension: true, message: "finish destroying after GitHub API rate limit")
         if remaining_seconds >= 15 * 60
           github_runner.incr_skip_deregistration
           nap 0
         end
       else
-        register_deadline("wait", 10 * 60, allow_extension: true)
+        register_deadline("wait", 10 * 60, allow_extension: true, message: "recover from GitHub API rate limit")
         if remaining_seconds >= 10 * 60
           github_runner.incr_destroy
           nap 0
@@ -368,7 +368,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def before_destroy
-    register_deadline(nil, 15 * 60)
+    register_deadline(nil, 15 * 60, message: "finish destroying")
     update_billing_record
   end
 
@@ -574,7 +574,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap 10
     end
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
     hop_setup_environment
   end
 
@@ -778,7 +778,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait
-    register_deadline(nil, 5 * 24 * 60 * 60)
+    register_deadline(nil, 5 * 24 * 60 * 60, message: "finish running job")
     substate = begin
       vm.sshable.cmd(RUNNER_SCRIPT_SUBSTATE_COMMAND).chomp
     rescue *Sshable::SSH_CONNECTION_ERRORS
@@ -811,7 +811,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10 && !busy?
-      register_deadline(nil, 2 * 60 * 60)
+      register_deadline(nil, 2 * 60 * 60, message: "finish destroying after not picking a job")
       Clog.emit("The runner did not pick a job", github_runner)
       github_runner.incr_destroy
       nap 0
@@ -897,8 +897,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
-        register_deadline(nil, 15 * 60, allow_extension: true)
-        register_deadline("wait_vm_destroy", 2 * 60 * 60)
+        register_deadline(nil, 15 * 60, allow_extension: true, message: "finish destroying while running a job")
+        register_deadline("wait_vm_destroy", 2 * 60 * 60, message: "finish running job before destroying")
         nap 15
       when false
         rescue_common_github_api_errors do
@@ -928,7 +928,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm_destroy
-    register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
+    register_deadline(nil, 15 * 60, allow_extension: true, message: "finish destroying") if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
 
     github_runner.destroy

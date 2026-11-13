@@ -108,7 +108,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     it "registers a deadline and starts the reconcile chain once the subnet waits" do
       pls.private_subnet.strand.update(label: "wait")
-      expect(nx).to receive(:register_deadline).with("wait", 15 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 15 * 60, message: "finish setup")
       expect { nx.start }.to hop("ensure_target_groups")
     end
   end
@@ -126,14 +126,14 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     it "runs the reconcile chain again when requested, under a deadline back to wait" do
       nx.incr_reconcile
-      expect(nx).to receive(:register_deadline).with("wait", 15 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 15 * 60, message: "finish reconciling")
       expect { nx.wait }.to hop("ensure_target_groups")
       expect(pls.reconcile_set?).to be false
     end
 
     it "hops to update_permissions under a deadline when a principals change is requested" do
       nx.incr_update_permissions
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish updating permissions")
       expect(ec2).not_to receive(:describe_vpc_endpoint_service_permissions)
 
       expect { nx.wait }.to hop("update_permissions")
@@ -142,7 +142,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
 
     it "hops to reconcile_connections under a deadline when the approved endpoints changed, keeping the request for that label" do
       nx.incr_reconcile_connections
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish reconciling connections")
       expect(ec2).not_to receive(:describe_vpc_endpoint_connections)
 
       expect { nx.wait }.to hop("reconcile_connections")
@@ -165,7 +165,7 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
     it "registers a deadline, resolves a failed-NLB page and starts the teardown chain" do
       pls.incr_destroy
       Prog::PageNexus.assemble("NLB failed", ["PrivateLinkServiceNlbFailed", pls.id], [pls.ubid], resource_id: pls.id)
-      expect(nx).to receive(:register_deadline).with(nil, 15 * 60)
+      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, message: "finish destroying")
       expect { nx.destroy }.to hop("recover_unrecorded_ids")
       expect(pls.destroy_set?).to be false
       expect(Page.from_tag_parts("PrivateLinkServiceNlbFailed", pls.id).resolve_set?).to be true

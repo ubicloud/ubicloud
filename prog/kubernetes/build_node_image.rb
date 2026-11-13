@@ -48,7 +48,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def build
-    register_deadline("sanitize", 15 * 60)
+    register_deadline("sanitize", 15 * 60, message: "finish building node image")
 
     case (state = vm.sshable.d_check(BUILD_UNIT))
     when "Succeeded"
@@ -108,7 +108,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def verify
-    register_deadline("promote", 30 * 60)
+    register_deadline("promote", 30 * 60, message: "finish verifying node image")
 
     cluster_name = "verify-#{MachineImageVersion[machine_image_version_id].ubid}"
     cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: cluster_name, project_id: Config.kubernetes_service_project_id, location_id:, version: kubernetes_version, cp_node_count: 3, machine_image_version_id:).subject

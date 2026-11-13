@@ -68,7 +68,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 120 * 60)
+    register_deadline("wait", 120 * 60, message: "finish provisioning")
     Prog::Kubernetes::EtcdBackupNexus.assemble(kubernetes_cluster.id)
     incr_install_metrics_server
     incr_install_prometheus_rbac

@@ -48,7 +48,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "finish setup")
 
     bud Prog::BootstrapRhizome, {"target_folder" => "inference_endpoint", "subject_id" => vm.id, "user" => "ubi"}
     hop_wait_bootstrap_rhizome

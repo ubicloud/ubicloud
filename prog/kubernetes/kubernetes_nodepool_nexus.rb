@@ -23,7 +23,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 120 * 60)
+    register_deadline("wait", 120 * 60, message: "finish provisioning")
     when_start_bootstrapping_set? do
       decr_start_bootstrapping
       hop_bootstrap_worker_nodes

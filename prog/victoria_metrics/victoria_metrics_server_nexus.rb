@@ -57,7 +57,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
     victoria_metrics_server.incr_initial_provisioning
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
 
     cert, cert_key = create_certificate
     victoria_metrics_server.update(cert:, cert_key:)
@@ -187,7 +187,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   end
 
   label def unavailable
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "become available")
 
     reap(fallthrough: true)
     nap 5 unless strand.children.select { it.prog == "VictoriaMetrics::VictoriaMetricsServerNexus" && it.label == "restart" }.empty?
@@ -202,7 +202,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
 
     Semaphore.incr(strand.children_dataset.select(:id), "destroy")

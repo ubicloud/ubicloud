@@ -20,7 +20,7 @@ class Prog::Storage::RotateKek < Prog::Base
   end
 
   label def back_up_key
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish rotating key encryption key")
     host_tool("backup", {old_key: old_key_hash})
 
     hop_rotate

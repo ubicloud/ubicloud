@@ -48,7 +48,7 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
   end
 
   label def configure_blob_storage
-    register_deadline("wait_servers", 10 * 60)
+    register_deadline("wait_servers", 10 * 60, message: "finish configuring blob storage")
 
     blob_storage = parseable_resource.blob_storage
     unless blob_storage&.strand&.label == "wait"
@@ -67,7 +67,7 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
   end
 
   label def wait_servers
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish provisioning servers")
 
     if Strand.where(id: parseable_resource.servers_dataset.select(:id)).exclude(label: "wait").empty?
       hop_wait
@@ -102,7 +102,7 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
 
     begin

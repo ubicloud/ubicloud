@@ -116,14 +116,14 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
     it "hops to start_after_host_reboot when signaled" do
       nx.incr_start_after_host_reboot
-      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60, message: "start after host reboot")
       expect { nx.wait }.to hop("start_after_host_reboot")
     end
 
     it "hops to unavailable when checkup finds slice unavailable" do
       nx.incr_checkup
       stub_available(available: false)
-      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 2 * 60, message: "become available")
       expect { nx.wait }.to hop("unavailable")
     end
 

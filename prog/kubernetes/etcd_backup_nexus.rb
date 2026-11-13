@@ -78,7 +78,7 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish destroying")
     decr_destroy
     # Reason for the followiwng "if" is that the MinioCluster might
     # be destroyed before this logic and it would cause nil reference exeception

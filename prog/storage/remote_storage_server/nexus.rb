@@ -69,7 +69,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish starting remote storage server")
     # The source volume's vhost backend keeps running when its VM is stopped, so
     # it still holds the disk and the kek pipe. Stop it so the remote server can
     # open the volume exclusively. The source VM cannot run again until its
@@ -97,7 +97,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   label def wait
     unless sshable.d_check(daemon_name) == "InProgress"
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish restarting remote storage server")
       hop_run_server
     end
     nap 30

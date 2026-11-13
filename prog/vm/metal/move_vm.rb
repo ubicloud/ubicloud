@@ -71,7 +71,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def start
-    register_deadline("wait_destroy_source", 60 * 60)
+    register_deadline("wait_destroy_source", 60 * 60, message: "finish moving VM")
     hop_wait
   end
 

@@ -43,7 +43,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 20 * 60)
+    register_deadline(nil, 20 * 60, message: "finish provisioning node")
     hop_create_node
   end
 

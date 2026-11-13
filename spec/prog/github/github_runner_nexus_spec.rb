@@ -1641,7 +1641,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
       expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND).and_return("running")
-      expect(nx).not_to receive(:register_deadline).with(nil, 7200)
+      expect(nx).not_to receive(:register_deadline).with(nil, 7200, message: "finish destroying after not picking a job")
 
       expect { nx.wait }.to nap(60)
       expect(runner.destroy_set?).to be(false)
@@ -2014,7 +2014,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "extends deadline if vm prevents destroy" do
       expect(runner.vm).to receive(:prevent_destroy_set?).and_return(true)
-      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
+      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true, message: "finish destroying")
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 

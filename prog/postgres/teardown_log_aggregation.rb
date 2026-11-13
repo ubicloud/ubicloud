@@ -10,7 +10,7 @@ class Prog::Postgres::TeardownLogAggregation < Prog::Base
   # The PostgresResource is already gone by the time this runs, so the ubid it
   # named its stream, user and role with is carried in the frame.
   label def start
-    register_deadline(nil, 60 * 60, page: "warning")
+    register_deadline(nil, 60 * 60, page: "warning", message: "finish tearing down log aggregation")
     hop_teardown
   end
 
