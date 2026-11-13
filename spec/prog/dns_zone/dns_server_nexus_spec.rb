@@ -178,6 +178,82 @@ RSpec.describe Prog::DnsZone::DnsServerNexus do
       end
     end
 
+    context "with a configured apex" do
+      let(:read_stdin) { "zone-read example.com @ NS\nzone-read example.com @ SOA" }
+      let(:default_apex) { "example.com. 3600 NS ns.example.com.\nexample.com. 3600 SOA ns.example.com. example.com. 41 86400 7200 1209600 3600\n" }
+      let(:update_stdin) {
+        [
+          "zone-abort example.com",
+          "zone-begin example.com",
+          "zone-unset example.com @ NS ns.example.com.",
+          "zone-set example.com @ 3600 NS ns1.example.net.",
+          "zone-set example.com @ 3600 NS ns2.example.net.",
+          "zone-set example.com @ 3600 SOA ns1.example.net. example.com. 42 86400 7200 1209600 3600",
+          "zone-commit example.com",
+        ].join("\n")
+      }
+
+      before { zone.update(nameservers: ["ns1.example.net", "ns2.example.net"]) }
+
+      it "updates the apex on every reachable VM before writing the knot config" do
+        other = create_vm(project_id: project.id, name: "dns-vm-2")
+        Sshable.create_with_id(other, unix_user: "ubi", host: "dns-2.test")
+        server.add_vm(other)
+        nx.dns_server.vms.each do |target|
+          expect(target.sshable).to receive(:_cmd).with("true").ordered.and_return("")
+          expect(target.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).ordered.and_return(default_apex)
+          expect(target.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: update_stdin).ordered.and_return("OK\n" * 7)
+        end
+        nx.dns_server.vms.each do |target|
+          expect(target.sshable).to receive(:_cmd).with("true").ordered.and_return("")
+          expect(target.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: nx.dns_server.knot_config).ordered
+          expect(target.sshable).to receive(:_cmd).with("sudo -u knot knotc reload").ordered
+        end
+
+        expect { nx.configure }.to hop("wait")
+        expect(Semaphore.where(strand_id: server.id, name: "configure")).to be_empty
+      end
+
+      it "leaves an unreachable VM to the knot config loop, which pages for it" do
+        sshable = nx.dns_server.vms.first.sshable
+        expect(sshable).to receive(:_cmd).with("true").twice.and_raise(IOError)
+        expect(Clog).to receive(:emit).with("dns server vm unreachable, skipping configure", {vm_ubid: vm.ubid}).and_call_original
+
+        expect { nx.configure }.to hop("wait")
+        expect(Page.from_tag_parts("DnsServerVmConfigure", vm.id)).not_to be_nil
+      end
+
+      it "retries when the apex update loses the connection" do
+        sshable = nx.dns_server.vms.first.sshable
+        expect(sshable).to receive(:_cmd).with("true").and_return("")
+        expect(sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_raise(Errno::ECONNRESET)
+        expect(Clog).to receive(:emit).with("dns server vm apex update failed, retrying", hash_including(vm_ubid: vm.ubid)).and_call_original
+
+        expect { nx.configure }.to nap(5)
+        expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq 1
+      end
+
+      it "finishes a pending revert once every VM has the default apex" do
+        zone.update(nameservers: nil, revert_apex: true)
+        sshable = nx.dns_server.vms.first.sshable
+        expect(sshable).to receive(:_cmd).with("true").twice.and_return("")
+        expect(sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex)
+        expect(sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: nx.dns_server.knot_config)
+        expect(sshable).to receive(:_cmd).with("sudo -u knot knotc reload")
+
+        expect { nx.configure }.to hop("wait")
+        expect(zone.reload.revert_apex).to be false
+      end
+
+      it "keeps a pending revert while a VM is unreachable" do
+        zone.update(nameservers: nil, revert_apex: true)
+        expect(nx.dns_server.vms.first.sshable).to receive(:_cmd).with("true").twice.and_raise(IOError)
+
+        expect { nx.configure }.to hop("wait")
+        expect(zone.reload.revert_apex).to be true
+      end
+    end
+
     it "allows zone record updates while server configuration is pending" do
       zone.insert_record(record_name: "new.example.com", type: "A", ttl: 10, data: "192.0.2.1")
       updater = Prog::DnsZone::DnsZoneNexus.new(zone.strand)

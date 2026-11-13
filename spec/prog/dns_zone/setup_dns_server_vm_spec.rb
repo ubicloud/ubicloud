@@ -376,6 +376,43 @@ zone-flush zone2.domain.io
 
       expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
     end
+
+    context "with a configured apex" do
+      let(:zone) {
+        dz = DnsZone.create(project_id: project.id, name: "c0.example.com", nameservers: ["ns1-c0.example.net"])
+        dz.add_dns_server(ds)
+        dz
+      }
+      let(:read_stdin) { "zone-read c0.example.com @ NS\nzone-read c0.example.com @ SOA" }
+      let(:default_apex) { "c0.example.com. 3600 NS toruk.\nc0.example.com. 3600 SOA ns.c0.example.com. c0.example.com. 37 86400 7200 1209600 3600\n" }
+      let(:updated_apex) { "c0.example.com. 3600 NS ns1-c0.example.net.\nc0.example.com. 3600 SOA ns1-c0.example.net. c0.example.com. 39 86400 7200 1209600 3600\n" }
+
+      before { zone }
+
+      it "applies the apex to the new VM and checks it against the existing VMs" do
+        existing = create_vm_with_sshable
+        prog
+        ds.add_vm(existing)
+        existing_sshable = prog.ds.vms.first.sshable
+
+        expect(existing_sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(updated_apex)
+        expect(prog.vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex)
+        expect(prog.vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: /\Azone-abort c0.example.com\nzone-begin c0.example.com\nzone-unset c0.example.com @ NS toruk.\nzone-set c0.example.com @ 3600 NS ns1-c0.example.net.\nzone-set c0.example.com @ 3600 SOA ns1-c0.example.net. c0.example.com. 38 /).and_return("OK\n" * 6)
+        expect(existing_sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: "zone-read --", log: false).and_return("apex")
+        expect(prog.vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: "zone-read --", log: false).and_return("apex")
+
+        expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
+        expect(ds.reload.vms.map(&:id)).to include(prog.vm.id)
+      end
+
+      it "skips zones without configured values" do
+        zone.update(nameservers: nil)
+        prog
+        expect(prog.vm.sshable).not_to receive(:_cmd)
+
+        expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
+      end
+    end
   end
 
   def create_vm_with_sshable

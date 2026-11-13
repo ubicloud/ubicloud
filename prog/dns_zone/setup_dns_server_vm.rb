@@ -153,6 +153,12 @@ sudo systemctl reboot
   end
 
   label def validate
+    ds.dns_zones.each do |dz|
+      next unless dz.manages_apex?
+
+      (ds.vms + [vm]).uniq(&:id).each { dz.rectify_apex(ds, it) }
+    end
+
     hop_sync_zones unless Prog::DnsZone::SetupDnsServerVm.vms_in_sync?(ds.vms + [vm])
     ds.add_vm vm unless ds.vms.map(&:id).include? vm.id
     pop "created VM for DnsServer"
