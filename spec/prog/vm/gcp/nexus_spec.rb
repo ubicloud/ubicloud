@@ -524,6 +524,24 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(account["ssh_authorized_keys"]).to eq(vm.sshable.keys.map(&:public_key))
     end
 
+    it "adds the project's operator SSH keys to the account" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-ssh-operator")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+
+      expect(YAML.safe_load(captured)["users"].last["ssh_authorized_keys"])
+        .to eq(vm.sshable.keys.map(&:public_key) + ["operator_ssh_key"])
+    end
+
     it "round-trips SSH keys through YAML without shell quoting" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
