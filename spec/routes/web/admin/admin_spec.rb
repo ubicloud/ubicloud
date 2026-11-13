@@ -3411,6 +3411,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
+    expect(page).to have_css(".github-runner-usage details#github-runner-usage-family-sizes:not([open]) summary", text: "Show sizes")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "400", "500",
       "2", "1", "1", "0", "1", "0",

@@ -266,6 +266,31 @@ caption, .collapsible-table summary {
   & table caption { display: none; }
 }
 
+.github-runner-usage {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+
+  &:has(#github-runner-usage-family-sizes:not([open])) .github-runner-usage-table :is(th, td):nth-child(n+13) {
+    display: none;
+  }
+}
+#github-runner-usage-family-sizes {
+  margin-top: 1em;
+
+  & summary {
+    list-style: none;
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px;
+    border: 1px solid var(--border-soft);
+    color: var(--link);
+  }
+  & summary::-webkit-details-marker { display: none; }
+  & summary:hover { background-color: var(--shade); }
+  &[open] .show-label, &:not([open]) .hide-label { display: none; }
+}
+
 code {
   display: inline-block;
   padding: 5px;
