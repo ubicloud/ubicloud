@@ -50,7 +50,7 @@ class MetricsReporter
   end
 
   def report
-    unless (client = VictoriaMetricsResource.client_for_project(Config.victoria_metrics_service_project_id))
+    unless (client = VictoriaMetricsResource.client_for_project(Config.control_plane_metrics_project_id))
       Clog.emit("#{@name} metrics report skipped because VictoriaMetrics is not configured")
       return
     end

@@ -84,6 +84,13 @@ RSpec.describe MetricsReporter do
     expect(reporter.report).to be_nil
   end
 
+  it "#report uses the VictoriaMetrics resource of the control plane metrics project" do
+    project_id = Project.generate_uuid
+    expect(Config).to receive(:control_plane_metrics_project_id).and_return(project_id)
+    expect(VictoriaMetricsResource).to receive(:client_for_project).with(project_id).and_return(nil)
+    expect(reporter.report).to be_nil
+  end
+
   it "#report emits and continues when the client database lookup fails" do
     expect(VictoriaMetricsResource).to receive(:client_for_project).and_raise(Sequel::DatabaseConnectionError)
     expect(Clog).to receive(:emit).with("api metrics report failed", Hash).and_call_original
