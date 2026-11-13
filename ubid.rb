@@ -123,6 +123,7 @@ class UBID
   # TYPE_POSTGRES_WAL_SHADOW = "pw"
   # TYPE_POSTGRES_WAL_LISTENER = "w1"
   # TYPE_POSTGRES_VPC_ENDPOINT = "ve"
+  TYPE_VPC_PEERING = "px"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
