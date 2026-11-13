@@ -362,7 +362,7 @@ RSpec.describe Scheduling::Dispatcher do
       arrays << Array.new(8) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
       arrays << Array.new(1) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3, true) }
       arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true, true) }
-      expect(di.metrics_hash(arrays.flatten, 0.5)).to eq({
+      expect(di.metrics_hash(arrays.flatten.shuffle(random: Random.new(1)), 0.5)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
         current_strand_delay: 12.0,
         lease_acquire_percentage: 95.5,

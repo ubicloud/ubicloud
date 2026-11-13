@@ -339,6 +339,7 @@ class Scheduling::Dispatcher
     # current delay numbers if the delay is increasing rapidly.
     array.reject!(&:old_strand)
     array.map!(&:total_delay)
+    array.sort!
     respirate_metrics[:current_strand_delay] = @current_strand_delay = array[(array.count * 0.95r).floor] || 0
 
     respirate_metrics
