@@ -372,7 +372,7 @@ RSpec.describe "Web UI JavaScript" do # rubocop:disable RSpec/DescribeClass
       expect(button).to be_disabled
       expect(button).to have_text(/\AFetch latest \(\s*\d\d\s*s\)\z/)
       seconds = Integer(button.find("span").text, 10)
-      expect(seconds).to be_between(1, 15)
+      expect(seconds).to be_between(1, 16)
 
       # The countdown decreases every second
       if seconds > 1

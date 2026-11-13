@@ -146,7 +146,7 @@ function setupCountdownButtons() {
     const retryAtMs = parseInt(button.data("countdown-until"), 10) * 1000;
 
     function tick() {
-      const remainingSeconds = Math.ceil((retryAtMs - Date.now()) / 1000);
+      const remainingSeconds = Math.ceil((retryAtMs - Date.now()) / 1000) + 1;
       if (remainingSeconds <= 0) {
         button.prop("disabled", false).text(label);
         return;
