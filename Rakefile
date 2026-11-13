@@ -258,6 +258,11 @@ task :monitor_smoke_test do
   sh(RbConfig.ruby, "spec/monitor_smoke_test.rb")
 end
 
+desc "Run JavaScript tests using a headless browser"
+task :javascript_test do
+  sh(RbConfig.ruby, "spec/javascript_test.rb")
+end
+
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
   # not partitioned, 1 process
