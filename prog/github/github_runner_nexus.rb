@@ -897,8 +897,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
-        register_deadline(nil, 15 * 60, allow_extension: true, message: "finish destroying while running a job")
-        register_deadline("wait_vm_destroy", 2 * 60 * 60, message: "finish running job before destroying")
+        register_deadline("wait_vm_destroy", 2 * 60 * 60, allow_extension: true, message: "finish running job before destroying")
         nap 15
       when false
         rescue_common_github_api_errors do

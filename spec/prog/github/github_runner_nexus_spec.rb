@@ -1909,6 +1909,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to nap(15)
     end
 
+    it "pushes the deadline back each time the runner is still running a job" do
+      runner.update(workflow_job: nil)
+      allow(client).to receive(:get).and_return(busy: true)
+      frame = nx.strand.stack.first
+
+      expect { nx.destroy }.to nap(15)
+      expect(frame["deadline_target"]).to eq "wait_vm_destroy"
+      expect(frame["deadline_message"]).to eq "finish running job before destroying"
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
+
+      frame["deadline_at"] = nx.strand.time_string(Time.now + 60)
+      expect { nx.destroy }.to nap(15)
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
+    end
+
     it "destroys resources and hops if runner deregistered" do
       vm.update(allocated_at: Time.now)
       expect(nx).to receive(:decr_destroy)
