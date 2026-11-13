@@ -114,6 +114,11 @@ RSpec/SpecFilePathFormat:
     - 'spec/routes/**/*.rb'
     - 'kubernetes/csi/spec/**/*.rb'
 
+# Run directly via rake javascript_test, not as part of the main spec suite
+RSpec/SpecFilePathSuffix:
+  Exclude:
+    - 'spec/javascript_test.rb'
+
 RSpec/MultipleMemoizedHelpers:
   Enabled: false
 
