@@ -1,0 +1,54 @@
+name: JavaScript CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mise.toml'
+      - 'assets/js/**'
+      - 'assets/css/tailwind.css'
+      - 'tailwind.config.js'
+      - 'views/**'
+      - 'clover.rb'
+      - 'spec/javascript_test.rb'
+      - '.github/workflows/javascript-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+  pull_request:
+    paths:
+      - 'mise.toml'
+      - 'assets/js/**'
+      - 'assets/css/tailwind.css'
+      - 'tailwind.config.js'
+      - 'views/**'
+      - 'clover.rb'
+      - 'spec/javascript_test.rb'
+      - '.github/workflows/javascript-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+
+jobs:
+  javascript-ci:
+    name: JavaScript CI
+    runs-on: ubicloud
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Clover
+      uses: $/.github/actions/setup-clover
+      with:
+        setup-node: true
+
+    # The tests check visibility, which depends on the Tailwind CSS
+    - name: Build assets
+      run: npm run prod
+
+    - name: Run JavaScript tests
+      run: bundle exec rake javascript_test
