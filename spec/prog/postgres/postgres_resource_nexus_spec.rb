@@ -342,12 +342,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.use_different_az_set?).to be true
     end
 
-    it "does not set use_different_az for non-AWS locations when FF is set" do
+    it "does not set use_different_az for metal locations when the AWS FF is set" do
       customer_project.set_ff_postgres_aws_use_different_azs_for_standbys(true)
 
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       expect(pg.use_different_az_set?).to be false
+    end
+
+    it "sets use_different_az for GCP locations unless the project opts out" do
+      gcp_location = Location[name: "gcp-us-central1"]
+      assemble = ->(name) { described_class.assemble(project_id: customer_project.id, location_id: gcp_location.id, name:, target_vm_size: "c4a-standard-4", target_storage_size_gib: 375).subject }
+
+      expect(assemble.call("pg-spread").use_different_az_set?).to be true
+      customer_project.set_ff_postgres_gcp_same_az_for_standbys(true)
+      expect(assemble.call("pg-same-az").use_different_az_set?).to be false
     end
 
     it "does not set use_different_az when FF is not set" do

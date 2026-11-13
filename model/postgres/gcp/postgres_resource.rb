@@ -62,5 +62,14 @@ class PostgresResource < Sequel::Model
       end
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:, availability_zone_required: false)
     end
+
+    # The VM strand picks the zone, so a server has none until it starts.
+    def gcp_servers_placed?
+      servers.all? { it.vm.vm_gcp_resource }
+    end
+
+    def gcp_use_different_az_by_default?
+      !project.get_ff_postgres_gcp_same_az_for_standbys
+    end
   end
 end

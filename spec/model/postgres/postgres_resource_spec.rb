@@ -463,6 +463,7 @@ RSpec.describe PostgresResource do
         postgres_resource.provision_new_standby
         new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
         expect(new_server.vm.strand.stack[0]["required_availability_zone"]).to eq("a")
+        expect(new_server.vm.strand.stack[0]["preferred_availability_zone"]).to be_nil
       end
 
       it "prefers the zone the preferred id names while still excluding the azs in use" do
@@ -472,6 +473,7 @@ RSpec.describe PostgresResource do
         postgres_resource.provision_new_standby
         new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
         expect(new_server.vm.strand.stack[0]["required_availability_zone"]).to be_nil
+        expect(new_server.vm.strand.stack[0]["preferred_availability_zone"]).to eq("c")
       end
 
       it "drops the preferred zone when a server already occupies it" do

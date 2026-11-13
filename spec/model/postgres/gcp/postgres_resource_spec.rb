@@ -60,6 +60,16 @@ RSpec.describe PostgresResource do
   end
 
   context "with GCP provider" do
+    let(:timeline) { PostgresTimeline.create(location_id: location.id) }
+
+    def create_server(vm, is_representative: false)
+      PostgresServer.create(
+        timeline:, resource: postgres_resource, vm_id: vm.id,
+        synchronization_status: "ready", timeline_access: "push", version: "17",
+        is_representative:,
+      )
+    end
+
     describe "#upgrade_candidate_server" do
       before { PgGceImage.dataset.destroy }
 
@@ -224,16 +234,6 @@ RSpec.describe PostgresResource do
     end
 
     describe "#new_server_exclusion_filters" do
-      let(:timeline) { PostgresTimeline.create(location_id: location.id) }
-
-      def create_server(vm, is_representative: false)
-        PostgresServer.create(
-          timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
-          is_representative:,
-        )
-      end
-
       context "when use_different_az_set? is false" do
         it "pins availability_zone to the representative server's zone" do
           vm1 = create_gcp_vm_with_nic("gcp-pg-vm-1", zone_suffix: "a")
@@ -294,6 +294,19 @@ RSpec.describe PostgresResource do
           filters = postgres_resource.new_server_exclusion_filters
           expect(filters.exclude_availability_zones).to eq(["a"])
         end
+      end
+    end
+
+    describe "#servers_placed?" do
+      before { create_server(create_gcp_vm_with_nic("gcp-pg-vm-1", zone_suffix: "a"), is_representative: true) }
+
+      it "is true when every server's VM has picked its zone" do
+        expect(postgres_resource.reload.servers_placed?).to be true
+      end
+
+      it "is false while a server's VM has not picked its zone" do
+        create_server(create_vm(project_id: project.id, location_id: location.id, name: "gcp-pg-vm-2"))
+        expect(postgres_resource.reload.servers_placed?).to be false
       end
     end
   end
