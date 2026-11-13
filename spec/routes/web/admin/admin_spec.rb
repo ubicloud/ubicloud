@@ -3436,6 +3436,7 @@ RSpec.describe CloverAdmin do
     expect(page.all("#content td").map(&:text)).to eq []
 
     project = Project.create(name: "test-project")
+    project.set_ff_no_alien_runners(true)
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
@@ -3457,7 +3458,7 @@ RSpec.describe CloverAdmin do
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "test-installation", "true", "100", "",
+      "test-installation", "true", "100", "X",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
