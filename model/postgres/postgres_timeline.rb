@@ -69,6 +69,10 @@ class PostgresTimeline < Sequel::Model
     backup_due? ? backup_slot_open_at : backup_slot_open_at + 60 * 60 * backup_period_hours
   end
 
+  def backup_period_hours_options
+    (BACKUP_PERIOD_HOURS_OPTIONS | [backup_period_hours]).sort
+  end
+
   def backup_schedule
     values.slice(:backup_window_start_at, :backup_retention_days, :backup_period_hours)
   end

@@ -1231,3 +1231,16 @@ $(document).on("click", ".remove-multi-input", function (event) {
     row.find("input, select").val("");
   }
 });
+
+function updateBackupMaintenanceWarning() {
+  const form = $("#backup-schedule-form");
+  const overlaps = form.data("backup-overlaps");
+  if (!overlaps) return;
+  const start = form.find("#backup_window_start_at").val();
+  const period = form.find("#backup_period_hours").val();
+  const overlapping = start !== "" && (overlaps[period] || []).includes(parseInt(start, 10));
+  $("#backup-maintenance-warning").toggleClass("hidden", !overlapping);
+}
+
+$(document).on("change", "#backup-schedule-form select", updateBackupMaintenanceWarning);
+$(updateBackupMaintenanceWarning);
