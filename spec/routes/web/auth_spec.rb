@@ -89,6 +89,19 @@ RSpec.describe Clover, "auth" do
     expect(audit_log_hash).to eq({"create_account" => ip_hash})
   end
 
+  it "tracks valid source provided to create account route and stores in database" do
+    visit "/create-account?source=foo-bar&source_detail=Baz-quux"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    expect(DB[:account_source].all).to eq [{account_id: Account.get(:id), source: "foo-bar", detail: "Baz-quux"}]
+    expect(audit_log_hash).to eq({"create_account" => ip_hash})
+  end
+
   it "ignores source that doesn't meet requirements" do
     visit "/?source=f,"
     visit "/create-account"
@@ -1428,6 +1441,17 @@ RSpec.describe Clover, "auth" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Default Dashboard")
       expect(DB[:account_source].all).to eq [{account_id: account.id, source: "foobar", detail: "f" * 36}]
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
+    end
+
+    it "can track source for account created via social login from create account page" do
+      mock_provider(:github)
+      visit "/create-account?source=foobar&source_detail=baz"
+      click_button "GitHub"
+      account = Account[email: TEST_USER_EMAIL]
+      expect(account).not_to be_nil
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(DB[:account_source].all).to eq [{account_id: account.id, source: "foobar", detail: "baz"}]
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 

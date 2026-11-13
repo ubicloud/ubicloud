@@ -569,6 +569,7 @@ class Clover < Roda
       super()
     end
 
+    before_create_account_route { scope.set_account_source }
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
     create_account_set_password? true
@@ -1155,14 +1156,7 @@ class Clover < Roda
       rodauth.check_active_session
 
       r.root do
-        if !current_account && (source = typecast_params.nonempty_str("source")) && /\A[-a-z0-9]{1,32}\z/.match?(source)
-          if (detail = typecast_params.nonempty_str("source_detail"))
-            detail.gsub!(/[^-a-z0-9A-Z]/, "")
-            detail = detail[0...36]
-            detail = nil if detail.empty?
-          end
-          session["account_source"] = [[source, detail]]
-        end
+        set_account_source unless current_account
 
         if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id && Config.github_app_name && Config.stripe_secret_key
           @step = if current_account

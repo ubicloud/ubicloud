@@ -199,6 +199,17 @@ class Clover < Roda
     nil
   end
 
+  def set_account_source
+    if (source = typecast_params.nonempty_str("source")) && /\A[-a-z0-9]{1,32}\z/.match?(source)
+      if (detail = typecast_params.nonempty_str("source_detail"))
+        detail.gsub!(/[^-a-z0-9A-Z]/, "")
+        detail = detail[0...36]
+        detail = nil if detail.empty?
+      end
+      session["account_source"] = [[source, detail]]
+    end
+  end
+
   def before_rodauth_create_account(account, name)
     account[:id] = Account.generate_uuid
     account[:name] = name
