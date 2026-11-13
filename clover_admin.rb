@@ -2150,6 +2150,7 @@ class CloverAdmin < Roda
       aws_quota_expr = effective_quota_expr(aws_quota_default, Sequel[:pq_aws][:value], Sequel[:p][:reputation])
       spill_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean)
       aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, nil)
+      family_expr = Sequel.case({Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]) => "premium"}, "standard")
       no_alien_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("no_alien_runners"), :boolean)
 
       @data = DB.from(runners.as(:r))
@@ -2161,7 +2162,7 @@ class CloverAdmin < Roda
         .select(
           Sequel[:i][:id],
           Sequel[:i][:name],
-          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:prem),
+          family_expr.as(:family),
           quota_expr.as(:quota),
           aws_quota_display_expr.as(:aws_quota),
           no_alien_expr.as(:no_alien),
@@ -2178,7 +2179,7 @@ class CloverAdmin < Roda
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
-        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :quota, :aws_quota, :no_alien)
+        .group(Sequel[:i][:id], Sequel[:i][:name], family_expr, :quota, :aws_quota, :no_alien)
         .reverse(:runner_vcpus, :vm_vcpus)
         .all
 
