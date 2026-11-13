@@ -42,7 +42,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           "groups" => "sudo",
           "sudo" => "ALL=(ALL:ALL) NOPASSWD:ALL",
           "shell" => "/bin/bash",
-          "ssh_authorized_keys" => vm.sshable.keys.map(&:public_key),
+          "ssh_authorized_keys" => vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [].freeze),
         },
       ],
     }
