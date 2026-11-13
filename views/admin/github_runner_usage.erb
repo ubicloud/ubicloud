@@ -15,7 +15,7 @@ end
 types.each do |type|
   total[:"#{type}_vcpus"] = "#{total.delete(:"allocated_#{type}_vcpus")} / #{total[:"#{type}_vcpus"]}"
 end
-@data.prepend({name: "TOTAL", prem: "", **total}) if @data.any? %>
+@data.prepend({name: "TOTAL", family: "", **total}) if @data.any? %>
 
 <% other_arch = (@arch == "x64") ? "arm64" : "x64" %>
 
@@ -44,8 +44,8 @@ end
 <h3>Columns</h3>
 
 <p>
-  <strong>prem:</strong> Whether premium runners are enabled. Even when enabled, runners can still fall back to
-  standard.
+  <strong>family:</strong> premium if premium runners are enabled, standard if not. Even when enabled, runners can
+  still fall back to standard.
 </p>
 
 <p><strong>quota:</strong> Effective GithubRunnerVCpu quota for the project.</p>

@@ -3416,7 +3416,7 @@ RSpec.describe CloverAdmin do
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
-      "test-installation", "true", "400", "500",
+      "test-installation", "premium", "400", "500",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
@@ -3434,7 +3434,7 @@ RSpec.describe CloverAdmin do
 
     project = Project.create(name: "test-project")
     project.set_ff_no_alien_runners(true)
-    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id, allocator_preferences: {"family_filter" => ["standard"]})
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
     create_vm_host(arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 6, total_cores: 24)
@@ -3452,7 +3452,7 @@ RSpec.describe CloverAdmin do
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "test-installation", "true", "100", "X",
+      "test-installation", "standard", "100", "X",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
