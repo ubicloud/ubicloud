@@ -3407,11 +3407,13 @@ RSpec.describe CloverAdmin do
     create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-1", vcpus: 4)
     create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-2", vcpus: 8)
     create_vm(project_id: service_project.id, location_id: aws_location.id, name: "aws-vm-3", arch: "arm64", vcpus: 16)
+    installation.add_private_subnet(PrivateSubnet.create(name: "aws-ps", project_id: project.id, location_id: aws_location.id, net4: "10.0.0.0/26", net6: "fd10::/64"))
+    installation.add_private_subnet(PrivateSubnet.create(name: "metal-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.1.0/26", net6: "fd11::/64"))
 
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2, total AWS VPCs 1 - premium: vcpu 50.0%, hugepage 4.27%")
     expect(page).to have_css(".github-runner-usage details#github-runner-usage-family-sizes:not([open]) summary", text: "Show sizes")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "400",
@@ -3453,7 +3455,7 @@ RSpec.describe CloverAdmin do
 
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8, spilled runners 1")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8, spilled runners 1, total AWS VPCs 0")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "200",
       "3", "0", "0", "0", "0", "0",

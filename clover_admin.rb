@@ -2193,6 +2193,7 @@ class CloverAdmin < Roda
         .to_hash(:family, [:vcpu_util, :hugepage_util])
 
       @spilled_vcpus, @spilled_runners = GithubRunner.aws_vm_usage(arch: @arch)
+      @aws_vpcs = DB[:github_installation_private_subnet].where(location_id: Config.github_runner_aws_location_id).count
 
       view("github_runner_usage")
     end
