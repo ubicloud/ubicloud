@@ -598,7 +598,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
 
       begin
-        host.sshable.cmd("sudo systemctl stop prep_:vm_name", vm_name:, timeout: 10, log: :on_error)
+        host.sshable.cmd("sudo systemctl stop prep_:vm_name", vm_name:, timeout: 10, log: false)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
