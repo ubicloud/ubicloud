@@ -591,7 +591,7 @@ class Clover
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
-          flash["notice"] = "Maintenance window is #{"un" unless pg.maintenance_window_start_at}set"
+          flash["notice"] = ["Maintenance window is #{"un" unless pg.maintenance_window_start_at}set", backup_maintenance_overlap_warning(pg)].compact.join(". ")
           r.redirect pg, "/settings"
         end
       end
@@ -629,7 +629,7 @@ class Clover
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
-          flash["notice"] = "Backup schedule is updated"
+          flash["notice"] = ["Backup schedule is updated", backup_maintenance_overlap_warning(pg)].compact.join(". ")
           r.redirect pg, "/settings"
         end
       end

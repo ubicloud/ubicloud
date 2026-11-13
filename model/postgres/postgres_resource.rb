@@ -463,6 +463,28 @@ class PostgresResource < Sequel::Model
     days.empty? ? hours : "#{days.map(&:capitalize).join(", ")}, #{hours}"
   end
 
+  # Whether any backup slot hour falls inside the maintenance window hours,
+  # ignoring which days the maintenance window applies to.
+  def backup_window_overlaps_maintenance_window?
+    return false unless representative_server.primary? && (backup_start = timeline.backup_window_start_at)
+
+    backup_start_hours_overlapping_maintenance_window(timeline.backup_period_hours).include?(backup_start)
+  end
+
+  # The backup window start hours (0-23) for which a backup slot of the given
+  # period falls inside the maintenance window hours.
+  def backup_start_hours_overlapping_maintenance_window(period)
+    return [] unless maintenance_window_start_at
+
+    slot_hours = PostgresTimeline.backup_window_hours_for(period)
+    maintenance_hours = Array.new(MAINTENANCE_DURATION_IN_HOURS) { (maintenance_window_start_at + it) % 24 }
+    (0...24).select do |backup_start|
+      slot_starts = (0...24).select { ((it - backup_start) % period.gcd(24)).zero? }
+      backup_hours = slot_starts.flat_map { |slot| Array.new(slot_hours) { (slot + it) % 24 } }
+      !(backup_hours & maintenance_hours).empty?
+    end
+  end
+
   def read_replica?
     parent_id && restore_target.nil?
   end

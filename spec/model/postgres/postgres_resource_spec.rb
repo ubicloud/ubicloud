@@ -1107,6 +1107,65 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#backup_start_hours_overlapping_maintenance_window" do
+    it "is empty without a maintenance window" do
+      expect(postgres_resource.backup_start_hours_overlapping_maintenance_window(24)).to eq([])
+    end
+
+    it "lists the start hours whose slots touch the maintenance hours" do
+      postgres_resource.update(maintenance_window_start_at: 3)
+      expect(postgres_resource.backup_start_hours_overlapping_maintenance_window(24)).to eq([0, 1, 2, 3, 4])
+      expect(postgres_resource.backup_start_hours_overlapping_maintenance_window(12)).to eq([0, 1, 2, 3, 4, 12, 13, 14, 15, 16])
+    end
+  end
+
+  describe "#backup_window_overlaps_maintenance_window?" do
+    before { create_postgres_server(resource: postgres_resource, timeline:) }
+
+    def overlaps?(maintenance_start, backup_start, period)
+      postgres_resource.update(maintenance_window_start_at: maintenance_start)
+      timeline.update(backup_window_start_at: backup_start, backup_period_hours: period, backup_retention_days: 35)
+      postgres_resource.reload.backup_window_overlaps_maintenance_window?
+    end
+
+    it "is false without a maintenance window or a backup window" do
+      expect(overlaps?(nil, 3, 24)).to be(false)
+      expect(overlaps?(3, nil, 24)).to be(false)
+    end
+
+    it "compares the daily slot hours with the maintenance hours" do
+      expect(overlaps?(3, 3, 24)).to be(true)
+      expect(overlaps?(3, 0, 24)).to be(true)
+      expect(overlaps?(3, 6, 24)).to be(false)
+      expect(overlaps?(3, 7, 24)).to be(false)
+      expect(overlaps?(3, 1, 24)).to be(true)
+    end
+
+    it "wraps around midnight" do
+      expect(overlaps?(1, 22, 24)).to be(true)
+      expect(overlaps?(22, 2, 24)).to be(false)
+    end
+
+    it "is false for a database that is not primary" do
+      postgres_resource.representative_server.update(timeline_access: "fetch")
+      expect(overlaps?(3, 3, 24)).to be(false)
+    end
+
+    it "accounts for every slot of a sub-daily period" do
+      expect(overlaps?(15, 3, 12)).to be(true)
+      expect(overlaps?(8, 3, 12)).to be(false)
+    end
+
+    it "uses a one hour slot for a one hour period and covers every hour" do
+      expect(overlaps?(9, 3, 1)).to be(true)
+    end
+
+    it "uses the starting hour of multi-day periods" do
+      expect(overlaps?(3, 4, 48)).to be(true)
+      expect(overlaps?(3, 8, 168)).to be(false)
+    end
+  end
+
   it "returns in_maintenance_window? correctly" do
     # nil maintenance_window means always in maintenance window
     postgres_resource.update(maintenance_window_start_at: nil)
