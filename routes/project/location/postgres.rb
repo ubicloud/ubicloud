@@ -602,6 +602,34 @@ class Clover
         end
       end
 
+      r.post @project.get_ff_postgres_backup_schedule, "set-backup-schedule" do
+        authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "settings" }
+
+        unless pg.representative_server.primary?
+          raise CloverError.new(400, "InvalidRequest", "Backup schedule can only be set on the primary database.")
+        end
+
+        update_params = typecast_params.convert!(skip_missing: true) do |tp|
+          tp.int("backup_period_hours", 24)
+          tp.int("backup_retention_days", 7)
+          tp.int("backup_window_start_at")
+        end.transform_keys(&:to_sym)
+
+        if update_params.empty?
+          raise CloverError.new(400, "InvalidRequest", "Must provide at least one of backup_period_hours, backup_window_start_at, or backup_retention_days.")
+        end
+
+        timeline = pg.representative_server.timeline
+        DB.transaction do
+          timeline.update(update_params)
+          timeline.incr_refresh_lifecycle_policy
+          audit_log(pg, "set_backup_schedule")
+        end
+
+        Serializers::Postgres.serialize(pg, {detailed: true})
+      end
+
       r.post "cancel-storage-auto-scale" do
         authorize("Postgres:edit", pg)
 
