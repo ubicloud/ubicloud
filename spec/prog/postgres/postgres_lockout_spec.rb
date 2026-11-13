@@ -124,4 +124,49 @@ RSpec.describe Prog::Postgres::PostgresLockout do
       expect { aws_nx.start }.to exit({"msg" => "lockout_succeeded"})
     end
   end
+
+  describe "#lockout_with_delete_nic" do
+    let(:v1) { Google::Cloud::Compute::V1 }
+    let(:gcp_location) { Location[name: "gcp-us-central1"] }
+    let(:gcp_resource) { create_postgres_resource(project:, location_id: gcp_location.id) }
+    let(:gcp_server) {
+      vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, location_id: gcp_location.id, size: "c4a-standard-4", arch: "arm64",
+        unix_user: "ubi", boot_image: "ubuntu-jammy").subject
+      server = PostgresServer.create(timeline: create_postgres_timeline(location_id: gcp_location.id), resource: gcp_resource,
+        vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
+      Strand.create_with_id(server, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "delete_nic"}])
+      server
+    }
+    let(:gcp_nx) { described_class.new(gcp_server.strand) }
+    let(:compute) { instance_double(v1::Instances::Rest::Client) }
+    let(:request) { {project: "test-gcp-project", zone: "us-central1-a", instance: gcp_server.vm.name} }
+
+    before do
+      LocationCredentialGcp.create_with_id(gcp_location, project_id: "test-gcp-project",
+        service_account_email: "test@test-gcp-project.iam.gserviceaccount.com", credentials_json: "{}")
+      VmGcpResource.create_with_id(gcp_server.vm, location_az_id: LocationAz.create(location_id: gcp_location.id, az: "a").id)
+      allow(v1::Instances::Rest::Client).to receive(:new).and_return(compute)
+    end
+
+    def instance_with(*nic_names)
+      v1::Instance.new(network_interfaces: nic_names.map { v1::NetworkInterface.new(name: it) })
+    end
+
+    it "deletes the Dynamic NIC with the strand id as request id" do
+      expect(compute).to receive(:get).with(**request).and_return(instance_with("nic0", "nic0.2"))
+      expect(compute).to receive(:delete_network_interface).with(**request, network_interface_name: "nic0.2", request_id: gcp_nx.strand.id)
+      expect { gcp_nx.start }.to exit({"msg" => "lockout_succeeded"})
+    end
+
+    it "exits with lockout_succeeded without deleting a Dynamic NIC that is gone" do
+      expect(compute).to receive(:get).with(**request).and_return(instance_with("nic0"))
+      expect(compute).not_to receive(:delete_network_interface)
+      expect { gcp_nx.start }.to exit({"msg" => "lockout_succeeded"})
+    end
+
+    it "exits with lockout_failed on a Google API error" do
+      expect(compute).to receive(:get).with(**request).and_raise(Google::Cloud::UnavailableError.new("boom"))
+      expect { gcp_nx.start }.to exit({"msg" => "lockout_failed"})
+    end
+  end
 end
