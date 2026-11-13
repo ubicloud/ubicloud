@@ -51,7 +51,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def create_addresses
-    register_deadline("setup_ssh_keys", 10 * 60)
+    register_deadline("setup_ssh_keys", 10 * 60, message: "create addresses and pull server info")
     vm_host.create_addresses
     hop_pull_server_info
   end
@@ -67,7 +67,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def install_host_os
     hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
 
-    register_deadline("setup_ssh_keys", 2 * 60 * 60, allow_extension: true)
+    register_deadline("setup_ssh_keys", 2 * 60 * 60, allow_extension: true, message: "finish installing operating system")
     new_frame = if install_os.is_a?(String)
       {"os_image_filename" => install_os}
     else
@@ -94,7 +94,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline("download_boot_images", 10 * 60)
+    register_deadline("download_boot_images", 10 * 60, message: "finish setup")
     hop_push :check_ip_reachability, Prog::BootstrapRhizome, new_frame: {"target_folder" => "host"}
   end
 
@@ -173,7 +173,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def download_boot_images
-    register_deadline("prep_reboot", 4 * 60 * 60)
+    register_deadline("prep_reboot", 4 * 60 * 60, message: "finish downloading boot images")
     default_boot_images.each { |image_name|
       bud Prog::DownloadBootImage, {
         "image_name" => image_name,
@@ -188,7 +188,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def prep_reboot
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "finish rebooting")
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
@@ -219,7 +219,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def prep_hardware_reset
-    register_deadline("wait", 20 * 60)
+    register_deadline("wait", 20 * 60, message: "finish hardware reset")
     vm_host.active_vms_dataset.update(display_state: "rebooting")
     decr_hardware_reset
     hop_hardware_reset
@@ -444,7 +444,7 @@ TIMER
           delete_from_stack("accepting_before_patch")
         end
         decr_patch
-        register_deadline("prep_reboot", 10 * 60)
+        register_deadline("prep_reboot", 10 * 60, message: "finish patching")
         hop_patch
       end
 
@@ -486,7 +486,7 @@ TIMER
       hop_wait
     end
 
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "finish upgrading ubiblk")
     Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, version, parent_id: strand.id)
     hop_wait_upgrade_ubiblk
   end
@@ -504,7 +504,7 @@ TIMER
       hop_wait
     end
 
-    register_deadline("wait", 90)
+    register_deadline("wait", 90, message: "become available")
     nap 30
   end
 
