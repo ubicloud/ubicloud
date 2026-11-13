@@ -7,7 +7,7 @@ class Prog::LearnNetwork < Prog::Base
 
   label def start
     if vm_host.leaseweb?
-      register_deadline("learn_ip6", 5 * 60)
+      register_deadline("learn_ip6", 5 * 60, message: "finish learning IPv6 network")
       hop_push :learn_ip6, Prog::Leaseweb::SetupNetworking
     end
 

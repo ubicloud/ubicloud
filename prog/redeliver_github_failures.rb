@@ -19,7 +19,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
   end
 
   label def wait_redelivers
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish redelivering GitHub failures")
     reap(:wait)
   end
 

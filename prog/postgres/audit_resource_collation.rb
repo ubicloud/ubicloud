@@ -248,7 +248,7 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 15 * 60, page: false)
+    register_deadline(nil, 15 * 60, page: false, message: "finish enumerating databases")
     hop_enumerate
   end
 
@@ -264,7 +264,7 @@ class Prog::Postgres::AuditResourceCollation < Prog::Base
     pop_unreachable("no databases returned") if databases.empty?
 
     # Two queries per database, each with a 60s statement timeout.
-    register_deadline(nil, (5 + 2 * databases.size) * 60, allow_extension: true, page: false)
+    register_deadline(nil, (5 + 2 * databases.size) * 60, allow_extension: true, page: false, message: "finish auditing collations")
     self.databases = databases
     self.results = []
     hop_audit_details

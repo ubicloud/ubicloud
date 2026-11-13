@@ -365,7 +365,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 24 * 60 * 60)
+    register_deadline(nil, 24 * 60 * 60, message: "finish downloading boot image")
 
     pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
 

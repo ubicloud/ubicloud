@@ -73,7 +73,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait_certificates
-    register_deadline("wait", 30 * 60)
+    register_deadline("wait", 30 * 60, message: "finish waiting for certificates")
 
     if minio_cluster.uses_publicly_signed_certificates? && initial_cert_id
       wait_for_public_cert("initial_cert_id")
@@ -84,7 +84,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait_pools
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish provisioning pools")
     if minio_cluster.pools.all? { it.strand.label == "wait" }
       MinioServer.incr_restart(server_ids_dataset)
       hop_wait
@@ -94,17 +94,17 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   label def wait
     if minio_cluster.certificate_last_checked_at < Time.now - 60 * 60 * 24 * (minio_cluster.uses_publicly_signed_certificates? ? 7 : 30)
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish refreshing certificates")
       hop_refresh_certificates
     end
 
     when_refresh_certificates_set? do
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish refreshing certificates")
       hop_refresh_certificates
     end
 
     when_switch_to_public_certs_set? do
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish switching to public certificates")
       hop_switch_to_public_certs
     end
 
@@ -197,7 +197,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
     minio_cluster.pools.each(&:incr_destroy)
     hop_wait_pools_destroyed

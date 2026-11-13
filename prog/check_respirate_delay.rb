@@ -5,7 +5,7 @@ class Prog::CheckRespirateDelay < Prog::Base
 
   label def wait
     if delayed?
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "recover from respirate delay")
       nap_hop(10, :delayed)
     end
     nap 10

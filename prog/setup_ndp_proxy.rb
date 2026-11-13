@@ -6,7 +6,7 @@ class Prog::SetupNdpProxy < Prog::Base
   label def start
     pop "ndp proxy not needed" unless vm_host.ndp_needed
 
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish setting up NDP proxy")
 
     unless vm_host.net6
       nap 5 if learn_network_running?

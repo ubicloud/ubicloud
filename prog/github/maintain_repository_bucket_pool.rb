@@ -16,7 +16,7 @@ class Prog::Github::MaintainRepositoryBucketPool < Prog::Base
     nap(nap_time) if nap_time > 0
 
     if GithubRepositoryBucketPool.count < MIN_BUCKETS
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish creating bucket")
       hop_create_bucket
     end
 

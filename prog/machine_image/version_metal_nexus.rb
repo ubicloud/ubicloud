@@ -74,7 +74,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
 
   label def archive
     # 12 minutes per 10 GiB for VM sources, fixed 1 hour for URL sources.
-    register_deadline("wait", source_vm_id ? Vm[source_vm_id].storage_size_gib * 72 : 3600)
+    register_deadline("wait", source_vm_id ? Vm[source_vm_id].storage_size_gib * 72 : 3600, message: "finish archiving")
 
     state = sshable.d_check(archive_unit)
     case state
@@ -139,7 +139,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 1800)
+    register_deadline(nil, 1800, message: "finish destroying")
     decr_destroy
 
     if machine_image_version_metal.status == "creating"

@@ -14,13 +14,13 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   SCRIPT
 
   def before_destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish destroying")
     vm.active_billing_records.each(&:finalize)
   end
 
   label def start
     nap 1 unless vm.nics.all? { it.strand.label == "wait" }
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
 
@@ -373,7 +373,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   label def wait
     when_update_firewall_rules_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "update firewall rules")
       hop_update_firewall_rules
     end
 
@@ -386,7 +386,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def prevent_destroy
-    register_deadline("destroy", 24 * 60 * 60)
+    register_deadline("destroy", 24 * 60 * 60, message: "finish destroying")
     nap 30
   end
 

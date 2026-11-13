@@ -12,11 +12,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
     if timeline.latest_backup_size_in_gib.nil? || postgres_resource.latest_backup_too_large_for_target?
       timeline.incr_take_backup_for_converge
-      register_deadline("wait_for_maintenance_window", 6 * 60 * 60)
+      register_deadline("wait_for_maintenance_window", 6 * 60 * 60, message: "finish taking backup for converge")
       nap 60
     end
 
-    register_deadline("wait_for_maintenance_window", 10 * 60)
+    register_deadline("wait_for_maintenance_window", 10 * 60, message: "finish provisioning servers")
 
     hop_provision_servers
   end
@@ -45,7 +45,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
       self.total_disk_usage = [total_disk_usage, previous_total_disk_usage].max
       self.total_lsn = [total_lsn, previous_total_lsn].max
-      register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
+      register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish preparing servers")
     end
 
     nap 60
@@ -141,7 +141,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 5 unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key))
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
-      register_deadline(nil, 10 * 60)
+      register_deadline(nil, 10 * 60, message: "finish failing over representative server")
       postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?)
     end
 

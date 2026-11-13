@@ -54,7 +54,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     minio_server.incr_initial_provisioning
     minio_server.incr_pin_net_threads
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ip4_string)
 
@@ -121,7 +121,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     end
 
     when_switch_to_public_certs_set? do
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish switching to public certificates")
       hop_switch_to_public_certs
     end
 
@@ -149,7 +149,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
     if minio_server.certificate_last_checked_at < Time.now - refresh_after
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "finish refreshing certificates")
       hop_refresh_certificates
     end
 
@@ -240,7 +240,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def unavailable
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "become available")
 
     reap(fallthrough: true)
     nap 5 unless strand.children_dataset.where(prog: "Minio::MinioServerNexus", label: "minio_restart").empty?
@@ -255,7 +255,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
     minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ip4_string)
     Cert.incr_destroy(current_cert_id) if current_cert_id

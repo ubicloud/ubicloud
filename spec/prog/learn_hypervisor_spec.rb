@@ -40,7 +40,7 @@ RSpec.describe Prog::LearnHypervisor do
         [Service]
         ExecStart=/opt/cloud-hypervisor/v53.0/cloud-hypervisor -v --api-socket path=/vm/#{vm.inhost_name}/ch.sock
       UNIT
-      expect(lh).to receive(:register_deadline).with("start", 30 * 60).and_call_original
+      expect(lh).to receive(:register_deadline).with("start", 30 * 60, message: "finish learning hypervisor").and_call_original
       expect { lh.start }.to exit("msg" => "learned ch 53.0 for #{vm}")
     end
 
