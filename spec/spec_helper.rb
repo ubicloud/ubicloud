@@ -31,6 +31,7 @@ Warning.ignore(:mismatched_indentations, /.*lib\/omniauth\/strategies\/oauth2\.r
 Warning.ignore(/URI::RFC3986_PARSER.make_regexp is obsolete/, /.*lib\/capybara\/session\/config\.rb/)
 # https://github.com/prawnpdf/prawn/issues/1349
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
+Warning.ignore(/character class has duplicated range/, /.*lib\/addressable\/idna\//)
 Warning.ignore(%r{CGI library is removed from Ruby 4\.0. Please use cgi/escape instead for CGI\.escape and CGI\.unescape features\.}, %r{.*(lib/capybara/rack_test/driver\.rb|lib/stripe\.rb)})
 
 require_relative "coverage_helper"
