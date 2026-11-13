@@ -1,0 +1,4 @@
+# Terraform generator: reviewed derivation and pinned dependency hashes -
+# bulky by nature; collapsed in review, never edited by hand.
+lib/terraform_generator/goldens/*.json linguist-generated=true
+lib/terraform_generator/support/tree/go.sum linguist-generated=true

@@ -1,0 +1,26 @@
+terraform {
+  required_providers {
+    ubicloud = {
+      source = "ubicloud/ubicloud"
+    }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_postgres" "db" {
+  project_id   = "<%= project_ubid %>"
+  location     = "<%= location %>"
+  name         = "<%= name %>"
+  size         = "standard-2"
+  storage_size = 128
+}
+
+data "ubicloud_postgres" "db" {
+  project_id = "<%= project_ubid %>"
+  location   = "<%= location %>"
+  name       = ubicloud_postgres.db.name
+}
