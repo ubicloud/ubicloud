@@ -60,7 +60,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def before_destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish destroying")
     vm.active_billing_records.each(&:finalize)
     vm.assigned_vm_address&.active_billing_record&.finalize
     log_vm_stats
@@ -152,7 +152,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       page.incr_resolve
     end
 
-    register_deadline("wait", 10 * 60, page: !boots_from_customer_machine_image?)
+    register_deadline("wait", 10 * 60, page: !boots_from_customer_machine_image?, message: "finish setup")
 
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
@@ -311,27 +311,27 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_start_after_host_reboot_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "start after host reboot")
       hop_start_after_host_reboot
     end
 
     when_update_firewall_rules_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "update firewall rules")
       hop_update_firewall_rules
     end
 
     unless vm.vm_storage_volumes_dataset.exclude(machine_image_version_id: nil, remote_storage_server_id: nil).empty?
-      register_deadline("wait", 30 * 60)
+      register_deadline("wait", 30 * 60, message: "complete storage catchup")
       hop_wait_storage_catchup
     end
 
     when_update_spdk_dependency_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "update spdk dependency")
       hop_update_spdk_dependency
     end
 
     when_restart_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish restarting")
       hop_restart
     end
 
@@ -349,7 +349,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     unless stale_kek_storage_volumes.empty?
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish rotating storage keys")
       hop_rotate_storage_keys
     end
 
@@ -457,12 +457,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_start_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish starting")
       hop_start_after_stop
     end
 
     when_restart_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish restarting")
       hop_restart
     end
 
@@ -488,7 +488,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_start_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "finish starting")
       hop_start_after_stop
     end
 
@@ -575,7 +575,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def prevent_destroy
-    register_deadline("destroy", 24 * 60 * 60)
+    register_deadline("destroy", 24 * 60 * 60, message: "finish destroying")
     nap 30
   end
 
