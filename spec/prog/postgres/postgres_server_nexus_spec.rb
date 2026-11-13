@@ -498,7 +498,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server.timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
       expect(sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
         .and_raise(Sshable::SshError.new("cmd", "", "NoCredentialProviders", 1, nil))
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "get WAL-G credentials ready")
 
       expect { nx.configure_walg_credentials }.to nap(5)
     end
@@ -602,7 +602,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_nx.postgres_server.vm.sshable
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
       expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(1024000)
-      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish initializing database from backup")
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
       expect(standby_nx.strand.stack[0]["disk_usage"]).to eq(1024000)
     end
@@ -1186,7 +1186,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if the lag is too high and extends deadline when lsn progresses" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return("0/1000000")
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
       expect { nx.wait_catch_up }.to nap(30)
       expect(nx.strand.stack.first["previous_lsn"]).to eq("0/1000000")
     end
@@ -1204,7 +1204,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return(nil)
       expect(server).to receive(:data_disk_usage).and_return(1024)
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
       expect { nx.wait_catch_up }.to nap(30)
       expect(nx.strand.stack.first["previous_disk_usage"]).to eq(1024)
     end
@@ -1270,14 +1270,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait if sync replication is established" do
-      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60).twice
+      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60, message: "finish synchronization").twice
       expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum", "sync")
       expect { standby_nx.wait_synchronization }.to hop("wait")
       expect { standby_nx.wait_synchronization }.to hop("wait")
     end
 
     it "naps and registers a deadline while sync replication is not established" do
-      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60)
+      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60, message: "finish synchronization")
       expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("")
       expect { standby_nx.wait_synchronization }.to nap(30)
     end
@@ -1310,7 +1310,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps and extends the deadline if replay is advancing while still in recovery" do
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
       expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish recovery")
       expect { nx.wait_recovery_completion }.to nap(5)
       expect(nx.previous_lsn).to eq("0/3000000")
     end
@@ -1319,7 +1319,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       refresh_frame(nx, new_values: {"previous_lsn" => "0/2000000"})
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
       expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish recovery")
       expect { nx.wait_recovery_completion }.to nap(5)
       expect(nx.previous_lsn).to eq("0/3000000")
     end
@@ -1397,13 +1397,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
       nx.incr_unplanned_take_over
-      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60)
+      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60, message: "finish preparing for unplanned take over")
       expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
     end
 
     it "hops to prepare_for_planned_take_over if take_over is set" do
       nx.incr_planned_take_over
-      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60)
+      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60, message: "finish preparing for planned take over")
       expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
 
@@ -1420,7 +1420,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to unavailable if checkup is set and the server is not available" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60, message: "become available")
       expect { nx.wait }.to hop("unavailable")
     end
 
@@ -1434,7 +1434,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_checkup
       nx.incr_restart
       expect(nx).not_to receive(:available?)
-      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60, message: "finish restarting")
       expect(nx).to receive(:daemonized_restart).and_return(false)
       expect { nx.wait }.to nap(1)
       expect(postgres_server.checkup_set?(cached: false)).to be false
@@ -1442,14 +1442,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to configure_metrics if configure_metrics is set" do
       nx.incr_configure_metrics
-      expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 3 * 60, message: "finish configuring metrics")
       expect { nx.wait }.to hop("configure_metrics")
     end
 
     it "drains promotion before a queued password update" do
       nx.incr_promote_read_replica
       nx.incr_update_superuser_password
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish promoting read replica")
       expect(server).to receive(:switch_to_new_timeline)
       expect { nx.wait }.to hop("promote_read_replica")
       expect(Semaphore.where(strand_id: server.id, name: "update_superuser_password").count).to eq(1)
@@ -1457,20 +1457,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to promote_read_replica if promote_read_replica is set" do
       nx.incr_promote_read_replica
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish promoting read replica")
       expect(server).to receive(:switch_to_new_timeline)
       expect { nx.wait }.to hop("promote_read_replica")
     end
 
     it "hops to configure_logs if configure_logs is set" do
       nx.incr_configure_logs
-      expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 3 * 60, message: "finish configuring logs")
       expect { nx.wait }.to hop("configure_logs")
     end
 
     it "hops to install_rhizome if install_rhizome is set" do
       nx.incr_install_rhizome
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish installing rhizome")
       expect { nx.wait }.to hop("install_rhizome")
     end
 
@@ -1496,7 +1496,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "decrements restart and unregisters deadline if daemonized restart succeeds" do
       nx.incr_restart
-      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60, message: "finish restarting")
       expect(nx).to receive(:daemonized_restart).and_return(true)
       expect(nx).to receive(:unregister_deadline).with("complete_restart")
       expect { nx.wait }.to nap(1)
@@ -1505,7 +1505,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "naps without decrementing restart if daemonized restart is not done yet" do
       nx.incr_restart
-      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60, message: "finish restarting")
       expect(nx).to receive(:daemonized_restart).and_return(false)
       expect { nx.wait }.to nap(1)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
@@ -1519,7 +1519,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby = server.resource.servers.find { !it.is_representative }
 
       nx.incr_restart
-      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60, message: "finish restarting")
       expect(standby.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv)
       expect(nx).not_to receive(:daemonized_restart)
       expect { nx.wait }.to nap(5)
@@ -1900,13 +1900,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     let(:minio_cluster) { MinioCluster.create(project_id: Config.postgres_service_project_id, location_id:, name: "pgminio", admin_user: "root", admin_password: "root") }
 
     it "registers a deadline to reach wait and skips to finalize_taking_over when there is no blob storage" do
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish backfilling WAL archive")
       expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
     end
 
     it "starts the backfill if it is not started yet" do
       minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish backfilling WAL archive")
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("NotStarted")
       expect(sshable).to receive(:d_run).with("backfill_wal_archive", "sudo", "postgres/bin/backfill-wal-archive", "18")
       expect { nx.backfill_wal_archive }.to nap(5)
@@ -1914,14 +1914,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "naps while the backfill is in progress" do
       minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish backfilling WAL archive")
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("InProgress")
       expect { nx.backfill_wal_archive }.to nap(5)
     end
 
     it "hops to finalize_taking_over when the backfill succeeds" do
       minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish backfilling WAL archive")
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
       expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
@@ -1930,7 +1930,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "pages and hops to finalize_taking_over when the backfill fails" do
       minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish backfilling WAL archive")
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Failed")
       expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
       expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
@@ -2024,7 +2024,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_nx.postgres_server.vm.sshable
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, message: "finish taking over")
 
       expect { standby_nx.taking_over }.to hop("finalize_taking_over")
 

@@ -10,7 +10,7 @@ class Prog::SetupCsumGuard < Prog::Base
   frame_reader :enable
 
   label def start
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish setting up csum guard")
     action = enable ? "install" : "uninstall"
 
     begin

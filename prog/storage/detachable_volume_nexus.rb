@@ -28,7 +28,7 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
   end
 
   label def wait_catch_up
-    register_deadline("wait", 60 * 60)
+    register_deadline("wait", 60 * 60, message: "finish catching up")
     host = detachable_volume.vm_host
     status = host.sshable.cmd_json("sudo host/bin/detachable-volume status :volume_id", volume_id: detachable_volume.ubid)
     nap 5 unless status["caught_up"]
@@ -38,7 +38,7 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     nap 5 if detachable_volume.key_encryption_key_2_id
     decr_destroy
 

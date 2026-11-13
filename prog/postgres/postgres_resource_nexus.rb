@@ -492,7 +492,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       refresh = true
     end
     if refresh
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish refreshing certificates")
       hop_refresh_certificates
     end
 
@@ -503,7 +503,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def destroy
     private_link_service = postgres_resource.private_link_service
-    register_deadline(nil, private_link_service ? 20 * 60 : 5 * 60)
+    register_deadline(nil, private_link_service ? 20 * 60 : 5 * 60, message: "finish destroying")
 
     decr_destroy
 

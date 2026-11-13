@@ -16,7 +16,7 @@ class Prog::DnsZone::DnsServerNexus < Prog::Base
 
   label def wait
     when_configure_set? do
-      register_deadline("wait", 15 * 60)
+      register_deadline("wait", 15 * 60, message: "finish configuring")
       hop_configure
     end
 

@@ -49,7 +49,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
   end
 
   label def wait_servers
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish provisioning servers")
 
     if victoria_metrics_resource.servers.all? { it.strand.label == "wait" }
       hop_refresh_dns_record
@@ -109,7 +109,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
 
     victoria_metrics_resource.dns_zone&.delete_record(record_name: victoria_metrics_resource.hostname)

@@ -10,7 +10,7 @@ class Prog::DeletedRecordPartitioner < Prog::Base
       nap 24 * 60 * 60
     end
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish checking partition runway")
     hop_check_runway
   end
 

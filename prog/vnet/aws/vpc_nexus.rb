@@ -5,7 +5,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
 
   label def start
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
@@ -198,7 +198,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def destroy
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
-      register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
+      register_deadline(nil, 10 * 60, allow_extension: true, message: "finish destroying") if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 
       Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet)
 
@@ -216,7 +216,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
     private_subnet.remove_all_firewalls

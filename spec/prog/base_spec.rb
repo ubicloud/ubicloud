@@ -613,6 +613,7 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).to receive(:delete).with("deadline_start")
       expect(st.stack.first).to receive(:delete).with("deadline_page")
       expect(st.stack.first).to receive(:delete).with("deadline_notified")
+      expect(st.stack.first).to receive(:delete).with("deadline_message")
 
       st.unsynchronized_run
     end
@@ -757,6 +758,45 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).not_to have_key("deadline_at")
       expect(st.stack.first).not_to have_key("deadline_target")
       expect(st.stack.first).not_to have_key("deadline_start")
+    end
+
+    it "unregister_deadline clears the deadline message" do
+      st = Strand.create(prog: "Test", label: :napper)
+      nx = Prog::Test.new(st)
+      nx.register_deadline("napper", 60, message: "finish napping")
+      expect(st.stack.first["deadline_message"]).to eq "finish napping"
+
+      nx.unregister_deadline("napper")
+
+      expect(st.stack.first).not_to have_key("deadline_message")
+    end
+
+    it "records the deadline message in the frame" do
+      st = Strand.create(prog: "Test", label: :start)
+      nx = Prog::Test.new(st)
+      nx.register_deadline("pusher2", 60, message: "push things")
+      expect(st.stack.first["deadline_message"]).to eq "push things"
+    end
+
+    it "removes a previous deadline message when registering a new deadline without a message" do
+      st = Strand.create(prog: "Test", label: :start)
+      nx = Prog::Test.new(st)
+      nx.register_deadline("pusher2", 60, message: "push things")
+      nx.register_deadline("pusher3", 60)
+      expect(st.stack.first).not_to have_key("deadline_message")
+      expect(st.stack.first["deadline_target"]).to eq "pusher3"
+    end
+
+    it "uses the deadline message in the page summary when the deadline expires" do
+      st = Strand.create(prog: "Test", label: :pusher1)
+      st.stack.first["deadline_target"] = "pusher2"
+      st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
+      st.stack.first["deadline_message"] = "push things"
+
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+      expect(Page.active.first.summary).to eq "#{st.ubid} did not push things within deadline! Test.pusher1 did not reach pusher2 on time"
     end
   end
 

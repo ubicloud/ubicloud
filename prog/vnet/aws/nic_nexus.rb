@@ -9,14 +9,14 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   frame_reader :aws_subnet_id, :use_eip, :create_network_interface?
 
   label def start
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish setup")
     NicAwsResource.create_with_id(nic.id, use_eip: use_eip != false, create_network_interface: create_network_interface? != false)
     hop_create_subnet
   end
 
   label def create_subnet
     unless private_subnet.strand.label == "wait"
-      register_deadline("wait", 5 * 60, allow_extension: true)
+      register_deadline("wait", 5 * 60, allow_extension: true, message: "finish waiting for subnet")
       nap 2
     end
 
@@ -33,7 +33,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     # NICs we don't create ourselves have their network interface created by AWS at launch.
     hop_wait unless nic.nic_aws_resource.create_network_interface
 
-    register_deadline("attach_eip_network_interface", 3 * 60)
+    register_deadline("attach_eip_network_interface", 3 * 60, message: "finish creating network interface")
     hop_create_network_interface
   end
 
@@ -131,7 +131,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     hop_destroy_entities unless nic.nic_aws_resource
 
     # NICs we didn't create ourselves are deleted by AWS on instance termination.

@@ -68,7 +68,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "finish setup")
     nap 10 unless private_link_service.private_subnet.strand.label == "wait"
     hop_ensure_target_groups
   end
@@ -299,17 +299,17 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
   label def wait
     when_reconcile_set? do
       decr_reconcile
-      register_deadline("wait", 15 * 60)
+      register_deadline("wait", 15 * 60, message: "finish reconciling")
       hop_ensure_target_groups
     end
 
     when_update_permissions_set? do
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish updating permissions")
       hop_update_permissions
     end
 
     when_reconcile_connections_set? do
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish reconciling connections")
       hop_reconcile_connections
     end
 
@@ -349,7 +349,7 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    register_deadline(nil, 15 * 60)
+    register_deadline(nil, 15 * 60, message: "finish destroying")
     nlb_failed_page&.incr_resolve
     hop_recover_unrecorded_ids
   end

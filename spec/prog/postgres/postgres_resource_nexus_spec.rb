@@ -1155,7 +1155,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       Strand.create_with_id(pls, prog: "Vnet::Aws::PrivateLinkServiceNexus", label: "wait")
       st.update(label: "destroy")
       nx.incr_destroy
-      expect(nx).to receive(:register_deadline).with(nil, 20 * 60)
+      expect(nx).to receive(:register_deadline).with(nil, 20 * 60, message: "finish destroying")
       expect { nx.destroy }.to hop("wait_children_destroyed")
       expect(pls.destroy_set?).to be true
       expect(pls.reload.postgres_resource_id).to eq postgres_resource.id

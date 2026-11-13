@@ -65,7 +65,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def configure_metrics
-    register_deadline("wait", 30 * 60)
+    register_deadline("wait", 30 * 60, message: "finish configuring metrics")
     decr_configure_metrics
 
     sshable = kubernetes_node.sshable
@@ -175,7 +175,7 @@ TIMER
   end
 
   label def renew_certs
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish renewing certificates")
     decr_renew_certs
 
     state = kubernetes_node.sshable.d_check("renew_certs")
@@ -212,12 +212,12 @@ TIMER
     end
 
     Clog.emit("KubernetesNode is unavailable due to mesh connectivity issues", {kubernetes_node_unavailable: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}})
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "become available")
     nap 15
   end
 
   label def retire
-    register_deadline("destroy", 6 * 60 * 60)
+    register_deadline("destroy", 6 * 60 * 60, message: "finish retiring")
     kubernetes_node.update(state: "draining")
     hop_retain_volumes
   end
@@ -249,7 +249,7 @@ TIMER
       sshable.d_restart(unit_name)
       nap 10
     else
-      register_deadline("destroy", 0)
+      register_deadline("destroy", 0, message: "finish draining")
       nap 3 * 60 * 60
     end
   end

@@ -8,7 +8,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   frame_accessor :gcp_address_name
 
   label def start
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish setup")
 
     # Record which VPC and subnet this NIC belongs to. The VPC is per (project, location)
     # and the subnet maps 1:1 to an Ubicloud PrivateSubnet. Firewall rules and tag bindings

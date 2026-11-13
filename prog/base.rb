@@ -42,7 +42,7 @@ class Prog::Base
   end
 
   frame_reader :link
-  frame_accessor :deadline_at, :deadline_target, :deadline_start, :deadline_page
+  frame_accessor :deadline_at, :deadline_target, :deadline_start, :deadline_page, :deadline_message
 
   # Searches the stack for the Prog that caused execution of the code,
   # which can be useful in logging from nested method calls.
@@ -497,7 +497,7 @@ end
     strand.time_string(time)
   end
 
-  def register_deadline(new_deadline_target, deadline_in, allow_extension: false, page: true)
+  def register_deadline(new_deadline_target, deadline_in, allow_extension: false, page: true, message: nil)
     if page.is_a?(String) && !Page::SEVERITY_ORDER.key?(page)
       raise Strand::InternalError, "BUG: invalid deadline page severity: #{page.inspect}"
     end
@@ -515,6 +515,12 @@ end
       self.deadline_target = new_deadline_target
       self.deadline_page = page
 
+      if message
+        self.deadline_message = message
+      else
+        strand.stack.first.delete("deadline_message")
+      end
+
       if allow_extension.is_a?(Integer)
         self.deadline_start ||= time_string(time)
         cap = Time.new(deadline_start) + allow_extension
@@ -527,7 +533,7 @@ end
 
   def unregister_deadline(deadline_target)
     resolve_deadline_target(deadline_target)
-    delete_from_stack("deadline_at", "deadline_target", "deadline_start", "deadline_page")
+    delete_from_stack("deadline_at", "deadline_target", "deadline_start", "deadline_page", "deadline_message")
   end
 
   def resolve_deadline_target(deadline_target)

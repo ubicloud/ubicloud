@@ -147,7 +147,7 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 24 * 60 * 60, page: false)
+    register_deadline(nil, 24 * 60 * 60, page: false, message: "finish scanning databases")
     hop_list_databases
   end
 

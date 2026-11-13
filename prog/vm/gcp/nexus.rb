@@ -8,7 +8,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 5 * 60, message: "finish destroying")
     vm.active_billing_records.each(&:finalize)
   end
 
@@ -17,7 +17,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       self.retry_zone_delay = nil
       nap delay
     end
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
     nap 5 unless vm.nics.all? { it.private_subnet.strand.label == "wait" }
     nap 1 unless vm.nics.all? { it.strand.label == "wait" }
 
@@ -253,7 +253,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   label def wait
     when_update_firewall_rules_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("wait", 5 * 60, message: "update firewall rules")
       hop_update_firewall_rules
     end
 
@@ -266,7 +266,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def prevent_destroy
-    register_deadline("destroy", 24 * 60 * 60)
+    register_deadline("destroy", 24 * 60 * 60, message: "finish destroying")
     nap 30
   end
 

@@ -44,13 +44,13 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
 
   label def wait
     when_start_after_host_reboot_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline(:wait, 5 * 60, message: "start after host reboot")
       hop_start_after_host_reboot
     end
 
     when_checkup_set? do
       unless available?
-        register_deadline("wait", 2 * 60)
+        register_deadline("wait", 2 * 60, message: "become available")
         hop_unavailable
       end
       decr_checkup

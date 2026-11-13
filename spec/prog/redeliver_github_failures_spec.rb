@@ -36,7 +36,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
 
   describe "#wait_redelivers" do
     it "registers deadline and reaps wait" do
-      expect(prog).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(prog).to receive(:register_deadline).with("wait", 10 * 60, message: "finish redelivering GitHub failures")
       expect { prog.wait_redelivers }.to hop("wait")
     end
   end

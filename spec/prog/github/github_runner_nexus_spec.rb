@@ -1641,7 +1641,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
       expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND).and_return("running")
-      expect(nx).not_to receive(:register_deadline).with(nil, 7200)
+      expect(nx).not_to receive(:register_deadline).with(nil, 7200, message: "finish destroying after not picking a job")
 
       expect { nx.wait }.to nap(60)
       expect(runner.destroy_set?).to be(false)
@@ -1909,6 +1909,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to nap(15)
     end
 
+    it "pushes the deadline back each time the runner is still running a job" do
+      runner.update(workflow_job: nil)
+      allow(client).to receive(:get).and_return(busy: true)
+      frame = nx.strand.stack.first
+
+      expect { nx.destroy }.to nap(15)
+      expect(frame["deadline_target"]).to eq "wait_vm_destroy"
+      expect(frame["deadline_message"]).to eq "finish running job before destroying"
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
+
+      frame["deadline_at"] = nx.strand.time_string(Time.now + 60)
+      expect { nx.destroy }.to nap(15)
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
+    end
+
     it "destroys resources and hops if runner deregistered" do
       vm.update(allocated_at: Time.now)
       expect(nx).to receive(:decr_destroy)
@@ -2014,7 +2029,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "extends deadline if vm prevents destroy" do
       expect(runner.vm).to receive(:prevent_destroy_set?).and_return(true)
-      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
+      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true, message: "finish destroying")
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 

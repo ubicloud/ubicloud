@@ -61,7 +61,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying")
     decr_destroy
     minio_pool.servers.each(&:incr_destroy)
 

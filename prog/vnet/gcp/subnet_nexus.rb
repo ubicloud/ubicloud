@@ -53,7 +53,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish setup")
 
     gcp_vpc = private_subnet.gcp_vpc ||
       ((private_subnet.gcp_management? || private_subnet.project.gcp_dedicated_subnet_vpcs) ? ensure_dedicated_vpc : ensure_shared_vpc)
@@ -178,7 +178,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def destroy
     # Dedicated VPC teardown happens inline in finish_destroy and can be slow.
     dedicated_vpc = private_subnet.gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
-    register_deadline("destroy", dedicated_vpc ? 15 * 60 : 5 * 60)
+    register_deadline("destroy", dedicated_vpc ? 15 * 60 : 5 * 60, message: "finish destroying")
     decr_destroy
     private_subnet.remove_all_firewalls
 

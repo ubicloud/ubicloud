@@ -83,7 +83,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
 
-      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60, message: "finish provisioning servers")
       expect { nx.start }.to hop("provision_servers")
     end
 
@@ -95,7 +95,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       end
 
       it "increments take_backup_for_converge, registers a deadline, and naps when the semaphore is not set" do
-        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 6 * 60 * 60)
+        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 6 * 60 * 60, message: "finish taking backup for converge")
 
         expect { nx.start }.to nap(60)
         expect(timeline.take_backup_for_converge_set?(cached: false)).to be(true)
@@ -110,7 +110,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
       it "hops to provision_servers once the recorded backup size fits the target" do
         timeline.update(latest_backup_size_in_gib: 50)
-        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
+        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60, message: "finish provisioning servers")
 
         expect { nx.start }.to hop("provision_servers")
       end

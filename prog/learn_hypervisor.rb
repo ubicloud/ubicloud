@@ -10,7 +10,7 @@ class Prog::LearnHypervisor < Prog::Base
   end
 
   label def start
-    register_deadline("start", 30 * 60)
+    register_deadline("start", 30 * 60, message: "finish learning hypervisor")
 
     pop "exiting as Vm destroyed" unless vm
     inhost_name = vm.inhost_name

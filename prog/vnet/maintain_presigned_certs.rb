@@ -40,7 +40,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     self.resource_id = ubid.to_uuid
     self.cert_id = st.id
     self.last_cert_created = now
-    register_deadline("wait", wait_deadline)
+    register_deadline("wait", wait_deadline, message: "finish presigned certificate request")
     hop_wait_for_signed_cert
   end
 

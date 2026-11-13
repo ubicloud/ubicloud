@@ -193,7 +193,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def reset_blob_storage
-    register_deadline("wait", cache_entry_deletion_budget)
+    register_deadline("wait", cache_entry_deletion_budget, message: "finish resetting blob storage")
     hop_recreate_blob_storage
   end
 
@@ -215,7 +215,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    register_deadline(nil, cache_entry_deletion_budget)
+    register_deadline(nil, cache_entry_deletion_budget, message: "finish destroying")
     hop_destroy_cache_entries
   end
 

@@ -16,7 +16,7 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   end
 
   label def start
-    register_deadline(nil, 10 * 60)
+    register_deadline(nil, 10 * 60, message: "finish destroying installation")
     hop_delete_installation
   end
 

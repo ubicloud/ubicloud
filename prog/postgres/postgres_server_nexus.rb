@@ -110,7 +110,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish setup")
 
     bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => true}
     hop_wait_bootstrap_rhizome
@@ -203,7 +203,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     # AttachRolePolicy is eventually consistent on AWS.
     # Wait for wal-g to be able to connect to storage before moving.
     unless postgres_server.walg_credentials_ready?
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "get WAL-G credentials ready")
       nap 5
     end
 
@@ -234,7 +234,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       previous_disk_usage = self.disk_usage || 0
       if disk_usage > previous_disk_usage
         self.disk_usage = disk_usage
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish initializing database from backup")
       end
     when "Failed", "NotStarted"
       previous_try_count = initialize_database_from_backup_try_count || 0
@@ -578,20 +578,20 @@ SQL
     if (current_lsn = postgres_server.last_known_lsn)
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
         self.previous_lsn = current_lsn
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
       end
     else
       disk_usage = postgres_server.data_disk_usage
       if disk_usage > (previous_disk_usage || 0)
         self.previous_disk_usage = disk_usage
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
       end
     end
     nap 30
   end
 
   label def wait_synchronization
-    register_deadline("wait", 5 * 60)
+    register_deadline("wait", 5 * 60, message: "finish synchronization")
 
     if catching_up_standby?
       when_configure_set? do
@@ -636,7 +636,7 @@ SQL
       # consistency is reached.
       elsif !current_lsn.to_s.empty? && (previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0)
         self.previous_lsn = current_lsn
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish recovery")
       end
     end
 
@@ -663,12 +663,12 @@ SQL
     end
 
     when_unplanned_take_over_set? do
-      register_deadline("backfill_wal_archive", 5 * 60)
+      register_deadline("backfill_wal_archive", 5 * 60, message: "finish preparing for unplanned take over")
       hop_prepare_for_unplanned_take_over
     end
 
     when_planned_take_over_set? do
-      register_deadline("backfill_wal_archive", 5 * 60)
+      register_deadline("backfill_wal_archive", 5 * 60, message: "finish preparing for planned take over")
       hop_prepare_for_planned_take_over
     end
 
@@ -678,7 +678,7 @@ SQL
 
     when_promote_read_replica_set? do
       decr_promote_read_replica
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish promoting read replica")
       postgres_server.switch_to_new_timeline
       hop_promote_read_replica
     end
@@ -689,7 +689,7 @@ SQL
 
     when_checkup_set? do
       unless restart_set? || available?
-        register_deadline("wait", 5 * 60)
+        register_deadline("wait", 5 * 60, message: "become available")
         hop_unavailable
       end
 
@@ -702,7 +702,7 @@ SQL
     end
 
     when_restart_set? do
-      register_deadline("complete_restart", 2 * 60)
+      register_deadline("complete_restart", 2 * 60, message: "finish restarting")
       # Hold off restarting until applying the new config keeps every
       # restart-sensitive parameter (max_connections etc.) >= its upstream and
       # <= its downstream running values. This orders the restart wave correctly
@@ -719,19 +719,19 @@ SQL
 
     when_configure_metrics_set? do
       decr_configure_metrics
-      register_deadline("wait", 3 * 60)
+      register_deadline("wait", 3 * 60, message: "finish configuring metrics")
       hop_configure_metrics
     end
 
     when_configure_logs_set? do
       decr_configure_logs
-      register_deadline("wait", 3 * 60)
+      register_deadline("wait", 3 * 60, message: "finish configuring logs")
       hop_configure_logs
     end
 
     when_install_rhizome_set? do
       decr_install_rhizome
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish installing rhizome")
       hop_install_rhizome
     end
 
@@ -973,7 +973,7 @@ SQL
       postgres_server.incr_send_failover_notification
       hop_backfill_wal_archive unless upgraded
 
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", 10 * 60, message: "finish taking over")
       hop_finalize_taking_over
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
@@ -987,7 +987,7 @@ SQL
   end
 
   label def backfill_wal_archive
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, message: "finish backfilling WAL archive")
     hop_finalize_taking_over if postgres_server.timeline.blob_storage.nil?
 
     case vm.sshable.d_check("backfill_wal_archive")

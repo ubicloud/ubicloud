@@ -666,7 +666,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#destroy" do
     it "triggers vm destroy, nic, sshable and minio server destroy" do
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, message: "finish destroying")
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
       expect(nx.minio_server.vm.user_nic).to receive(:incr_destroy)
@@ -677,7 +677,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
     it "triggers vm destroy, nic, sshable, dnszone delete record and minio server destroy if dnszone exits" do
       DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, message: "finish destroying")
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
       expect(nx.minio_server.vm.user_nic).to receive(:incr_destroy)
@@ -689,7 +689,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
     it "if dnszone exits and vm has ipv4, it gets deleted properly" do
       DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, message: "finish destroying")
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
       expect(nx.minio_server.vm.user_nic).to receive(:incr_destroy)
