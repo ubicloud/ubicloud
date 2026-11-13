@@ -1,0 +1,67 @@
+<%# locals: (vp:, ps:, can_edit:) %>
+<% state = vp.display_state
+peer_project = vp.peer_account_id
+peer_network = vp.peer_vpc_id.split("/").last %>
+
+<div
+  id="vpc-peering-<%= vp.ubid %>"
+  class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200"
+>
+  <div class="px-4 py-4 sm:px-6 flex flex-wrap items-center justify-between gap-4">
+    <div class="min-w-0">
+      <div class="flex items-center gap-3">
+        <span class="text-base font-semibold text-gray-900 break-all"><%= peer_network %></span>
+        <%== part("components/vpc_peering_state_label", state:) %>
+      </div>
+
+      <p class="mt-1 text-sm text-gray-500">Project <%= peer_project %></p>
+    </div>
+
+    <% if can_edit && state != "deleting" %>
+      <%== part(
+        "components/delete_button",
+        url: "#{path(ps)}/vpc-peering/#{vp.ubid}",
+        confirmation_message: "Are you sure you want to delete the VPC peering with network #{peer_network} in project #{peer_project}? Traffic over it stops at once. Afterwards, delete your side of the peering in project #{peer_project}."
+      ) %>
+    <% end %>
+  </div>
+
+  <div class="px-4 py-5 sm:px-6 space-y-4 text-sm text-gray-700">
+    <% case state %>
+    <% when "creating" %>
+      <p><%= vp.state_message || "Adding Ubicloud's side of the peering..." %></p>
+    <% when "waiting_for_peer" %>
+      <% if vp.state_message %>
+        <div class="rounded-md bg-yellow-50 p-4 text-yellow-800"><%= vp.state_message %></div>
+      <% end %>
+
+      <p>
+        Ubicloud's side of the peering, <strong><%= vp.vpc_peering_gcp_resource.peering_name %></strong>, is ready.
+        Traffic flows as soon as you create the matching side in project <strong><%= peer_project %></strong>.
+      </p>
+
+      <%== part("networking/vpc_peering/gcp/setup_steps", vp:, ps:) %>
+
+      <p class="text-gray-500">
+        Ubicloud checks for your side every minute for the first hour, then every 5 minutes.
+      </p>
+    <% when "active" %>
+      <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <dt class="font-medium text-gray-500">Imported subnet routes</dt>
+        <dd class="sm:col-span-2"><%= vp.peer_cidrs.empty? ? "None yet" : vp.peer_cidrs.join(", ") %></dd>
+      </dl>
+
+      <details>
+        <summary class="cursor-pointer font-medium text-gray-900">Your side of the setup</summary>
+
+        <div class="mt-4 space-y-4">
+          <%== part("networking/vpc_peering/gcp/setup_steps", vp:, ps:) %>
+        </div>
+      </details>
+    <% when "failed" %>
+      <div class="rounded-md bg-red-50 p-4 text-red-800"><%= vp.state_message %></div>
+    <% else %>
+      <p>Removing Ubicloud's side of the peering...</p>
+    <% end %>
+  </div>
+</div>

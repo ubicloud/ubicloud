@@ -1,7 +1,8 @@
 <% hostname = @pg.hostname
   password = URI.encode_uri_component(@pg.superuser_password)
   hostnames = [[hostname, ""]]
-  allow_private = @pg.private_subnet.connected_subnets.any?
+  allow_private = @pg.private_subnet.connected_subnets.any? ||
+    (@pg.location.gcp? && !@pg.private_subnet.vpc_peerings_dataset.where(state: "active").not_deleting.empty?)
   hostnames << [@pg.private_hostname, "-private"] if allow_private
   publicly_signed = @pg.uses_publicly_signed_certificates?
 

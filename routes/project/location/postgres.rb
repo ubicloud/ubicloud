@@ -183,7 +183,9 @@ class Clover
         DB.transaction do
           pg.dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: pg.representative_server.vm.ip6_string)
           pg.dns_zone.delete_record(record_name: pg.private_hostname, type: "AAAA")
-          pg.dns_zone.insert_record(record_name: pg.private_hostname, type: "AAAA", ttl: 10, data: pg.representative_server.vm.private_ipv6_string)
+          if (private_ipv6 = pg.private_dns_records[:AAAA])
+            pg.dns_zone.insert_record(record_name: pg.private_hostname, type: "AAAA", ttl: 10, data: private_ipv6)
+          end
           pg.incr_refresh_dns_record
           audit_log(pg, "add_aaaa_record")
         end

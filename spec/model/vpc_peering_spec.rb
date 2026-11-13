@@ -89,4 +89,19 @@ RSpec.describe VpcPeering do
     VpcPeeringAwsResource.create_with_id(vp, peer_region: "us-west-2")
     expect { vp.destroy }.to change { DeletedRecord.where(record_id: vp.id).select_order_map(:model_name) }.from([]).to(%w[VpcPeering VpcPeeringAwsResource])
   end
+
+  it "allows peerings to networks of one name in two GCP projects" do
+    expect {
+      %w[acme-prod acme-dev].each {
+        described_class.create(private_subnet_id: ps.id, peer_account_id: it, peer_vpc_id: "projects/#{it}/global/networks/default")
+      }
+    }.to change { ps.vpc_peerings_dataset.select_order_map(:peer_vpc_id) }.from([]).to(%w[projects/acme-dev/global/networks/default projects/acme-prod/global/networks/default])
+  end
+
+  it "destroys its GCP resource and keeps a deleted record of both" do
+    gcp = VpcPeeringGcpResource.create_with_id(vp, peering_name: "ubicloud-#{vp.ubid}")
+    expect(gcp.vpc_peering.id).to eq vp.id
+    expect { vp.destroy }.to change { DeletedRecord.where(record_id: vp.id).select_order_map(:model_name) }.from([]).to(%w[VpcPeering VpcPeeringGcpResource])
+    expect(VpcPeeringGcpResource[vp.id]).to be_nil
+  end
 end

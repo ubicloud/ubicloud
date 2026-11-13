@@ -5,8 +5,9 @@ require_relative "../model"
 class VpcPeering < Sequel::Model
   many_to_one :private_subnet, read_only: true
   one_to_one :vpc_peering_aws_resource, key: :id, read_only: true
+  one_to_one :vpc_peering_gcp_resource, key: :id, read_only: true
 
-  plugin :association_dependencies, vpc_peering_aws_resource: :destroy
+  plugin :association_dependencies, vpc_peering_aws_resource: :destroy, vpc_peering_gcp_resource: :destroy
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
 
@@ -41,3 +42,4 @@ end
 #  vpc_peering_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 # Referenced By:
 #  vpc_peering_aws_resource | vpc_peering_aws_resource_id_fkey | (id) REFERENCES vpc_peering(id)
+#  vpc_peering_gcp_resource | vpc_peering_gcp_resource_id_fkey | (id) REFERENCES vpc_peering(id)

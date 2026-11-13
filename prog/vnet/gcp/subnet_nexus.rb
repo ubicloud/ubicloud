@@ -176,6 +176,13 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def destroy
+    peerings = private_subnet.vpc_peerings_dataset
+    unless peerings.empty?
+      VpcPeering.incr_destroy(peerings.not_deleting.select(:id))
+      Clog.emit("Cannot destroy subnet with VPC peerings, waiting for them to be destroyed", private_subnet)
+      nap 5
+    end
+
     # Dedicated VPC teardown happens inline in finish_destroy and can be slow.
     dedicated_vpc = private_subnet.gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
     register_deadline("destroy", dedicated_vpc ? 15 * 60 : 5 * 60)
