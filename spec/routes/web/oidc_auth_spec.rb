@@ -128,6 +128,34 @@ RSpec.describe Clover, "OIDC auth" do
     click_button "Login"
   end
 
+  # Logs in with a stale oidc_groups_refreshed_at (by freezing Time.now to
+  # the past for the duration of login only), so the very next request is
+  # already past OIDC_GROUPS_REFRESH_INTERVAL and triggers a refresh.
+  # Matches the login token exchange on grant_type so a subsequently-stubbed
+  # refresh-token exchange to the same URL can't be matched by mistake.
+  def login_with_stale_refresh(groups:, refresh_token:, claim: "groups")
+    stub_request(:post, token_url)
+      .with(body: hash_including("grant_type" => "authorization_code"))
+      .to_return do |_req|
+        {
+          status: 200,
+          body: {
+            access_token: "access_tok",
+            token_type: "bearer",
+            expires_in: 3600,
+            refresh_token:,
+            id_token: generate_id_token(nonce: fake_oidc.last_nonce, **{claim => groups}),
+          }.to_json,
+          headers: {"Content-Type" => "application/json"},
+        }
+      end
+
+    real_now = Time.now
+    allow(Time).to receive(:now).and_return(real_now - 700)
+    initiate_oidc_login
+    allow(Time).to receive(:now).and_call_original
+  end
+
   it "fails login if domain is not allowed domain for OidcProvider" do
     oidc_provider.remove_allowed_domain("example.com")
     stub_token_endpoint
@@ -254,6 +282,53 @@ RSpec.describe Clover, "OIDC auth" do
       expect(page.body).to eq "org-eng"
     end
 
+    it "re-fetches groups via refresh token once the refresh interval elapses" do
+      login_with_stale_refresh(groups: %w[eng].freeze, refresh_token: "initial-rt")
+
+      stub_request(:post, token_url)
+        .with(body: hash_including("grant_type" => "refresh_token", "refresh_token" => "initial-rt"))
+        .to_return(status: 200, body: {
+          access_token: "new-access",
+          token_type: "bearer",
+          expires_in: 3600,
+          refresh_token: "rotated-rt",
+          id_token: generate_id_token(nonce: nil, groups: %w[ops].freeze),
+        }.to_json, headers: {"Content-Type" => "application/json"})
+
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-ops"
+    end
+
+    it "clears cached groups when the refresh token is rejected" do
+      login_with_stale_refresh(groups: %w[eng].freeze, refresh_token: "initial-rt")
+
+      stub_request(:post, token_url)
+        .with(body: hash_including("grant_type" => "refresh_token"))
+        .to_return(status: 400, body: {error: "invalid_grant"}.to_json, headers: {"Content-Type" => "application/json"})
+
+      visit "/oidc-groups"
+      expect(page.body).to eq ""
+    end
+
+    it "keeps cached groups when the refresh request fails unexpectedly" do
+      login_with_stale_refresh(groups: %w[eng].freeze, refresh_token: "initial-rt")
+
+      stub_request(:post, token_url)
+        .with(body: hash_including("grant_type" => "refresh_token"))
+        .to_return(status: 500, body: "")
+
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-eng"
+    end
+
+    it "keeps cached groups when the OIDC provider is no longer found" do
+      login_with_stale_refresh(groups: %w[eng].freeze, refresh_token: "initial-rt")
+      oidc_provider.destroy
+
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-eng"
+    end
+
     it "keeps groups from an id_token without email after fetching userinfo" do
       stub_token_endpoint(id_token: {email: nil, groups: %w[eng].freeze})
       stub_userinfo_endpoint
@@ -281,6 +356,22 @@ RSpec.describe Clover, "OIDC auth" do
         expect(page.title).to eq("Ubicloud - Default Dashboard")
         visit "/oidc-groups"
         expect(page.body).to eq "org-foo"
+      end
+
+      it "re-fetches groups from userinfo on refresh when the id_token lacks the claim" do
+        login_with_stale_refresh(groups: %w[eng].freeze, refresh_token: "initial-rt", claim: "myapp:groups")
+
+        stub_request(:post, token_url)
+          .with(body: hash_including("grant_type" => "refresh_token"))
+          .to_return(status: 200, body: {
+            access_token: "new-access",
+            token_type: "bearer",
+            id_token: generate_id_token(nonce: nil),
+          }.to_json, headers: {"Content-Type" => "application/json"})
+        stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "myapp:groups" => %w[ops].freeze})
+
+        visit "/oidc-groups"
+        expect(page.body).to eq "org-ops"
       end
     end
   end
