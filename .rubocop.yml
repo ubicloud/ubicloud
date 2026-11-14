@@ -49,6 +49,9 @@ Style/TrailingCommaInArrayLiteral:
 Style/TrailingCommaInHashLiteral:
   EnforcedStyleForMultiline: diff_comma
 
+Style/TrailingCommaInBlockArgs:
+  Enabled: false
+
 # Seems to be buggy and flags non-redundant line continuations as redundant
 Style/RedundantLineContinuation:
   Enabled: false
