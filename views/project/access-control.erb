@@ -1,8 +1,8 @@
 <% if @token
   page_header = "Token #{@token.ubid}"
   ace_options = [
-    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
-    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
+    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [it.ubid, it.name] }.sort_by! { _2 } : v] }],
+    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [it.ubid, it.name] } : v] }]
   ]
   form_action = path(@token)
   table_headers = %w[Action Object].freeze
@@ -18,9 +18,9 @@
 else
   page_header = "Access Control"
   ace_options = [
-    ["aces[][subject]", @subject_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }],
-    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
-    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
+    ["aces[][subject]", @subject_options.to_h { |k, v| [k, k ? v.map { [it.ubid, it.name] } : v] }],
+    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [it.ubid, it.name] }.sort_by! { _2 } : v] }],
+    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [it.ubid, it.name] } : v] }]
   ]
   form_action = "#{user_path}/access-control"
   table_headers = %w[Subject Action Object].freeze
@@ -88,7 +88,7 @@ end
                 class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>"
               >
                 <% if editable %>
-                  <% ace_options.each_with_index do | (name, options), index| %>
+                  <% ace_options.each_with_index do |(name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
 
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">

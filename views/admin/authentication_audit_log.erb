@@ -42,7 +42,7 @@
       </tr>
     <% end %>
 
-    <% if link_text = audit_log_paginate %>
+    <% if (link_text = audit_log_paginate) %>
       <% link_params_html = @next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;") %>
       <tr>
         <td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td>

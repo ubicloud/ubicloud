@@ -58,7 +58,7 @@
     </div>
 
     <% connection_infos.each_with_index do |(key, value), index|
-      hidden_class = index == 0 ? "" : "hidden" %>
+      hidden_class = (index == 0) ? "" : "hidden" %>
       <div class="bg-gray-200 rounded-md p-6 mt-5 connection-info-box connection-info-box-<%= key %> <%= hidden_class %>">
         <%== part("components/copyable_content", content: value, revealable: true, classes: "!flex justify-between") %>
       </div>
