@@ -8,7 +8,7 @@ end
 @cutoff_alert = @usage_alerts.find(&:cutoff)
 @usage_alerts.delete(@cutoff_alert) %>
 
-<% if billing_info = @project.billing_info %>
+<% if (billing_info = @project.billing_info) %>
   <%== part(
     "components/page_header",
     breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], %w[Billing #].freeze]

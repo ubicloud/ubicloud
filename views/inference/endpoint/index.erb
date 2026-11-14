@@ -38,7 +38,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
         <div class="flex items-center gap-1 text-gray-500">
-          <%if hf_model = ie.tags["hf_model"]%>
+          <%if (hf_model = ie.tags["hf_model"])%>
           <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
           <%else%>
           <p class="text-gray-500">Not available</p>
