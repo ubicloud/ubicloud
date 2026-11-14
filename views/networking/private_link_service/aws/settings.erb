@@ -43,7 +43,7 @@ hostname = pls.private_hostname %>
             <% end %>
           </div>
 
-          <% if error = flash.dig("errors", "allowed_principals") %>
+          <% if (error = flash.dig("errors", "allowed_principals")) %>
             <%== part("components/form/error", name: "allowed_principals", error:) %>
           <% end %>
 

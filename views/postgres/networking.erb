@@ -6,7 +6,7 @@
       </h3>
 
       <p class="text-gray-500 mt-2">
-        <% if firewall = @pg.customer_firewall %>
+        <% if (firewall = @pg.customer_firewall) %>
           You can
           <a class="text-orange-600" href="<%= path(firewall) %>/networking">manage firewall rules using the firewall for this PostgreSQL database</a>.
         <% else %>

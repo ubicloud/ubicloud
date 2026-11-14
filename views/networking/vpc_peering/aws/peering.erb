@@ -38,7 +38,7 @@ requester_vpc_id = ps.private_subnet_aws_resource.vpc_id %>
         (account <strong><%= aws.requester_account_id %></strong>, <%= ps.location.name %>) to your VPC
         <strong><%= vp.peer_vpc_id %></strong> in account <strong><%= vp.peer_account_id %></strong>
         (<%= aws.peer_region %>).
-        <% if expires_at = aws.expires_at %>
+        <% if (expires_at = aws.expires_at) %>
           It expires on <strong><%= expires_at.getutc.strftime("%F %H:%M UTC") %></strong>. After that, delete this
           peering and create it again.
         <% end %>
