@@ -10,7 +10,9 @@ class GithubRepository < Sequel::Model
   one_to_many :runners, key: :repository_id, class: :GithubRunner, read_only: true
   one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry, remover: nil, clearer: nil
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, read_only: true, &:active
-  one_to_many :active_workflow_runs, key: :repository_id, class: :GithubActiveWorkflowRun, read_only: true
+  one_to_many :active_workflow_runs, key: :repository_id, class: :GithubActiveWorkflowRun, read_only: true, order: [Sequel.desc(:run_id), Sequel.desc(:run_attempt)]
+  one_to_many :completed_workflow_runs, key: :repository_id, class: :GithubCompletedWorkflowRun, read_only: true, order: [Sequel.desc(:create_date), Sequel.desc(:run_id), Sequel.desc(:run_attempt)]
+  one_to_many :completed_workflow_jobs, key: :repository_id, class: :GithubCompletedWorkflowJob, read_only: true, order: [Sequel.desc(:workflow_run_create_date), Sequel.desc(:job_id)]
 
   plugin :association_dependencies, cache_entries: :destroy
 
@@ -20,6 +22,10 @@ class GithubRepository < Sequel::Model
 
   TEMPORARY_CREDENTIALS = "temp-creds"
   NO_RUNNER_LAST_JOB_CUTOFF = Time.utc(2000)
+
+  dataset_module do
+    where :with_runners, Sequel[:last_job_at] > NO_RUNNER_LAST_JOB_CUTOFF
+  end
 
   def self.cache_size_limit
     10_737_418_240 # 10GB

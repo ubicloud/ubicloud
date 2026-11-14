@@ -167,7 +167,12 @@ class Clover
 
       r.on "repository" do
         r.get api? do
-          paginated_result(installation.repositories_dataset.order(:name), Serializers::GithubRepository, installation:)
+          paginated_result(installation.repositories_dataset.with_runners.order(:name), Serializers::GithubRepository, installation:)
+        end
+
+        r.get web? do
+          @repositories = installation.repositories_dataset.with_runners.order(:name).all
+          view "github/repositories"
         end
 
         r.on GITHUB_REPOSITORY_NAME_OR_UBID do |repository_name, repository_id|
@@ -177,9 +182,103 @@ class Clover
             installation.repositories_dataset.with_pk(repository_id)
           end
           check_found_object(repository)
+          @repository = repository
 
           r.get api? do
             Serializers::GithubRepository.serialize(repository, installation:)
+          end
+
+          r.get web?, "job-metrics" do
+            today = Time.now.utc.to_date
+            @metrics = repository
+              .completed_workflow_jobs_dataset
+              .where(workflow_run_create_date: (today - 6)..today)
+              .limit(1000)
+              .from_self
+              .select_group(:workflow_name)
+              .select_append {
+                [
+                  it.count.function.*.as(:count),
+                  it.count.function.*.filter(conclusion: "success").as(:success_count),
+                  it.sum(:duration).as(:total),
+                  it.max(:duration).as(:max),
+                  it.percentile_disc(0.5).within_group(:duration).as(:p50),
+                  it.percentile_disc(0.9).within_group(:duration).as(:p90),
+                  it.percentile_disc(0.99).within_group(:duration).as(:p99),
+                ]
+              }
+              .order(Sequel.desc(:total), :workflow_name)
+              .all
+
+            view "github/job-metrics"
+          end
+
+          r.get web?, "runs" do
+            limit = 25
+            run_id, run_attempt = typecast_params.pos_int(%w[run_id run_attempt].freeze)
+            today = Time.now.utc.to_date
+            oldest_date = today - 42
+
+            @runs = if (date = typecast_params.date("date"))
+              date = date.clamp(oldest_date, today)
+              []
+            else
+              date = today
+              ds = repository.active_workflow_runs_dataset.limit(limit + 1)
+              if run_id && run_attempt
+                ds = ds.where(Sequel[%i[run_id run_attempt].freeze] <= [run_id, run_attempt])
+                run_id = run_attempt = nil
+              end
+              ds.all
+            end
+
+            num_active_runs = @runs.length
+            if num_active_runs <= limit
+              earliest_search_date = [date - 6, oldest_date].max
+              ds = repository
+                .completed_workflow_runs_dataset
+                .where(create_date: earliest_search_date..date)
+                .limit(limit + 1 - num_active_runs)
+
+              if run_id && run_attempt
+                ds = ds.where(Sequel[%i[create_date run_id run_attempt].freeze] <= [date, run_id, run_attempt])
+              end
+
+              @runs.concat(ds.all)
+            end
+
+            if @runs.length > limit
+              next_run = @runs.pop
+              @older_runs_params = {
+                "run_id" => next_run.run_id,
+                "run_attempt" => next_run.run_attempt,
+              }
+              @older_runs_params["date"] = next_run.create_date if next_run.completed?
+            elsif earliest_search_date > oldest_date
+              @older_runs_params = {"date" => date - 7}
+            end
+
+            @empty_date_range = [earliest_search_date, date] if @runs.empty?
+
+            view "github/runs"
+          end
+
+          r.on web?, "run", Date, Integer, Integer do |date, run_id, run_attempt|
+            cond = {create_date: date, run_id:, run_attempt:}
+            next unless (@run = repository.active_workflow_runs_dataset.first(cond) ||
+              repository.completed_workflow_runs_dataset.first(cond))
+
+            r.get true do
+              @jobs = @run.completed_workflow_jobs
+              @jobs = @run.active_runners + @jobs unless @run.completed?
+
+              view "github/run"
+            end
+
+            r.get Integer do |job_id|
+              next unless (@job = @run.completed_workflow_jobs_dataset.first(job_id:))
+              view "github/job"
+            end
           end
 
           r.on "cache" do

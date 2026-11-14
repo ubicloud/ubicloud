@@ -1,0 +1,63 @@
+<% @page_title = "Workflow Job" %>
+
+<%== render("github/tabbar") %>
+
+<% run = @run
+   job = @job
+   repository_name = @repository.name
+   run_path = "#{path(@installation)}/repository/#{@repository.ubid}/run/#{run.create_date}/#{run.run_id}/#{run.run_attempt}"
+   job_url = "https://github.com/#{repository_name}/actions/runs/#{job.run_id}/job/#{job.job_id}"
+   badge_class = "inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5"
+   status_text, status_color = github_workflow_run_status_label(job)
+   time_format = "%Y-%m-%d %H:%M:%S UTC"
+
+   data = [
+     ["Status", "<span class='#{badge_class} #{status_color}'>#{h(status_text)}</span>", {escape: false}],
+     ["Workflow Run", run.display_title, {link: run_path}],
+     ["Job ID", job.job_id],
+     ["Job", job.job_name],
+     ["Workflow Name", job.workflow_name],
+     ["Label", job.label],
+     ["Actual Label", job.actual_label],
+     ["Billed VM Size", job.billed_vm_size],
+     ["Created At", job.job_created_at.getutc.strftime(time_format)],
+     ["Started At", job.job_started_at.getutc.strftime(time_format)],
+     ["Completed At", (job.job_completed_at || job.completed_at).getutc.strftime(time_format)],
+     ["Queued For", format_time_diff(job.job_created_at, job.job_started_at)],
+     ["Duration", format_time_diff(0, job.duration)],
+   ]
+
+   if (github_duration = job.github_duration)
+     data << ["GitHub Workflow Job Duration", format_time_diff(0, github_duration)]
+   end %>
+
+<div class="grid grid-cols-1 gap-6">
+  <div class="md:flex md:items-start md:justify-between md:gap-4">
+    <div class="min-w-0">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:tracking-tight">
+        <%= job.job_name %>
+      </h3>
+
+      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+        <span class="font-medium text-gray-700"><%= repository_name %></span>
+
+        <span>
+          <%= run.event %> by
+          <a href="https://github.com/<%= run.actor_login %>" class="hover:underline"><%= run.actor_login %></a>
+        </span>
+      </div>
+
+      <% if run.head_branch || run.commit_hash %>
+        <div class="mt-1 text-gray-500 text-xs truncate">
+          <%== part("github/run_branch", run:, repository_name:, compact: true) %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="mt-4 md:mt-0 shrink-0">
+      <%== part("components/button", text: "View on GitHub", link: job_url, icon: "github") %>
+    </div>
+  </div>
+
+  <%== part("components/kv_data_card", data:) %>
+</div>

@@ -4,6 +4,11 @@ require_relative "../../model"
 
 class GithubCompletedWorkflowRun < Sequel::Model
   plugin DailyPartitionMethods, partition_type: :date
+  one_to_many :completed_workflow_jobs, class: :GithubCompletedWorkflowJob, key: [:workflow_run_create_date, :repository_id, :run_id, :run_attempt], primary_key: [:create_date, :repository_id, :run_id, :run_attempt], order: :job_id, read_only: true
+
+  def completed?
+    true
+  end
 end
 
 # Table: github_completed_workflow_run

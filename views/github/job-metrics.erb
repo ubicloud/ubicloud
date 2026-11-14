@@ -1,0 +1,184 @@
+<% @page_title = "Job Metrics" %>
+
+<%== render("github/tabbar") %>
+
+<% metrics = @metrics
+   count = metrics.sum { it[:count] }
+   success_count = metrics.sum { it[:success_count] }
+   total = metrics.sum { it[:total].to_i }
+   bar_max = [metrics.map { it[:p90].to_i }.max.to_i, 1].max
+   duration_text = ->(value) { format_time_diff(0, value.to_i) }
+   percent_text = ->(part, whole) { sprintf("%0.1f%%", part * 100.0 / whole) }
+   bar_percent = ->(value) { (value.to_f * 100 / bar_max).round(2) }
+   scope_text = (count >= 1000) ? "1000 recent jobs" : "all jobs in the last 7 days"
+   stats = [
+     ["Jobs", count.to_s],
+     ["Success Rate", (count == 0) ? "-" : percent_text.call(success_count, count)],
+     ["Workflows", metrics.length.to_s],
+     ["Runner Time", duration_text.call(total)]
+   ]
+   th_class = "px-3 py-3.5 text-right text-sm font-semibold text-gray-900 whitespace-nowrap"
+   td_class = "px-3 py-4 text-right text-sm text-gray-500 whitespace-nowrap tabular-nums" %>
+
+<div class="grid grid-cols-1 gap-6">
+  <div>
+    <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:tracking-tight">
+      <%= @repository.name %>
+    </h3>
+
+    <% if count > 0 %>
+      <p id="job-metrics-scope" class="mt-2 text-sm text-gray-500">
+        Metrics for <%= scope_text %>, grouped by workflow
+      </p>
+    <% end %>
+  </div>
+
+  <% if count == 0 %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-8 py-4 lg:px-32">
+      <%== part(
+        "components/empty_state",
+        icon: "hero-chart-pie",
+        title: "No job metrics",
+        description: "No completed jobs are available from the last 7 days."
+      ) %>
+    </div>
+  <% else %>
+    <dl id="job-metrics-stats" class="grid grid-cols-2 min-[1340px]:grid-cols-4 gap-4">
+      <% stats.each do |label, value| %>
+        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-5 sm:p-6">
+          <dt class="truncate text-sm font-medium text-gray-500"><%= label %></dt>
+          <dd class="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900"><%= value %></dd>
+        </div>
+      <% end %>
+    </dl>
+
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="overflow-x-auto">
+        <table id="job-metrics-workflows" class="min-w-full divide-y divide-gray-300">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">
+                Workflow
+              </th>
+
+              <th scope="col" class="<%= th_class %>">Jobs</th>
+              <th scope="col" class="<%= th_class %>">Success</th>
+              <th scope="col" class="hidden min-[460px]:table-cell <%= th_class %>">Median</th>
+
+              <th
+                scope="col"
+                class="hidden min-[790px]:max-[1023px]:table-cell min-[1100px]:table-cell <%= th_class %>"
+              >
+                p90
+              </th>
+
+              <th
+                scope="col"
+                class="hidden min-[890px]:max-[1023px]:table-cell min-[1200px]:table-cell <%= th_class %>"
+              >
+                p99
+              </th>
+
+              <th scope="col" class="hidden min-[700px]:table-cell <%= th_class %>">Slowest</th>
+              <th scope="col" class="hidden min-[580px]:table-cell <%= th_class %>">Runner Time</th>
+
+              <th
+                scope="col"
+                class="
+                  hidden min-[1430px]:table-cell pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              >
+                Duration
+              </th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% metrics.each do |row| %>
+              <% name = row[:workflow_name]
+                 p50_text = duration_text.call(row[:p50])
+                 p90_text = duration_text.call(row[:p90])
+                 p50_percent = bar_percent.call(row[:p50])
+                 p90_percent = bar_percent.call(row[:p90]) %>
+
+              <tr>
+                <td class="pl-4 pr-3 sm:pl-6 py-4 text-sm font-medium text-gray-900 w-full max-w-0">
+                  <div class="truncate" title="<%= name %>">
+                    <% if name %>
+                      <%= name %>
+                    <% else %>
+                      <span class="italic text-gray-500">Unnamed workflow</span>
+                    <% end %>
+                  </div>
+                </td>
+
+                <td class="<%= td_class %>"><%= row[:count] %></td>
+
+                <td class="<%= td_class %>">
+                  <%= percent_text.call(row[:success_count], row[:count]) %>
+                </td>
+
+                <td class="hidden min-[460px]:table-cell <%= td_class %> text-gray-900 font-medium"><%= p50_text %></td>
+
+                <td class="hidden min-[790px]:max-[1023px]:table-cell min-[1100px]:table-cell <%= td_class %>">
+                  <%= p90_text %>
+                </td>
+
+                <td class="hidden min-[890px]:max-[1023px]:table-cell min-[1200px]:table-cell <%= td_class %>">
+                  <%= duration_text.call(row[:p99]) %>
+                </td>
+
+                <td class="hidden min-[700px]:table-cell <%= td_class %>"><%= duration_text.call(row[:max]) %></td>
+                <td class="hidden min-[580px]:table-cell <%= td_class %>"><%= duration_text.call(row[:total]) %></td>
+
+                <td
+                  class="hidden min-[1430px]:table-cell pl-3 pr-4 sm:pr-6 py-4"
+                  title="Median: <%= p50_text %>, p90: <%= p90_text %>"
+                >
+                  <svg class="h-4 w-48" aria-hidden="true">
+                    <rect
+                      y="2"
+                      height="12"
+                      width="100%"
+                      rx="3"
+                      class="fill-gray-100"
+                    />
+
+                    <rect
+                      y="2"
+                      height="12"
+                      width="<%= p90_percent %>%"
+                      rx="3"
+                      class="fill-orange-200"
+                    />
+
+                    <rect
+                      y="2"
+                      height="12"
+                      width="<%= p50_percent %>%"
+                      rx="3"
+                      class="fill-orange-500"
+                    />
+                  </svg>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="hidden min-[1430px]:flex px-4 py-3 sm:px-6 items-center justify-end gap-4 text-xs text-gray-500">
+        <span class="flex items-center gap-1.5">
+          <span class="h-3 w-3 rounded-sm bg-orange-500"></span>
+          Median
+        </span>
+
+        <span class="flex items-center gap-1.5">
+          <span class="h-3 w-3 rounded-sm bg-orange-200"></span>
+          90th percentile
+        </span>
+      </div>
+    </div>
+  <% end %>
+</div>
