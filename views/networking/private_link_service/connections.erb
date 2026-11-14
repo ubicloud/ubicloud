@@ -55,7 +55,7 @@ allowed = @pls.private_link_service_aws_resource.allowed_endpoints %>
               <% end %>
             </div>
 
-            <% if error = flash.dig("errors", "allowed_vpc_endpoints") %>
+            <% if (error = flash.dig("errors", "allowed_vpc_endpoints")) %>
               <%== part("components/form/error", name: "allowed_vpc_endpoints", error:) %>
             <% end %>
 

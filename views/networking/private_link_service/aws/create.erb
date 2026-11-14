@@ -79,7 +79,7 @@
             </div>
           </div>
 
-          <% if error = flash.dig("errors", "allowed_principals") %>
+          <% if (error = flash.dig("errors", "allowed_principals")) %>
             <%== part("components/form/error", name: "allowed_principals", error:) %>
           <% end %>
 
@@ -140,7 +140,7 @@
             <% end %>
           </div>
 
-          <% if error = flash.dig("errors", "ports") %>
+          <% if (error = flash.dig("errors", "ports")) %>
             <%== part("components/form/error", name: "ports", error:) %>
           <% end %>
 

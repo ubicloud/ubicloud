@@ -22,7 +22,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 </div>
 
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
-                  <% if uid = @identities[provider.to_s] %>
+                  <% if (uid = @identities[provider.to_s]) %>
                     <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                       <%== hidden_inputs(provider:, uid:) %>
                       <%== part("components/button", text: "Disconnect", type: "danger") %>
