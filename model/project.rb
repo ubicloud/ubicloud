@@ -364,6 +364,8 @@ class Project < Sequel::Model
     :postgres_aws_ssh_ipv6,
     :private_link_service_aws,
     :private_link_service_gcp,
+    :postgres_gcp_dual_nic,
+    :postgres_gcp_ssh_ipv6,
   )
 end
 

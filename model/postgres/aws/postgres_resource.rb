@@ -39,6 +39,26 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    def aws_use_separate_management_nic?
+      true
+    end
+
+    def aws_ensure_management_subnet
+    end
+
+    def aws_management_nic_use_eip?
+      !aws_ssh_ipv6?
+    end
+
+    def aws_mgmt_ssh_via_user_security_group?
+      return false if servers.empty?
+
+      ps_aws = private_subnet.private_subnet_aws_resource
+      return true if ps_aws.nil? || ps_aws.mgmt_security_group_id.nil? || ps_aws.mgmt_security_group_id == ps_aws.user_security_group_id
+
+      servers.any? { it.vm.management_nic.nil? }
+    end
+
     def aws_lockout_mechanisms
       ["pg_stop", "hba", "detach_nic"].freeze
     end

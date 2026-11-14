@@ -27,8 +27,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # See doc/gcp_firewall_architecture.md for the full design.
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
-  MANAGEMENT_NET4 = "100.64.0.0/20"
-
   def self.assemble_management(location_id)
     unless (location = Location[location_id])&.gcp?
       fail "No existing GCP location"
@@ -42,7 +40,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     DB.transaction do
       PrivateSubnet.dataset.insert_conflict(target: key.keys).insert(
         id: PrivateSubnet.generate_uuid,
-        net4: MANAGEMENT_NET4,
+        net4: Config.gcp_postgres_mgmt_net4,
         net6: Prog::Vnet::SubnetNexus.random_private_ipv6(location, project).to_s,
         state: "waiting",
         **key,

@@ -34,7 +34,7 @@ class PostgresResource < Sequel::Model
     :destroy, :refresh_certificates, :use_different_az, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
-    :bypass_maintenance_window, :cert_renewed
+    :bypass_maintenance_window, :cert_renewed, :use_dual_nic
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone, :availability_zone_required)
@@ -49,6 +49,10 @@ class PostgresResource < Sequel::Model
   def aws_ssh_ipv6?
     return false unless location.aws? && project.get_ff_postgres_aws_ssh_ipv6
     private_subnet.dedicated_mgmt_security_group?
+  end
+
+  def any_server_has_management_nic?
+    !Nic.where(is_management: true, vm_id: servers_dataset.select(:vm_id)).empty?
   end
 
   def path
@@ -381,19 +385,11 @@ class PostgresResource < Sequel::Model
     rules
   end
 
-  # Keep port 22 in the internal firewall, which the user security group is
-  # reconciled to, only while some server still depends on the user group
-  # for control plane SSH. New AWS resources use the mgmt group from the
-  # start; existing ones switch once the mgmt group is split off and every
-  # VM has a management NIC.
-  def mgmt_ssh_via_user_security_group?
-    return true unless location.aws?
-    return false if servers.empty?
+  def remove_unneeded_internal_ssh_rules
+    return if mgmt_ssh_via_user_security_group?
 
-    ps_aws = private_subnet.private_subnet_aws_resource
-    return true if ps_aws.nil? || ps_aws.mgmt_security_group_id.nil? || ps_aws.mgmt_security_group_id == ps_aws.user_security_group_id
-
-    servers.any? { it.vm.management_nic.nil? }
+    ssh_rules = internal_firewall.firewall_rules_dataset.where(port_range: Sequel.pg_range(22..22))
+    private_subnet.apply_firewalls unless ssh_rules.destroy.zero?
   end
 
   def pg_firewall_rules(firewall: customer_firewall)
