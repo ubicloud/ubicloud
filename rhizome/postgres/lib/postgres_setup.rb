@@ -116,6 +116,19 @@ class PostgresSetup
     r "systemctl", "daemon-reload" if changed
   end
 
+  NEEDRESTART_CONF_PATH = "/etc/needrestart/conf.d/82-clover-postgres.conf"
+
+  NEEDRESTART_CONF = <<~'CONF'
+    $nrconf{override_rc}{qr(^postgresql@.+\.service$)} = 0;
+    $nrconf{override_rc}{qr(^pgbouncer@.+\.service$)} = 0;
+  CONF
+
+  def configure_needrestart
+    return if File.exist?(NEEDRESTART_CONF_PATH) && File.read(NEEDRESTART_CONF_PATH) == NEEDRESTART_CONF
+    r "mkdir", "-p", File.dirname(NEEDRESTART_CONF_PATH)
+    safe_write_to_file(NEEDRESTART_CONF_PATH, NEEDRESTART_CONF)
+  end
+
   def configure_service_slice
     safe_write_to_file("/etc/systemd/system/system-go_services.slice", <<~SLICE)
       [Slice]
