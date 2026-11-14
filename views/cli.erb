@@ -22,14 +22,14 @@ end %>
   <% if !@last_cli && !@cli %>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
-        <% unless multi %>
+        <% if multi %>
+          This page allows scheduling the execution of multiple commands, one per line. It will run the command on the
+          first line and display the output, and the set the next command for execution.
+        <% else %>
           This page provides access to a web version of
           <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's CLI</a>.
           You can use it without installing the CLI. All features are available, except ones that execute external
           programs.
-        <% else %>
-          This page allows scheduling the execution of multiple commands, one per line. It will run the command on the
-          first line and display the output, and the set the next command for execution.
         <% end %>
       </div>
     </div>
