@@ -110,10 +110,6 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
-          if scope.start_with?("refs/pull/unknown-run-")
-            fail CloverError.new(400, "InvalidRequest", "This cache could not be used by another run")
-          end
-
           if size && size > GithubRepository.cache_size_limit
             fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
           end
@@ -184,6 +180,13 @@ class Clover
 
         entry = repository.cache_entries_dataset.first(upload_id:, committed_at: nil)
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
+
+        # Another run could not use this cache, so discard it. Report success, because BuildKit
+        # fails the build for a refused save, and loops forever if every reserve says it already exists.
+        if entry.scope.start_with?("refs/pull/unknown-run-")
+          entry.destroy
+          next {}
+        end
 
         begin
           repository.blob_storage_client.complete_multipart_upload({
