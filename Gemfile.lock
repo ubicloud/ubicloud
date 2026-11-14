@@ -418,7 +418,7 @@ GEM
       uber (< 0.2.0)
     retriable (4.2.0)
     rexml (3.4.4)
-    roda (3.109.0)
+    roda (3.110.0)
       rack
     rodauth (2.50.0)
       roda (>= 2.6.0)
