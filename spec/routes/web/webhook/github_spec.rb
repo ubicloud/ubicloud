@@ -402,11 +402,23 @@ RSpec.describe Clover, "github" do
     end
 
     it "uses pull request ref for cache_scope when the event is a pull_request" do
-      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", pull_requests: [{number: 42}])))
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", pull_requests: [{number: 41, base: {repo: {id: 2}}}, {number: 42, base: {repo: {id: 1}}}])))
       expect(page.status_code).to eq(200)
       workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1)
       expect(workflow_run.cache_scope).to eq("refs/pull/42/merge")
       expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "uses unknown-run ref for cache_scope when no pull request has this repository as the base" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", pull_requests: [{number: 42, base: {repo: {id: 2}}}])))
+      expect(page.status_code).to eq(200)
+      expect(GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1).cache_scope).to eq("refs/pull/unknown-run-7777777/merge")
+    end
+
+    it "uses unknown-run ref for cache_scope when the workflow run does not have a repository id" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", repository_id: nil, pull_requests: [{number: 42, base: {repo: {id: nil}}}])))
+      expect(page.status_code).to eq(200)
+      expect(GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1).cache_scope).to eq("refs/pull/unknown-run-7777777/merge")
     end
 
     it "use unknown-run ref for cache_scope for a non-pull_request fork run" do
@@ -554,7 +566,7 @@ RSpec.describe Clover, "github" do
     end
   end
 
-  def workflow_run_object(run_id: 7777777, head_branch: "test-branch", display_title: "CI", event: "push", status: "queued", head_repository_full_name: "test-user/my-repo", repository_full_name: "test-user/my-repo", pull_requests: [], conclusion: nil, head_sha: "32eb7222f4676683fcec5dca08dc1218168801d5", head_commit: {id: "32eb7222f4676683fcec5dca08dc1218168801d5", message: "cm"})
+  def workflow_run_object(run_id: 7777777, head_branch: "test-branch", display_title: "CI", event: "push", status: "queued", head_repository_full_name: "test-user/my-repo", repository_full_name: "test-user/my-repo", repository_id: 1, pull_requests: [], conclusion: nil, head_sha: "32eb7222f4676683fcec5dca08dc1218168801d5", head_commit: {id: "32eb7222f4676683fcec5dca08dc1218168801d5", message: "cm"})
     {
       id: run_id,
       run_attempt: 1,
@@ -568,7 +580,7 @@ RSpec.describe Clover, "github" do
       run_started_at: Time.now.utc.to_date.strftime("%FT10:20:40Z"),
       updated_at: (Time.now - 1).to_s,
       head_repository: {full_name: head_repository_full_name},
-      repository: {full_name: repository_full_name},
+      repository: {id: repository_id, full_name: repository_full_name},
       pull_requests:,
       head_commit:,
       actor: {login: "al"},

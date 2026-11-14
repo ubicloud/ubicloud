@@ -18,7 +18,12 @@ class Clover
   def github_workflow_run_cache_scope(run, repository_name: run.dig("repository", "full_name"), run_id: run["id"], head_branch: run["head_branch"])
     head_repository_full_name = run.dig("head_repository", "full_name")
     if run["event"] == "pull_request" || (head_repository_full_name && head_repository_full_name != repository_name)
-      "refs/pull/#{run.dig("pull_requests", 0, "number") || "unknown-run-#{run_id}"}/merge"
+      # pull_requests can include pull requests in other repositories (e.g. ones opened
+      # inside a fork), so only use a pull request whose base is this repository.
+      if (repository_id = run.dig("repository", "id"))
+        pull_request = run["pull_requests"]&.find { it.dig("base", "repo", "id") == repository_id }
+      end
+      "refs/pull/#{pull_request&.[]("number") || "unknown-run-#{run_id}"}/merge"
     else
       head_branch || ""
     end

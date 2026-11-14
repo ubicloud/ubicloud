@@ -261,7 +261,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).with("test", 555).and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]}))
+        expect(client).to receive(:workflow_run).with("test", 555).and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}, pull_requests: [{number: 41, base: {repo: {id: 2}}}, {number: 42, base: {repo: {id: 1}}}]}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
 
@@ -290,7 +290,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}}))
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}}))
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
 
@@ -319,7 +319,7 @@ RSpec.describe Clover, "github" do
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "pull_request", head_repository: {full_name: "other/test"}, pull_requests: [{number: 42}]}))
+        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}, pull_requests: [{number: 41, base: {repo: {id: 2}}}, {number: 42, base: {repo: {id: 1}}}]}))
         upload_ids = ["upload-id-1", "upload-id-2"]
         expect(blob_storage_client).to receive(:create_multipart_upload).twice { instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: upload_ids.shift) }
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything).twice
