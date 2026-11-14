@@ -13,7 +13,7 @@ require_relative "loader"
 if ENV["WEB_CONCURRENCY"]
   CONNECTION_CHECKOUT_TELEMETRY = ConnectionCheckoutTelemetry.new
   CONNECTION_CHECKOUT_TELEMETRY.setup
-  API_METRICS_REPORTER = Config.api_metrics_report_enabled ? ApiMetricsReporter.new : nil
+  API_METRICS_REPORTER = Config.api_metrics_report_enabled ? MetricsReporter.new(name: "api", metrics: ApiMetrics) : nil
 else
   CONNECTION_CHECKOUT_TELEMETRY = nil
   API_METRICS_REPORTER = nil

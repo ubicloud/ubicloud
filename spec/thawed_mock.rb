@@ -123,6 +123,7 @@ module ThawedMock
   allow_mocking(Clog, :emit, :write)
   allow_mocking(CloudflareClient, :new)
   allow_mocking(Clover, :ips_v4, :call, :authorized_project)
+  allow_mocking(ControlPlaneMetrics, :count_runner_admission, :observe_github_runner, :observe_metrics_export, :observe_monitor_pulse, :observe_respirate_dispatch, :observe_ssh_command, :observe_strand_label, :observe_strand_run, :observe_vm_provision, :set_monitor_state, :set_respirate_current_strand_delay)
   allow_mocking(DnsChecker, :open)
   allow_mocking(DnsChecker::Checker, :new)
   allow_mocking(EmailRenderer, :sendmail)

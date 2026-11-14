@@ -572,6 +572,36 @@ LOCK
       expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
     end
 
+    it "does not log a fast successful command" do
+      expect(Clog).not_to receive(:emit).with("ssh cmd execution", anything)
+      expect(ControlPlaneMetrics).to receive(:observe_ssh_command).with(prog: "", label: "", outcome: "success", duration: Float).and_call_original
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", timeout: nil, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "logs a slow successful command" do
+      now = Time.now
+      allow(Time).to receive(:now).and_return(now, now + Sshable::SLOW_CMD_LOG_SECONDS + 1)
+      expect(Clog).to receive(:emit).with("ssh cmd execution", instance_of(Hash))
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", timeout: nil, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "does not log a slow successful command when log: :on_error" do
+      now = Time.now
+      allow(Time).to receive(:now).and_return(now, now + Sshable::SLOW_CMD_LOG_SECONDS + 1)
+      expect(Clog).not_to receive(:emit).with("ssh cmd execution", anything)
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: :on_error, timeout: nil, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "logs a failing command" do
+      expect(Clog).to receive(:emit).with("ssh cmd execution", instance_of(Hash))
+      expect(ControlPlaneMetrics).to receive(:observe_ssh_command).with(prog: "", label: "", outcome: "failure", duration: Float).and_call_original
+      simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError
+    end
+
     it "does not log a successful command when log: :on_error" do
       expect(Clog).not_to receive(:emit).with("ssh cmd execution", anything)
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
@@ -611,7 +641,17 @@ LOCK
       err = IOError.new("the party is over")
       expect(session).to receive(:open_channel).and_raise err
       expect(sa).to receive(:invalidate_cache_entry)
+      expect(ControlPlaneMetrics).to receive(:observe_ssh_command).with(prog: "", label: "", outcome: "error", duration: Float).and_call_original
       expect { sa.cmd("irrelevant", _skip_command_checking: true) }.to raise_error err
+    end
+
+    it "records the prog and label of the strand running the command" do
+      Thread.current[:strand_run] = ["Vm::HostNexus", "wait"]
+      expect(ControlPlaneMetrics).to receive(:observe_ssh_command).with(prog: "Vm::HostNexus", label: "wait", outcome: "success", duration: Float).and_call_original
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false, timeout: nil, _skip_command_checking: true)).to eq("hello")
+    ensure
+      Thread.current[:strand_run] = nil
     end
   end
 
@@ -688,12 +728,12 @@ LOCK
     end
 
     it "calls cmd with the correct run command and no stdin" do
-      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: :on_error_or_slow)
       sa.d_run(unit_name, run_command)
     end
 
     it "calls cmd with the correct run command and passes stdin" do
-      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: :on_error_or_slow)
       sa.d_run(unit_name, run_command, stdin: stdin_data)
     end
 

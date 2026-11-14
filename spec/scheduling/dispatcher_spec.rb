@@ -23,6 +23,15 @@ RSpec.describe Scheduling::Dispatcher do
     described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, telemetry_db:, **)
   end
 
+  describe "#initialize" do
+    it "reserves a database connection for the metrics reporter" do
+      expect(Config).to receive(:control_plane_metrics_report_enabled).and_return(true)
+      expect(Config).to receive(:db_pool_respirate).and_return(4)
+      @di = described_class.new(pool_size: 8, telemetry_db:)
+      expect(@di.instance_variable_get(:@thread_data).size).to eq 1
+    end
+  end
+
   describe "#handle_disconnects" do
     it "automatically retries block on disconnect error" do
       i = 0
@@ -331,13 +340,18 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#metrics_thread" do
-    it "emits metrics every 200 queue entries" do
+    it "records each complete strand dispatch and updates scheduling metrics every 200 entries" do
+      t = Time.now
+      metric = Strand::RespirateMetrics.new(t, t + 1, t + 2, t + 3, true, 4, 5)
+      incomplete = Strand::RespirateMetrics.new(t, t + 1)
       q = Queue.new
       n = described_class::METRICS_EVERY
-      n.times { q.push 1 }
+      n.times { q.push metric }
+      q.push incomplete
       q.push nil
-      expect(di).to receive(:metrics_hash).with([1] * n, instance_of(Float)).and_return({})
-      expect(Clog).to receive(:emit).and_call_original
+      expect(ControlPlaneMetrics).to receive(:observe_respirate_dispatch).with(scan_delay: 1.0, queue_delay: 1.0, lease_delay: 1.0, total_delay: 3.0, queue_size: 4, available_workers: 5, lease_acquired: true, old_strand: nil, lease_expired: nil).exactly(n).times.and_call_original
+      expect(ControlPlaneMetrics).to receive(:set_respirate_current_strand_delay).with(3.0).and_call_original
+      expect(Clog).not_to receive(:emit)
       di.metrics_thread(q)
     end
   end
@@ -353,7 +367,7 @@ RSpec.describe Scheduling::Dispatcher do
       arrays << Array.new(8) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
       arrays << Array.new(1) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3, true) }
       arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true, true) }
-      expect(di.metrics_hash(arrays.flatten, 0.5)).to eq({
+      expect(di.metrics_hash(arrays.flatten.shuffle(random: Random.new(1)), 0.5)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
         current_strand_delay: 12.0,
         lease_acquire_percentage: 95.5,
@@ -504,7 +518,7 @@ RSpec.describe Scheduling::Dispatcher do
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
 
-      expect(msgs).to eq ["hopped", "exception terminates strand run"]
+      expect(msgs).to eq ["exception terminates strand run"]
     end
   end
 end

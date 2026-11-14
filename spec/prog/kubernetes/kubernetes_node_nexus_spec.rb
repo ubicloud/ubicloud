@@ -193,7 +193,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "starts the daemonizer, marks the node renewing_certs and naps when not started" do
       nx.incr_renew_certs
       expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("NotStarted")
-      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run renew_certs /home/ubi/kubernetes/bin/renew-certs", {log: true, stdin: "{\"node_ipv4\":\"#{kd.vm.private_ipv4}\"}"})
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run renew_certs /home/ubi/kubernetes/bin/renew-certs", {log: :on_error_or_slow, stdin: "{\"node_ipv4\":\"#{kd.vm.private_ipv4}\"}"})
       expect { nx.renew_certs }.to nap(30)
       expect(kd.reload.state).to eq("renewing_certs")
       expect(kd.renew_certs_set?).to be false
@@ -277,7 +277,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "starts the drain process when run for the first time and naps" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("NotStarted")
-      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", {log: true, stdin: nil})
+      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", {log: :on_error_or_slow, stdin: nil})
       expect { nx.drain }.to nap(10)
     end
 

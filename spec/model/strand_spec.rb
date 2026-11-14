@@ -121,6 +121,19 @@ RSpec.describe Strand do
     expect(st.stack[0]["last_label_changed_at"]).to match(/\.\d{6} /)
   end
 
+  it "starts timing the frame that is on top after a push or pop" do
+    st = described_class.create(prog: "Test", label: "hop_pusher")
+    before_push = Time.now
+    st.unsynchronized_run
+    st.reload
+    expect(Time.new(st.stack.first["last_label_changed_at"])).to be >= before_push
+    before_pop = Time.now
+    st.unsynchronized_run
+    st.reload
+    expect(st.label).to eq "hop_pushed"
+    expect(Time.new(st.stack.first["last_label_changed_at"])).to be >= before_pop
+  end
+
   it "rejects prog names that are not in the right module" do
     expect {
       described_class.prog_verify(Object)
@@ -249,12 +262,100 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
+  describe "strand run context" do
+    it "exposes the running prog and label to the thread and restores the outer value" do
+      Thread.current[:strand_run] = ["Outer", "label"]
+      st = described_class.create(prog: "Test", label: "deferred_transaction_hopper")
+      seen = nil
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("deferred_transaction_hopper outside transaction") { seen = Thread.current[:strand_run] }
+      st.unsynchronized_run
+      expect(seen).to eq ["Test", "deferred_transaction_hopper"]
+      expect(Thread.current[:strand_run]).to eq ["Outer", "label"]
+    ensure
+      Thread.current[:strand_run] = nil
+    end
+  end
+
+  describe "label duration metric" do
+    it "records the target label of a hop within the same prog" do
+      st = described_class.create(prog: "Test", label: "hop_entry")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "hop_entry", outcome: "hop", to: "hop_exit", duration: Float)
+      st.unsynchronized_run
+    end
+
+    it "records the target prog and label of a push into another prog" do
+      st = described_class.create(prog: "Test2", label: "pusher1")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test2", label: "pusher1", outcome: "hop", to: "Test.pusher2", duration: Float)
+      st.unsynchronized_run
+    end
+
+    it "records an empty target on exit" do
+      st = described_class.create(prog: "Test", label: "hop_exit")
+      expect(ControlPlaneMetrics).to receive(:observe_strand_label).with(prog: "Test", label: "hop_exit", outcome: "exit", to: "", duration: Float)
+      st.unsynchronized_run
+    end
+  end
+
+  describe "timeline" do
+    it "records label durations through push and pop and logs the timeline on exit" do
+      st = described_class.create(prog: "Test", label: "hop_pusher")
+      expect(st).to receive(:timeline_prog?).with("Test").and_return(true).exactly(3).times
+      expect(Clog).to receive(:emit).with("strand timeline", instance_of(Hash)) do |_, data|
+        timeline = data[:strand_timeline]
+        expect(timeline[:strand]).to eq st.ubid
+        expect(timeline[:prog]).to eq "Test"
+        expect(timeline[:timeline].map(&:first)).to contain_exactly("hop_pusher", "pusher3", "hop_pushed")
+        expect(timeline[:timeline].map { it[3] }).to eq timeline[:timeline].map { it[3] }.sort
+        expect(timeline[:timeline].map { it[1] }).to eq [1, 1, 1]
+        expect(timeline[:started_at]).to match(/\.\d{6} /)
+        expect(timeline[:total]).to be_a Float
+      end
+
+      expect(st.unsynchronized_run).to be_a Prog::Base::Hop
+      expect(st.stack.last["timeline"].keys).to eq ["hop_pusher"]
+      expect(st.reload.stack.last["timeline"].keys).to eq ["hop_pusher"]
+      expect(st.unsynchronized_run).to be_a Prog::Base::Hop
+      expect(st.reload.unsynchronized_run).to be_a Prog::Base::Exit
+      expect(st).not_to exist
+    end
+
+    it "starts the timeline when the first label is left" do
+      now = Time.at(1_800_000_000)
+      allow(Time).to receive(:now).and_return(now)
+      st = described_class.new(prog: "Vm::Metal::Nexus", label: "start", stack: [{}])
+      timeline = st.send(:record_timeline, 2.0)
+      expect(timeline).to eq("start" => [1, 2.0, 0.0])
+      expect(Time.new(st.stack.last["timeline_started_at"])).to eq now - 2
+    end
+
+    it "counts and sums repeated labels of pushed progs under a prefix" do
+      now = Time.at(1_800_000_000)
+      allow(Time).to receive(:now).and_return(now)
+      root_frame = {"timeline_started_at" => st.send(:time_string, now - 100), "timeline" => {"Test.pusher3" => [2, 3.0, 1.0]}}
+      st = described_class.new(prog: "Test", label: "pusher3", stack: [{"link" => ["Github::GithubRunnerNexus", "wait"]}, root_frame])
+      timeline = st.send(:record_timeline, 2.0)
+      expect(timeline).to eq("Test.pusher3" => [3, 5.0, 98.0])
+      expect(st.stack.last["timeline"]).to be timeline
+    end
+
+    it "only lists existing progs" do
+      described_class::TIMELINE_PROGS.each { expect(described_class.prog_verify(Object.const_get("Prog::#{it}"))).to eq it }
+    end
+
+    it "does not record a timeline without a stack frame" do
+      st = described_class.new(prog: "Vm::Metal::Nexus", label: "wait", stack: [])
+      expect(st.send(:record_timeline, 1)).to be_nil
+    end
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now - 11)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(ControlPlaneMetrics).to receive(:observe_strand_run).with(prog: "Test", label: "napper", duration: 11).and_call_original
     expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
     st.unsynchronized_run
   end

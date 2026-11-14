@@ -21,6 +21,12 @@ RSpec.describe GithubRunner do
     hash[message]
   end
 
+  it "observes durations by the requested vm size and architecture" do
+    github_runner.update(label: "ubicloud-standard-4-arm")
+    expect(ControlPlaneMetrics).to receive(:observe_github_runner).with(stage: "allocation", vm_size: "standard-4", arch: "arm64", duration: 3)
+    github_runner.observe_duration("allocation", 3)
+  end
+
   it "can log duration with a vm" do
     vm = github_runner.vm
     boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)

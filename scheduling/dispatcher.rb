@@ -52,10 +52,11 @@ class Scheduling::Dispatcher
 
     needed_db_connections = 1
     needed_db_connections += 1 if partition_number
+    needed_db_connections += 1 if Config.control_plane_metrics_report_enabled
     # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
     # use more threads than database connections (db_pool_respirate - 1),
-    # and we need separate database connections for the scan thread and the
-    # repartition thread.
+    # and we need separate database connections for the scan thread, the
+    # repartition thread, and the metrics reporter thread.
     pool_size = pool_size.clamp(1, Config.db_pool_respirate - 1 - needed_db_connections)
 
     # The queue size is 4 times the size of the thread pool by default, as that should
@@ -245,17 +246,31 @@ class Scheduling::Dispatcher
       .prepare(:select, :get_strand_cohort)
   end
 
-  # Thread responsible for collecting and emitting metrics. This emits after every
-  # 1000 strand runs, as that allows easy calculations of the related metrics and is
-  # not too to burdensome on the logging infrastructure, while still being helpful.
+  # Thread responsible for collecting metrics. Each strand run is recorded in
+  # ControlPlaneMetrics, and every METRICS_EVERY strand runs the dispatcher updates the
+  # strand rate and delay it uses for scheduling.
   def metrics_thread(metrics_queue)
     array = []
     t = Time.now
     while (metric = metrics_queue.pop)
+      next unless metric.complete?
+
+      ControlPlaneMetrics.observe_respirate_dispatch(
+        scan_delay: metric.scan_delay,
+        queue_delay: metric.queue_delay,
+        lease_delay: metric.lease_delay,
+        total_delay: metric.total_delay,
+        queue_size: metric.queue_size,
+        available_workers: metric.available_workers,
+        lease_acquired: metric.lease_acquired,
+        old_strand: metric.old_strand,
+        lease_expired: metric.lease_expired,
+      )
       array << metric
       if array.size == METRICS_EVERY
         new_t = Time.now
-        Clog.emit("respirate metrics", {respirate_metrics: metrics_hash(array, new_t - t)})
+        metrics_hash(array, new_t - t)
+        ControlPlaneMetrics.set_respirate_current_strand_delay(@current_strand_delay)
         t = new_t
         array.clear
       end
@@ -338,6 +353,7 @@ class Scheduling::Dispatcher
     # current delay numbers if the delay is increasing rapidly.
     array.reject!(&:old_strand)
     array.map!(&:total_delay)
+    array.sort!
     respirate_metrics[:current_strand_delay] = @current_strand_delay = array[(array.count * 0.95r).floor] || 0
 
     respirate_metrics

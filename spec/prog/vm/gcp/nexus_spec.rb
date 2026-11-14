@@ -1213,7 +1213,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   describe "#create_billing_record" do
     before do
       nx.vm.update(allocated_at: Time.now - 100)
-      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_call_original
     end
 
     it "does not create billing records when the project is not billable" do

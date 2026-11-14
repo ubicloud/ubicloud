@@ -15,7 +15,7 @@ class MonitorRunner
     # every minute.
     @scan_every = scan_every
 
-    # The number of seconds between reporting monitor metrics.
+    # The number of seconds between updating monitor state metrics.
     @report_every = report_every
 
     # The number of seconds after a monitor job completes before resubmitting it.
@@ -74,20 +74,27 @@ class MonitorRunner
     end
   end
 
-  def emit_metrics
-    Clog.emit("monitor metrics", {
-      monitor_metrics: {
-        active_threads_count: Thread.list.count - @internal_threads,
-        threads_waiting_for_db_connection: DB.pool.num_waiting,
-        total_monitor_resources: @monitor_resources.resources.size,
-        total_monitor_attached_resources: @monitor_resources.resources.each_value.sum(&:num_attached_resources),
-        total_metric_export_resources: @metric_export_resources.resources.size,
-        monitor_submit_queue_length: @monitor_resources.submit_queue.length,
-        metric_export_submit_queue_length: @metric_export_resources.submit_queue.length,
-        monitor_idle_worker_threads: @monitor_resources.submit_queue.num_waiting,
-        metric_export_idle_worker_threads: @metric_export_resources.submit_queue.num_waiting,
-      },
-    })
+  def update_metrics
+    resources = Hash.new(0)
+    @monitor_resources.resources.each_value do |r|
+      [r, *r.attached_resource_list].each do
+        resources[{resource_type: it.resource.class.name, reading: it.reading}] += 1
+      end
+    end
+
+    export_resources = Hash.new(0)
+    @metric_export_resources.resources.each_value do
+      export_resources[{resource_type: it.resource.class.name}] += 1
+    end
+
+    ControlPlaneMetrics.set_monitor_state(
+      resources:,
+      export_resources:,
+      queue_lengths: {{kind: "pulse"} => @monitor_resources.submit_queue.length, {kind: "export"} => @metric_export_resources.submit_queue.length},
+      idle_workers: {{kind: "pulse"} => @monitor_resources.submit_queue.num_waiting, {kind: "export"} => @metric_export_resources.submit_queue.num_waiting},
+      active_threads: Thread.list.count - @internal_threads,
+      threads_waiting_for_db: DB.pool.num_waiting,
+    )
   end
 
   def check_stuck_pulses
@@ -122,7 +129,7 @@ class MonitorRunner
     # Time after which to run the scan query to check for new resources.
     scan_after = Time.now
 
-    # Time after which to report the number of active threads and other metric information.
+    # Time after which to update the number of active threads and other monitor state metrics.
     report_after = Time.now + @report_every
 
     # Time after which to report the number of active threads.
@@ -158,7 +165,7 @@ class MonitorRunner
       # If the time since the last report has exceeded the deadline, report again.
       if t > report_after
         report_after = t + @report_every
-        emit_metrics
+        update_metrics
       end
 
       # If the time since the last pulse check has exceeded the deadline,

@@ -200,7 +200,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 
-      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet)
+      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet) if seconds_in_label > 5 * 60
 
       nap 5
     end

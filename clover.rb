@@ -212,7 +212,7 @@ class Clover < Roda
     }.new
   else
     # simplecov:disable
-    $stderr
+    AccessLogFilter.new($stderr)
     # simplecov:enable
   end
   plugin :common_logger, logger

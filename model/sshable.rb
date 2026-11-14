@@ -27,6 +27,8 @@ class Sshable < Sequel::Model
     IOError,
   ].freeze
 
+  SLOW_CMD_LOG_SECONDS = 5
+
   dataset_module do
     order :by_id, :id
     exclude :with_host_keys, host_keys: nil
@@ -97,7 +99,7 @@ class Sshable < Sequel::Model
     JSON.parse(cmd(cmd, **args))
   end
 
-  def cmd(cmd, stdin: nil, log: true, timeout: :default, session: nil)
+  def cmd(cmd, stdin: nil, log: :on_error_or_slow, timeout: :default, session: nil)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -147,16 +149,26 @@ class Sshable < Sequel::Model
       # A caller-supplied session is not in the thread-local cache and its
       # lifecycle is owned by the caller, so leave the cache alone.
       invalidate_cache_entry unless session
+      observe_ssh_command("error", Time.now - start)
       raise
     end
 
     stdout_str = stdout.string.freeze
     stderr_str = stderr.string.freeze
     success = exit_code&.zero?
+    finish = Time.now
+    duration = finish - start
+    outcome = if success
+      "success"
+    elsif exit_code
+      "failure"
+    else
+      "timeout"
+    end
+    observe_ssh_command(outcome, duration)
 
-    if log == true || (log == :on_error && !success)
-      finish = Time.now
-      embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+    if log == true || (log && !success) || (log == :on_error_or_slow && duration > SLOW_CMD_LOG_SECONDS)
+      embed = {ubid:, start:, finish:, timeout:, duration:,
                cmd:, exit_code:, exit_signal:}
 
       # Suppress large outputs to avoid annoyance in duplication
@@ -187,7 +199,7 @@ class Sshable < Sequel::Model
     cmd("common/bin/daemonizer2 clean :unit_name", unit_name:)
   end
 
-  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: true)
+  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: :on_error_or_slow)
     cmd("common/bin/daemonizer2 run :unit_name :shelljoin_run_command", unit_name:, shelljoin_run_command:, stdin:, log:)
   end
 
@@ -404,6 +416,11 @@ LOCK
 
       false
     end
+  end
+
+  def observe_ssh_command(outcome, duration)
+    prog, label = Thread.current[:strand_run]
+    ControlPlaneMetrics.observe_ssh_command(prog: prog || "", label: label || "", outcome:, duration:)
   end
 
   def channel_wait(ch, wait_deadline)
