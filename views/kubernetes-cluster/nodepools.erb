@@ -1,16 +1,16 @@
 <% rows =
-   @kc.nodepools_dataset.eager(:strand, :semaphores, cluster: :location).all.map do |np|
-     [
+     @kc.nodepools_dataset.eager(:strand, :semaphores, cluster: :location).all.map do |np|
        [
-         [np.name, { link: "#{path(np)}/overview" }],
-         np.node_count,
-         np.target_node_size,
-         np.version,
-         [part("components/kubernetes_state_label", state: np.display_state), { escape: false }]
-       ],
-       { id: "nodepool-#{np.ubid}" }
-     ]
-   end %>
+         [
+           [np.name, { link: "#{path(np)}/overview" }],
+           np.node_count,
+           np.target_node_size,
+           np.version,
+           [part("components/kubernetes_state_label", state: np.display_state), { escape: false }]
+         ],
+         { id: "nodepool-#{np.ubid}" }
+       ]
+     end %>
 
 <div class="p-6">
   <%== part(
