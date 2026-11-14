@@ -12,7 +12,7 @@
         <<-MSG
 "messages": [{"role": "user", "content": "say something"}],
     "stream": true
-MSG
+        MSG
       ]
     when "Embeddings"
       ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
@@ -30,7 +30,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
   -d <span class="text-green-400">'{
     "model": "#{ie.model_name}",
     #{curl_message}   }'</span>
-  CURL
+    CURL
     %>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-4">
     <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
