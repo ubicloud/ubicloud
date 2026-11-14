@@ -10,4 +10,7 @@ EXTENSION_UPGRADE_SCRIPTS = {
   18 => {
     "postgis" => "SELECT postgis_extensions_upgrade();",
   },
+  19 => {
+    "postgis" => "SELECT postgis_extensions_upgrade();",
+  },
 }

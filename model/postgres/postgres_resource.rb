@@ -865,7 +865,7 @@ class PostgresResource < Sequel::Model
   # Bumped on its own schedule: a version is offered in POSTGRES_VERSION_OPTIONS
   # for a while before new databases are created with it by default.
   DEFAULT_VERSION = "18"
-  LATEST_VERSION = "18"
+  LATEST_VERSION = "19"
 
   def self.default_version
     DEFAULT_VERSION
@@ -907,6 +907,7 @@ class PostgresResource < Sequel::Model
     "ubuntu-2604" => {
       "17" => "20260824.1.0",
       "18" => "20260824.1.0",
+      "19" => "20261112.9.1",
     },
   }
 end
@@ -961,7 +962,7 @@ end
 #  hostname_version_check                 | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_image_family_check              | (target_image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
 #  target_storage_configuration_is_object | (target_storage_configuration IS NULL OR jsonb_typeof(target_storage_configuration) = 'object'::text)
-#  target_version_check                   | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  target_version_check                   | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text, '19'::text]))
 #  valid_maintenance_window_days_bitmask  | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
 #  valid_maintenance_windows_start_at     | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
