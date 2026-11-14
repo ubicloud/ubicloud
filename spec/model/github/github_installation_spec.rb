@@ -7,19 +7,6 @@ RSpec.describe GithubInstallation do
     described_class.create(installation_id: 123, project_id: Project.create(name: "default").id, name: "test-user", type: "User")
   }
 
-  describe ".with_github_installation_id" do
-    it "returns the installation with the given GitHub installation id" do
-      installation
-      expect(described_class.with_github_installation_id(123)).to eq(installation)
-      expect(described_class.with_github_installation_id(456)).to be_nil
-    end
-
-    it "does not return the installation if it is being destroyed" do
-      installation.this.update(created_at: described_class::CREATED_AT_CUTOFF)
-      expect(described_class.with_github_installation_id(123)).to be_nil
-    end
-  end
-
   it "returns sum of used vm cores" do
     vms = [2, 4, 8].map { create_vm(cores: it) }
 

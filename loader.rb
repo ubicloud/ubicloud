@@ -241,8 +241,6 @@ def clover_freeze
   [
     Authorization,
     Authorization::Unauthorized,
-    DailyPartitionMethods,
-    DailyPartitionMethods::ClassMethods,
     DnsChecker::Checker,
     HealthMonitorMethods,
     Hosting,

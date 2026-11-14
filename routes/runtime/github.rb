@@ -21,7 +21,7 @@ class Clover
         # We prioritize scope over key, returning the cache for the first matching
         # key in the head branch scope, followed by the first matching key in
         # default branch scope.
-        scopes = [github_runner_cache_scope(runner, run_id: typecast_params.str("runId")), repository.default_branch]
+        scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.str("runId")), repository.default_branch]
         scopes.compact!
         scopes.uniq!
 
@@ -74,7 +74,7 @@ class Clover
             fail CloverError.new(204, "NotFound", "No cache entry")
           end
 
-          scopes = [github_runner_cache_scope(runner), repository.default_branch].compact
+          scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
           entries = repository.cache_entries_dataset
             .exclude(committed_at: nil)
             .where(key:, scope: scopes)
@@ -105,7 +105,7 @@ class Clover
           key, version = typecast_params.nonempty_str!(%w[key version].freeze)
           size = typecast_params.pos_int("cacheSize")
 
-          unless (scope = github_runner_cache_scope(runner, run_id: typecast_params.nonempty_str("runId"), emit_workflow_error: false))
+          unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.nonempty_str("runId")))
             Clog.emit("The runner does not have a workflow job", {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}})
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
@@ -180,13 +180,6 @@ class Clover
 
         entry = repository.cache_entries_dataset.first(upload_id:, committed_at: nil)
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
-
-        # Another run could not use this cache, so discard it. Report success, because BuildKit
-        # fails the build for a refused save, and loops forever if every reserve says it already exists.
-        if entry.scope.start_with?("refs/pull/unknown-run-")
-          entry.destroy
-          next {}
-        end
 
         begin
           repository.blob_storage_client.complete_multipart_upload({

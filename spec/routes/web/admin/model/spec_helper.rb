@@ -180,12 +180,6 @@ module AdminModelSpecHelper
       GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
     end
 
-    def create_github_active_workflow_run
-      installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
-      repo = GithubRepository.create(installation_id: installation.id, name: "test-repo")
-      GithubActiveWorkflowRun.create(installation_id: installation.id, repository_id: repo.id, repository_name: "test-user/test-repo", run_id: 111, run_attempt: 1, create_date: Time.now.utc.to_date, head_branch: "main", head_repository_full_name: "test-user/test-repo", event: "push", status: "queued", display_title: "CI", commit_message: "cm", actor_login: "al", cache_scope: "main")
-    end
-
     def create_globally_blocked_dnsname
       GloballyBlockedDnsname.create(dns_name: "blocked.example.com")
     end

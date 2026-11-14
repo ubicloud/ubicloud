@@ -6,10 +6,6 @@ require "aws-sdk-s3"
 require "octokit"
 
 RSpec.describe Clover, "github" do
-  def sawyer_resource(data)
-    Sawyer::Resource.new(Sawyer::Agent.new("https://api.github.com"), data)
-  end
-
   describe "authentication" do
     let(:vm) { create_vm }
 
@@ -83,24 +79,6 @@ RSpec.describe Clover, "github" do
     }
     let(:url_presigner) { instance_double(Aws::S3::Presigner, presigned_request: "aa") }
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
-    let(:workflow_run) do
-      GithubActiveWorkflowRun.create(
-        installation_id: installation.id,
-        repository_id: repository.id,
-        repository_name: "test-user/my-repo",
-        run_id: 111,
-        run_attempt: 1,
-        create_date: Time.now.utc.to_date,
-        head_branch: "dev",
-        head_repository_full_name: "test-user/my-repo",
-        event: "push",
-        status: "queued",
-        display_title: "CI",
-        commit_message: "cm",
-        actor_login: "al",
-        cache_scope: "refs/pull/7/merge",
-      )
-    end
 
     before do
       login_runtime(runner.vm)
@@ -128,41 +106,13 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "No workflow job data available")
       end
 
-      it "reserves cache if the cache scope is for a run with an unknown pull request" do
-        workflow_run.update(cache_scope: "refs/pull/unknown-run-111/merge")
-        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
-        expect(Github).not_to receive(:installation_client)
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-111/merge")
-        expect(repository.cache_entries_dataset.select_map(:scope)).to eq(["refs/pull/unknown-run-111/merge"])
-      end
-
-      it "reserves cache if the cache scope is for a run with a known pull request" do
-        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
-        workflow_run
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries_dataset.select_map(:scope)).to eq(["refs/pull/7/merge"])
-      end
-
       it "fails if cache is bigger than 10GB" do
-        runner.update(cache_scope: runner.head_branch)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 11 * 1024 * 1024 * 1024}
 
         expect(last_response).to have_runtime_error(400, "The cache size is over the 10GB limit")
       end
 
       it "fails if the cache entry already exists before upload" do
-        runner.update(cache_scope: runner.head_branch)
         GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
@@ -170,7 +120,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if the cache entry already exists after upload" do
-        runner.update(cache_scope: runner.head_branch)
         s3_client = instance_double(Aws::S3::Client, create_multipart_upload: nil, delete_object: nil)
         repository_id = repository.id
         created_by = runner.id
@@ -187,7 +136,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "rollbacks inconsistent cache entry if a failure occurs in the middle" do
-        runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).and_raise(CloverError.new(500, "UnexpectedError", "Sorry, we couldn’t process your request because of an unexpected error."))
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}
 
@@ -198,9 +146,8 @@ RSpec.describe Clover, "github" do
       it "gets branch from GitHub API if the runner doesn't have a branch info" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         client = instance_double(Octokit::Client)
-        expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: runner.ubid}]}))
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push"}))
+        expect(Github).to receive(:installation_client).with(installation.installation_id, auto_paginate: true).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id"))
 
@@ -210,187 +157,7 @@ RSpec.describe Clover, "github" do
         expect(repository.cache_entries.first.scope).to eq("dev")
       end
 
-      it "uses the cache_scope of the associated workflow run instead of issuing API request to github" do
-        workflow_run
-        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil)
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("refs/pull/7/merge")
-      end
-
-      it "uses the cache_scope of the associated workflow run after getting the run_id from the GitHub API, without fetching the workflow run" do
-        workflow_run
-        runner.update(workflow_job: nil, installation_id: installation.id)
-        client = instance_double(Octokit::Client)
-        expect(Github).to receive(:installation_client).and_return(client).once
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]}))
-        expect(client).not_to receive(:workflow_run)
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100, runId: 111}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("refs/pull/7/merge")
-        runner.reload
-        expect(runner.run_id).to eq(111)
-        expect(runner.cache_scope).to eq("refs/pull/7/merge")
-      end
-
-      it "fetches the workflow run after getting the run_id from the GitHub API if there is no associated workflow run for the run attempt" do
-        workflow_run
-        runner.update(workflow_job: nil, installation_id: installation.id)
-        client = instance_double(Octokit::Client)
-        expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 2, head_branch: "dev", runner_name: runner.ubid}]}))
-        expect(client).to receive(:workflow_run).with("test", 111).and_return(sawyer_resource({event: "push"}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")).and_return("url-1")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100, runId: 111}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("dev")
-        expect(runner.reload.cache_scope).to eq("dev")
-      end
-
-      it "uses a pull-request scope instead of the head branch for a pull_request-triggered run" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).with("test", 555).and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}, pull_requests: [{number: 41, base: {repo: {id: 2}}}, {number: 42, base: {repo: {id: 1}}}]}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("refs/pull/42/merge")
-      end
-
-      it "uses an unknown-run pull-request scope when the head repository is a fork, even without an explicit pull_request event" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "workflow_run", head_repository: {full_name: "other/test"}, pull_requests: []}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-555/merge")
-        expect(repository.cache_entries_dataset.select_map(:scope)).to eq(["refs/pull/unknown-run-555/merge"])
-      end
-
-      it "uses an unknown-run pull-request scope when the workflow run has no pull request information" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(runner.reload.cache_scope).to eq("refs/pull/unknown-run-555/merge")
-        expect(repository.cache_entries_dataset.select_map(:scope)).to eq(["refs/pull/unknown-run-555/merge"])
-      end
-
-      it "keeps the head branch as scope for a same-repository, non pull_request run" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "dev", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push", head_repository: {full_name: "test"}}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("dev")
-      end
-
-      it "only resolves the cache scope from GitHub once per job" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "pull_request", repository: {id: 1}, head_repository: {full_name: "other/test"}, pull_requests: [{number: 41, base: {repo: {id: 2}}}, {number: 42, base: {repo: {id: 1}}}]}))
-        upload_ids = ["upload-id-1", "upload-id-2"]
-        expect(blob_storage_client).to receive(:create_multipart_upload).twice { instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: upload_ids.shift) }
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything).twice
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-        post "/runtime/github/caches", {key: "k2", version: "v1", cacheSize: 100}
-
-        expect(repository.cache_entries.map(&:scope)).to eq(["refs/pull/42/merge", "refs/pull/42/merge"])
-      end
-
-      it "uses the runner's run_id and head_branch columns instead of the workflow_job when set" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: nil, run_id: 777, head_branch: "dev", installation_id: installation.id)
-        expect(client).to receive(:workflow_run).with("test", 777).and_return(sawyer_resource({event: "push"}))
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
-        expect(url_presigner).to receive(:presigned_url).with(:upload_part, anything)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(repository.cache_entries.first.scope).to eq("dev")
-      end
-
-      it "fails if the workflow run can not be fetched from GitHub to resolve the cache scope" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "main", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_raise(Octokit::NotFound)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response).to have_runtime_error(400, "No workflow job data available")
-      end
-
-      it "stores an empty cache scope and fails if the workflow run has no head branch" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).once.and_return(sawyer_resource({event: "push"}))
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-        expect(last_response).to have_runtime_error(400, "No workflow job data available")
-        expect(runner.reload.cache_scope).to eq("")
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-        expect(last_response).to have_runtime_error(400, "No workflow job data available")
-      end
-
-      it "fails without issuing API request to github if the runner has an empty cache scope" do
-        runner.update(cache_scope: "", installation_id: installation.id)
-        expect(Github).not_to receive(:installation_client)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response).to have_runtime_error(400, "No workflow job data available")
-      end
-
-      it "stores an empty cache scope and fails if the associated workflow run has an empty cache scope" do
-        workflow_run.update(cache_scope: "")
-        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil, installation_id: installation.id)
-        expect(Github).not_to receive(:installation_client)
-
-        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
-
-        expect(last_response).to have_runtime_error(400, "No workflow job data available")
-        expect(runner.reload.cache_scope).to eq("")
-      end
-
       it "returns presigned urls and upload id for the reserved cache" do
-        runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id", expires_in: GithubCacheEntry.presigned_url_expires_in)) do |_, params|
           "url-#{params[:part_number]}"
@@ -410,7 +177,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "returns presigned urls and upload id for the reserved cache without size" do
-        runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")) do |_, params|
           "url-#{params[:part_number]}"
@@ -430,7 +196,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if can not authorize multipart upload" do
-        runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).with(hash_including(bucket: repository.bucket_name)).and_raise(Aws::S3::Errors::Unauthorized.new("error", "error")).exactly(3)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
@@ -438,7 +203,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if the bucket does not yet exist" do
-        runner.update(cache_scope: runner.head_branch)
         expect(blob_storage_client).to receive(:create_multipart_upload).with(hash_including(bucket: repository.bucket_name)).and_raise(Aws::S3::Errors::NoSuchBucket.new("error", "error")).exactly(3)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
@@ -500,18 +264,6 @@ RSpec.describe Clover, "github" do
         expect(entry.reload.committed_at).not_to be_nil
       end
 
-      it "discards the cache entry if the cache scope is for a run with an unknown pull request" do
-        entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "refs/pull/unknown-run-111/merge", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
-        expect(blob_storage_client).not_to receive(:complete_multipart_upload)
-        expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket: repository.bucket_name, key: entry.blob_key, upload_id: "upload-id")
-        expect(blob_storage_client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
-        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)).to eq({})
-        expect(entry).not_to exist
-      end
-
       it "completes multipart upload without size" do
         entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id")
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
@@ -563,7 +315,7 @@ RSpec.describe Clover, "github" do
         GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
-        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]}))
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]})
         get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
 
         expect(last_response.status).to eq(204)
@@ -584,75 +336,14 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil, installation_id: installation.id)
         entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
-        expect(Github).to receive(:installation_client).and_return(client).twice
-        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [{head_branch: "dev", runner_name: runner.ubid}]}))
-        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push"}))
+        expect(Github).to receive(:installation_client).with(installation.installation_id, auto_paginate: true).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
         expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "dev"])
         expect(runner.reload.workflow_job["head_branch"]).to eq("dev")
-        expect(runner.head_branch).to eq("dev")
-      end
-
-      it "uses the cache_scope of the associated workflow run instead of issuing API request to github" do
-        workflow_run
-        runner.update(run_id: 111, run_attempt: 1, workflow_job: nil)
-        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "refs/pull/7/merge", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
-
-        get "/runtime/github/cache", {keys: "k1", version: "v1"}
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "refs/pull/7/merge"])
-      end
-
-      it "uses the cache_scope of the associated workflow run after getting the run_id from the GitHub API, without fetching the workflow run" do
-        workflow_run
-        runner.update(workflow_job: nil, installation_id: installation.id)
-        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "refs/pull/7/merge", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-        client = instance_double(Octokit::Client)
-        expect(Github).to receive(:installation_client).and_return(client).once
-        expect(client).to receive(:workflow_run_jobs).with("test", "111").and_return(sawyer_resource({jobs: [{id: 789, run_id: 111, run_attempt: 1, head_branch: "dev", runner_name: runner.ubid}]}))
-        expect(client).not_to receive(:workflow_run)
-        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
-
-        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 111}
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "refs/pull/7/merge"])
-        expect(runner.reload.cache_scope).to eq("refs/pull/7/merge")
-      end
-
-      it "does not let a fork PR whose head branch collides with the default branch name poison the default-branch cache" do
-        GithubCacheEntry.create(key: "k1", version: "v1", scope: "refs/pull/42/merge", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        vm = create_vm
-        runner = GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "main", run_id: 999}, installation_id: installation.id)
-        login_runtime(vm)
-        expect(client).to receive(:workflow_run).with("test", 999).and_return(sawyer_resource({event: "push"}))
-
-        get "/runtime/github/cache", {keys: "k1", version: "v1"}
-
-        expect(last_response.status).to eq(204)
-        expect(runner).to exist
-      end
-
-      it "logs and falls back to the default branch scope if the workflow run can not be fetched from GitHub" do
-        client = instance_double(Octokit::Client)
-        allow(Github).to receive(:installation_client).and_return(client)
-        runner.update(workflow_job: {head_branch: "dev", run_id: 555}, installation_id: installation.id)
-        expect(client).to receive(:workflow_run).and_raise(Octokit::NotFound)
-        expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
-        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
-
-        get "/runtime/github/cache", {keys: "k1", version: "v1"}
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "main"])
       end
 
       it "returns a cache from default branch when no branch info" do
@@ -675,7 +366,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "returns the first matched cache with key for runner's branch" do
-        runner.update(cache_scope: runner.head_branch)
         [
           ["k1", "v1", "dev"],
           ["k1", "v2", "main"],
@@ -734,7 +424,6 @@ RSpec.describe Clover, "github" do
       end
 
       it "returns the list of cache entries for the key" do
-        runner.update(cache_scope: runner.head_branch)
         [
           ["k1", "v1", "dev"],
           ["k1", "v2", "main"],
@@ -749,25 +438,6 @@ RSpec.describe Clover, "github" do
         response = JSON.parse(last_response.body)
         expect(response["totalCount"]).to eq(2)
         expect(response["artifactCaches"].map { [it["cacheKey"], it["cacheVersion"]] }).to eq([["k1", "v1"], ["k1", "v2"]])
-      end
-
-      it "uses the cache_scope of the associated workflow run if available" do
-        workflow_run
-        runner.update(run_id: 111, run_attempt: 1)
-        [
-          ["k1", "v1", "dev"],
-          ["k1", "v2", "refs/pull/7/merge"],
-          ["k1", "v1", "feature"],
-          ["k2", "v1", "dev"],
-        ].each do |key, version, branch|
-          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
-        end
-
-        get "/runtime/github/caches", {key: "k1"}
-
-        response = JSON.parse(last_response.body)
-        expect(response["totalCount"]).to eq(1)
-        expect(response["artifactCaches"].map { [it["cacheKey"], it["cacheVersion"]] }).to eq([["k1", "v2"]])
       end
 
       it "returns the list of cache entries for the default branch" do

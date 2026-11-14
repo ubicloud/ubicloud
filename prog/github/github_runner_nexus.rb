@@ -11,7 +11,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  frame_accessor :boot_bug_checked, :vm_family
+  frame_accessor :boot_bug_checked
 
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
@@ -150,7 +150,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   def update_billing_record
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
-    return unless github_runner.ready_at && github_runner.has_workflow_job_info?
+    return unless github_runner.ready_at && github_runner.workflow_job
 
     billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
@@ -164,8 +164,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       "#{vm.family}-#{vm.vcpus}"
     end
     billed_vm_size += "-arm" if arch == "arm64"
-    now = Time.now
-    github_runner.update(billed_vm_size:, completed_at: now)
+    github_runner.update(billed_vm_size:)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
 
     resource_id, resource_label = if project.get_ff_github_billing_by_repository
@@ -181,7 +180,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     retries = 0
     begin
-      begin_time = now.to_date.to_time
+      begin_time = Time.now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
       duration = Time.now - billed_from
       used_amount = (duration / 60).ceil
@@ -811,7 +810,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # so we destroy the runner. We check if the runner is busy or not with
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
-    if !github_runner.has_workflow_job_info? && Time.now > github_runner.ready_at + 5 * 60 + 10 && !busy?
+    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10 && !busy?
       register_deadline(nil, 2 * 60 * 60)
       Clog.emit("The runner did not pick a job", github_runner)
       github_runner.incr_destroy
@@ -825,10 +824,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     vm_host = vm.vm_host
     # If the runner is not assigned any job or job is not successful, we log
     # journalctl output to debug if there was any problem with the runner script.
-    case (conclusion = github_runner.conclusion)
-    when "success"
-      nil
-    else
+    if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
       if vm_host
         serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
         vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid, log: :on_error)
@@ -879,7 +875,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           line.gsub!(/ host: \S+/, "")
           line
         end
-        Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion:, vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
+        Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
       end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
@@ -897,7 +893,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # when the job is completed. In certain situations, such as fraudulent activity,
     # we may need to bypass this verification and immediately remove the runner
     # using the semaphore.
-    unless github_runner.skip_deregistration_set? || github_runner.status == "completed"
+    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
@@ -914,7 +910,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if vm
       collect_final_telemetry if vm.allocated_at
-      self.vm_family = vm.family
       destroy_vm
     end
 
@@ -935,59 +930,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def wait_vm_destroy
     register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
-
-    if github_runner[:job_id] && github_runner.runner_id && github_runner.run_id && github_runner.completed_at
-      unless (workflow_run_create_date = github_runner.workflow_run_create_date)
-        begin
-          run = github_runner.installation.client.get("repos/#{github_runner.repository_name}/actions/runs/#{github_runner.run_id}/attempts/#{github_runner.run_attempt}")
-        rescue Octokit::ClientError, Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => ex
-          Clog.emit("error contacting GitHub to get run_started_at for runner, skipping completed workflow job insertion", Util.exception_to_hash(ex, into: {github_completed_workflow_job_skipped: {github_runner:}}))
-        else
-          unless (workflow_run_create_date = run[:run_started_at]&.utc&.to_date)
-            Clog.emit("no run_started_at for github workflow job, skipping completed workflow job insertion", {github_completed_workflow_job_skipped: {github_runner:}})
-          end
-        end
-      end
-
-      if workflow_run_create_date
-        begin
-          DB.transaction(savepoint: true) do
-            GithubCompletedWorkflowJob.insert(
-              workflow_run_create_date:,
-              label: github_runner.label,
-              actual_label: github_runner.actual_label || github_runner.label,
-              duration: (github_runner.completed_at - github_runner.ready_at).ceil,
-              runner_id: github_runner.id,
-              runner_vm_id: github_runner.vm_id,
-              vm_family: vm_family || github_runner.billed_vm_size.split("-", 2)[0],
-              **github_runner.values.slice(
-                :repository_id,
-                :job_id,
-                :installation_id,
-                :created_at,
-                :completed_at,
-                :run_id,
-                :run_attempt,
-                :head_branch,
-                :workflow_name,
-                :job_name,
-                :job_created_at,
-                :job_started_at,
-                :job_completed_at,
-                :ready_at,
-                :status,
-                :conclusion,
-                :billed_vm_size,
-              ),
-            )
-          end
-        rescue Sequel::DatabaseError => ex
-          Clog.emit("failed to insert completed github workflow job", Util.exception_to_hash(ex, into: {github_completed_workflow_job_insert_failure: {github_runner:}}))
-        else
-          github_runner.skip_deleted_record!
-        end
-      end
-    end
 
     github_runner.destroy
     pop "github runner deleted"

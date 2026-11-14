@@ -5,32 +5,17 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   frame_accessor :skip_check_queued_jobs
 
   RUNNER_START_WINDOW = 60.0
-  BACKDATE_LAST_JOB_AT = (60 * 60 * 24 * 365.2425 * 1000 + 12 * 60 * 60)
-  UPDATE_SCHEDULE = Sequel::Qualifier.new(:strand).transform(Strand::SCHEDULE_NO_LATER_THAN_NOW)
 
-  def self.assemble(installation, name, default_branch, update_last_job_at: true)
-    last_job_at = Time.now.utc
-    last_job_at -= BACKDATE_LAST_JOB_AT unless update_last_job_at
-
+  def self.assemble(installation, name, default_branch)
     DB.transaction do
-      repository = GithubRepository.new(installation_id: installation.id, name:, default_branch:, last_job_at:)
+      repository = GithubRepository.new(installation_id: installation.id, name:)
       repository.skip_auto_validations(:unique) do
-        updates = {}
-        updates[:last_job_at] = if update_last_job_at
-          Sequel.case({(Sequel[:github_repository][:last_job_at] < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF) => last_job_at + 60}, last_job_at)
-        else
-          Sequel[:github_repository][:last_job_at]
-        end
+        updates = {last_job_at: Time.now}
         updates[:default_branch] = default_branch if default_branch
         repository.insert_conflict(target: [:installation_id, :name], update: updates).save_changes
       end
-
-      if update_last_job_at && repository.last_job_at > last_job_at + 30
-        update = {schedule: UPDATE_SCHEDULE}
-      end
-
       Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { it.id = repository.id }
-        .insert_conflict(target: :id, update:).save_changes
+        .insert_conflict(target: :id).save_changes
     end
   end
 
@@ -90,9 +75,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
     start_transaction do
       required_runners = queued_labels.filter_map do |(actual_label, label), count|
-        # Remove workflow_job: nil after all GithubRunner have job_id set if workflow_job set
-        idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil, job_id: nil).count
-
+        idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
         # The calculation of the required_runner_count isn't atomic because it
         # requires multiple API calls and database queries. However, it will
         # eventually settle on the correct value. If we create more runners than
@@ -179,10 +162,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
-    if github_repository.last_job_at < GithubRepository::NO_RUNNER_LAST_JOB_CUTOFF
-      hibernate
-    end
-
     when_reset_blob_storage_set? { hop_reset_blob_storage }
 
     if Time.now - github_repository.last_job_at > 6 * 60 * 60
@@ -241,8 +220,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def destroy_cache_entries
-    unless github_repository.runners_dataset.empty? && github_repository.active_workflow_runs_dataset.empty?
-      Clog.emit("Cannot destroy repository with active runners or workflow runs", {not_destroyed_repository: {repository_name: github_repository.name}})
+    unless github_repository.runners.empty?
+      Clog.emit("Cannot destroy repository with active runners", {not_destroyed_repository: {repository_name: github_repository.name}})
       start_transaction { nap 2 * 60 }
     end
 
