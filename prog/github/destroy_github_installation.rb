@@ -4,15 +4,11 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   subject_is :github_installation
 
   def self.assemble(installation)
-    DB.transaction do
-      installation.this.update(created_at: Sequel::CURRENT_TIMESTAMP - Sequel.cast("1000 years", :interval))
-      Strand.create(
-        prog: "Github::DestroyGithubInstallation",
-        label: "start",
-        schedule: Time.now + 35,
-        stack: [{"subject_id" => installation.id}],
-      )
-    end
+    Strand.create(
+      prog: "Github::DestroyGithubInstallation",
+      label: "start",
+      stack: [{"subject_id" => installation.id}],
+    )
   end
 
   label def before_run
@@ -33,15 +29,17 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   end
 
   label def destroy_resources
-    GithubRepository.incr_destroy(github_installation.repositories_dataset.select(:id))
-    GithubActiveWorkflowRun.incr_destroy(github_installation.active_workflow_runs_dataset.select(:id))
-    GithubRunner.incr_skip_deregistration(github_installation.runners_dataset.select(:id))
-    GithubRunner.incr_destroy(github_installation.runners_dataset.select(:id))
+    github_installation.repositories.map(&:incr_destroy)
+    github_installation.runners.map do |runner|
+      runner.incr_skip_deregistration
+      runner.incr_destroy
+    end
     hop_wait_resource_destroy
   end
 
   label def wait_resource_destroy
-    nap 10 unless github_installation.runners_dataset.empty? && github_installation.repositories_dataset.empty? && github_installation.active_workflow_runs_dataset.empty?
+    nap 10 unless github_installation.runners_dataset.empty?
+    nap 10 unless github_installation.repositories_dataset.empty?
 
     github_installation.destroy_private_subnets
     hop_wait_private_subnets_destroy

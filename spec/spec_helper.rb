@@ -58,13 +58,11 @@ RSpec.configure do |config|
   config.before(:suite) do
     clover_freeze
 
-    Prog::DeletedRecordPartitioner::PARTITIONED_MODELS.each { it.ensure_partitions(through: Time.now.utc.to_date + 1) }
+    DeletedRecord.ensure_partitions(through: Time.now.utc.to_date + 1)
   end
 
   config.after(:suite) do
-    Prog::DeletedRecordPartitioner::PARTITIONED_MODELS.each do |model|
-      model.partition_days.each { model.drop_partition(it) }
-    end
+    DeletedRecord.partition_days.each { DeletedRecord.drop_partition(it) }
   end
 
   leaked_threads = ObjectSpace::WeakMap.new
