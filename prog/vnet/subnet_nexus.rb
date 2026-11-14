@@ -20,13 +20,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
-    ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
     nic_ipv4_prefix_len ||= 32
     if nic_ipv4_prefix_len != 32 && !location.metal?
       fail "Only metal locations support a nic_ipv4_prefix_len other than 32"
     end
     ipv6_range ||= random_private_ipv6(location, project).to_s
-    ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
+    if ipv4_range
+      ipv4_range_size = NetAddr::IPv4Net.parse(ipv4_range.to_s).netmask.prefix_len
+      aws_subnet_ipv4_range_size ||= [ipv4_range_size + Math.log2(location.azs.count + 1).ceil, 28].min if location.aws?
+    else
+      ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
+      ipv4_range = random_private_ipv4(location, project, ipv4_range_size).to_s
+    end
     DB.transaction do
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, nic_ipv4_prefix_len:, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
@@ -121,8 +126,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     failure_message = if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) }
       "Selected IPv4 subnet #{selected_addr} is banned"
-    elsif !Config.ipv4_subnet_collision_check_disabled && (private_subnet = project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id])
-      "Selected IPv4 subnet #{selected_addr} is already in use by #{private_subnet.ubid}"
+    elsif !Config.ipv4_subnet_collision_check_disabled && (private_subnet = project.private_subnets_dataset.where(location_id: location.id).overlapping_net4(selected_addr).first)
+      "Selected IPv4 subnet #{selected_addr} overlaps #{private_subnet.ubid}"
     end
 
     if failure_message

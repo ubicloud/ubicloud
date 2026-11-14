@@ -24,6 +24,8 @@ class PrivateSubnet < Sequel::Model
     [it, [prefix, PRIVATE_24_BLOCK_COUNT - 2**prefix].freeze]
   }.freeze
 
+  PRIVATE_IPV4_NETS = PRIVATE_SUBNET_RANGES.keys.map { NetAddr::IPv4Net.parse(it) }.freeze
+
   BANNED_IPV4_SUBNETS = [
     NetAddr::IPv4Net.parse("172.16.0.0/16"),
     NetAddr::IPv4Net.parse("172.17.0.0/16"),
@@ -37,6 +39,13 @@ class PrivateSubnet < Sequel::Model
   GCP_MANAGEMENT_SUBNET_NAME = "ubicloud-pg-mgmt"
 
   dataset_module Pagination
+
+  dataset_module do
+    def overlapping_net4(net)
+      where(Sequel.pg_inet_op(:net4).contains_or_contained_by(net.to_s))
+    end
+  end
+
   include ObjectTag::Cleanup
 
   def connected_subnets

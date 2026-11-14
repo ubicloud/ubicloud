@@ -9,3 +9,4 @@ Options:
     -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+    -i, --ipv4-range=cidr            private IPv4 range of the created private subnet (e.g. 10.20.0.0/20)

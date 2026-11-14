@@ -137,6 +137,25 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.192/26")
     end
 
+    it "finds a new subnet if the one it found is inside a larger subnet" do
+      expect(PrivateSubnet).to receive(:random_subnet).with(26).and_return("192.168.0.0/16", "10.0.0.0/8")
+      project = Project.create(name: "test-project")
+      taken = described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "192.168.0.0/16").subject
+      expect(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
+      expect(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
+      expect(Clog).to receive(:emit).with("Selected IPv4 subnet 192.168.0.128/26 overlaps #{taken.ubid}").and_call_original
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.128/26")
+    end
+
+    it "finds a new subnet if the one it found contains a smaller subnet" do
+      expect(PrivateSubnet).to receive(:random_subnet).with(16).twice.and_return("10.0.0.0/8")
+      project = Project.create(name: "test-project")
+      taken = described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.20.4.0/26").subject
+      expect(SecureRandom).to receive(:random_number).with(2**(16 - 8) - 1).and_return(19, 20)
+      expect(Clog).to receive(:emit).with("Selected IPv4 subnet 10.20.0.0/16 overlaps #{taken.ubid}").and_call_original
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 16).to_s).to eq("10.21.0.0/16")
+    end
+
     it "finds a new subnet if the one it found is banned" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
       project = Project.create(name: "test-project")
@@ -242,6 +261,38 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: "10.1.0.0/16", aws_subnet_ipv4_range_size: 20).subject
 
       expect(ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }).to eq(["10.1.0.0/20", "10.1.16.0/20"])
+    end
+
+    def aws_subnet_cidrs_for(range, az_count)
+      az_count.times { LocationAz.create(location_id: aws_location.id, az: ("a".ord + it).chr, zone_id: "usw2-az#{it + 1}") }
+      ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: range).subject
+      ps.private_subnet_aws_resource.aws_subnets_dataset.order(:ipv4_cidr).map { it.ipv4_cidr.to_s }
+    end
+
+    it "splits a given range evenly across the AZs" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 3)).to eq(["10.1.0.0/22", "10.1.4.0/22", "10.1.8.0/22"])
+    end
+
+    it "splits a given range into power of two sized AZ subnets" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 6)).to eq(%w[10.1.0.0/23 10.1.2.0/23 10.1.4.0/23 10.1.6.0/23 10.1.8.0/23 10.1.10.0/23])
+    end
+
+    it "keeps a spare AZ slot when the AZ count is a power of two" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/20", 4)).to eq(%w[10.1.0.0/23 10.1.2.0/23 10.1.4.0/23 10.1.6.0/23])
+    end
+
+    it "keeps a spare AZ slot in a single AZ location" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/24", 1)).to eq(["10.1.0.0/25"])
+    end
+
+    it "takes the range size from a given range over a passed ipv4_range_size" do
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      ps = described_class.assemble(prj.id, location_id: aws_location.id, ipv4_range: "10.1.0.0/20", ipv4_range_size: 16).subject
+      expect(ps.private_subnet_aws_resource.aws_subnets_dataset.map { it.ipv4_cidr.to_s }).to eq(["10.1.0.0/21"])
+    end
+
+    it "does not split a given range below /28" do
+      expect(aws_subnet_cidrs_for("10.1.0.0/26", 6)).to eq(%w[10.1.0.0/28 10.1.0.16/28 10.1.0.32/28 10.1.0.48/28])
     end
   end
 

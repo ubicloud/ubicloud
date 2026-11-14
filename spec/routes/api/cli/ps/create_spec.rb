@@ -40,4 +40,11 @@ RSpec.describe Clover, "cli ps create" do
     expect(ps.firewalls).to eq [fw]
     expect(body).to eq "Private subnet created with id: #{ps.ubid}\n"
   end
+
+  it "creates ps with -i option" do
+    body = cli(%w[ps eu-central-h1/test-ps create -i 10.20.0.0/20])
+    ps = PrivateSubnet.first
+    expect(ps.net4.to_s).to eq "10.20.0.0/20"
+    expect(body).to eq "Private subnet created with id: #{ps.ubid}\n"
+  end
 end

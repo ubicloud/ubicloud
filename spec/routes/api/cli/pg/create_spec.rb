@@ -50,12 +50,13 @@ RSpec.describe Clover, "cli pg create" do
 
   it "creates PostgreSQL database with custom private subnet name" do
     expect(PostgresResource.count).to eq 0
-    body = cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64 -P my-custom-subnet])
+    body = cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64 -P my-custom-subnet -i 172.17.0.0/20])
     expect(PostgresResource.count).to eq 1
     pg = PostgresResource.first
     expect(pg).to be_a PostgresResource
     expect(pg.name).to eq "test-pg"
     expect(pg.private_subnet.name).to eq "my-custom-subnet"
+    expect(pg.private_subnet.net4.to_s).to eq "172.17.0.0/20"
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
 end

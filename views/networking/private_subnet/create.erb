@@ -14,6 +14,8 @@
 <% form_elements = [
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
+    {name: "ipv4_range", type: "text", label: "IPv4 range (optional)", placeholder: "10.20.0.0/20", extra_class: "sm:w-56", opening_tag: "<div class='sm:col-span-3'>",
+     description_html: "<p class='text-sm leading-6 text-gray-600'>Leave empty for a random range. To peer this subnet with another network, enter a private range from /16 to /26 (/16 to /24 in AWS locations) that doesn't overlap it.</p>"},
   ]
 
   action = "#{@project.path}/private-subnet" %>

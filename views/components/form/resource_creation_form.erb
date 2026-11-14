@@ -80,7 +80,8 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
     when "checkbox"
       locals = {name:, label:, options:, description: element[:description]}
     when "text"
-      locals = {name:, label:, value: element[:value], attributes: attributes.merge!({placeholder:})}
+      attributes["aria-label"] = element[:aria_label] if element[:aria_label]
+      locals = {name:, label:, value: element[:value], attributes: attributes.merge!({placeholder:}), description_html: element[:description_html], extra_class: element[:extra_class]}
     when "number"
       locals = {name:, label:, type: "number", attributes: attributes.merge!({placeholder:})}
       type = "text"

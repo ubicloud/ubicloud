@@ -6,6 +6,7 @@ class UbiCli
 
     options("ubi ps location/ps-name create [options]", key: :ps_create) do
       on("-f", "--firewall-id=fw-id-or-name", "add to given firewall")
+      on("-i", "--ipv4-range=cidr", "private IPv4 range (e.g. 10.20.0.0/20)")
     end
 
     run do |opts|
