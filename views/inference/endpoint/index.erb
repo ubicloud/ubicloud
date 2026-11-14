@@ -5,21 +5,21 @@
 <div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
   <% @inference_models.each_with_index do |ie, index|
     path, model_icon, curl_message = case ie.tags["capability"]
-      when "Text Generation"
-        [
-          "/v1/chat/completions",
-          "hero-chat-bubble-bottom-center-text",
+    when "Text Generation"
+      [
+        "/v1/chat/completions",
+        "hero-chat-bubble-bottom-center-text",
         <<-MSG
 "messages": [{"role": "user", "content": "say something"}],
     "stream": true
 MSG
-        ]
-      when "Embeddings"
-        ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
-      # simplecov:disable
-      else
-        fail "Unknown model capability"
-      # simplecov:enable
+      ]
+    when "Embeddings"
+      ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
+    # simplecov:disable
+    else
+      fail "Unknown model capability"
+    # simplecov:enable
     end
 
 
