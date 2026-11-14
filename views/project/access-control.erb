@@ -88,7 +88,7 @@ end
                 class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>"
               >
                 <% if editable %>
-                  <% ace_options.each_with_index do | (name, options), index| %>
+                  <% ace_options.each_with_index do |(name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
 
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
