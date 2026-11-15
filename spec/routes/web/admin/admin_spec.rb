@@ -4316,12 +4316,13 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows VM Host Usage filtered by location" do
-    vm_host = create_vm_host(data_center: "FSN1-DC1", total_cores: 48, used_cores: 4, total_hugepages_1g: 375, used_hugepages_1g: 32)
+    vm_host = create_vm_host(data_center: "FSN1-DC1", total_cores: 48, used_cores: 4, total_hugepages_1g: 375, used_hugepages_1g: 32, os_version: "ubuntu-24.04")
     HostProvider.create do
       it.id = vm_host.id
       it.server_identifier = "123"
       it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
     end
+    VmHostInventory.create(server_model: "AX102", uplink: "1Gbps") { it.id = vm_host.id }
     StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 600, vm_host_id: vm_host.id)
     StorageDevice.create(name: "nvme1", total_storage_gib: 500, available_storage_gib: 100, vm_host_id: vm_host.id)
     BootImage.create(name: "ubuntu-jammy", version: "1", vm_host_id: vm_host.id, size_gib: 14)
@@ -4341,7 +4342,7 @@ RSpec.describe CloverAdmin do
 
     click_button "Search"
     headers = page.all(".vm-host-usage-table thead th").map(&:text)
-    expect(headers).to include("location", "provider")
+    expect(headers).to include("location", "provider", "os_version", "server_model", "uplink")
     expect(page.all(".vm-host-usage-table tbody tr").size).to eq 2
     expect(page.find(".vm-host-usage-table caption").text).to eq "VM Hosts (2)"
 
@@ -4350,7 +4351,7 @@ RSpec.describe CloverAdmin do
     row = page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text) }
     expect(row.size).to eq 1
     expect(page.find(".vm-host-usage-table caption").text).to eq "VM Hosts (1)"
-    expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "hetzner", "standard", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
+    expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "hetzner", "standard", "ubuntu-24.04", "AX102", "1Gbps", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
   end
 
   it "filters VM Host Usage by arch, total_cores, state and provider, composing filters" do

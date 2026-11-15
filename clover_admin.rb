@@ -2406,6 +2406,7 @@ class CloverAdmin < Roda
           .left_join(ip4_agg.as(:ip), routed_to_host_id: vmh[:id])
           .left_join(vm_agg.as(:vm), vm_host_id:)
           .left_join(Sequel[:host_provider].as(:hp), id: vmh[:id])
+          .left_join(Sequel[:vm_host_inventory].as(:inv), id: vmh[:id])
           .select(
             vmh[:id],
             Sequel[:location][:name].as(:location),
@@ -2413,6 +2414,9 @@ class CloverAdmin < Roda
             vmh[:data_center],
             Sequel[:hp][:provider_name],
             vmh[:family],
+            vmh[:os_version],
+            Sequel[:inv][:server_model],
+            Sequel[:inv][:uplink],
             Sequel.function(:coalesce, Sequel[:vm][:vm_count], 0).as(:vm_count),
             vmh[:used_cores],
             vmh[:total_cores],
@@ -2442,6 +2446,9 @@ class CloverAdmin < Roda
             datacenter: row[:data_center],
             provider: row[:provider_name],
             family: row[:family],
+            os_version: row[:os_version],
+            server_model: row[:server_model],
+            uplink: row[:uplink],
             vms: row[:vm_count],
             cores: "#{row[:used_cores]} / #{row[:total_cores]}",
             hugepages: "#{row[:used_hugepages_1g]} / #{row[:total_hugepages_1g]}",
