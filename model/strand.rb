@@ -224,6 +224,7 @@ RETURNING *",
   end
 
   POSTGRES_SERVER_WITH_RESOURCE = ->(s) { s.is_a?(PostgresServer) && s.resource }
+  SLOW_RUN_LOG_SECONDS = 10
 
   def unsynchronized_run
     start_time = Time.now
@@ -324,7 +325,6 @@ RETURNING *",
         when Prog::Base::Hop
           hp = prog_action
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: label_duration, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
           to = (hp.new_prog == run_prog) ? hp.new_label.to_s : "#{hp.new_prog}.#{hp.new_label}"
           ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", to:, duration: label_duration)
           top_frame["last_label_changed_at"] = time_string(Time.now)
@@ -338,7 +338,6 @@ RETURNING *",
         when Prog::Base::Exit
           ext = prog_action
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("exited", {strand_exited: {strand: ubid, duration: label_duration, from: prog_label}})
           ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", to: "", duration: label_duration)
 
           self.exitval = ext.exitval
@@ -378,7 +377,7 @@ RETURNING *",
     Thread.current[:strand_run] = outer_strand_run
     duration = Time.now - start_time
     ControlPlaneMetrics.observe_strand_run(prog: run_prog, label: run_label, duration:)
-    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > 1
+    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > SLOW_RUN_LOG_SECONDS
   end
 
   def run(seconds = 0)
