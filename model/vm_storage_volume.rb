@@ -19,6 +19,12 @@ class VmStorageVolume < Sequel::Model
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
 
+  TWO_LAYER_IMAGE_VERSION = "20261108.1.2"
+
+  def two_layer_boot?
+    boot && boot_image&.name&.start_with?("github-") && boot_image.version == TWO_LAYER_IMAGE_VERSION
+  end
+
   def provider_dispatcher_group_name
     vm.location.provider_dispatcher_group_name
   end
