@@ -303,6 +303,10 @@ end
     @frame ||= strand.stack.first.dup.freeze
   end
 
+  def seconds_in_label
+    (changed_at = frame["last_label_changed_at"]) ? Time.now - Time.new(changed_at) : 0
+  end
+
   def retval
     strand.retval
   end
