@@ -8,12 +8,6 @@ class CloudflareClient
     @connection = Excon.new("https://api.cloudflare.com", headers: {"Authorization" => "Bearer #{api_key}"})
   end
 
-  def create_token(name, policies)
-    response = @connection.post(path:, body: {name:, policies:}.to_json, expects: 200)
-    data = JSON.parse(response.body)
-    [data["result"]["id"], data["result"]["value"]]
-  end
-
   def delete_token(token_id)
     @connection.delete(path: "#{path}/#{token_id}", expects: [200, 404]).status
   end
