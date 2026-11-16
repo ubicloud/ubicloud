@@ -187,7 +187,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       sshable = prime(targets: [target])
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit}").and_return("NotStarted")
       command = ["sudo", "-u", "postgres", "psql", "-U", "postgres", "-X", "-d", "dbname='app'", "-t", "--csv", "-v", "ON_ERROR_STOP=1", "-c", target["query"]]
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run #{unit} #{command.shelljoin}", stdin: nil, log: true)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run #{unit} #{command.shelljoin}", stdin: nil, log: :on_error_or_slow)
       expect { nx.wait_table_scan }.to nap(5)
     end
 

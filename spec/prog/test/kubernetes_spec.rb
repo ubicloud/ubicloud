@@ -275,7 +275,7 @@ RSpec.describe Prog::Test::Kubernetes do
         unit_name = "csi_data_write_#{i}"
         bash_cmd = "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
         expected_cmd = "common/bin/daemonizer2 run #{unit_name} #{["bash", "-c", bash_cmd].shelljoin}"
-        expect(sshable).to receive(:_cmd).with(expected_cmd, stdin: nil, log: true)
+        expect(sshable).to receive(:_cmd).with(expected_cmd, stdin: nil, log: :on_error_or_slow)
       end
       expect { kubernetes_test.test_data_write }.to hop("wait_data_write")
     end
