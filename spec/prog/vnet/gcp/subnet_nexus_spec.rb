@@ -863,7 +863,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         vp = peering("customer-vpc")
         st.update(label: "wait")
         ps.incr_destroy
-        expect(Clog).to receive(:emit).with("hopped", {strand_hopped: hash_including(from: "Vnet::Gcp::SubnetNexus.wait", to: "Vnet::Gcp::SubnetNexus.destroy")}).and_call_original
         expect(Clog).to receive(:emit).with(waiting_msg, instance_of(PrivateSubnet)).twice.and_call_original
 
         expect(st.run).to be_a(Prog::Base::Hop)

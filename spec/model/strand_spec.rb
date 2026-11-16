@@ -289,9 +289,9 @@ RSpec.describe Strand do
     now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now - 11)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
     expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
-    expect { st.unsynchronized_run }.to change { control_plane_metric(:strand_run_duration_seconds, prog: "Test", label: "napper").fetch("sum") }.by(a_value_within(0.001).of(10))
+    expect { st.unsynchronized_run }.to change { control_plane_metric(:strand_run_duration_seconds, prog: "Test", label: "napper").fetch("sum") }.by(a_value_within(0.001).of(11))
   end
 end
