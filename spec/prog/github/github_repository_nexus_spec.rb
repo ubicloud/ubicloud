@@ -468,11 +468,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(cloudflare_client).to receive(:delete_token).with("access-key")
       new_bucket_name = "#{repository.ubid}-enam"
       expect(blob_storage_client).to receive(:create_bucket).with({bucket: new_bucket_name, create_bucket_configuration: {location_constraint: "enam"}})
-      expect(cloudflare_client).to receive(:create_token).with("#{new_bucket_name}-token", instance_of(Array)).and_return(["new-key", "new-secret"])
       expect { nx.recreate_blob_storage }.to hop("wait")
       repository.reload
       expect(repository.bucket_name).to eq(new_bucket_name)
-      expect(repository.access_key).to eq("new-key")
+      expect(repository.access_key).to eq(GithubRepository::TEMPORARY_CREDENTIALS)
       expect(Semaphore.where(strand_id: repository.id, name: "reset_blob_storage").count).to eq(0)
     end
 

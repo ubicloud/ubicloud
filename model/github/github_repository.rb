@@ -135,30 +135,18 @@ class GithubRepository < Sequel::Model
   end
 
   def self.create_bucket(bucket_name, rescue_bucket_already_owned: true, location: nil)
-    begin
-      admin_client.create_bucket({
-        bucket: bucket_name,
-        create_bucket_configuration: {location_constraint: location || Config.github_cache_blob_storage_region},
-      })
-    rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
-      raise unless rescue_bucket_already_owned
-    end
-
-    policies = [
-      {
-        "effect" => "allow",
-        "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-        "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
-      },
-    ]
-
-    CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
+    admin_client.create_bucket({
+      bucket: bucket_name,
+      create_bucket_configuration: {location_constraint: location || Config.github_cache_blob_storage_region},
+    })
+  rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+    raise unless rescue_bucket_already_owned
   end
 
   def setup_blob_storage
     DB.transaction do
       lock!(:no_key_update)
-      return if access_key && secret_key
+      return if access_key
 
       unless (location = installation.preferred_cache_location)
         ds = DB[:github_repository_bucket_pool]
@@ -179,8 +167,8 @@ class GithubRepository < Sequel::Model
         Prog::Github::MaintainRepositoryBucketPool.schedule_strand
       else
         new_bucket_name = location ? "#{bucket_name}-#{location}" : bucket_name
-        token_id, token = self.class.create_bucket(new_bucket_name, location:)
-        update(bucket_name: new_bucket_name, access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+        self.class.create_bucket(new_bucket_name, location:)
+        update(bucket_name: new_bucket_name, access_key: TEMPORARY_CREDENTIALS)
         Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
       end
     end

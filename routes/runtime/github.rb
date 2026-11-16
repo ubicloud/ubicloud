@@ -95,12 +95,7 @@ class Clover
 
         # reserveCache
         r.post do
-          begin
-            repository.setup_blob_storage unless repository.access_key
-          rescue Excon::Error::HTTPStatus, Excon::Error::Timeout => ex
-            Clog.emit("Unable to setup blob storage", {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}})
-            fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
-          end
+          repository.setup_blob_storage unless repository.access_key
 
           key, version = typecast_params.nonempty_str!(%w[key version].freeze)
           size = typecast_params.pos_int("cacheSize")
@@ -124,11 +119,7 @@ class Clover
           bucket = repository.bucket_name
           blob_storage_client = repository.blob_storage_client
 
-          # Token creation on Cloudflare R2 takes time to propagate. Since that point is the
-          # first time we use the credentials, we are waiting it to be propagated. Note that,
-          # credential propagation will happen only while the bucket and token are being created
-          # initially. So, the retry block expected to run only while saving the first cache
-          # entry for a repository.
+          # A just-created bucket may not be usable yet, so retry the first R2 call a few times.
           retries = 0
           begin
             upload_id = blob_storage_client.create_multipart_upload(bucket:, key: blob_key).upload_id

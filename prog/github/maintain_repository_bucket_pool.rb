@@ -26,8 +26,8 @@ class Prog::Github::MaintainRepositoryBucketPool < Prog::Base
   label def create_bucket
     ubid = UBID.generate("et")
     bucket_name = ubid.to_s
-    token_id, token = GithubRepository.create_bucket(bucket_name, rescue_bucket_already_owned: false)
-    GithubRepositoryBucketPool.create_with_id(ubid.to_uuid, access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+    GithubRepository.create_bucket(bucket_name, rescue_bucket_already_owned: false)
+    GithubRepositoryBucketPool.create_with_id(ubid.to_uuid, access_key: GithubRepository::TEMPORARY_CREDENTIALS, secret_key: GithubRepository::TEMPORARY_CREDENTIALS)
     Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
     self.last_bucket_created = now
     nap_hop(MIN_WAIT_BETWEEN_BUCKETS_SECONDS, :wait)

@@ -217,22 +217,15 @@ RSpec.describe GithubRepository do
   describe ".setup_blob_storage" do
     before { github_repository.update(access_key: nil, secret_key: nil) }
 
-    it "creates a bucket and token" do
+    it "creates a bucket that uses temporary credentials" do
       bucket_name = github_repository.bucket_name
-      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
+      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur")
       expect(blob_storage_client).to receive(:create_bucket).with({bucket: bucket_name, create_bucket_configuration: {location_constraint: "weur"}})
-      expected_policy = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"},
-        },
-      ]
-      expect(cloudflare_client).to receive(:create_token).with("#{bucket_name}-token", expected_policy).and_return(["test-key", "test-secret"])
+      expect(CloudflareClient).not_to receive(:new)
       expect(Clog).to receive(:emit).with("Blob storage setup completed", instance_of(Hash)).and_return({blob_storage_setup_completed: {bucket_name:}})
       github_repository.setup_blob_storage
-      expect(github_repository.reload.access_key).to eq("test-key")
-      expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository.reload.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
+      expect(github_repository.secret_key).to be_nil
     end
 
     it "uses a precreated bucket if one is available" do
@@ -240,7 +233,6 @@ RSpec.describe GithubRepository do
       other_bucket = GithubRepositoryBucketPool.create(access_key: "other-key", secret_key: "other-secret")
       st = Strand.create(id: Prog::Github::MaintainRepositoryBucketPool::STRAND_ID, prog: "Github::MaintainRepositoryBuckets", label: "wait", schedule: Time.now + 60 * 60)
       expect(blob_storage_client).not_to receive(:create_bucket)
-      expect(cloudflare_client).not_to receive(:create_token)
 
       expect { github_repository.setup_blob_storage }.to change(GithubRepositoryBucketPool, :count).from(2).to(1)
       remaining_bucket = GithubRepositoryBucketPool.first
@@ -256,41 +248,38 @@ RSpec.describe GithubRepository do
       github_repository.installation.update(allocator_preferences: {"location_filter" => [Location::LEASEWEB_WDC02_ID]})
       GithubRepositoryBucketPool.create(access_key: "precreated-key", secret_key: Digest::SHA256.hexdigest("precreated-secret"))
       bucket_name = "#{github_repository.ubid}-enam"
-      expect(Config).to receive(:github_cache_blob_storage_account_id).and_return("123")
       expect(blob_storage_client).to receive(:create_bucket).with({bucket: bucket_name, create_bucket_configuration: {location_constraint: "enam"}})
-      expected_policy = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"},
-        },
-      ]
-      expect(cloudflare_client).to receive(:create_token).with("#{bucket_name}-token", expected_policy).and_return(["test-key", "test-secret"])
       github_repository.setup_blob_storage
       github_repository.reload
       expect(github_repository.bucket_name).to eq(bucket_name)
-      expect(github_repository.access_key).to eq("test-key")
-      expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
+      expect(github_repository.secret_key).to be_nil
       expect(GithubRepositoryBucketPool.count).to eq(1)
     end
 
-    it "prefixes the bucket and token names with e2e in e2e runs" do
+    it "prefixes the bucket name with e2e in e2e runs" do
       allow(Config).to receive(:is_e2e).and_return(true)
       expect(blob_storage_client).to receive(:create_bucket).with(hash_including(bucket: "e2e-#{github_repository.ubid}"))
-      expect(cloudflare_client).to receive(:create_token).with("e2e-#{github_repository.ubid}-token", instance_of(Array)).and_return(["test-key", "test-secret"])
       github_repository.setup_blob_storage
-      expect(github_repository.reload.access_key).to eq("test-key")
+      expect(github_repository.reload.bucket_name).to eq("e2e-#{github_repository.ubid}")
     end
 
     it "succeeds if the bucket already exists and access key does not exist" do
-      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
+      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur")
       expect(blob_storage_client).to receive(:create_bucket).and_raise(Aws::S3::Errors::BucketAlreadyOwnedByYou.new(nil, nil))
-      expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
       github_repository.setup_blob_storage
-      expect(github_repository.reload.access_key).to eq("test-key")
+      expect(github_repository.reload.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
     end
 
-    it "succeeds if the access and secret key already exist" do
+    it "does nothing if the repository already uses temporary credentials" do
+      github_repository.update(access_key: described_class::TEMPORARY_CREDENTIALS)
+      GithubRepositoryBucketPool.create(access_key: described_class::TEMPORARY_CREDENTIALS, secret_key: described_class::TEMPORARY_CREDENTIALS)
+      github_repository.setup_blob_storage
+      expect(github_repository.reload.access_key).to eq(described_class::TEMPORARY_CREDENTIALS)
+      expect(GithubRepositoryBucketPool.count).to eq(1)
+    end
+
+    it "does nothing if the repository already has a token" do
       github_repository.update(access_key: "existing-key", secret_key: Digest::SHA256.hexdigest("existing-secret"))
       github_repository.setup_blob_storage
       expect(github_repository.reload.access_key).to eq("existing-key")
