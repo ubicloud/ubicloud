@@ -24,10 +24,6 @@ class MonitorableResource
     end
   end
 
-  def num_attached_resources
-    @attached_resources&.size || 0
-  end
-
   def reading
     @pulse[:reading].to_s
   end

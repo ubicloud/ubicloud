@@ -113,7 +113,7 @@ lines.each_value(&:uniq!).each_value { it.sort_by!(&:inspect) }
   end
 end
 
-unless lines[:other].flat_map(&:keys).uniq.sort == ["message", "monitor_metrics"]
+if lines[:other]
   warn "unexpected other lines: #{lines[:other]}"
   exit 1
 end
