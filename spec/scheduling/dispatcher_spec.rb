@@ -356,7 +356,7 @@ RSpec.describe Scheduling::Dispatcher do
       control_plane_metric(:respirate_strand_delay_seconds, stage:).fetch("sum")
     end
 
-    it "records each complete strand dispatch and emits metrics every 200 entries" do
+    it "records each complete strand dispatch and updates scheduling metrics every 200 entries" do
       t = Time.now
       metric = Strand::RespirateMetrics.new(t, t + 1, t + 2, t + 3, true, 4, 5)
       incomplete = Strand::RespirateMetrics.new(t, t + 1)
@@ -365,7 +365,7 @@ RSpec.describe Scheduling::Dispatcher do
       n.times { q.push metric }
       q.push incomplete
       q.push nil
-      expect(Clog).to receive(:emit).with("respirate metrics", instance_of(Hash)).and_call_original
+      expect(Clog).not_to receive(:emit)
       expect { di.metrics_thread(q) }
         .to change { delay_sum("scan") }.by(a_value_within(0.001).of(n))
         .and change { delay_sum("queue") }.by(a_value_within(0.001).of(n))

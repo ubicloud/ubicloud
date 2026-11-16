@@ -249,9 +249,9 @@ class Scheduling::Dispatcher
     end
   end
 
-  # Thread responsible for collecting and emitting metrics. This emits after every
-  # 1000 strand runs, as that allows easy calculations of the related metrics and is
-  # not too to burdensome on the logging infrastructure, while still being helpful.
+  # Thread responsible for collecting metrics. Each strand run is recorded in
+  # ControlPlaneMetrics, and every METRICS_EVERY strand runs the dispatcher updates the
+  # strand rate and delay it uses for scheduling.
   def metrics_thread(metrics_queue)
     array = []
     t = Time.now
@@ -272,7 +272,7 @@ class Scheduling::Dispatcher
       array << metric
       if array.size == METRICS_EVERY
         new_t = Time.now
-        Clog.emit("respirate metrics", {respirate_metrics: metrics_hash(array, new_t - t)})
+        metrics_hash(array, new_t - t)
         ControlPlaneMetrics.set_respirate_current_strand_delay(@current_strand_delay)
         t = new_t
         array.clear
