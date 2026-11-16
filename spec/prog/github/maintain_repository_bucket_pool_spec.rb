@@ -50,8 +50,8 @@ RSpec.describe Prog::Github::MaintainRepositoryBucketPool do
   end
 
   describe "#create_bucket" do
-    it "creates a bucket and token, records them, and hops to wait" do
-      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
+    it "creates a bucket that uses temporary credentials, records it, and hops to wait" do
+      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur")
       blob_storage_client = instance_double(Aws::S3::Client)
       expect(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
       bucket_name = nil
@@ -59,19 +59,7 @@ RSpec.describe Prog::Github::MaintainRepositoryBucketPool do
         bucket_name = args[:bucket]
         expect(args).to eq({bucket: bucket_name, create_bucket_configuration: {location_constraint: "weur"}})
       end
-      cloudflare_client = instance_double(CloudflareClient)
-      expect(CloudflareClient).to receive(:new).and_return(cloudflare_client)
-      expect(cloudflare_client).to receive(:create_token) do |name, policies|
-        expect(name).to eq "#{bucket_name}-token"
-        expect(policies).to eq [
-          {
-            "effect" => "allow",
-            "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-            "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"},
-          },
-        ]
-        ["test-key", "test-secret"]
-      end
+      expect(CloudflareClient).not_to receive(:new)
       refresh_frame(prog, new_values: {"last_bucket_created" => 0})
 
       expect { prog.create_bucket }.to hop("wait", nap: described_class::MIN_WAIT_BETWEEN_BUCKETS_SECONDS)
@@ -80,16 +68,15 @@ RSpec.describe Prog::Github::MaintainRepositoryBucketPool do
       bucket = GithubRepositoryBucketPool.first
       expect(bucket.ubid).to eq bucket_name
       expect(bucket_name).to start_with("et")
-      expect(bucket.access_key).to eq "test-key"
-      expect(bucket.secret_key).to eq Digest::SHA256.hexdigest("test-secret")
+      expect(bucket.access_key).to eq GithubRepository::TEMPORARY_CREDENTIALS
+      expect(bucket.secret_key).to eq GithubRepository::TEMPORARY_CREDENTIALS
       expect(prog.strand.stack[0]["last_bucket_created"]).to be_within(5).of(Time.now.to_i)
     end
 
-    it "raises without creating a token if the bucket already exists" do
+    it "raises without recording the bucket if it already exists" do
       blob_storage_client = instance_double(Aws::S3::Client)
       expect(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
       expect(blob_storage_client).to receive(:create_bucket).and_raise(Aws::S3::Errors::BucketAlreadyOwnedByYou.new(nil, nil))
-      expect(CloudflareClient).not_to receive(:new)
 
       expect { prog.create_bucket }.to raise_error(Aws::S3::Errors::BucketAlreadyOwnedByYou)
       expect(GithubRepositoryBucketPool.count).to eq 0
