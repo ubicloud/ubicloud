@@ -13,6 +13,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   frame_accessor :boot_bug_checked, :vm_family, :concurrency_limited
 
+  HELD_RUNNER_SECONDS = 5
+
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
@@ -246,6 +248,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   def observe_duration(stage, duration)
     github_runner.observe_duration(stage, duration, concurrency_limited: !!concurrency_limited)
+  end
+
+  def admission_log_fields
+    {installation_ubid: installation.ubid, installation_name: installation.name, repository_name: github_runner.repository_name, label: github_runner.label}
+  end
+
+  def log_admitted_after_waiting(admission)
+    return if (waited = seconds_in_label) < HELD_RUNNER_SECONDS
+    Clog.emit("runner admitted after waiting", {runner_admitted: {**admission_log_fields, admission:, waited: waited.round(1)}})
   end
 
   def log_registered
@@ -494,9 +505,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   label def wait_concurrency_limit
     # An operator can set the spill over semaphore by hand to override the checks below.
-    hop_allocate_vm if spill_over_set? && alien_allowed?
+    if spill_over_set? && alien_allowed?
+      log_admitted_after_waiting("spill_over_override")
+      hop_allocate_vm
+    end
 
     if quota_available?
+      log_admitted_after_waiting("quota_available")
       hop_apply_custom_label_quota if github_runner.custom_label
       hop_wait_allocation_slot
     end
@@ -505,13 +520,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if project.reputation == "limited"
       ControlPlaneMetrics.count_runner_admission(decision: "limited_reputation")
-      Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      Clog.emit("not allowed because of limited reputation", {limited_reputation: admission_log_fields}) if seconds_in_label < HELD_RUNNER_SECONDS
       nap rand(5..15)
     end
 
     if project.get_ff_hard_runner_concurrency_limit
       ControlPlaneMetrics.count_runner_admission(decision: "hard_concurrency_limit")
-      Clog.emit("not allowed because of hard concurrency limit", {hard_concurrency_limit: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      Clog.emit("not allowed because of hard concurrency limit", {hard_concurrency_limit: admission_log_fields}) if seconds_in_label < HELD_RUNNER_SECONDS
       nap rand(5..15)
     end
 
@@ -553,13 +568,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         end
 
         ControlPlaneMetrics.count_runner_admission(decision: "spilled_over")
+        log_admitted_after_waiting("spilled_over")
         Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
         github_runner.incr_spill_over
         hop_allocate_vm
       end
 
       ControlPlaneMetrics.count_runner_admission(decision: "high_utilization")
-      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
@@ -567,7 +582,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.incr_not_upgrade_premium
     end
     ControlPlaneMetrics.count_runner_admission(decision: "low_utilization")
-    Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
+    log_admitted_after_waiting("low_utilization")
 
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_wait_allocation_slot
