@@ -548,6 +548,7 @@ DHCP
 all-servers
 server=8.8.8.8
 server=1.1.1.1
+server=/github.com/8.8.8.8
 dhcp-option=6,#{dns_ipv4}
 listen-address=#{dns_ipv4}
 dhcp-option=54,#{dns_ipv4}
@@ -558,15 +559,16 @@ dhcp-option=54,#{dns_ipv4}
       # family or either provider.  The IPv4 upstream is reachable only
       # through the port-53 SNAT to the VM's public IPv4 (see
       # generate_nat4_rules), so IPv4-less VMs list two IPv6 upstreams.
-      dns_servers = if ip4.nil? || ip4.empty?
-        ["2001:4860:4860::8888", "2606:4700:4700::1111"]
+      dns_servers, github_dns_servers = if ip4.nil? || ip4.empty?
+        [["2001:4860:4860::8888", "2606:4700:4700::1111"], ["2001:4860:4860::8888"]]
       else
-        ["8.8.8.8", "2606:4700:4700::1111"]
+        [["8.8.8.8", "2606:4700:4700::1111"], ["8.8.8.8", "2001:4860:4860::8888"]]
       end
       <<~IP4_CONFIG
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 all-servers
 #{dns_servers.map { "server=#{_1}" }.join("\n")}
+#{github_dns_servers.map { "server=/github.com/#{_1}" }.join("\n")}
 dhcp-option=6,#{dns_ipv4}
 listen-address=#{dns_ipv4}
 dhcp-option=54,#{dns_ipv4}
