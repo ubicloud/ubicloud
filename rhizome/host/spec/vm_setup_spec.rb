@@ -295,7 +295,7 @@ RSpec.describe VmSetup do
     it "queries one upstream per family when the VM has a public IPv4" do
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false, ip4: "123.123.123.123/32")
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
-      expect(dnsmasq_conf).to include("all-servers\nserver=8.8.8.8\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).to include("all-servers\nserver=8.8.8.8\nserver=2606:4700:4700::1111\nserver=/github.com/8.8.8.8\nserver=/github.com/2001:4860:4860::8888\ndhcp-option")
       expect(dnsmasq_conf).not_to include("strict-order")
       expect(dnsmasq_conf).not_to include("server=2001:4860:4860::8888")
       expect(dnsmasq_conf).not_to include("server=1.1.1.1")
@@ -304,14 +304,14 @@ RSpec.describe VmSetup do
     it "queries two IPv6 upstreams when the VM has no public IPv4" do
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false, ip4: "")
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
-      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111\nserver=/github.com/2001:4860:4860::8888\ndhcp-option")
       expect(dnsmasq_conf).not_to include("server=8.8.8.8")
     end
 
     it "queries two IPv6 upstreams when the ip4 kwarg is omitted" do
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
-      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111\nserver=/github.com/2001:4860:4860::8888\ndhcp-option")
       expect(dnsmasq_conf).not_to include("server=8.8.8.8")
     end
   end
@@ -1449,6 +1449,7 @@ NFTABLES_CONF
         all-servers
         server=8.8.8.8
         server=1.1.1.1
+        server=/github.com/8.8.8.8
         dhcp-option=6,10.0.0.2
         listen-address=10.0.0.2
         dhcp-option=54,10.0.0.2
