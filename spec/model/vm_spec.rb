@@ -442,6 +442,29 @@ RSpec.describe Vm do
       expect(volumes[1]["track_written"]).to be(true)
     end
 
+    it "splits a two-layer github boot volume into a read-only image disk and a blank writable disk" do
+      boot_image.update(name: "github-ubuntu-2604-x64", version: VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
+
+      volumes = vm.storage_volumes
+      expect(volumes.size).to eq(3)
+
+      image_disk = volumes[0]
+      expect(image_disk["image"]).to eq("github-ubuntu-2604-x64")
+      expect(image_disk["size_gib"]).to eq(0)
+      expect(image_disk["read_only"]).to be(true)
+      expect(image_disk["encrypted"]).to be(false)
+
+      writable_disk = volumes[1]
+      expect(writable_disk["image"]).to be_nil
+      expect(writable_disk["image_version"]).to be_nil
+      expect(writable_disk["size_gib"]).to eq(1)
+      expect(writable_disk["read_only"]).to be(false)
+      expect(writable_disk["encrypted"]).to be(true)
+
+      # the non-boot data disk is emitted unchanged
+      expect(volumes[2]["disk_index"]).to eq(1)
+    end
+
     it "adds archive_source when volume has machine_image_version_id" do
       project_id = Project.create(name: "test").id
       store = MachineImageStore.create(
