@@ -215,4 +215,40 @@ RSpec.describe VmStorageVolume do
       expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon only supported for vm storage volumes with vhost block backend")
     end
   end
+
+  describe "#two_layer_boot?" do
+    def volume_with_image(boot:, name:, version:)
+      v = described_class.new(boot:)
+      image = (name || version) ? instance_double(BootImage, name:, version:) : nil
+      allow(v).to receive(:boot_image).and_return(image)
+      v
+    end
+
+    it "is true for a boot github image pinned to the two-layer version" do
+      v = volume_with_image(boot: true, name: "github-ubuntu-2604-x64", version: "20261108.1.2")
+      expect(v.two_layer_boot?).to be true
+    end
+
+    it "is false for any other image version" do
+      older = volume_with_image(boot: true, name: "github-ubuntu-2604-x64", version: "20261021.1.0")
+      newer = volume_with_image(boot: true, name: "github-ubuntu-2604-x64", version: "20261201.1.0")
+      expect(older.two_layer_boot?).to be false
+      expect(newer.two_layer_boot?).to be false
+    end
+
+    it "is false for non-github images" do
+      v = volume_with_image(boot: true, name: "ubuntu-noble", version: "20261108.1.2")
+      expect(v.two_layer_boot?).to be false
+    end
+
+    it "is false for a non-boot volume" do
+      v = volume_with_image(boot: false, name: "github-ubuntu-2604-x64", version: "20261108.1.2")
+      expect(v.two_layer_boot?).to be false
+    end
+
+    it "is false when there is no boot image" do
+      v = volume_with_image(boot: true, name: nil, version: nil)
+      expect(v).not_to be_two_layer_boot
+    end
+  end
 end

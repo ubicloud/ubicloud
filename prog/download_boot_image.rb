@@ -169,30 +169,36 @@ class Prog::DownloadBootImage < Prog::Base
       "x64" => {
         "20261021.1.0" => "6fffd2f7c365f4bcd788860670ce2d0ba50e7bcf76d6303da3375c2486d659a3",
         "20261105.1.0" => "1bf1de7fbb1c45f91b701543c081d64947a29299e566b982bcb7eb6773a4f598",
+        "20261108.1.2" => "9ac7bdc61057e372c698a45e9fcf2ccbb7987b998920273c9eab822d5db1a0f2", # Two layer runner test boot image
       },
       "arm64" => {
         "20261021.1.0" => "91815f08bb49a98f8981cec03ff5581337e58f32a6b269397693455f8bf4aa73",
         "20261105.1.0" => "180bab0df01feb9d2059393a5c636dc420b9732a7153cddec24d981ec6fd9709",
+        "20261108.1.2" => "f0fd3027dfe4dc614ae663f460ea414f23a84628fb25c767694948bc99ab630a", # Two layer runner test boot image
       },
     },
     "github-ubuntu-2404" => {
       "x64" => {
         "20261021.1.0" => "9c0c39e384b4b54cc377920be2c4b291204aae1599f8c756ae33f6124da29689",
         "20261105.1.0" => "d6e86dd9011f0057b712721ceb289ffe6ab1be14082faa2794f62bd1840f656b",
+        "20261108.1.2" => "a4635061ebc7c4ff5d25dae8603dc619b88e1e2ccf170291bdc8b61fef30c9e2", # Two layer runner test boot image
       },
       "arm64" => {
         "20261021.1.0" => "e3113fac8df5eb508c5af08380c51575404e9df75820d304cf0c9171d8e5364d",
         "20261105.1.0" => "714251c5f8fd9a3d44a72b20d891825d144065c7c104eeaf46f62c34be4c44b2",
+        "20261108.1.2" => "6b6bc29079d51200d84f55a8ebd3471af8c88fa70cc020de2f53944c954fddad", # Two layer runner test boot image
       },
     },
     "github-ubuntu-2204" => {
       "x64" => {
         "20261021.1.0" => "3463b55b3766f81466f36fc947662ec3cf6cfb8be6c34b41ffe3af881994c0f2",
         "20261105.1.0" => "9a9120ba2ff04fe50740b93639d2f19634945354188a25d8140c380d39ad68f3",
+        "20261108.1.2" => "6b418a6bc3ccc493f39d6d93569d81c2a49892f2021cfdd03bbf9301a3dfc5d0", # Two layer runner test boot image
       },
       "arm64" => {
         "20261021.1.0" => "66b9b343f2258f1619c2409b8fc3d3836add8b8e75b91d3a6b4e649a5efbc675",
         "20261105.1.0" => "c65af7b04fc6498f2476393081aed7ce02895fd4ce6d81e18ccebf2b508c3b89",
+        "20261108.1.2" => "b0c5a45b2b3ae8cd6c861d7ef91b0f34c4ff7adf6f13d88a40b1d8ab28edc4f7", # Two layer runner test boot image
       },
     },
     "postgres-ubuntu-2204" => {
