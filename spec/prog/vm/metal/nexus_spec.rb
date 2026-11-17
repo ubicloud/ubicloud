@@ -1950,7 +1950,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#log_vm_stats" do
     it "logs stats" do
       expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("{\"stats\": \"stats\"}")
-      expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats"})
+      expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats", "image_name" => "ubuntu-jammy", "image_version" => nil})
+      nx.log_vm_stats
+    end
+
+    it "includes the boot image version when the boot volume has one" do
+      bi = BootImage.create(name: "github-ubuntu-2604", version: "20261108.1.2", size_gib: 15, vm_host_id: vm_host.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, boot_image_id: bi.id)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("{\"stats\": \"stats\"}")
+      expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats", "image_name" => "ubuntu-jammy", "image_version" => "20261108.1.2"})
       nx.log_vm_stats
     end
 
