@@ -450,6 +450,64 @@ RSpec.describe "Web UI JavaScript" do # rubocop:disable RSpec/DescribeClass
       expect(page).to have_no_css("#cache_enabled_toggle .active")
       expect(page).to have_css("#cache_enabled_toggle button")
     end
+
+    describe "runner metrics charts" do
+      let(:chart_windows) { Queue.new }
+
+      before do
+        project.set_ff_github_runner_metrics(true)
+        windows = chart_windows
+        client = Object.new
+        client.define_singleton_method(:query_range) do |query:, start_ts:, end_ts:|
+          windows << [start_ts, end_ts]
+          []
+        end
+        allow(VictoriaMetricsResource).to receive(:client_for_project).and_return(client)
+      end
+
+      # Each chart refresh queries every series of every chart over one window.
+      def chart_window
+        count = Metrics::GITHUB_RUNNER_METRICS.sum { |_, metric| metric.series.size }
+        windows = Array.new(count) { chart_windows.pop(timeout: 5) }.uniq
+        expect(windows.size).to eq 1
+        windows.first
+      end
+
+      it "bounds a completed job's charts to the job, offering only time ranges that fit in it" do
+        repository_id = GithubRepository.create(name: "test-org/repo", installation_id: installation.id).id
+        installation_id = installation.id
+        create_date = Time.now.utc.to_date
+        GithubCompletedWorkflowRun.create_partition(create_date) unless GithubCompletedWorkflowRun.partition_days.include?(create_date)
+        GithubCompletedWorkflowJob.create_partition(create_date) unless GithubCompletedWorkflowJob.partition_days.include?(create_date)
+        started_at = Time.at(Time.now.to_i - 1200)
+        completed_at = started_at + 900
+        GithubCompletedWorkflowRun.insert(repository_id:, run_id: 1005, run_attempt: 1, create_date:, installation_id:, created_at: started_at, run_started_at: started_at, completed_at:, event: "push", status: "completed", conclusion: "success", display_title: "Build", actor_login: "octocat", duration: 900)
+        GithubCompletedWorkflowJob.insert(repository_id:, job_id: 20, workflow_run_create_date: create_date, installation_id:, runner_id: GithubRunner.generate_uuid, runner_vm_id: Vm.generate_uuid, completed_at:, run_id: 1005, run_attempt: 1, workflow_name: "CI", job_name: "build", job_created_at: started_at, job_started_at: started_at, job_completed_at: completed_at, ready_at: started_at, status: "completed", conclusion: "success", label: "ubicloud", actual_label: "ubicloud", billed_vm_size: "standard-2", vm_family: "standard", duration: 900)
+
+        visit "#{project.path}/github/#{installation.ubid}/repository/#{UBID.to_ubid(repository_id)}/run/#{create_date}/1005/1/20/charts"
+        expect(page).to have_select("time-range", options: ["Whole job", "Last 5 minutes", "Last 15 minutes"], selected: "Whole job")
+        expect(chart_window).to eq [started_at.to_i - 60, completed_at.to_i + 60]
+
+        select "Last 5 minutes", from: "time-range"
+        expect(chart_window).to eq [completed_at.to_i + 60 - 300, completed_at.to_i + 60]
+      end
+
+      it "bounds a runner's charts to the time since its job started" do
+        job_started_at = Time.at(Time.now.to_i - 600)
+        vm = create_vm(project_id: project.id)
+        runner = GithubRunner.create(installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id, repository_name: "test-org/repo", label: "ubicloud", job_started_at:)
+
+        visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+        expect(page).to have_select("time-range", options: ["Since the job started", "Last 5 minutes"], selected: "Since the job started")
+        start_ts, end_ts = chart_window
+        expect(start_ts).to eq job_started_at.to_i - 60
+        expect(end_ts).to be_within(5).of(Time.now.to_i)
+
+        select "Last 5 minutes", from: "time-range"
+        start_ts, end_ts = chart_window
+        expect(end_ts - start_ts).to eq 300
+      end
+    end
   end
 
   describe "resource creation form" do

@@ -293,9 +293,24 @@ class Clover
               view "github/run"
             end
 
-            r.get Integer do |job_id|
+            r.on Integer do |job_id|
               next unless (@job = @run.completed_workflow_jobs_dataset.first(job_id:))
-              view "github/job"
+
+              r.get true do
+                @page = "overview"
+                view "github/job"
+              end
+
+              r.on @project.get_ff_github_runner_metrics do
+                r.get "charts" do
+                  @page = "charts"
+                  view "github/job"
+                end
+
+                r.get "metrics", r.accepts_json? do
+                  metrics_response(Metrics::GITHUB_RUNNER_METRICS, UBID.to_ubid(@job.runner_id), GithubRunner.victoria_metrics_client)
+                end
+              end
             end
           end
 
