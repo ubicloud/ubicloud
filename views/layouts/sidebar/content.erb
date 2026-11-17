@@ -19,6 +19,14 @@
             ) %>
             <%== part(
               "layouts/sidebar/item",
+              name: "GitHub Runners",
+              url: "#{@project.path}/github",
+              is_active: request.path.start_with?("#{@project.path}/github"),
+              icon: "github",
+              has_permission: Config.github_app_name && has_project_permission("Project:github")
+            ) %>
+            <%== part(
+              "layouts/sidebar/item",
               name: "Compute",
               url: "#{@project.path}/vm",
               is_active: request.path.start_with?("#{@project.path}/vm"),
@@ -152,23 +160,6 @@
                 has_permission: true
               ) %>
             <% end %>
-          </ul>
-        </li>
-      <% end %>
-
-      <% if @project_permissions && has_project_permission("Project:github") && Config.github_app_name %>
-        <li>
-          <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
-
-          <ul role="list" class="-mx-2 mt-2 space-y-1">
-            <%== part(
-              "layouts/sidebar/item",
-              name: "GitHub Runners",
-              url: "#{@project.path}/github",
-              is_active: request.path.start_with?("#{@project.path}/github"),
-              icon: "github",
-              has_permission: has_project_permission("Project:github")
-            ) %>
           </ul>
         </li>
       <% end %>
