@@ -4,13 +4,20 @@ require "netaddr"
 require "sequel/core"
 require_relative "config"
 require_relative "lib/util"
+
 connect_opts_proc = nil
+database_url = if (process_type = ENV["PROCESS_TYPE"])
+  Config.send(:"clover_database_url_#{process_type}")
+else
+  Config.clover_database_url
+end
+
 if Config.clover_database_rds_iam_auth_enabled
   require "pg/aws_rds_iam"
   driver_options = {aws_rds_iam_auth_token_generator: "default"}
 elsif Config.clover_database_gcp_iam_auth_enabled
   require_relative "lib/gcp_database_auth"   # loaded only on the GCP path
-  role = GcpDatabaseAuth.url_user(Config.clover_database_url)
+  role = GcpDatabaseAuth.url_user(database_url)
   connect_opts_proc = GcpDatabaseAuth.connect_opts_proc(role => Config.clover_database_gcp_clover_login_sa)
   driver_options = {}
 else
@@ -22,7 +29,7 @@ Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs
 
 if ENV["SHARED_CONNECTION"] == "1"
   max_connections = 1
-elsif (process_type = ENV["PROCESS_TYPE"])
+elsif process_type
   max_connections = Config.send(:"db_pool_#{process_type}") - 1
   pool_timeout = Config.send(:"database_timeout_#{process_type}")
 end
@@ -31,7 +38,7 @@ max_connections ||= Config.db_pool - 1
 pool_timeout ||= Config.database_timeout
 
 pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
-DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:, connect_opts_proc:)
+DB = Sequel.connect(database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:, connect_opts_proc:)
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)
