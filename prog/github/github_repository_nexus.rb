@@ -235,24 +235,31 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   label def destroy
     decr_destroy
+    hop_wait_runs_jobs_finished
+  end
 
+  label def wait_runs_jobs_finished
+    nap_if_runs_or_jobs
     register_deadline(nil, cache_entry_deletion_budget, message: "finish destroying")
     hop_destroy_cache_entries
   end
 
   label def destroy_cache_entries
-    unless github_repository.runners_dataset.empty? && github_repository.active_workflow_runs_dataset.empty?
-      Clog.emit("Cannot destroy repository with active runners or workflow runs", {not_destroyed_repository: {repository_name: github_repository.name}})
-      start_transaction { nap 2 * 60 }
-    end
-
     destroy_next_cache_entry_and_nap
+    nap_if_runs_or_jobs
     github_repository.destroy_blob_storage if github_repository.access_key
 
     start_transaction do
       github_repository.active_billing_record&.finalize
       github_repository.destroy
       pop "github repository destroyed"
+    end
+  end
+
+  def nap_if_runs_or_jobs
+    unless github_repository.runners_dataset.empty? && github_repository.active_workflow_runs_dataset.empty?
+      Clog.emit("Cannot destroy repository with active runners or workflow runs", {not_destroyed_repository: {repository_name: github_repository.name}})
+      nap 2 * 60
     end
   end
 
