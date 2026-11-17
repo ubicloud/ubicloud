@@ -549,6 +549,17 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
+  describe "#transaction_around_run?" do
+    it "is false for the wait label" do
+      runner.strand.update(label: "wait")
+      expect(nx.transaction_around_run?).to be false
+    end
+
+    it "is true for other labels" do
+      expect(nx.transaction_around_run?).to be true
+    end
+  end
+
   describe "#start" do
     it "hops to wait_concurrency_limit if there is no capacity" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
@@ -1704,6 +1715,46 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND).and_return("running")
 
       expect { nx.wait }.to nap(60)
+    end
+
+    it "runs the SSH check outside a transaction when run through the strand" do
+      runner.strand.update(label: "wait")
+      transaction_started = false
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        transaction_started = true if kwargs == {savepoint: true}
+        m.call(*args, **kwargs, &block)
+      end
+      st = nx.strand
+      expect(st).to receive(:prog_class).and_return(class_double(described_class, new: nx))
+      expect(vm.sshable).to receive(:_cmd).with(described_class::RUNNER_SCRIPT_SUBSTATE_COMMAND) do
+        expect(transaction_started).to be false
+        "running"
+      end
+
+      expect(st.unsynchronized_run).to have_attributes(class: Prog::Base::Nap, seconds: 60)
+      expect(transaction_started).to be true
+    end
+
+    it "runs before_destroy in the same transaction as the hop to destroy when run through the strand" do
+      runner.update(ready_at: now - 5 * 60)
+      runner.strand.update(label: "wait")
+      runner.incr_destroy
+      transaction_started = false
+      allow(DB).to receive(:transaction).and_wrap_original do |m, *args, **kwargs, &block|
+        transaction_started = true if kwargs == {savepoint: true}
+        m.call(*args, **kwargs, &block)
+      end
+      st = nx.strand
+      expect(st).to receive(:prog_class).and_return(class_double(described_class, new: nx))
+      expect(nx).to receive(:update_billing_record).and_wrap_original do |m|
+        expect(transaction_started).to be true
+        m.call
+      end
+      expect(vm.sshable).not_to receive(:_cmd)
+
+      expect(st.unsynchronized_run).to be_a Prog::Base::Hop
+      expect(st.reload.label).to eq("destroy")
+      expect(BillingRecord[resource_id: installation.id].amount).to eq(5)
     end
 
     it "raises ssh exception again for non-aws instance" do

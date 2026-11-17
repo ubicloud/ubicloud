@@ -373,6 +373,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     update_billing_record
   end
 
+  # The wait label polls the runner over SSH and the GitHub API. Running it
+  # outside a transaction keeps a database connection from staying open
+  # during that I/O.
+  def transaction_around_run?
+    strand.label != "wait"
+  end
+
   label def start
     unless project.active?
       github_runner.destroy
@@ -800,9 +807,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap 15
     when "failed"
       Clog.emit("The runner script failed", github_runner)
-      github_runner.provision_spare_runner
-      github_runner.incr_destroy
-      nap 0
+      start_transaction do
+        github_runner.provision_spare_runner
+        github_runner.incr_destroy
+        nap 0
+      end
     end
 
     # JIT tokens are valid for 5 minutes. If the runner doesn't pick a job
