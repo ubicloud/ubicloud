@@ -493,12 +493,49 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#destroy" do
+    it "decrements destroy and hops to wait_runs_jobs_finished" do
+      nx.incr_destroy
+      expect { nx.destroy }.to hop("wait_runs_jobs_finished")
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(0)
+    end
+  end
+
+  def create_active_workflow_run
+    GithubActiveWorkflowRun.create(
+      installation_id: installation.id,
+      repository_id: repository.id,
+      repository_name: "test-user/my-repo",
+      run_id: 7777777,
+      run_attempt: 1,
+      create_date: Time.now.utc.to_date,
+      head_branch: "test-branch",
+      head_repository_full_name: "test-user/my-repo",
+      event: "push",
+      status: "queued",
+      display_title: "CI",
+      commit_message: "cm",
+      actor_login: "al",
+      cache_scope: "test-branch",
+    )
+  end
+
+  describe "#wait_runs_jobs_finished" do
+    it "naps if has active runner" do
+      GithubRunner.create(repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
+      expect { nx.wait_runs_jobs_finished }.to nap(2 * 60)
+      expect(nx.deadline_at).to be_nil
+    end
+
+    it "naps if has active workflow run" do
+      create_active_workflow_run
+      expect { nx.wait_runs_jobs_finished }.to nap(2 * 60)
+      expect(nx.deadline_at).to be_nil
+    end
+
     it "registers a deadline that scales with the cache entries and hops to destroy_cache_entries" do
       GithubCacheEntry.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-1", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
-      nx.incr_destroy
-      expect { nx.destroy }.to hop("destroy_cache_entries")
+      expect { nx.wait_runs_jobs_finished }.to hop("destroy_cache_entries")
       expect(Time.new(nx.deadline_at)).to be_within(5).of(now + 401)
-      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(0)
     end
   end
 
@@ -506,26 +543,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "does not destroy if has active runner" do
       GithubRunner.create(repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
       expect { nx.destroy_cache_entries }.to nap(2 * 60)
+      expect(repository).to exist
     end
 
     it "does not destroy if has active workflow run" do
-      GithubActiveWorkflowRun.create(
-        installation_id: installation.id,
-        repository_id: repository.id,
-        repository_name: "test-user/my-repo",
-        run_id: 7777777,
-        run_attempt: 1,
-        create_date: Time.now.utc.to_date,
-        head_branch: "test-branch",
-        head_repository_full_name: "test-user/my-repo",
-        event: "push",
-        status: "queued",
-        display_title: "CI",
-        commit_message: "cm",
-        actor_login: "al",
-        cache_scope: "test-branch",
-      )
+      create_active_workflow_run
       expect { nx.destroy_cache_entries }.to nap(2 * 60)
+      expect(repository).to exist
     end
 
     it "destroys cache entries one at a time, then blob storage if has one" do
