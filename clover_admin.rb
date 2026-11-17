@@ -2358,6 +2358,50 @@ class CloverAdmin < Roda
       view("cogs")
     end
 
+    r.get "unallocated-vms" do
+      now = Time.now
+      vm_row = ->(vm) do
+        {
+          "VM" => table_link(vm.name, "/model/Vm/#{vm.ubid}"),
+          "Location" => vm.location.name,
+          "Arch" => vm.arch,
+          "Family" => vm.family,
+          "vCPUs" => vm.vcpus,
+          "Created At" => vm.created_at,
+          "Waited" => format_seconds((now - vm.created_at).to_i),
+          "Waiting for Capacity" => vm.waiting_for_capacity_set?,
+        }
+      end
+
+      runner_vms, other_vms = Vm
+        .where(allocated_at: nil, vm_host_id: nil)
+        .where { created_at < Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 minute", :interval) }
+        .eager(:location, :project, :semaphores, github_runner: :installation)
+        .order(:created_at, :id)
+        .all
+        .partition(&:github_runner)
+
+      @runner_vms = runner_vms.map do |vm|
+        runner = vm.github_runner
+        installation = runner.installation
+        vm_row.call(vm).merge(
+          "Runner" => table_link(runner.ubid, "/model/GithubRunner/#{runner.ubid}"),
+          "Runner Waited" => format_seconds((now - runner.created_at).to_i),
+          "Installation" => table_link(installation.name, "/model/GithubInstallation/#{installation.ubid}"),
+          "Repository" => runner.repository_name,
+          "Label" => runner.label,
+        )
+      end
+
+      @other_vms = other_vms.map do |vm|
+        vm_row.call(vm).merge(
+          "Project" => table_link(vm.project.name, "/model/Project/#{vm.project.ubid}"),
+        )
+      end
+
+      view("unallocated_vms")
+    end
+
     r.get "vm-host-usage" do
       @locations = Location.where(id: VmHost.select(:location_id)).select_order_map([:name, :id]).map { |name, id| [name, UBID.to_ubid(id)] }
       @archs = %w[x64 arm64].freeze

@@ -3541,6 +3541,54 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
   end
 
+  it "shows VMs that waited longer than one minute for a host, oldest first" do
+    rows = ->(table) { page.all(".#{table} tbody tr").map { it.all("td").map(&:text) } }
+
+    click_link "Unallocated VMs"
+    expect(page.title).to eq "Ubicloud Admin - Unallocated VMs"
+    expect(page).to have_content "No data available for Runner VMs (0) table"
+    expect(page).to have_content "No data available for Other VMs (0) table"
+
+    now = Time.now.floor
+    project = Project.create(name: "customer")
+    installation = GithubInstallation.create(installation_id: 1, name: "test-installation", type: "Organization", project_id: project.id)
+    runner_vm = ->(created_at:, runner_created_at:, **args) do
+      vm = create_vm(location_id: Location::GITHUB_RUNNERS_ID, created_at:, **args)
+      runner = GithubRunner.create(installation_id: installation.id, repository_name: "ubicloud/test", label: "ubicloud-standard-#{vm.vcpus}", vm_id: vm.id, location_id: vm.location_id, created_at: runner_created_at)
+      vm.update(name: runner.ubid)
+      runner
+    end
+    new_runner = runner_vm.call(created_at: now - 2 * 60, runner_created_at: now - 3 * 60)
+    old_runner = runner_vm.call(created_at: now - 3 * 60 * 60, runner_created_at: now - 4 * 60 * 60, arch: "arm64", family: "premium", vcpus: 8)
+    Strand.create_with_id(old_runner.vm_id, prog: "Vm::Metal::Nexus", label: "start")
+    Vm[old_runner.vm_id].incr_waiting_for_capacity
+    create_vm(project_id: project.id, name: "new-vm", location_id: Location::HETZNER_HEL1_ID, created_at: now - 5 * 60)
+    old_vm = create_vm(project_id: project.id, name: "old-vm", created_at: now - 2 * 60 * 60)
+    create_vm(project_id: project.id, name: "recent-vm", created_at: now - 30)
+    create_vm(project_id: project.id, name: "allocated-vm", created_at: now - 60 * 60, allocated_at: now - 59 * 60)
+    create_vm(project_id: project.id, name: "legacy-vm", created_at: now - 60 * 60, vm_host_id: create_vm_host.id)
+
+    allow(Time).to receive(:now).and_return(now)
+    page.refresh
+    expect(page.all(".unallocated-runner-vm-table thead th").map(&:text)).to eq ["VM", "Location", "Arch", "Family", "vCPUs", "Created At", "Waited", "Waiting for Capacity", "Runner", "Runner Waited", "Installation", "Repository", "Label"]
+    expect(rows.call("unallocated-runner-vm-table")).to eq [
+      [old_runner.ubid, "github-runners", "arm64", "premium", "8", (now - 3 * 60 * 60).strftime("%F %T"), "03:00:00", "true", old_runner.ubid, "04:00:00", "test-installation", "ubicloud/test", "ubicloud-standard-8"],
+      [new_runner.ubid, "github-runners", "x64", "standard", "2", (now - 2 * 60).strftime("%F %T"), "00:02:00", "false", new_runner.ubid, "00:03:00", "test-installation", "ubicloud/test", "ubicloud-standard-2"],
+    ]
+    expect(page.all(".unallocated-other-vm-table thead th").map(&:text)).to eq ["VM", "Location", "Arch", "Family", "vCPUs", "Created At", "Waited", "Waiting for Capacity", "Project"]
+    expect(rows.call("unallocated-other-vm-table")).to eq [
+      ["old-vm", "hetzner-fsn1", "x64", "standard", "2", (now - 2 * 60 * 60).strftime("%F %T"), "02:00:00", "false", "customer"],
+      ["new-vm", "hetzner-hel1", "x64", "standard", "2", (now - 5 * 60).strftime("%F %T"), "00:05:00", "false", "customer"],
+    ]
+
+    click_link "old-vm"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{old_vm.ubid}"
+
+    visit "/unallocated-vms"
+    click_link "test-installation", match: :first
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{installation.ubid}"
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")

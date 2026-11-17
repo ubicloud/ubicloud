@@ -1,0 +1,6 @@
+<% @page_title = "Unallocated VMs" %>
+
+<p>VMs that have waited longer than one minute for a host, oldest first.</p>
+
+<%== part("components/table", title: "Runner VMs (#{@runner_vms.size})", table_class: "unallocated-runner-vm-table", data: @runner_vms, use_admin_label: false) %>
+<%== part("components/table", title: "Other VMs (#{@other_vms.size})", table_class: "unallocated-other-vm-table", data: @other_vms, use_admin_label: false) %>
