@@ -48,6 +48,22 @@ RSpec.describe Clover, "github" do
     expect(page.title).to eq("Ubicloud - Active Runners")
   end
 
+  it "redirects to the setup page if the installation cannot run jobs without billing info" do
+    allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    installation
+
+    visit "#{project.path}/github"
+
+    expect(page).to have_current_path("#{project.path}/github/setup")
+    expect(page).to have_content("Step 3 of 4")
+
+    project.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+    visit "#{project.path}/github"
+
+    expect(page).to have_current_path("#{project.path}/github/#{installation.ubid}/runner")
+    expect(page.title).to eq("Ubicloud - Active Runners")
+  end
+
   describe "setup" do
     before do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")

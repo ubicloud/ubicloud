@@ -16,7 +16,7 @@ class Clover
       if api?
         paginated_result(ds, Serializers::GithubInstallation)
       else
-        if (installation = ds.first)
+        if (installation = ds.first) && (@project.billing_info_id || !Config.stripe_secret_key)
           r.redirect installation, "/runner"
         end
         r.redirect @project, "/github/setup"
