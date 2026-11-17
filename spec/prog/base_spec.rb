@@ -485,7 +485,7 @@ RSpec.describe Prog::Base do
 
     it "raises for an invalid page severity" do
       nx = Prog::Test.new(Strand.create(prog: "Test", label: :start))
-      expect { nx.register_deadline("pusher2", 1, page: "bogus") }.to raise_error(Strand::InternalError, 'BUG: invalid deadline page severity: "bogus"')
+      expect { nx.register_deadline("pusher2", 1, page: "bogus", message: "reach pusher2") }.to raise_error(Strand::InternalError, 'BUG: invalid deadline page severity: "bogus"')
     end
 
     it "logs the expired deadline instead of paging when the deadline opts out" do
@@ -499,7 +499,7 @@ RSpec.describe Prog::Base do
       }.not_to change { Page.active.count }.from(0)
 
       expect(Clog).to have_received(:emit).with(
-        "#{st.ubid} has an expired deadline! Test.pusher1 did not reach pusher2 on time",
+        "#{st.ubid} did not reach pusher2 within deadline! Test.pusher1 did not reach pusher2 on time",
         {expired_deadline: {strand: st.ubid, prog: "Test", label: "pusher1", deadline_target: "pusher2"}},
       )
       expect(st.stack.last["deadline_notified"]).to be true
@@ -512,7 +512,7 @@ RSpec.describe Prog::Base do
       3.times { st.unsynchronized_run }
 
       expect(Clog).to have_received(:emit).with(
-        "#{st.ubid} has an expired deadline! Test.pusher1 did not reach pusher2 on time",
+        "#{st.ubid} did not reach pusher2 within deadline! Test.pusher1 did not reach pusher2 on time",
         {expired_deadline: {strand: st.ubid, prog: "Test", label: "pusher1", deadline_target: "pusher2"}},
       ).once
     end
@@ -782,7 +782,7 @@ RSpec.describe Prog::Base do
       st = Strand.create(prog: "Test", label: :start)
       nx = Prog::Test.new(st)
       nx.register_deadline("pusher2", 60, message: "push things")
-      nx.register_deadline("pusher3", 60)
+      nx.register_deadline("pusher3", 60, message: nil)
       expect(st.stack.first).not_to have_key("deadline_message")
       expect(st.stack.first["deadline_target"]).to eq "pusher3"
     end

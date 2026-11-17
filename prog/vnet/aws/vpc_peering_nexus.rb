@@ -27,7 +27,7 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
   label def start
     hop_destroy if private_subnet.destroying_set?
     nap 10 unless private_subnet.strand.label == "wait"
-    register_deadline("wait_acceptance", 15 * 60)
+    register_deadline("wait_acceptance", 15 * 60, message: "create peering connection")
     hop_create_connection
   end
 
@@ -74,10 +74,10 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
     when "initiating-request"
       nap 5
     when "provisioning"
-      register_deadline("wait", 15 * 60)
+      register_deadline("wait", 15 * 60, message: "provision peering connection")
       nap 5
     when "active"
-      register_deadline("wait", 15 * 60)
+      register_deadline("wait", 15 * 60, message: "configure peering routes")
       vpc_peering_aws_resource.update(expires_at: nil)
       cidrs = accepter_cidrs(pcx)
       if cidrs.empty?
@@ -120,7 +120,7 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
     pcx = established_connection
     nap 5 unless pcx.status.code == "active"
     if vpc_peering.state != "active"
-      register_deadline("wait", 15 * 60)
+      register_deadline("wait", 15 * 60, message: "reconfigure peering routes")
       hop_configure
     end
     routes = routed_cidrs
@@ -137,7 +137,7 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    register_deadline(nil, 15 * 60)
+    register_deadline(nil, 15 * 60, message: "finish destroying")
     hop_remove_routes
   end
 
@@ -263,7 +263,7 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
     end
     Clog.emit("VPC peering quota exceeded", {vpc_peering_quota_exceeded: {ubid: vpc_peering.ubid, location: location.ubid, error_code: e.code}})
     vpc_peering.update(state_message: "Ubicloud has reached the AWS limit for pending peering requests in this region. The request is sent automatically when capacity frees up.")
-    register_deadline("wait_acceptance", 60 * 60, allow_extension: 60 * 60, page: "warning")
+    register_deadline("wait_acceptance", 60 * 60, allow_extension: 60 * 60, page: "warning", message: "send peering request after AWS quota frees up")
     nap 5 * 60
   end
 
@@ -380,7 +380,7 @@ class Prog::Vnet::Aws::VpcPeeringNexus < Prog::Base
   def fail_peering(reason)
     vpc_peering_aws_resource.update(expires_at: nil)
     vpc_peering.update(state: "failed", state_message: reason)
-    register_deadline("failed", 15 * 60)
+    register_deadline("failed", 15 * 60, message: "clean up failed peering")
     hop_remove_routes
   end
 

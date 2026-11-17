@@ -26,7 +26,7 @@ class Prog::Vnet::Gcp::VpcPeeringNexus < Prog::Base
   label def start
     hop_destroy if private_subnet.destroying_set?
     nap 10 unless private_subnet.strand.label == "wait"
-    register_deadline("wait", 15 * 60)
+    register_deadline("wait", 15 * 60, message: "create peering")
     hop_add_peering
   end
 
@@ -96,7 +96,7 @@ class Prog::Vnet::Gcp::VpcPeeringNexus < Prog::Base
     if peering.state == "ACTIVE"
       unless vpc_peering.state == "active"
         vpc_peering.update(state: "active", state_message: nil)
-        register_deadline("wait", 15 * 60)
+        register_deadline("wait", 15 * 60, message: "refresh peer CIDRs")
         hop_refresh_peer_cidrs
       end
       update_peer_cidrs
@@ -117,7 +117,7 @@ class Prog::Vnet::Gcp::VpcPeeringNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    register_deadline(nil, 15 * 60)
+    register_deadline(nil, 15 * 60, message: "finish destroying")
     hop_remove_peering
   end
 
@@ -279,7 +279,7 @@ class Prog::Vnet::Gcp::VpcPeeringNexus < Prog::Base
 
   def fail_peering(reason)
     vpc_peering.update(state: "failed", state_message: reason)
-    register_deadline("failed", 15 * 60)
+    register_deadline("failed", 15 * 60, message: "clean up failed peering")
     hop_remove_peering
   end
 end

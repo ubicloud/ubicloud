@@ -175,32 +175,32 @@ class Prog::Test < Prog::Base
   end
 
   label def nap_with_expired_deadline
-    register_deadline("pusher2", -10)
+    register_deadline("pusher2", -10, message: "reach pusher2")
     nap(10)
   end
 
   label def set_expired_deadline
-    register_deadline("pusher2", -1)
+    register_deadline("pusher2", -1, message: "reach pusher2")
     hop_pusher1
   end
 
   label def set_expired_no_page_deadline
-    register_deadline("pusher2", -1, page: false)
+    register_deadline("pusher2", -1, page: false, message: "reach pusher2")
     hop_pusher1
   end
 
   label def set_expired_warning_deadline
-    register_deadline("pusher2", -1, page: "warning")
+    register_deadline("pusher2", -1, page: "warning", message: "reach pusher2")
     hop_pusher1
   end
 
   label def extend_deadline
-    register_deadline("pusher2", 1, allow_extension: true)
+    register_deadline("pusher2", 1, allow_extension: true, message: "reach pusher2")
     hop_pusher1
   end
 
   label def extend_deadline_with_limit
-    register_deadline("pusher2", 10 * 60, allow_extension: 30 * 60)
+    register_deadline("pusher2", 10 * 60, allow_extension: 30 * 60, message: "reach pusher2")
     hop_pusher1
   end
 
@@ -214,7 +214,7 @@ class Prog::Test < Prog::Base
   end
 
   label def set_popping_deadline2
-    register_deadline("pusher2", -1)
+    register_deadline("pusher2", -1, message: "reach pusher2")
     hop_popper
   end
 
