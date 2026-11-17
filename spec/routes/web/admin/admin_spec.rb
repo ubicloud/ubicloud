@@ -3466,7 +3466,7 @@ RSpec.describe CloverAdmin do
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2, total AWS VPCs 1 - premium: vcpu 50.0%, hugepage 4.27%")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27% - premium: vcpu 50.0%, hugepage 4.27% - aws: vcpus 12, runners 2, VPCs 1 - gcp: vcpus 0, runners 0")
     expect(page).to have_css(".github-runner-usage details#github-runner-usage-family-sizes:not([open]) summary", text: "Show sizes")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "400",
@@ -3475,16 +3475,46 @@ RSpec.describe CloverAdmin do
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
+      "0", "0", "0",
       "test-installation", "premium", "400",
       "2", "1", "1", "0", "1", "0",
       "46 / 46", "34 / 46", "30 / 128",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0", "1",
+      "0", "0", "0",
     ]
 
     click_link "test-installation"
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{installation.ubid}"
+  end
+
+  it "shows GitHub runners on GCP in the x64 VM usage" do
+    gcp_location = Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "gcp-europe-west3", ui_name: "GCP Frankfurt", visible: false)
+    expect(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_location.id)
+    project = Project.create(name: "test-project")
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
+    vm = create_vm(vcpus: 32, family: "n4d-standard", location_id: gcp_location.id, allocated_at: Time.now)
+    GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-premium-30", allocated_at: Time.now, vm_id: vm.id, location_id: gcp_location.id)
+
+    click_link "GitHub Runner VM Usage"
+    expect(page).to have_css("p", exact_text: "standard: vcpu 0%, hugepage 0% - premium: vcpu 0%, hugepage 0% - aws: vcpus 0, runners 0, VPCs 0 - gcp: vcpus 32, runners 1")
+    expect(page.all("#content td").map(&:text)).to eq [
+      "TOTAL", "", "300",
+      "0", "0", "0", "0", "1", "0",
+      "30 / 30", "32 / 32", "0 / 0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "1",
+      "test-installation", "premium", "300",
+      "0", "0", "0", "0", "1", "0",
+      "30 / 30", "32 / 32", "0 / 0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "1",
+    ]
   end
 
   it "shows GitHub runner arm64 VM usage" do
@@ -3508,7 +3538,7 @@ RSpec.describe CloverAdmin do
 
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8, spilled runners 1, total AWS VPCs 0")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27% - aws: vcpus 8, runners 1, VPCs 0")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "200",
       "3", "0", "0", "0", "0", "0",
@@ -3585,7 +3615,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
   end
 
-  it "shows weekly GitHub runner revenue on metal and spilled to AWS since the first recorded day" do
+  it "shows weekly GitHub runner revenue on metal and spilled to AWS and GCP since the first recorded day" do
     rows = -> { page.all(".github-runner-revenue-table tbody tr").map { it.all("td").map(&:text) } }
 
     today = Date.new(2026, 11, 26)
@@ -3602,10 +3632,10 @@ RSpec.describe CloverAdmin do
     create_record = lambda do |billing_rate_id, days_ago, amount, resource_tags = {}|
       BillingRecord.create(project_id: project.id, resource_id:, resource_name: "Daily Usage", billing_rate_id:, span: Sequel.pg_range((today - days_ago).to_time...(today - days_ago + 1).to_time), amount:, resource_tags:)
     end
-    create_record.call(runner_rate_id.call("standard-2"), 0, 1000, {"aws_standard_minutes" => 400})
+    create_record.call(runner_rate_id.call("standard-2"), 0, 1000, {"aws_standard_minutes" => 300, "gcp_standard_minutes" => 100})
     create_record.call(runner_rate_id.call("standard-2"), 1, 2000, {"aws_standard_minutes" => 400, "aws_premium_minutes" => 200})
     create_record.call(BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"], 1, 2)
-    create_record.call(runner_rate_id.call("premium-2"), 3, 500, {"aws_premium_minutes" => 100})
+    create_record.call(runner_rate_id.call("premium-2"), 3, 500, {"aws_premium_minutes" => 60, "gcp_premium_minutes" => 40})
     create_record.call(runner_rate_id.call("standard-4"), 8, 600)
     create_record.call(runner_rate_id.call("standard-2"), 22, 800)
     create_record.call(runner_rate_id.call("standard-2"), 33, 400)

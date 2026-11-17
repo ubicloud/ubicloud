@@ -26,11 +26,17 @@ end
 
 <p>
   <strong>standard:</strong>
-  <%= "vcpu #{@family_utilization.dig("standard", 0) || 0}%, hugepage #{@family_utilization.dig("standard", 1) || 0}%, spilled vcpus #{@spilled_vcpus}, spilled runners #{@spilled_runners}, total AWS VPCs #{@aws_vpcs}" %>
+  <%= "vcpu #{@family_utilization.dig("standard", 0) || 0}%, hugepage #{@family_utilization.dig("standard", 1) || 0}%" %>
 
   <% if @arch == "x64" %>
     - <strong>premium:</strong>
     <%= "vcpu #{@family_utilization.dig("premium", 0) || 0}%, hugepage #{@family_utilization.dig("premium", 1) || 0}%" %>
+  <% end %>
+  - <strong>aws:</strong>
+  <%= "vcpus #{@spilled_vcpus}, runners #{@spilled_runners}, VPCs #{@aws_vpcs}" %>
+  <% if @arch == "x64" %>
+    - <strong>gcp:</strong>
+    <%= "vcpus #{@gcp_vcpus}, runners #{@gcp_runners}" %>
   <% end %>
 </p>
 
@@ -74,3 +80,6 @@ end
 <p><strong>s*:</strong> Number of runners with that standard family, including ones that fell back from premium.</p>
 <p><strong>p*:</strong> Number of runners with that premium family.</p>
 <p><strong>a*:</strong> Number of alien runners.</p>
+<% if @arch == "x64" %>
+  <p><strong>g*:</strong> Number of runners in the GCP runner location.</p>
+<% end %>

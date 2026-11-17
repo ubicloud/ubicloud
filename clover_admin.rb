@@ -2181,6 +2181,16 @@ class CloverAdmin < Roda
       aws_vcpus_expr = aws_location_id ? Sequel.function(:coalesce, Sequel.function(:sum, r_vcpus).filter(Sequel[:r][:location_id] => aws_location_id), 0) : Sequel.cast(0, Integer)
       no_alien_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("no_alien_runners"), :boolean)
 
+      gcp_size_exprs = []
+      if @arch == "x64"
+        gcp_location_id = Config.github_runner_gcp_location_id
+        gcp_size_exprs.concat([8, 16, 32].map { count_f.call(Sequel[:v][:location_id] => gcp_location_id, v_vcpus => it).as(:"g#{it}") })
+        @gcp_vcpus, @gcp_runners = Vm.where(location_id: gcp_location_id).get([
+          Sequel.function(:coalesce, Sequel.function(:sum, :vcpus), 0).as(:vcpus),
+          Sequel.function(:count).*.as(:runners),
+        ])
+      end
+
       @data = DB.from(runners.as(:r))
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:project].as(:p), id: Sequel[:i][:project_id])
@@ -2207,6 +2217,7 @@ class CloverAdmin < Roda
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
+          *gcp_size_exprs,
         )
         .group(Sequel[:i][:id], Sequel[:i][:name], family_expr, :quota, :aws_quota, :no_alien)
         .reverse(:runner_vcpus, :vm_vcpus)
@@ -2233,7 +2244,8 @@ class CloverAdmin < Roda
       begin_date = end_date - 7 * week_count
       day = Sequel.function(:lower, :span)
       tags = Sequel.pg_jsonb_op(:resource_tags)
-      sum_aws_minutes = ->(family) { Sequel.function(:sum, Sequel.function(:coalesce, tags.get_text("aws_#{family}_minutes").cast(:integer), 0)) }
+      tag_minutes = ->(key) { Sequel.function(:coalesce, tags.get_text(key).cast(:integer), 0) }
+      sum_spilled_minutes = ->(family) { Sequel.function(:sum, tag_minutes.call("aws_#{family}_minutes") + tag_minutes.call("gcp_#{family}_minutes")) }
       runner_rates = BillingRate.from_resource_type("GitHubRunnerMinutes").to_h { [it["id"], it] }
 
       records = DB[:billing_record]
@@ -2241,7 +2253,7 @@ class CloverAdmin < Roda
         .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_date.to_time...end_date.to_time)) }
         .select_group(day.as(:day), :billing_rate_id)
         .select_append { sum(:amount).as(:minutes) }
-        .select_append(sum_aws_minutes.call("standard").as(:aws_standard_minutes), sum_aws_minutes.call("premium").as(:aws_premium_minutes))
+        .select_append(sum_spilled_minutes.call("standard").as(:spilled_standard_minutes), sum_spilled_minutes.call("premium").as(:spilled_premium_minutes))
         .all
 
       weeks = Array.new(week_count) do |i|
@@ -2251,9 +2263,9 @@ class CloverAdmin < Roda
         week = weeks[(end_date - row[:day].to_date - 1).to_i / 7]
         rate = runner_rates[row[:billing_rate_id]]
         price = rate["unit_price"]
-        week[:spilled_standard] += row[:aws_standard_minutes] * price
-        week[:spilled_premium] += row[:aws_premium_minutes] * price
-        metal_revenue = (row[:minutes] - row[:aws_standard_minutes] - row[:aws_premium_minutes]) * price
+        week[:spilled_standard] += row[:spilled_standard_minutes] * price
+        week[:spilled_premium] += row[:spilled_premium_minutes] * price
+        metal_revenue = (row[:minutes] - row[:spilled_standard_minutes] - row[:spilled_premium_minutes]) * price
         if rate["resource_family"].start_with?("premium")
           week[:metal_premium] += metal_revenue
         else
