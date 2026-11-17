@@ -757,6 +757,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     # they should be also reproduced in E2E tests which will notify us.
     Clog.emit("Failed to collect VM destroy stats", failed_vm_destroy_stats: Util.exception_to_hash(e))
   else
+    stats["image_name"] = vm.boot_image
+    stats["image_version"] = vm.vm_storage_volumes.first&.boot_image&.version
     Clog.emit("VM destroy stats", vm_destroy_stats: stats)
   end
 end
