@@ -25,7 +25,8 @@ class Prog::DownloadBootImage < Prog::Base
     arch_versions = BOOT_IMAGE_SHA256.dig(image_name, vm_host.arch)
     fail "Unknown boot image: #{image_name}" unless arch_versions && !arch_versions.empty?
 
-    arch_versions.keys.max
+    excluded = Config.is_e2e ? [] : [VmStorageVolume::TWO_LAYER_IMAGE_VERSION]
+    (arch_versions.keys - excluded).max
   end
 
   def download_from_r2?
