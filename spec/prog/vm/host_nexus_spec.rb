@@ -280,7 +280,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "extends the shorter setup_ssh_keys deadline set by create_addresses" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
-      nx.register_deadline("setup_ssh_keys", 10 * 60)
+      nx.register_deadline("setup_ssh_keys", 10 * 60, message: "create addresses and pull server info")
       expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs")
       expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 2 * 60 * 60)
     end

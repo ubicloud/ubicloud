@@ -68,6 +68,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcPeeringNexus do
       ps.strand.update(label: "wait")
       expect { nx.start }.to hop("add_peering")
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "create peering"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -168,6 +169,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcPeeringNexus do
         expect { nx.add_peering }.to hop("remove_peering")
         expect(vp.reload).to have_attributes(state: "failed", state_message: "GCP refused the peering with network customer-vpc in project customer-project. Check the project ID and network name. No subnet range of your network may overlap 10.10.0.0/26, the ranges of this subnet's other peerings (10.20.0.0/16, 10.21.0.0/24), or the subnets of networks peered with yours. Delete this peering and create it again. GCP said: Subnet ranges overlap")
         expect(frame_value(nx, "deadline_target")).to eq "failed"
+        expect(frame_value(nx, "deadline_message")).to eq "clean up failed peering"
         expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
       end
     end
@@ -312,6 +314,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcPeeringNexus do
       expect { nx.wait }.to hop("refresh_peer_cidrs")
       expect(vp.reload).to have_attributes(state: "active", state_message: nil)
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "refresh peer CIDRs"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -322,6 +325,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcPeeringNexus do
       expect { nx.wait }.to hop("refresh_peer_cidrs")
       expect(vp.reload).to have_attributes(state: "active", state_message: nil)
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "refresh peer CIDRs"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -415,7 +419,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcPeeringNexus do
       vp.incr_destroy
       expect { nx.destroy }.to hop("remove_peering")
       expect(vp.reload.destroy_set?).to be false
-      expect(nx.strand.stack.first).to include("deadline_target" => nil)
+      expect(nx.strand.stack.first).to include("deadline_target" => nil, "deadline_message" => "finish destroying")
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
   end

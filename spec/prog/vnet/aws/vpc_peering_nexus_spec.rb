@@ -93,6 +93,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       ps.strand.update(label: "wait")
       expect { nx.start }.to hop("create_connection")
       expect(frame_value(nx, "deadline_target")).to eq "wait_acceptance"
+      expect(frame_value(nx, "deadline_message")).to eq "create peering connection"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -219,6 +220,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
           .and change { vp.reload.state_message }.from(nil).to("Ubicloud has reached the AWS limit for pending peering requests in this region. The request is sent automatically when capacity frees up.")
         expect(frame_value(nx, "deadline_target")).to eq "wait_acceptance"
         expect(frame_value(nx, "deadline_page")).to eq "warning"
+        expect(frame_value(nx, "deadline_message")).to eq "send peering request after AWS quota frees up"
         first_deadline = frame_value(nx, "deadline_at")
         expect(Time.new(first_deadline)).to be_within(5).of(Time.now + 60 * 60)
 
@@ -237,6 +239,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       expect { nx.create_connection }.to hop("remove_routes")
       expect(vp.reload).to have_attributes(state: "failed", state_message: "The AWS account of this location has reached its limit of VPC peering requests. Accept or delete pending requests in that account, then delete this peering and create it again. AWS said: You have reached the limit")
       expect(frame_value(nx, "deadline_target")).to eq "failed"
+      expect(frame_value(nx, "deadline_message")).to eq "clean up failed peering"
     end
 
     {
@@ -342,6 +345,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       stub_describe(by_id: conn("provisioning"))
       expect { nx.wait_acceptance }.to nap(5)
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "provision peering connection"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -361,6 +365,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       expect(vp.peer_cidrs.map(&:to_s)).to eq ["10.200.0.0/16", "10.201.0.0/16"]
       expect(aws_vp.reload.expires_at).to be_nil
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "configure peering routes"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -687,6 +692,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       expect(client).not_to receive(:describe_route_tables)
       expect { nx.wait }.to hop("configure")
       expect(frame_value(nx, "deadline_target")).to eq "wait"
+      expect(frame_value(nx, "deadline_message")).to eq "reconfigure peering routes"
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
 
@@ -789,7 +795,7 @@ RSpec.describe Prog::Vnet::Aws::VpcPeeringNexus do
       vp.incr_destroy
       expect { nx.destroy }.to hop("remove_routes")
       expect(vp.reload.destroy_set?).to be false
-      expect(nx.strand.stack.first).to include("deadline_target" => nil)
+      expect(nx.strand.stack.first).to include("deadline_target" => nil, "deadline_message" => "finish destroying")
       expect(deadline_at).to be_within(5).of(Time.now + 15 * 60)
     end
   end
