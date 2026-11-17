@@ -2157,6 +2157,16 @@ class CloverAdmin < Roda
       aws_vcpus_expr = aws_location_id ? Sequel.function(:coalesce, Sequel.function(:sum, r_vcpus).filter(Sequel[:r][:location_id] => aws_location_id), 0) : Sequel.cast(0, Integer)
       no_alien_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("no_alien_runners"), :boolean)
 
+      gcp_size_exprs = []
+      if @arch == "x64"
+        gcp_location_id = Config.github_runner_gcp_location_id
+        gcp_size_exprs.concat([8, 16, 32].map { count_f.call(Sequel[:v][:location_id] => gcp_location_id, v_vcpus => it).as(:"g#{it}") })
+        @gcp_vcpus, @gcp_runners = Vm.where(location_id: gcp_location_id).get([
+          Sequel.function(:coalesce, Sequel.function(:sum, :vcpus), 0).as(:vcpus),
+          Sequel.function(:count).*.as(:runners),
+        ])
+      end
+
       @data = DB.from(runners.as(:r))
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:project].as(:p), id: Sequel[:i][:project_id])
@@ -2183,6 +2193,7 @@ class CloverAdmin < Roda
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
+          *gcp_size_exprs,
         )
         .group(Sequel[:i][:id], Sequel[:i][:name], family_expr, :quota, :aws_quota, :no_alien)
         .reverse(:runner_vcpus, :vm_vcpus)
