@@ -25,9 +25,10 @@ module CastingConfigHelpers
     end
   end
 
-  def override(name, default, method)
-    value = cast(ENV.fetch(name.to_s.upcase, default), method)
-    create(name, value)
+  def override(name, default, method, clear: false)
+    assign_cast_clear name, method, clear do |env_name|
+      ENV[env_name] || default
+    end
   end
 
   def int
