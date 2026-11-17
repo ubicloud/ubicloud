@@ -164,11 +164,22 @@ end
       if !destroying_set?
         raise Strand::InternalError, "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
         if destroy_set?
-          send(:before_destroy) if respond_to?(:before_destroy)
-          if defined?(hop_destroy)
-            hop_destroy
+          destroy_early = proc do
+            send(:before_destroy) if respond_to?(:before_destroy)
+            if defined?(hop_destroy)
+              hop_destroy
+            else
+              pop "exiting early due to destroy semaphore"
+            end
+          end
+
+          # before_destroy can write to the database, for example to finalize
+          # billing records. Those writes must commit together with the flow
+          # control, also when the label runs outside a transaction.
+          if transaction_around_run?
+            destroy_early.call
           else
-            pop "exiting early due to destroy semaphore"
+            start_transaction(&destroy_early)
           end
         end
       elsif destroy_set? && @strand.stack.count > 1

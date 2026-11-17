@@ -308,6 +308,16 @@ RSpec.describe Prog::Base do
       expect(events).to eq [:transaction_start, "hopped"]
     end
 
+    it "runs before_destroy inside the transaction" do
+      st = Strand.create(prog: "Test2", label: "deferred_transaction_napper")
+      expect(st.unsynchronized_run).to be_a Prog::Base::Nap
+      events.clear
+
+      Semaphore.incr(st.id, :destroy)
+      expect(st.unsynchronized_run).to be_a Prog::Base::Exit
+      expect(events).to eq [:transaction_start, "before destroy called", "exited"]
+    end
+
     it "applies semaphore decrements inside the transaction" do
       st = Strand.create(prog: "Test", label: "deferred_transaction_decrement_semaphore")
       Semaphore.incr(st.id, :test_semaphore)

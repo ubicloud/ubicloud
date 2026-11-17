@@ -11,4 +11,12 @@ class Prog::Test2 < Prog::Base
   label def pusher1
     push Prog::Test, {test_level: "2"}, :pusher2
   end
+
+  def transaction_around_run?
+    !strand.label.start_with?("deferred_transaction_")
+  end
+
+  label def deferred_transaction_napper
+    nap 1
+  end
 end
