@@ -91,7 +91,7 @@ RSpec.describe Clover, "github" do
     visit "/set_github_installation_project_id/#{project.ubid}"
     visit "/github/callback?code=invalid"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
+    expect(page.title).to eq("Ubicloud - GitHub Actions Setup")
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
@@ -102,7 +102,7 @@ RSpec.describe Clover, "github" do
     visit "/set_github_installation_project_id/#{project.ubid}"
     visit "/github/callback?code=123123"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
+    expect(page.title).to eq("Ubicloud - GitHub Actions Setup")
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
@@ -113,7 +113,7 @@ RSpec.describe Clover, "github" do
     visit "/set_github_installation_project_id/#{project.ubid}"
     visit "/github/callback?code=123123"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
+    expect(page.title).to eq("Ubicloud - GitHub Actions Setup")
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
