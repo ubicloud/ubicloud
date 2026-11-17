@@ -1,0 +1,10 @@
+<% @page_title = "GitHub Actions Setup" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["GitHub Runners", "#"].freeze]
+) %>
+
+<div class="max-w-3xl rounded-lg bg-white px-4 py-6 shadow sm:px-10">
+  <%== part("github/setup-steps", step: @step, can_add_payment_method: has_project_permission("Project:billing")) %>
+</div>
