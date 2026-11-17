@@ -2200,6 +2200,61 @@ class CloverAdmin < Roda
       view("github_runner_usage")
     end
 
+    r.get "github-runner-revenue" do
+      @weeks = (typecast_params.pos_int("weeks") || 8).clamp(1, 52)
+      @first_day = Date.new(2026, 11, 18)
+      end_date = Date.today
+      recorded_weeks = ((end_date - @first_day).to_i / 7).clamp(0, nil)
+      week_count = [@weeks, recorded_weeks].min
+      begin_date = end_date - 7 * week_count
+      day = Sequel.function(:lower, :span)
+      tags = Sequel.pg_jsonb_op(:resource_tags)
+      sum_aws_minutes = ->(family) { Sequel.function(:sum, Sequel.function(:coalesce, tags.get_text("aws_#{family}_minutes").cast(:integer), 0)) }
+      runner_rates = BillingRate.from_resource_type("GitHubRunnerMinutes").to_h { [it["id"], it] }
+
+      records = DB[:billing_record]
+        .where(billing_rate_id: runner_rates.keys)
+        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_date.to_time...end_date.to_time)) }
+        .select_group(day.as(:day), :billing_rate_id)
+        .select_append { sum(:amount).as(:minutes) }
+        .select_append(sum_aws_minutes.call("standard").as(:aws_standard_minutes), sum_aws_minutes.call("premium").as(:aws_premium_minutes))
+        .all
+
+      weeks = Array.new(week_count) do |i|
+        {begin_date: end_date - 7 * (i + 1), metal_standard: 0, spilled_standard: 0, metal_premium: 0, spilled_premium: 0}
+      end
+      records.each do |row|
+        week = weeks[(end_date - row[:day].to_date - 1).to_i / 7]
+        rate = runner_rates[row[:billing_rate_id]]
+        price = rate["unit_price"]
+        week[:spilled_standard] += row[:aws_standard_minutes] * price
+        week[:spilled_premium] += row[:aws_premium_minutes] * price
+        metal_revenue = (row[:minutes] - row[:aws_standard_minutes] - row[:aws_premium_minutes]) * price
+        if rate["resource_family"].start_with?("premium")
+          week[:metal_premium] += metal_revenue
+        else
+          week[:metal_standard] += metal_revenue
+        end
+      end
+
+      @data = weeks.map do |week|
+        spilled = week[:spilled_standard] + week[:spilled_premium]
+        total = week[:metal_standard] + week[:metal_premium] + spilled
+        spilled_share = total.zero? ? "-" : format("%.1f%%", spilled * 100 / total)
+        {
+          "Week" => week[:begin_date].to_s,
+          "Metal Standard" => table_cost(week[:metal_standard]),
+          "Spilled Standard" => table_cost(week[:spilled_standard]),
+          "Metal Premium" => table_cost(week[:metal_premium]),
+          "Spilled Premium" => table_cost(week[:spilled_premium]),
+          "Total" => table_cost(total),
+          "Spilled Share" => spilled_share,
+        }
+      end
+
+      view("github_runner_revenue")
+    end
+
     r.get "us-fleet" do
       us_location_ids = [Location::LEASEWEB_WDC02_ID]
       quota_default = ProjectQuota.default_quotas["GithubRunnerVCpu"]
