@@ -235,6 +235,9 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   label def destroy
     decr_destroy
+    Strand
+      .where(id: github_repository.active_workflow_runs_dataset.select(:id))
+      .update(schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW)
     hop_wait_runs_jobs_finished
   end
 
