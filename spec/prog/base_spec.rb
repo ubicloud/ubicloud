@@ -778,15 +778,6 @@ RSpec.describe Prog::Base do
       expect(st.stack.first["deadline_message"]).to eq "push things"
     end
 
-    it "removes a previous deadline message when registering a new deadline without a message" do
-      st = Strand.create(prog: "Test", label: :start)
-      nx = Prog::Test.new(st)
-      nx.register_deadline("pusher2", 60, message: "push things")
-      nx.register_deadline("pusher3", 60, message: nil)
-      expect(st.stack.first).not_to have_key("deadline_message")
-      expect(st.stack.first["deadline_target"]).to eq "pusher3"
-    end
-
     it "uses the deadline message in the page summary when the deadline expires" do
       st = Strand.create(prog: "Test", label: :pusher1)
       st.stack.first["deadline_target"] = "pusher2"

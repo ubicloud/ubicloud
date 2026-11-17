@@ -497,7 +497,7 @@ end
     strand.time_string(time)
   end
 
-  def register_deadline(new_deadline_target, deadline_in, allow_extension: false, page: true, message: nil)
+  def register_deadline(new_deadline_target, deadline_in, message:, allow_extension: false, page: true)
     if page.is_a?(String) && !Page::SEVERITY_ORDER.key?(page)
       raise Strand::InternalError, "BUG: invalid deadline page severity: #{page.inspect}"
     end
@@ -514,12 +514,7 @@ end
 
       self.deadline_target = new_deadline_target
       self.deadline_page = page
-
-      if message
-        self.deadline_message = message
-      else
-        strand.stack.first.delete("deadline_message")
-      end
+      self.deadline_message = message
 
       if allow_extension.is_a?(Integer)
         self.deadline_start ||= time_string(time)
