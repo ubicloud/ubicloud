@@ -498,14 +498,28 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.destroy }.to hop("wait_runs_jobs_finished")
       expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(0)
     end
+
+    it "schedules the strands of the repository's active workflow runs to run immediately" do
+      t = Time.now
+      later = t + 60 * 60
+      run = create_active_workflow_run
+      run_st = Strand.create_with_id(run, prog: "Github::GithubActiveWorkflowRunNexus", label: "start", schedule: later)
+      other_repository = described_class.assemble(installation, "ubicloud/other", "main").subject
+      other_run = create_active_workflow_run(repository: other_repository, run_id: 8888888)
+      other_run_st = Strand.create_with_id(other_run, prog: "Github::GithubActiveWorkflowRunNexus", label: "start", schedule: later)
+
+      expect { nx.destroy }.to hop("wait_runs_jobs_finished")
+      expect(run_st.reload.schedule).to be_within(5).of(t)
+      expect(other_run_st.reload.schedule).to be_within(5).of(later)
+    end
   end
 
-  def create_active_workflow_run
+  def create_active_workflow_run(repository: self.repository, run_id: 7777777)
     GithubActiveWorkflowRun.create(
       installation_id: installation.id,
       repository_id: repository.id,
       repository_name: "test-user/my-repo",
-      run_id: 7777777,
+      run_id:,
       run_attempt: 1,
       create_date: Time.now.utc.to_date,
       head_branch: "test-branch",
