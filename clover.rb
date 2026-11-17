@@ -539,7 +539,9 @@ class Clover < Roda
         redirect "/login"
       end
 
-      @saved_login_redirect = "/?setup=github_actions" if session["github_actions_setup"]
+      if (setup_path = session["github_actions_setup_path"])
+        @saved_login_redirect = setup_path
+      end
     end
 
     after_login do
@@ -682,7 +684,9 @@ class Clover < Roda
 
     after_omniauth_create_account do
       scope.after_rodauth_create_account(account_id)
-      session[login_redirect_session_key] = "/?setup=github_actions" if session["github_actions_setup"]
+      if (setup_path = session["github_actions_setup_path"])
+        session[login_redirect_session_key] = setup_path
+      end
     end
 
     omniauth_on_failure do
@@ -1080,6 +1084,12 @@ class Clover < Roda
         ""
       end
     end
+
+    hash_branch("set_github_actions_setup") do |r|
+      no_authorization_needed
+      session["github_actions_setup"] = true
+      ""
+    end
   end
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
@@ -1164,6 +1174,12 @@ class Clover < Roda
       rodauth.load_memory
       rodauth.check_active_session
 
+      # Sessions from before the setup return path was stored have a
+      # boolean flag. Remove this after those sessions are gone.
+      if session.delete("github_actions_setup")
+        session["github_actions_setup_path"] ||= "/?setup=github_actions"
+      end
+
       r.root do
         set_account_source unless current_account
 
@@ -1187,7 +1203,7 @@ class Clover < Roda
             1
           end
 
-          session["github_actions_setup"] = true unless @step == 4
+          session["github_actions_setup_path"] = "/?setup=github_actions" unless @step == 4
           next view "github/actions-setup"
         end
 

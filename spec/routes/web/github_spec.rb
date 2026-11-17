@@ -144,4 +144,18 @@ RSpec.describe Clover, "github" do
     expect(installation.type).to eq("User")
     expect(installation.project_id).to eq(project.id)
   end
+
+  it "redirects to setup workflow if session has setup flag from before the return path was stored" do
+    allow(Config).to receive_messages(omniauth_github_id: "123", stripe_secret_key: "secret_key")
+    expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
+    expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
+
+    visit "/set_github_installation_project_id/#{project.ubid}"
+    visit "/set_github_actions_setup"
+    visit "/github/callback?code=123123&installation_id=345"
+
+    expect(page).to have_current_path("/?setup=github_actions")
+    expect(page.title).to eq("Ubicloud - GitHub Actions Setup")
+    expect(page.driver.request.session).not_to include("github_actions_setup")
+  end
 end
