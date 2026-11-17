@@ -571,6 +571,18 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.upgrade_standby }.to nap(5)
     end
 
+    it "cancels the timeline's in-flight backup before starting pg_upgrade" do
+      candidate.timeline.update(backup_inprogress_server_id: create_server.id)
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
+      expect(candidate.timeline.backup_inprogress_server.vm.sshable).to receive(:_cmd)
+        .with("if test -x postgres/bin/cancel-ongoing-backup; then sudo postgres/bin/cancel-ongoing-backup; else echo absent; fi").and_return("").ordered
+      expect(candidate).to receive(:configure_hash).and_return({})
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", pg.target_version, stdin: "{}").ordered
+
+      expect { nx.upgrade_standby }.to nap(5)
+      expect(timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
     it "naps if status of the upgrade is unknown" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Unknown")
       expect { nx.upgrade_standby }.to nap(5)

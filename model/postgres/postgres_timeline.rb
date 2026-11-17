@@ -7,6 +7,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :parent, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}, is_used: true
+  many_to_one :backup_inprogress_server, class: :PostgresServer, read_only: true
   many_to_one :location, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :secret_key
@@ -43,7 +44,44 @@ class PostgresTimeline < Sequel::Model
     return true if take_backup_for_converge_set?
     return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
 
-    leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+    backup_status_server.vm.sshable.d_check("take_postgres_backup") != "InProgress"
+  end
+
+  def backup_status_server
+    backup_inprogress_server || leader
+  end
+
+  # nil while a failover or fence is under way, so the caller waits.
+  def backup_candidate_server
+    resource = leader.resource
+    return leader unless resource.backup_from_standby?
+    return if resource.ongoing_failover? || leader.fenced_or_locked_out?
+
+    resource.servers(eager: [:semaphores, :strand]).select {
+      it.standby? &&
+        it.timeline_id == id &&
+        it.synchronization_status == "ready" &&
+        it.strand.label == "wait" &&
+        !it.destroy_set? &&
+        !it.recycle_set? &&
+        !it.recycle_unavailable_server_set? &&
+        !it.recycle_by_user_request_set? &&
+        it.lsn_caught_up
+    }.min_by { [it.needs_recycling? ? 1 : 0, -it.created_at.to_f] } || leader
+  end
+
+  # Best effort: must not block the failover or upgrade calling it.
+  def cancel_ongoing_backup
+    return unless (server = backup_inprogress_server)
+
+    update(backup_inprogress_server_id: nil)
+    return if server.destroy_set?
+
+    # A server whose rhizome predates cancel-ongoing-backup leaves its backup to fail.
+    output = server.vm.sshable.cmd("if test -x :script; then sudo :script; else echo absent; fi", script: "postgres/bin/cancel-ongoing-backup")
+    Clog.emit("cancel-ongoing-backup is not installed; leaving the postgres backup to fail", [self, {backup_server: server.ubid}]) if output.strip == "absent"
+  rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => ex
+    Clog.emit("Could not stop the postgres backup", Util.exception_to_hash(ex, into: {ubid:}))
   end
 
   # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
@@ -141,16 +179,17 @@ end
 
 # Table: postgres_timeline
 # Columns:
-#  id                        | uuid                     | PRIMARY KEY
-#  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                 | uuid                     |
-#  access_key                | text                     |
-#  secret_key                | text                     |
-#  latest_backup_started_at  | timestamp with time zone |
-#  location_id               | uuid                     |
-#  cached_earliest_backup_at | timestamp with time zone |
-#  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
-#  latest_backup_size_in_gib | bigint                   |
+#  id                          | uuid                     | PRIMARY KEY
+#  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                   | uuid                     |
+#  access_key                  | text                     |
+#  secret_key                  | text                     |
+#  latest_backup_started_at    | timestamp with time zone |
+#  location_id                 | uuid                     |
+#  cached_earliest_backup_at   | timestamp with time zone |
+#  backup_period_hours         | smallint                 | NOT NULL DEFAULT 24
+#  latest_backup_size_in_gib   | bigint                   |
+#  backup_inprogress_server_id | uuid                     |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

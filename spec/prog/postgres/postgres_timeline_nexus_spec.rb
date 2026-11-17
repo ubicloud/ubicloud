@@ -492,12 +492,26 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "cleans up and hops to wait if the backup is successful" do
       postgres_timeline.incr_take_backup_for_converge
-      sshable = nx.postgres_timeline.leader.vm.sshable
+      postgres_timeline.update(backup_inprogress_server_id: server.id)
+      sshable = nx.postgres_timeline.backup_inprogress_server.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
       expect(postgres_timeline.take_backup_for_converge_set?(cached: false)).to be(false)
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+    end
+
+    it "keeps the backup server and its unit when the clean fails, so the check repeats there" do
+      postgres_timeline.update(backup_inprogress_server_id: server.id)
+      sshable = nx.postgres_timeline.backup_inprogress_server.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").and_raise(Sshable::SshError.new("clean", "", "", 1, nil)).ordered
+
+      expect {
+        DB.transaction(savepoint: true) { nx.take_backup }
+      }.to raise_error(Sshable::SshError)
+      expect(postgres_timeline.reload.backup_inprogress_server_id).to eq(server.id)
     end
 
     it "naps if a backup is already in progress" do
@@ -513,9 +527,117 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return((200 * 1024 * 1024).to_s).ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 18 25", {log: true, stdin: nil}).ordered
 
+      expect(Clog).to receive(:emit).with("Started postgres backup", [instance_of(PostgresTimeline), {backup_server: server.ubid, backup_from_standby: false}]).and_call_original
+
       expect { nx.take_backup }.to nap(60)
       expect(postgres_timeline.reload.latest_backup_started_at).not_to be_nil
       expect(postgres_timeline.latest_backup_size_in_gib).to eq(200)
+      expect(postgres_timeline.backup_inprogress_server_id).to eq(server.id)
+    end
+
+    it "checks the leader when the server that ran the last backup is gone" do
+      postgres_timeline.update(backup_inprogress_server_id: PostgresServer.generate_uuid)
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("InProgress")
+
+      expect { nx.take_backup }.to nap(60)
+    end
+
+    context "when the project opts into backups from standby" do
+      let(:standby) { create_postgres_server(resource:, timeline: postgres_timeline, is_representative: false).tap { it.strand.update(label: "wait") } }
+      let(:leader_sshable) { nx.postgres_timeline.leader.vm.sshable }
+
+      def record_lsn(server, lsn)
+        POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: server.id, last_known_lsn: lsn)
+      end
+
+      def cached_standby
+        nx.postgres_timeline.leader.resource.servers.find { it.id == standby.id }
+      end
+
+      def expect_backup_started_on_standby
+        standby_sshable = cached_standby.vm.sshable
+        expect(standby_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return((100 * 1024 * 1024).to_s)
+        expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup-standby 18 25", {log: true, stdin: nil})
+        standby_sshable
+      end
+
+      before do
+        project.set_ff_postgres_backup_from_standby_default(true)
+        record_lsn(server, "1/0")
+      end
+
+      after do
+        POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: [server.id, standby.id]).delete
+      end
+
+      it "starts the backup on a caught-up standby" do
+        record_lsn(standby, "1/0")
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted")
+        expect_backup_started_on_standby
+        expect(Clog).to receive(:emit).with("Started postgres backup", [instance_of(PostgresTimeline), {backup_server: standby.ubid, backup_from_standby: true}]).and_call_original
+
+        expect { nx.take_backup }.to nap(60)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to eq(standby.id)
+        expect(postgres_timeline.latest_backup_size_in_gib).to eq(100)
+      end
+
+      it "waits instead of starting a backup while the primary is fenced" do
+        record_lsn(standby, "1/0")
+        server.incr_fence
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted")
+
+        expect { nx.take_backup }.to nap(60)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+      end
+
+      it "retries a failed backup on the standby" do
+        record_lsn(standby, "1/0")
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed")
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup")
+        expect_backup_started_on_standby
+
+        expect { nx.take_backup }.to nap(60)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to eq(standby.id)
+      end
+
+      it "retries on the primary when a failover cut the backup short and the surviving standby is still re-syncing" do
+        record_lsn(standby, "1/0")
+        standby.update(synchronization_status: "catching_up")
+        standby.strand.update(label: "wait_catch_up")
+        postgres_timeline.update(backup_inprogress_server_id: PostgresServer.generate_uuid)
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+        expect(leader_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0").ordered
+        expect(leader_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 18 25", {log: true, stdin: nil}).ordered
+        expect(Clog).to receive(:emit).with("Started postgres backup", [instance_of(PostgresTimeline), {backup_server: server.ubid, backup_from_standby: false}]).and_call_original
+
+        expect { nx.take_backup }.to nap(60)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to eq(server.id)
+      end
+
+      it "starts the backup on the leader when the standby lags" do
+        record_lsn(standby, "0/0")
+        sshable = nx.postgres_timeline.leader.vm.sshable
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+        expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0").ordered
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 18 25", {log: true, stdin: nil}).ordered
+
+        expect { nx.take_backup }.to nap(60)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to eq(server.id)
+      end
+
+      it "checks and cleans the backup unit on the standby that ran the last backup" do
+        postgres_timeline.update(backup_inprogress_server_id: standby.id)
+        postgres_timeline.incr_take_backup_for_converge
+        standby_sshable = nx.postgres_timeline.backup_inprogress_server.vm.sshable
+        expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+        expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+
+        expect { nx.take_backup }.to hop("wait")
+        expect(postgres_timeline.take_backup_for_converge_set?(cached: false)).to be(false)
+        expect(postgres_timeline.reload.backup_inprogress_server_id).to be_nil
+      end
     end
 
     it "passes cpu.weight to take-backup when the optimized backup config is disabled" do
@@ -528,9 +650,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.take_backup }.to nap(60)
     end
 
-    it "retries when the previous backup failed" do
+    it "cleans the failed unit and retries when the previous backup failed" do
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
       expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 18 25", {log: true, stdin: nil}).ordered
 
