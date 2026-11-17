@@ -9,8 +9,15 @@ class MinioServer < Sequel::Model
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster, read_only: true
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key
-  plugin SemaphoreMethods, :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning, :switch_to_public_certs, :pin_net_threads, :cert_renewed
+  plugin SemaphoreMethods, :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning, :switch_to_public_certs, :pin_net_threads, :cert_renewed, :configure_metrics
   include HealthMonitorMethods
+  include MetricsTargetMethods
+
+  # Cluster-wide collectors report the same deployment state from every
+  # server, so only the server with the lowest index scrapes them. Per-bucket
+  # usage is left out, as its cardinality grows with the bucket count.
+  NODE_METRICS_PATHS = %w[/api/requests /system /debug/go /scanner].freeze
+  CLUSTER_METRICS_PATHS = %w[/cluster/health /cluster/usage/objects /cluster/erasure-set].freeze
 
   def generate_etc_hosts_entry
     entries = ["127.0.0.1 #{hostname}"]
@@ -56,6 +63,24 @@ class MinioServer < Sequel::Model
     {
       ssh_session:,
       minio_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket")),
+    }
+  end
+
+  def init_metrics_export_session
+    {ssh_session: vm.sshable.start_fresh_session}
+  end
+
+  def metrics_config
+    bearer_token = JWT.encode({sub: cluster.admin_user, iss: "prometheus"}, cluster.admin_password, "HS512")
+    paths = (cluster.servers.first.id == id) ? NODE_METRICS_PATHS + CLUSTER_METRICS_PATHS : NODE_METRICS_PATHS
+
+    {
+      endpoints: paths.map { {url: "https://localhost:9000/minio/metrics/v3#{it}", bearer_token:} },
+      max_file_retention: 120,
+      interval: "15s",
+      additional_labels: {ubicloud_resource_id: cluster.ubid, instance: ubid},
+      metrics_dir: "/home/ubi/minio/metrics",
+      project_id: Config.minio_service_project_id,
     }
   end
 
