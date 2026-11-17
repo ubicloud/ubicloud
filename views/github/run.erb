@@ -13,7 +13,8 @@
    run_path = "#{path(@installation)}/repository/#{@repository.ubid}/run/#{run.create_date}/#{run.run_id}/#{run.run_attempt}"
    workflow_name = @jobs.find(&:workflow_name)&.workflow_name
    badge_class = "inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5"
-   run_status_text, run_status_color = github_workflow_run_status_label(run) %>
+   run_status_text, run_status_color = github_workflow_run_status_label(run)
+   runner_metrics = @project.get_ff_github_runner_metrics %>
 
 <div class="grid grid-cols-1 gap-6">
   <div class="md:flex md:items-start md:justify-between md:gap-4">
@@ -87,6 +88,10 @@
               >
                 Timing
               </th>
+
+              <% if runner_metrics %>
+                <th scope="col" class="pl-3 pr-4 sm:pr-6 py-3.5"><span class="sr-only">Metrics</span></th>
+              <% end %>
             </tr>
           </thead>
         <% end %>
@@ -177,6 +182,13 @@
                     </div>
                   <% end %>
                 </td>
+
+                <% if runner_metrics %>
+                  <td class="pl-3 pr-4 sm:pr-6 py-4 text-right whitespace-nowrap">
+                    <% metrics_link = job.completed? ? "#{run_path}/#{job.job_id}" : "#{path(@installation)}/runner/#{job.ubid}" %>
+                    <%== part("components/button", text: "Metrics", link: metrics_link, icon: "hero-chart-pie") %>
+                  </td>
+                <% end %>
               </tr>
             <% end %>
           <% end %>

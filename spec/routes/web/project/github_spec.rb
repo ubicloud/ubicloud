@@ -422,7 +422,7 @@ RSpec.describe Clover, "github" do
       project.set_ff_github_runner_metrics(true)
       vm = create_vm(project_id: project.id, name: "runner-vm", location_id: Location::GITHUB_RUNNERS_ID)
       runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
-      runner.update(vm_id: vm.id, location_id: vm.location_id, job_id: 123, workflow_name: "test-workflow", job_name: "test-job", job_created_at: Time.now, job_started_at: Time.now)
+      runner.update(vm_id: vm.id, location_id: vm.location_id, run_id: 456, job_id: 123, workflow_name: "test-workflow", job_name: "test-job", job_created_at: Time.now, job_started_at: Time.now)
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
       within("#runner-#{runner.ubid}") { click_link "Metrics" }
@@ -430,7 +430,9 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Runner #{runner.ubid}")
       expect(page).to have_content "my-repo | test-workflow / test-job"
+      expect(page).to have_link "View on GitHub", href: "http://github.com/my-repo/actions/runs/456/job/123"
       expect(page.find_by_id("metrics-container")["data-metrics-url"]).to eq("#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}")
+      expect(page.all("#time-range option").map(&:text)).to eq(["Since the job started"])
       expect(page.all(".metric-chart").map { it["data-metric-key"] }).to eq(Metrics::GITHUB_RUNNER_METRICS.keys.map(&:to_s))
     end
 
@@ -439,6 +441,18 @@ RSpec.describe Clover, "github" do
       runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
 
       expect_runner_load_average_json("#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}", runner.ubid)
+    end
+
+    it "bounds the charts of a runner without a job to the runner's lifetime" do
+      project.set_ff_github_runner_metrics(true)
+      vm = create_vm(project_id: project.id, name: "runner-vm", location_id: Location::GITHUB_RUNNERS_ID)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner.update(vm_id: vm.id, location_id: vm.location_id, created_at: Time.now - 900)
+
+      visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+
+      expect(page.find_by_id("metrics-container")["data-start"]).to eq((runner.created_at - 60).utc.iso8601)
+      expect(page.all("#time-range option").map(&:text)).to eq(["Since the runner started", "Last 5 minutes", "Last 15 minutes"])
     end
 
     it "shows no charts for a runner without a vm" do
@@ -975,6 +989,18 @@ RSpec.describe Clover, "github" do
         expect(row).to have_content "Started just now"
       end
 
+      it "links each job to its runner metrics when the project enables runner metrics" do
+        project.set_ff_github_runner_metrics(true)
+        today = Time.now.utc.to_date
+        create_active_run(1005, run_attempt: 2, status: "in_progress", run_started_at: Time.now - 60)
+        runner = create_runner(30, status: "in_progress", job_started_at: Time.now - 30)
+        create_completed_job(20)
+
+        visit "#{run_path_prefix}/#{today}/1005/2"
+        expect(find_by_id("job-30")).to have_link "Metrics", href: "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+        expect(find_by_id("job-20")).to have_link "Metrics", href: "#{run_path_prefix}/#{today}/1005/2/20"
+      end
+
       it "shows details of a completed workflow run and its jobs" do
         today = Time.now.utc.to_date
         create_completed_run(1005, create_date: today - 2, run_attempt: 2)
@@ -1080,6 +1106,33 @@ RSpec.describe Clover, "github" do
           rows = page.all("dl div").to_h { [it.find("dt").text, it.find("dd").text] }
           expect(rows).to include("Workflow Name" => "-", "Workflow Run" => "Completed 1005-1", "Status" => "Success", "Completed At" => completed_at.getutc.strftime("%Y-%m-%d %H:%M:%S UTC"), "Duration" => "45s")
           expect(rows).not_to have_key "GitHub Workflow Job Duration"
+        end
+
+        it "shows metrics of a completed job for its run window when the project enables runner metrics" do
+          project.set_ff_github_runner_metrics(true)
+          now = Time.now
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2)
+          create_completed_job(20, job_started_at: now - 1200, job_completed_at: now - 5)
+
+          visit "#{run_path_prefix}/#{today}/1005/2/20"
+          expect(page.status_code).to eq(200)
+          container = page.find_by_id("metrics-container")
+          expect(container["data-metrics-url"]).to eq("#{run_path_prefix}/#{today}/1005/2/20")
+          expect(container["data-start"]).to eq((now - 1260).utc.iso8601)
+          expect(container["data-end"]).to eq((now + 55).utc.iso8601)
+          expect(page.all("#time-range option").map(&:text)).to eq(["Whole job", "Last 5 minutes", "Last 15 minutes"])
+          expect(page.all(".metric-chart").map { it["data-metric-key"] }).to eq(Metrics::GITHUB_RUNNER_METRICS.keys.map(&:to_s))
+        end
+
+        it "returns the metrics of a completed job's runner as JSON" do
+          project.set_ff_github_runner_metrics(true)
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2)
+          runner_id = GithubRunner.generate_uuid
+          create_completed_job(20, runner_id:)
+
+          expect_runner_load_average_json("#{run_path_prefix}/#{today}/1005/2/20", UBID.to_ubid(runner_id))
         end
 
         it "returns 404 for missing job" do

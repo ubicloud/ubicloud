@@ -1,9 +1,16 @@
-<%# locals: (resource:, metrics:, running_subject:, nodes: nil, metrics_url: path(resource), available: resource.display_state != "creating") %>
+<%# locals: (resource:, metrics:, running_subject:, nodes: nil, metrics_url: path(resource), available: resource.display_state != "creating", start_time: nil, end_time: nil, window_name: nil) %>
 <div
   id="metrics-container"
   class="p-6"
   data-metrics-url="<%= metrics_url %>"
-  data-zoomable
+  <% if start_time %>
+    data-start="<%= start_time.utc.iso8601 %>"
+    <% if end_time %>
+      data-end="<%= end_time.utc.iso8601 %>"
+    <% end %>
+  <% else %>
+    data-zoomable
+  <% end %>
 >
   <% if available %>
     <div class="mb-4 flex gap-2 justify-end">
@@ -34,15 +41,26 @@
         "
         name="time-range"
       >
-        <option value="30m">Last 30 minutes</option>
-        <option value="1h" selected>Last 1 hour</option>
-        <option value="3h">Last 3 hours</option>
-        <option value="6h">Last 6 hours</option>
-        <option value="12h">Last 12 hours</option>
-        <option value="1d">Last 1 day</option>
-        <option value="2d">Last 2 days</option>
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
+        <% if start_time %>
+          <% window_seconds = (end_time || Time.now) - start_time %>
+          <option value="window" selected><%= window_name %></option>
+
+          <% [[5, "Last 5 minutes"], [15, "Last 15 minutes"], [30, "Last 30 minutes"], [60, "Last 1 hour"], [180, "Last 3 hours"], [360, "Last 6 hours"]].each do |minutes, text| %>
+            <% if minutes * 60 < window_seconds %>
+              <option value="<%= minutes %>m"><%= text %></option>
+            <% end %>
+          <% end %>
+        <% else %>
+          <option value="30m">Last 30 minutes</option>
+          <option value="1h" selected>Last 1 hour</option>
+          <option value="3h">Last 3 hours</option>
+          <option value="6h">Last 6 hours</option>
+          <option value="12h">Last 12 hours</option>
+          <option value="1d">Last 1 day</option>
+          <option value="2d">Last 2 days</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        <% end %>
       </select>
 
       <%== part("components/button", attributes: {id: "refresh-button"}, text: "  Refresh", type: "primary", icon: "hero-refresh") %>

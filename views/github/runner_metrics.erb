@@ -1,5 +1,12 @@
 <% @page_title = "Runner #{@runner.ubid}" %>
 <% @enable_echarts = true %>
+<% if (job_started_at = @runner.job_started_at)
+     window_start = job_started_at
+     window_name = "Since the job started"
+   else
+     window_start = @runner.created_at
+     window_name = "Since the runner started"
+   end %>
 
 <%== render("github/tabbar") %>
 
@@ -17,7 +24,13 @@
       </p>
     </div>
 
-    <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800"><%= @runner.label %></div>
+    <div class="flex items-center gap-3">
+      <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800"><%= @runner.label %></div>
+
+      <% if @runner.has_workflow_job_info? %>
+        <%== part("components/button", text: "View on GitHub", link: @runner.job_url, icon: "github") %>
+      <% end %>
+    </div>
   </div>
 </div>
 
@@ -28,6 +41,8 @@
     metrics: Metrics::GITHUB_RUNNER_METRICS,
     running_subject: "runner",
     metrics_url: "#{path(@installation)}/runner/#{@runner.ubid}",
-    available: @runner.vm_id
+    available: @runner.vm_id,
+    start_time: window_start - 60,
+    window_name:
   ) %>
 </div>

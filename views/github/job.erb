@@ -1,4 +1,6 @@
 <% @page_title = "Workflow Job" %>
+<% runner_metrics = @project.get_ff_github_runner_metrics
+   @enable_echarts = runner_metrics %>
 
 <%== render("github/tabbar") %>
 
@@ -60,4 +62,20 @@
   </div>
 
   <%== part("components/kv_data_card", data:) %>
+
+  <% if runner_metrics %>
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <%== part(
+        "components/metrics_charts",
+        resource: job,
+        metrics: Metrics::GITHUB_RUNNER_METRICS,
+        running_subject: "runner",
+        metrics_url: "#{run_path}/#{job.job_id}",
+        available: true,
+        start_time: job.job_started_at - 60,
+        end_time: (job.job_completed_at || job.completed_at) + 60,
+        window_name: "Whole job"
+      ) %>
+    </div>
+  <% end %>
 </div>
