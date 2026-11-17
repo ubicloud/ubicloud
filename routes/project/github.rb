@@ -26,7 +26,7 @@ class Clover
     r.get web?, "create" do
       session["github_installation_project_id"] = @project.id
 
-      unless session["github_actions_setup"]
+      unless session["github_actions_setup_path"]
         handle_validation_failure("github/index")
         unless @project.has_valid_payment_method?
           raise_web_error("Project doesn't have valid billing information")
