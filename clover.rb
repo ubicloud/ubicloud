@@ -403,7 +403,10 @@ class Clover < Roda
 
     title_instance_variable :@page_title
     check_csrf? false
-    domain URI(Config.base_url).host
+
+    clover_domain = URI(Config.base_url).host.freeze
+    ::OmniAuth.config.allowed_hosts = [Config.test? ? "www.example.com" : clover_domain] # simplecov:disable
+    domain clover_domain
     base_url Config.base_url
     transaction_opts do
       opts = super()
