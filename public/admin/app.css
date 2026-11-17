@@ -231,6 +231,8 @@ h3 { font-size: 1.1em; }
 
 td:has(> .cost) { text-align: right; }
 
+.github-runner-revenue-table td { text-align: center; }
+
 label {
   display: inline-block;
   margin-right: 5px;
