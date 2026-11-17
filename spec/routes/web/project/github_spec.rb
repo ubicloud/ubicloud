@@ -48,6 +48,80 @@ RSpec.describe Clover, "github" do
     expect(page.title).to eq("Ubicloud - Active Runners")
   end
 
+  describe "setup" do
+    before do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    end
+
+    it "can install GitHub app and add payment method from project" do
+      visit "#{project.path}/github/setup"
+
+      expect(page.title).to eq("Ubicloud - GitHub Actions Setup")
+      expect(page).to have_content("Step 2 of 4")
+      expect(page).to have_link("Back", href: project.path)
+      within "#desktop-menu" do
+        expect(page).to have_link("GitHub Runners")
+      end
+
+      click_link "Install the Ubicloud GitHub app"
+      expect(page.driver.request.session["login_redirect"]).to eq("/apps/runner-app/installations/new")
+
+      require "octokit"
+      oauth_client = instance_double(Octokit::Client)
+      adhoc_client = instance_double(Octokit::Client)
+      expect(Github).to receive(:oauth_client).and_return(oauth_client)
+      expect(Octokit::Client).to receive(:new).and_return(adhoc_client)
+      expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
+      expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
+
+      visit "/set_github_installation_project_id/#{project.ubid}"
+      visit "/github/callback?code=123123&installation_id=345"
+      expect(page).to have_current_path("#{project.path}/github/setup")
+      expect(page).to have_content("Step 3 of 4")
+
+      customers_service = instance_double(Stripe::CustomerService)
+      payment_methods_service = instance_double(Stripe::PaymentMethodService)
+      payment_intents_service = instance_double(Stripe::PaymentIntentService)
+      setup_intents_service = instance_double(Stripe::SetupIntentService)
+      checkout_sessions_service = instance_double(Stripe::Checkout::SessionService)
+      expect(StripeClient).to receive_messages(
+        customers: customers_service,
+        payment_methods: payment_methods_service,
+        payment_intents: payment_intents_service,
+        setup_intents: setup_intents_service,
+        checkout: instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service),
+      )
+
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(checkout_sessions_service).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
+      expect(setup_intents_service).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
+      expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from("card" => {"brand" => "visa"}, "billing_details" => {}))
+
+      click_button "Add payment method"
+      expect(page).to have_current_path("#{project.path}/github/setup")
+      expect(page).to have_content("Step 4 of 4")
+      expect(page).to have_flash_notice(/Payment method added successfully/)
+
+      click_link "Go to your runners"
+      expect(page.title).to eq("Ubicloud - Active Runners")
+    end
+
+    it "asks for a project admin to add payment method if user cannot manage billing" do
+      installation
+      AccessControlEntry.dataset.update(action_id: ActionType::NAME_MAP["Project:github"])
+
+      visit "#{project.path}/github/setup"
+
+      expect(page).to have_content("Step 3 of 4")
+      expect(page).to have_no_button("Add payment method")
+      expect(page).to have_content("Ask a project admin to add a payment method.")
+    end
+  end
+
   describe "setting" do
     it "can connect GitHub account" do
       visit "#{project.path}/github"

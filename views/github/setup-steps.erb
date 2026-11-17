@@ -1,4 +1,4 @@
-<%# locals: (step:) %>
+<%# locals: (step:, can_add_payment_method: true) %>
 
 <% steps = ["Create account", "Connect repositories", "Add payment method", "Update workflows"]
 headings = [
@@ -56,22 +56,29 @@ headings = [
         Ubicloud runners are pay-as-you-go, so we need a card on file before your first job can run.
       </p>
 
-      <div class="mt-1 flex">
-        <% form(action: billing_path, method: :post, class: "w-full sm:w-auto") do %>
-          <%== part(
-            "components/button",
-            icon: "hero-banknotes",
-            text: "Add payment method",
-            extra_class: "w-full sm:w-auto min-h-11 sm:min-h-0 px-4"
-          ) %>
-        <% end %>
-      </div>
+      <% if can_add_payment_method %>
+        <div class="mt-1 flex">
+          <% form(action: billing_path, method: :post, class: "w-full sm:w-auto") do %>
+            <%== part(
+              "components/button",
+              icon: "hero-banknotes",
+              text: "Add payment method",
+              extra_class: "w-full sm:w-auto min-h-11 sm:min-h-0 px-4"
+            ) %>
+          <% end %>
+        </div>
 
-      <%== part(
-        "components/onboarding_note",
-        text: "We place a small temporary authorization to verify the card and cancel it right away. " \
-              "Depending on your bank, it can take up to two weeks to drop off your statement."
-      ) %>
+        <%== part(
+          "components/onboarding_note",
+          text: "We place a small temporary authorization to verify the card and cancel it right away. " \
+                "Depending on your bank, it can take up to two weeks to drop off your statement."
+        ) %>
+      <% else %>
+        <%== part(
+          "components/onboarding_note",
+          text: "You don't have permission to manage billing for this project. Ask a project admin to add a payment method."
+        ) %>
+      <% end %>
     <% else %>
       <p class="text-sm leading-6 text-gray-600">
         Change <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">runs-on</code> to a

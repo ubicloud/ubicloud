@@ -36,6 +36,19 @@ class Clover
       r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
     end
 
+    r.get web?, "setup" do
+      @step = if @project.github_installations_dataset.empty?
+        2
+      elsif Config.stripe_secret_key && !@project.billing_info_id
+        3
+      else
+        4
+      end
+
+      session["github_actions_setup_path"] = "#{@project.path}/github/setup" unless @step == 4
+      view "github/setup"
+    end
+
     r.on GITHUB_INSTALLATION_NAME_OR_UBID do |installation_name, installation_id|
       installation = if installation_name
         @project.github_installations_dataset.first(name: installation_name)
