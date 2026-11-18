@@ -63,7 +63,7 @@ class Repartitioner
 
   # Notify the channel that we exist, so that other processes
   # can repartition appropriately if needed.
-  def notify
+  def notify(db: @db)
     db.notify(@channel, payload: @partition_number_string)
   end
 
