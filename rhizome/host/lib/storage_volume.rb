@@ -41,6 +41,8 @@ class StorageVolume
     @slice = params.fetch("slice_name", "system.slice")
     @num_queues = params.fetch("num_queues", 1)
     @queue_size = params.fetch("queue_size", 256)
+    @seg_count_max = Integer(params.fetch("seg_count_max", 4))
+    @seg_size_max = Integer(params.fetch("seg_size_max", 64 * 1024))
     @copy_on_read = params.fetch("copy_on_read", false)
     @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
@@ -285,8 +287,8 @@ class StorageVolume
       "socket" => vhost_sock,
       "num_queues" => @num_queues,
       "queue_size" => @queue_size,
-      "seg_size_max" => 64 * 1024,
-      "seg_count_max" => 4,
+      "seg_size_max" => @seg_size_max,
+      "seg_count_max" => @seg_count_max,
       "copy_on_read" => @copy_on_read,
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
@@ -339,8 +341,8 @@ class StorageVolume
     {
       "num_queues" => @num_queues,
       "queue_size" => @queue_size,
-      "seg_size_max" => 64 * 1024,
-      "seg_count_max" => 4,
+      "seg_size_max" => @seg_size_max,
+      "seg_count_max" => @seg_count_max,
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
     }

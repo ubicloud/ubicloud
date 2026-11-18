@@ -599,10 +599,31 @@ RSpec.describe StorageVolume do
           lines.include?("include = [\"vhost-backend-stripe-source.conf\", \"vhost-backend-secrets.conf\"]") &&
             lines.include?("[device]") &&
             lines.include?("[tuning]") &&
+            lines.include?("seg_count_max = 4") &&
+            lines.include?("seg_size_max = 65536") &&
             !lines.include?("[danger_zone]")
         })
 
       encrypted_vhost_v2_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "writes the segment limits given in the volume params to the v2 config" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+        "seg_count_max" => 64,
+        "seg_size_max" => 4096,
+      })
+      expect(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend-secrets.conf", anything)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+        lines = content.split("\n")
+        lines.include?("seg_count_max = 64") && lines.include?("seg_size_max = 4096")
+      })
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
 
     it "writes v2 config with archive source" do
