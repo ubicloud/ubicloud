@@ -37,7 +37,7 @@ module Ubicloud
     # Use Net::HTTP to submit a request to the Ubicloud API.
     def call(method, path, params: nil, missing: :raise)
       Net::HTTP.start(@base_uri.hostname, @base_uri.port, use_ssl: @base_uri.scheme == "https") do |http|
-        path = URI.join(@base_uri, path).path
+        path = URI.join(@base_uri, path).request_uri
 
         response = case method
         when "GET"

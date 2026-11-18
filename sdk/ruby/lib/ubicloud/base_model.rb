@@ -29,7 +29,7 @@ module Ubicloud
   module BaseList
     # Return a list of model instances.
     def list(adapter)
-      adapter.get(fragment)[:items].map { new(adapter, it) }
+      _list_items(adapter, fragment).map { new(adapter, it) }
     end
   end
 
@@ -54,6 +54,24 @@ module Ubicloud
       end
 
       private
+
+      # Retrieve all items at the given path, following the start_after
+      # cursor until every page has been read.  Endpoints that do not paginate
+      # (no +count+ in the response) return a single page.
+      def _list_items(adapter, path)
+        items = []
+        params = nil
+        loop do
+          page = adapter.get(path, params)
+          page_items = page[:items]
+          items.concat(page_items)
+          count = page[:count]
+          break if count.nil? || page_items.empty? || items.length >= count
+
+          params = {start_after: page_items.last[:id]}
+        end
+        items
+      end
 
       # Used by models to set defaults for parameters.  Overrides the _create_params
       # method using the given block.  The block should mutate the parameter hash.

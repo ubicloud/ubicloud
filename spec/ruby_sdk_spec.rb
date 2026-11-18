@@ -56,6 +56,26 @@ RSpec.describe Ubicloud do
     expect(ubi.vm.new(location: "eu-central-h1", name: "test-vm", firewalls: object).firewalls).to eq object
   end
 
+  it "Model.list retrieves all pages" do
+    adapter = instance_double(Ubicloud::Adapter)
+    expect(adapter).to receive(:get).with("vm", nil).and_return({items: [{id: "a"}, {id: "b"}], count: 3})
+    expect(adapter).to receive(:get).with("vm", {start_after: "b"}).and_return({items: [{id: "c"}], count: 3})
+    expect(Ubicloud::Vm.list(adapter).map { it.values[:id] }).to eq(%w[a b c])
+  end
+
+  it "BaseList.list retrieves all pages" do
+    adapter = instance_double(Ubicloud::Adapter)
+    expect(adapter).to receive(:get).with("github", nil).and_return({items: [{id: "a"}], count: 2})
+    expect(adapter).to receive(:get).with("github", {start_after: "a"}).and_return({items: [{id: "b"}], count: 2})
+    expect(Ubicloud::GithubInstallation.list(adapter).map { it.values[:id] }).to eq(%w[a b])
+  end
+
+  it "BaseList.list handles responses without count" do
+    adapter = instance_double(Ubicloud::Adapter)
+    expect(adapter).to receive(:get).with("ssh-public-key", nil).and_return({items: [{id: "a"}, {id: "b"}]})
+    expect(Ubicloud::SshPublicKey.list(adapter).map { it.values[:id] }).to eq(%w[a b])
+  end
+
   it "Model.list raises for location including /" do
     expect { ubi.vm.list(location: "foo/bar") }.to raise_error(Ubicloud::Error, "invalid location: \"foo/bar\"")
   end
@@ -540,6 +560,12 @@ RSpec.describe Ubicloud do
 
   describe Ubicloud::Adapter::NetHttp do
     let(:adapter) { described_class.new(token: "foo", project_id: "pj", base_uri: "http://localhost") }
+
+    it "includes the query string in GET requests" do
+      stub_request(:get, "http://localhost/project/pj/vm?start_after=abc")
+        .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
+      expect(adapter.get("vm", {start_after: "abc"})).to eq({})
+    end
 
     it "sends expected headers for GET requests" do
       stub_request(:get, "http://localhost/project/pj/headers")
