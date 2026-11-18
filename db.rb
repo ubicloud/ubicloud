@@ -38,7 +38,8 @@ max_connections ||= Config.db_pool - 1
 pool_timeout ||= Config.database_timeout
 
 pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
-DB = Sequel.connect(database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:, connect_opts_proc:)
+DB_OPTS = {max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:, connect_opts_proc:}
+DB = Sequel.connect(database_url, **DB_OPTS)
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)

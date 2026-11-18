@@ -7,7 +7,7 @@ class Repartitioner
 
   def initialize(partition_number:, channel:, listen_timeout:, recheck_seconds:, stale_seconds:, max_partition:)
     @partition_number = partition_number
-    @db = Sequel.connect(DB.url, single_threaded: true, port: 5432, keep_reference: false)
+    @db = Sequel.connect(DB.url, **DB_OPTS, single_threaded: true, port: 5432, keep_reference: false)
 
     # Assume when starting that we are the final partition. For cases where we aren't,
     # this will quickly be updated after startup.
