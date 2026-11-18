@@ -644,6 +644,7 @@ let metricsZoomRange = null;
 // Metrics are sampled too sparsely to render windows narrower than the
 // smallest time-range preset (30 minutes) without gaps.
 const MIN_ZOOM_WINDOW_MS = 30 * 60 * 1000;
+const darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 const colorPalette = [
   {
     color: '#5470c6',
@@ -690,7 +691,7 @@ function setupMetricsCharts() {
       key: metricKey,
       unit: chart.getAttribute('data-metric-unit'),
       zoomable,
-      chart: echarts.init(chart)
+      chart: echarts.init(chart, darkMode ? 'dark' : null)
     };
     metricsCharts.push(chartInstance);
     setupInitialChartOptions(chartInstance);
@@ -730,9 +731,11 @@ function setupMetricsCharts() {
 
 function setupInitialChartOptions(chartInstance) {
   const options = {
+    backgroundColor: 'transparent',
     color: colorPalette.map(p => p.color),
     tooltip: {
       trigger: 'axis',
+      ...(darkMode && { backgroundColor: '#292524', borderColor: '#44403c', textStyle: { color: '#f5f5f4' } }),
       formatter: function (params) {
         const isoDate = toLocalISOString(new Date(params[0].value[0]));
 
@@ -996,7 +999,7 @@ function updateMetricsCharts() {
   }
 
   for (const chartInstance of metricsCharts) {
-    chartInstance.chart.showLoading();
+    chartInstance.chart.showLoading(darkMode ? { maskColor: 'rgba(28, 25, 23, 0.8)', textColor: '#f5f5f4' } : {});
     queryAndUpdateChart(chartInstance, start_time, end_time);
   }
 }
