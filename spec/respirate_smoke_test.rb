@@ -56,7 +56,7 @@ ds = Strand.where(id: strands.map(&:id))
 r, w = IO.pipe
 output = +""
 Thread.new do
-  output << r.read(4096).to_s
+  output << r.read(40960).to_s
 end
 time = Time.now
 

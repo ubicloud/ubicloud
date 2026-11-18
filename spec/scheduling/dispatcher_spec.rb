@@ -27,7 +27,7 @@ RSpec.describe Scheduling::Dispatcher do
     it "automatically retries block on disconnect error" do
       i = 0
       expect(di).to receive(:sleep).twice
-      v = di.handle_disconnects("") do
+      v = di.handle_disconnects("", db: DB) do
         i += 1
         case i
         when 1
@@ -43,7 +43,13 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "raises and emits for other exceptions" do
       expect(Clog).to receive(:emit)
-      expect { di.handle_disconnects("foo") { raise "bar" } }.to raise_error(RuntimeError)
+      expect { di.handle_disconnects("foo", db: DB) { raise "bar" } }.to raise_error(RuntimeError)
+    end
+
+    it "synchronizes on the given database" do
+      db = Sequel.mock
+      expect(db).to receive(:synchronize).and_call_original
+      expect(di.handle_disconnects("", db:) { 1 }).to eq 1
     end
   end
 
