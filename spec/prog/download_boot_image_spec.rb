@@ -59,18 +59,13 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.latest_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
 
-    it "excludes the pinned two-layer test image from the latest github version" do
-      allow(Config).to receive(:is_e2e).and_return(false)
-      keys = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2604", vm_host.arch).keys
-      expect(keys).to include(VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
-      expect(dbi.latest_boot_image_version("github-ubuntu-2604")).not_to eq(VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
-    end
-
-    it "resolves the two-layer test image as the latest github version in e2e" do
-      allow(Config).to receive(:is_e2e).and_return(true)
-      keys = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2604", vm_host.arch).keys
-      expect(dbi.latest_boot_image_version("github-ubuntu-2604")).to eq(keys.max)
-      expect(dbi.latest_boot_image_version("github-ubuntu-2604")).to eq(VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
+    [false, true].each do |is_e2e|
+      it "excludes the pinned two-layer test image from the latest github version (e2e: #{is_e2e})" do
+        allow(Config).to receive(:is_e2e).and_return(is_e2e)
+        keys = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2604", vm_host.arch).keys
+        expect(keys).to include(VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
+        expect(dbi.latest_boot_image_version("github-ubuntu-2604")).not_to eq(VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
+      end
     end
   end
 
