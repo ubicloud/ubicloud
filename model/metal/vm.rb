@@ -127,6 +127,19 @@ class Vm < Sequel::Model
       )
     end
 
+    RUNNER_STORAGE_TUNING = {
+      "allow_disposable_volume_optimizations" => true,
+      "stripe_sector_count_shift" => 6,
+      "seg_count_max" => 64,
+      "seg_size_max" => 4096,
+    }.freeze
+
+    def runner_storage_tuning?(volume)
+      location_id == Location::GITHUB_RUNNERS_ID &&
+        !volume.two_layer_boot? &&
+        !!volume.vhost_block_backend&.supports_disposable_volume_optimizations?
+    end
+
     def storage_volumes
       if vm_host_slice
         pool_cpus = (vm_host_slice.cpus.map(&:cpu_number) +
@@ -161,6 +174,7 @@ class Vm < Sequel::Model
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id
           v["boost_io_until_caught_up"] = true if s.boost_io_until_caught_up?
+          v.merge!(RUNNER_STORAGE_TUNING) if runner_storage_tuning?(s)
         }
 
         next [volume] unless s.two_layer_boot?
