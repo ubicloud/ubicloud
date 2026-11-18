@@ -1,0 +1,12 @@
+<% @page_title = "Prepayments" %>
+
+<p>
+  Completed checkout sessions for the last 100 payments made through the selected Stripe payment link.
+</p>
+
+<% form({id: "prepayments-search"}, wrapper: :div) do |f| %>
+  <%== f.input(:text, key: "payment_link", label: "Payment Link ID", value: @payment_link, required: true) %>
+  <%== f.button("Show Prepayments") %>
+<% end %>
+
+<%== part("components/table", title: "Prepayments (#{@data.count})", table_class: "prepayment-table", data: @data, use_admin_label: false) %>

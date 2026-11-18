@@ -487,6 +487,8 @@ class CloverAdmin < Roda
 
   BILLING_COUNTRY_OPTIONS = ISO3166::Country.all.reject { Config.sanctioned_countries.include?(it.alpha2) }.sort_by!(&:common_name).map! { [it.common_name, it.alpha2].freeze }.freeze
 
+  PREPAYMENT_PAYMENT_LINK_ID = "plink_1T1jl7KqCBxw0BKSFG3glmJG"
+
   Object.new.instance_exec do
     def model(...)
       ObjectModelDSL.new(...)
@@ -2516,6 +2518,39 @@ class CloverAdmin < Roda
         end
 
       view("customer_usage")
+    end
+
+    r.get "prepayments" do
+      @payment_link = typecast_params.nonempty_str("payment_link") || PREPAYMENT_PAYMENT_LINK_ID
+      @data = []
+
+      unless Config.stripe_secret_key
+        flash.now["error"] = "Stripe is not configured"
+        next view("prepayments")
+      end
+
+      begin
+        sessions = StripeClient.checkout.sessions.list(
+          {payment_link: @payment_link, status: "complete", limit: 100},
+        ).auto_paging_each.to_a
+      rescue Stripe::StripeError => e
+        flash.now["error"] = "Failed to fetch Stripe checkout sessions: #{e.message}"
+        next view("prepayments")
+      end
+
+      @data = sessions.map do |session|
+        {
+          "Created" => Time.at(session.created).utc.strftime("%Y-%m-%d %H:%M"),
+          "Payment Intent" => session.payment_intent.to_s,
+          "Customer" => session.customer.to_s,
+          "Email" => session.customer_details&.email.to_s,
+          "Amount" => format("%.2f", session.amount_total.to_i / 100.0),
+          "Currency" => session.currency.to_s.upcase,
+          "Status" => session.payment_status,
+        }
+      end
+
+      view("prepayments")
     end
 
     r.get "unpaid-invoices" do

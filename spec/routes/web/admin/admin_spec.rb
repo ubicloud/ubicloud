@@ -4528,6 +4528,87 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Invoice #{other_sep.ubid}"
   end
 
+  it "lists completed prepayments from the Stripe payment link" do
+    expect(Config).to receive(:stripe_secret_key).with(no_args).and_return("secret_key")
+
+    sessions = [
+      Stripe::StripeObject.construct_from(
+        created: Time.utc(2026, 11, 10, 12, 34).to_i,
+        payment_intent: "pi_prepay_1",
+        customer: "cus_prepay_1",
+        customer_details: {email: "first@example.com"},
+        amount_total: 12_345,
+        currency: "usd",
+        payment_status: "paid",
+      ),
+      Stripe::StripeObject.construct_from(
+        created: Time.utc(2026, 11, 11, 1, 2).to_i,
+        payment_intent: "pi_prepay_2",
+        customer: nil,
+        customer_details: nil,
+        amount_total: 1_000,
+        currency: "usd",
+        payment_status: "paid",
+      ),
+    ]
+    checkout_sessions_service = instance_double(Stripe::Checkout::SessionService)
+    expect(checkout_sessions_service).to receive(:list)
+      .with({payment_link: "plink_1T1jl7KqCBxw0BKSFG3glmJG", status: "complete", limit: 100})
+      .and_return(instance_double(Stripe::ListObject, auto_paging_each: sessions.each))
+    expect(StripeClient).to receive(:checkout).with(no_args).and_return(instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service))
+
+    click_link "Prepayments"
+    expect(page.title).to eq "Ubicloud Admin - Prepayments"
+    expect(page).to have_content("Completed checkout sessions for the last 100 payments made through the selected Stripe payment link.")
+    expect(page).to have_field("Payment Link ID", with: "plink_1T1jl7KqCBxw0BKSFG3glmJG")
+    expect(page.all(".prepayment-table thead th").map(&:text)).to eq ["Created", "Payment Intent", "Customer", "Email", "Amount", "Currency", "Status"]
+    expect(page.all(".prepayment-table tbody tr").map { it.all("td").map(&:text) }).to eq [
+      ["2026-11-10 12:34", "pi_prepay_1", "cus_prepay_1", "first@example.com", "123.45", "USD", "paid"],
+      ["2026-11-11 01:02", "pi_prepay_2", "", "", "10.00", "USD", "paid"],
+    ]
+  end
+
+  it "allows changing the prepayment payment link" do
+    expect(Config).to receive(:stripe_secret_key).with(no_args).twice.and_return("secret_key")
+
+    empty_list = -> { instance_double(Stripe::ListObject, auto_paging_each: [].each) }
+    checkout_sessions_service = instance_double(Stripe::Checkout::SessionService)
+    expect(checkout_sessions_service).to receive(:list)
+      .with({payment_link: "plink_1T1jl7KqCBxw0BKSFG3glmJG", status: "complete", limit: 100})
+      .and_return(empty_list.call)
+    expect(checkout_sessions_service).to receive(:list)
+      .with({payment_link: "plink_custom", status: "complete", limit: 100})
+      .and_return(empty_list.call)
+    expect(StripeClient).to receive(:checkout).with(no_args).twice.and_return(instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service))
+
+    visit "/prepayments"
+    fill_in "Payment Link ID", with: "plink_custom"
+    click_button "Show Prepayments"
+
+    expect(page).to have_field("Payment Link ID", with: "plink_custom")
+    expect(page).to have_content("No data available")
+  end
+
+  it "shows an error when Stripe is not configured for prepayments" do
+    expect(Config).to receive(:stripe_secret_key).with(no_args).and_return(nil).at_least(:once)
+
+    visit "/prepayments"
+    expect(page).to have_flash_error("Stripe is not configured")
+    expect(page).to have_content("No data available")
+  end
+
+  it "shows an error when fetching prepayments fails" do
+    expect(Config).to receive(:stripe_secret_key).with(no_args).and_return("secret_key")
+    checkout_sessions_service = instance_double(Stripe::Checkout::SessionService)
+    expect(checkout_sessions_service).to receive(:list)
+      .with({payment_link: "plink_1T1jl7KqCBxw0BKSFG3glmJG", status: "complete", limit: 100})
+      .and_raise(Stripe::StripeError.new("network down"))
+    expect(StripeClient).to receive(:checkout).with(no_args).and_return(instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service))
+
+    visit "/prepayments"
+    expect(page).to have_flash_error("Failed to fetch Stripe checkout sessions: network down")
+  end
+
   it "shows accounts grouped by IP address, ordered by last account creation" do
     fraud1 = create_account("fraud1@ibi.com", with_project: false)
     fraud2 = create_account("fraud2@ibi.com", with_project: false)
