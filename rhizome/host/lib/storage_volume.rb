@@ -46,6 +46,7 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
+    @allow_disposable_volume_optimizations = params.fetch("allow_disposable_volume_optimizations", false)
     @allowed_cpus = params["allowed_cpus"]
     @archive_source = params["archive_source"]
     @remote_source = params["remote_source"]
@@ -121,6 +122,10 @@ class StorageVolume
   end
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    if @allow_disposable_volume_optimizations && !vhost_backend.supports_disposable_volume_optimizations?
+      fail "vhost block backend version #{@vhost_backend_version} does not support disposable volume optimizations"
+    end
+
     if use_config_v2?
       write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if has_source?
       write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets))
@@ -310,12 +315,18 @@ class StorageVolume
   end
 
   def v2_main_toml
-    PerfectTOML.generate({
+    tables = {
       "include" => v2_includes,
       "device" => v2_device_table,
       "tuning" => v2_tuning_table,
       "encryption" => v2_encryption_table,
-    })
+    }
+    tables["danger_zone"] = v2_danger_zone_table if @allow_disposable_volume_optimizations
+    PerfectTOML.generate(tables)
+  end
+
+  def v2_danger_zone_table
+    {"enabled" => true, "allow_disposable_volume_optimizations" => true}
   end
 
   def v2_includes

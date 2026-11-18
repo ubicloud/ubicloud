@@ -37,6 +37,16 @@ RSpec.describe VhostBlockBackend do
     end
   end
 
+  describe "#supports_disposable_volume_optimizations?" do
+    it "returns true for v0.7.0 and later" do
+      expect(described_class.new("v0.7.0").supports_disposable_volume_optimizations?).to be true
+    end
+
+    it "returns false for versions before v0.7.0" do
+      expect(described_class.new("v0.6.0").supports_disposable_volume_optimizations?).to be false
+    end
+  end
+
   describe "#supports_stats_rpc?" do
     it "returns true for v0.4.0 and later" do
       expect(v042.supports_stats_rpc?).to be true
