@@ -435,6 +435,41 @@ RSpec.describe Vm do
       ])
     end
 
+    it "tunes ubiblk volumes of github runners for single use" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      vbb.update(version: "v0.7.0")
+      volumes = vm.storage_volumes
+      expect(volumes[1]).to include(
+        "allow_disposable_volume_optimizations" => true, "stripe_sector_count_shift" => 6,
+        "seg_count_max" => 64, "seg_size_max" => 4096,
+      )
+      expect(volumes[0]).not_to have_key("allow_disposable_volume_optimizations")
+    end
+
+    it "does not tune github runner volumes booting the two-layer image" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      vbb.update(version: "v0.7.0")
+      boot_image.update(name: "github-ubuntu-2604-x64", version: VmStorageVolume::TWO_LAYER_IMAGE_VERSION)
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(vhost_block_backend_id: vbb.id, vring_workers: 1, spdk_installation_id: nil)
+      volumes = vm.storage_volumes
+      expect(volumes.size).to eq(3)
+      expect(volumes[0..1].map { it.keys & Vm::Metal::RUNNER_STORAGE_TUNING.keys }).to eq([[], []])
+      expect(volumes[2]).to include("allow_disposable_volume_optimizations" => true)
+    end
+
+    it "does not tune github runner volumes on a ubiblk without the optimizations" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(vm.storage_volumes[1]).not_to have_key("allow_disposable_volume_optimizations")
+    end
+
+    it "does not tune volumes outside github runners" do
+      vbb.update(version: "v0.7.0")
+      volumes = vm.storage_volumes
+      expect(volumes[1]).not_to have_key("allow_disposable_volume_optimizations")
+      expect(volumes[1]).not_to have_key("stripe_sector_count_shift")
+      expect(volumes[1]).not_to have_key("seg_count_max")
+    end
+
     it "includes track_written true when set on a volume" do
       VmStorageVolume.where(vm_id: vm.id, disk_index: 1).update(track_written: true)
       volumes = vm.storage_volumes

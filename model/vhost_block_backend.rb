@@ -6,6 +6,7 @@ class VhostBlockBackend < Sequel::Model
   MIN_REMOTE_STORAGE_SERVER_VERSION = 500
   MIN_ARCHIVE_SUPPORT_VERSION = 401
   MIN_DUMP_METADATA_SUPPORT_VERSION = 400
+  MIN_DISPOSABLE_VOLUME_OPTIMIZATIONS_VERSION = 700
 
   plugin ResourceMethods, etc_type: true
 
@@ -23,6 +24,10 @@ class VhostBlockBackend < Sequel::Model
 
   def supports_dump_metadata?
     version_code >= MIN_DUMP_METADATA_SUPPORT_VERSION
+  end
+
+  def supports_disposable_volume_optimizations?
+    version_code >= MIN_DISPOSABLE_VOLUME_OPTIMIZATIONS_VERSION
   end
 end
 
