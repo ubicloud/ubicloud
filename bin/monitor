@@ -107,7 +107,7 @@ end
 # all monitor processes know the expected partitioning. The rand is to avoid thundering herd issues.
 sleep(1 + rand)
 3.times do
-  repartitioner.notify
+  repartitioner.notify(db: DB)
   sleep 1
 end
 
