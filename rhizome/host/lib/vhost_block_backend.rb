@@ -27,6 +27,7 @@ class VhostBlockBackend
     parsed = Gem::Version.new(version.delete_prefix("v"))
     @v0_4_or_later = parsed >= Gem::Version.new("0.4.0")
     @v0_5_or_later = parsed >= Gem::Version.new("0.5.0")
+    @v0_7_or_later = parsed >= Gem::Version.new("0.7.0")
   end
 
   def config_v2?
@@ -41,6 +42,13 @@ class VhostBlockBackend
   # ships from v0.5.0 onwards.
   def supports_remote_stripe_server?
     @v0_5_or_later
+  end
+
+  # Under the danger_zone flag, v0.7.0 keeps the stripe map in RAM and
+  # serves reads of unfetched stripes from the image. v0.6.0 accepted the
+  # flag under another name.
+  def supports_disposable_volume_optimizations?
+    @v0_7_or_later
   end
 
   def supports_stats_rpc?

@@ -626,6 +626,40 @@ RSpec.describe StorageVolume do
       sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
 
+    it "enables disposable volume optimizations in the v2 config when asked" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.7.0",
+        "allow_disposable_volume_optimizations" => true,
+      })
+      expect(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend-secrets.conf", anything)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+        lines = content.split("\n")
+        lines.include?("[danger_zone]") &&
+          lines.include?("enabled = true") &&
+          lines.include?("allow_disposable_volume_optimizations = true")
+      })
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "refuses disposable volume optimizations before ubiblk v0.7.0" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.6.0",
+        "allow_disposable_volume_optimizations" => true,
+      })
+      expect(sv).not_to receive(:write_config_file)
+      expect { sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets) }
+        .to raise_error(RuntimeError, "vhost block backend version v0.6.0 does not support disposable volume optimizations")
+    end
+
     it "writes v2 config with archive source" do
       sv = described_class.new("test", {
         "disk_index" => 2,
