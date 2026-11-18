@@ -194,13 +194,49 @@ RSpec.describe Minio::Client do
 
     it "properly lists objects with or without continuation-token" do
       stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 200, body: xml_with_continuation_token)
-      stub_request(:get, "#{endpoint}/test?continuation-token=ct&delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1&start-after=ct").to_return(status: 200, body: xml_without_continuation_token)
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1&continuation-token=ct").to_return(status: 200, body: xml_without_continuation_token)
       expect(minio_client.list_objects("test", "folder_path", max_keys: 1).map(&:key)).to eq(["name1", "name2"])
+    end
+
+    it "returns a page and its continuation token" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 200, body: xml_with_continuation_token)
+      objects, token = minio_client.list_objects_page("test", "folder_path", max_keys: 1)
+      expect(objects.map(&:key)).to eq(["name1"])
+      expect(token).to eq("ct")
+    end
+
+    it "returns a nil token on the last page" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 200, body: xml_without_continuation_token)
+      objects, token = minio_client.list_objects_page("test", "folder_path", max_keys: 1)
+      expect(objects.map(&:key)).to eq(["name2"])
+      expect(token).to be_nil
+    end
+
+    it "sends continuation-token instead of start-after once paging" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1&continuation-token=ct").to_return(status: 200, body: xml_without_continuation_token)
+      objects, token = minio_client.list_objects_page("test", "folder_path", max_keys: 1, start_after: "name1", token: "ct")
+      expect(objects.map(&:key)).to eq(["name2"])
+      expect(token).to be_nil
+    end
+
+    it "returns an empty page for a non existent bucket" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 404)
+      expect(minio_client.list_objects_page("test", "folder_path", max_keys: 1)).to eq([[], nil])
     end
 
     it "returns empty list for non existent bucket" do
       stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 404)
       expect(minio_client.list_objects("test", "folder_path", max_keys: 1)).to eq([])
+    end
+
+    it "passes start-after when given" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1&start-after=name1").to_return(status: 200, body: xml_without_continuation_token)
+      expect(minio_client.list_objects("test", "folder_path", max_keys: 1, start_after: "name1").map(&:key)).to eq(["name2"])
+    end
+
+    it "omits start-after when not given" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 200, body: xml_without_continuation_token)
+      expect(minio_client.list_objects("test", "folder_path", max_keys: 1).map(&:key)).to eq(["name2"])
     end
   end
 
