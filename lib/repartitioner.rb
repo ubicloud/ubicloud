@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 class Repartitioner
-  attr_reader :strand_id_range
+  attr_reader :strand_id_range, :db
 
   attr_accessor :repartitioned
 
   def initialize(partition_number:, channel:, listen_timeout:, recheck_seconds:, stale_seconds:, max_partition:)
     @partition_number = partition_number
+    @db = Sequel.connect(DB.url, single_threaded: true, port: 5432, keep_reference: false)
 
     # Assume when starting that we are the final partition. For cases where we aren't,
     # this will quickly be updated after startup.
@@ -63,7 +64,7 @@ class Repartitioner
   # Notify the channel that we exist, so that other processes
   # can repartition appropriately if needed.
   def notify
-    DB.notify(@channel, payload: @partition_number_string)
+    db.notify(@channel, payload: @partition_number_string)
   end
 
   # Listens on the channel to determine what other processes are
@@ -86,7 +87,7 @@ class Repartitioner
     # Continuouly LISTENs for notifications on the channel until shutdown.
     # If notified about a higher partition number than the currently expected
     # partitioning, repartition the current process to decrease the partition size.
-    DB.listen(@channel, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
+    db.listen(@channel, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
       throw :stop if @shutdown
 
       unless (notify_partition_num = Integer(payload, exception: false)) && allowed_partition_range.cover?(notify_partition_num)
