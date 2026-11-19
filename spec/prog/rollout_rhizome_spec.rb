@@ -14,9 +14,9 @@ RSpec.describe Prog::RolloutRhizome do
   }
   let(:project_id) { Project.create(name: "RolloutRhizomeTest").id }
 
-  let(:fsn1_host) { create_vm_host(created_at: Time.utc(2024, 1, 1), location_id: Location::HETZNER_FSN1_ID) }
+  let(:fsn1_host) { create_host_with_boot_image(created_at: Time.utc(2024, 1, 1), location_id: Location::HETZNER_FSN1_ID) }
   let(:hel1_host) { create_vm_host(created_at: Time.utc(2024, 1, 2), location_id: Location::HETZNER_HEL1_ID) }
-  let(:wdc2_host) { create_vm_host(created_at: Time.utc(2024, 1, 3), location_id: Location::LEASEWEB_WDC02_ID) }
+  let(:wdc2_host) { create_host_with_boot_image(created_at: Time.utc(2024, 1, 3), location_id: Location::LEASEWEB_WDC02_ID) }
   let(:ghr_hosts) {
     [
       create_vm_host(created_at: Time.utc(2024, 1, 4), arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID),
@@ -34,6 +34,12 @@ RSpec.describe Prog::RolloutRhizome do
       *ghr_hosts,
     ]
   }
+
+  def create_host_with_boot_image(**)
+    host = create_vm_host(**)
+    BootImage.create(name: Config.default_boot_image_name, version: "20240101", vm_host_id: host.id, activated_at: Time.now, size_gib: 3)
+    host
+  end
 
   describe ".assemble" do
     it "creates strand with hosts to rollout to" do
@@ -81,6 +87,19 @@ RSpec.describe Prog::RolloutRhizome do
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: fsn1_host.id).populate_ipv4_addresses
       Address.create(cidr: "2.1.1.0/30", routed_to_host_id: wdc2_host.id).populate_ipv4_addresses
       st = described_class.assemble(vm_project_id: project_id)
+
+      expect(st.stack.first["initial_host_ids"]).to eq([wdc2_host.id])
+    end
+
+    it "skips an initial host without the default boot image" do
+      fsn1_host.boot_images_dataset.destroy
+      BootImage.create(name: "ubuntu-jammy", version: "20240101", vm_host_id: fsn1_host.id, activated_at: Time.now, size_gib: 3)
+
+      expect(st.stack.first["initial_host_ids"]).to eq([wdc2_host.id])
+    end
+
+    it "skips an initial host whose default boot image is not activated" do
+      fsn1_host.boot_images_dataset.update(activated_at: nil)
 
       expect(st.stack.first["initial_host_ids"]).to eq([wdc2_host.id])
     end

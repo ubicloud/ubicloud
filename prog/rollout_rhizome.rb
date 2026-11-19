@@ -24,6 +24,7 @@ class Prog::RolloutRhizome < Prog::Base
           .where(Sequel[:address][:routed_to_host_id] => Sequel[:vm_host][:id])
           .exists,
       )
+      .where(id: BootImage.where(name: Config.default_boot_image_name).exclude(activated_at: nil).select(:vm_host_id))
 
     initial_host_ids = [
       initial_vm_host_ds.where(location_id: Location::HETZNER_FSN1_ID).get(:id),
