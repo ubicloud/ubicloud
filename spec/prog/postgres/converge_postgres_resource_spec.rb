@@ -559,9 +559,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.upgrade_standby }.to hop("update_metadata")
     end
 
-    it "hops to upgrade_failed when upgrade fails" do
+    it "records the failure time and hops to upgrade_failed when upgrade fails" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
       expect { nx.upgrade_standby }.to hop("upgrade_failed")
+      expect(Time.parse(nx.strand.stack[0]["upgrade_failed_at"])).to be_within(5).of(Time.now)
     end
 
     it "starts upgrade when not started" do

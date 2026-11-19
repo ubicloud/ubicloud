@@ -1758,6 +1758,15 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
       end
 
+      it "returns the failure time of a failed upgrade" do
+        pg.update(target_version: "17")
+        Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("upgrade_status" => "failed", "upgrade_failed_at" => "2026-11-19T10:00:00Z")
+      end
+
       it "no ongoing upgrade" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
 

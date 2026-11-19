@@ -7,6 +7,7 @@ class Serializers::PostgresUpgrade < Serializers::Base
       target_version: postgres_resource.target_version,
       upgrade_status: postgres_resource.upgrade_status,
       upgrade_stage: postgres_resource.upgrade_stage,
+      upgrade_failed_at: postgres_resource.upgrade_failed_at&.utc&.iso8601,
     }
   end
 end

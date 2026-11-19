@@ -5432,6 +5432,11 @@ components:
               upgrade_stage:
                 type: string
                 nullable: true
+              upgrade_failed_at:
+                description: Time of the upgrade failure, if the upgrade failed
+                type: string
+                format: date-time
+                nullable: true
             additionalProperties: false
             required:
               - current_version

@@ -12,6 +12,14 @@ class UbiCli
       body << "Major version upgrade of PostgreSQL database #{sdk_object.id} to version #{upgrade_status[:target_version]}\n"
       body << "Status: #{upgrade_status[:upgrade_status]}\n"
       body << "Stage: #{upgrade_status[:upgrade_stage] || "N/A"}\n"
+      if upgrade_status[:upgrade_status] == "failed"
+        logs_cmd = "ubi pg #{@location}/#{@name} get-logs --stream-name upgrade -l 500"
+        if (failed_at = upgrade_status[:upgrade_failed_at])
+          failed_at = Time.parse(failed_at)
+          logs_cmd << " --start #{(failed_at - 60 * 60).utc.iso8601} --end #{(failed_at + 60).utc.iso8601}"
+        end
+        body << "\nTo find the cause of the failure, see the upgrade logs:\n  #{logs_cmd}\n"
+      end
       response(body)
     end
   end

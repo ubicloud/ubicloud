@@ -38,6 +38,15 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
     expect(output).to include("Major version upgrade of PostgreSQL database #{@pg.ubid} to version 17")
     expect(output).to include("Status: failed")
     expect(output).to include("Stage: upgrade_failed")
+    expect(output).to include("ubi pg #{@ref} get-logs --stream-name upgrade -l 500\n")
+  end
+
+  it "shows the upgrade logs command for the time of the failure" do
+    @pg.update(target_version: 17)
+    Strand.create(parent_id: @pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+
+    output = cli(%W[pg #{@ref} show-upgrade-status])
+    expect(output).to include("ubi pg #{@ref} get-logs --stream-name upgrade -l 500 --start 2026-11-19T09:00:00Z --end 2026-11-19T10:01:00Z\n")
   end
 
   it "shows upgrade stage N/A when strand unavailable" do

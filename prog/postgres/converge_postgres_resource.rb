@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_failed_at
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -96,6 +96,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       upgrade_candidate.vm.sshable.d_clean("upgrade_postgres")
       hop_update_metadata
     when "Failed"
+      self.upgrade_failed_at = time_string(Time.now)
       hop_upgrade_failed
     when "NotStarted"
       args = [postgres_resource.target_version]

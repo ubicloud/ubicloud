@@ -53,6 +53,8 @@ end %>
     <% if @pg.upgrade_stage == "upgrade_failed" %>
       <p>
         Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
+        To find the cause, see the
+        <a href="<%= path(@pg) %>/logs?<%= to_query_string(@pg.upgrade_failure_logs_params) %>" class="text-orange-600 hover:underline">upgrade logs</a>.
       </p>
     <% else %>
       <p>Database upgrade to Postgres <%= @pg.target_version %> is in progress.</p>
