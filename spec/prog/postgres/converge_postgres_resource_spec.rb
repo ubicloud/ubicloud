@@ -566,9 +566,20 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "starts upgrade when not started" do
+      create_server(is_representative: true, version: "17")
+      pg.update(target_version: "18")
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
       expect(candidate).to receive(:configure_hash).and_return({"user_config" => {"wal_level" => "logical"}})
-      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", pg.target_version, stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "18", stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
+      expect { nx.upgrade_standby }.to nap(5)
+    end
+
+    it "passes the source version when skipping major versions" do
+      create_server(is_representative: true, version: "16")
+      pg.update(target_version: "18")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
+      expect(candidate).to receive(:configure_hash).and_return({"user_config" => {}})
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "18", "16", stdin: JSON.generate({"user_config" => {}}))
       expect { nx.upgrade_standby }.to nap(5)
     end
 

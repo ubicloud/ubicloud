@@ -98,7 +98,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     when "Failed"
       fail_upgrade("Database upgrade failed. We have reverted the database to the previous version, and it is now available again.")
     when "NotStarted"
-      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version, stdin: JSON.generate(upgrade_candidate.configure_hash))
+      args = [postgres_resource.target_version]
+      # Pass the source version only when skipping versions, so a candidate
+      # with older rhizome that takes a single argument can still upgrade.
+      args << postgres_resource.version if postgres_resource.target_version.to_i - postgres_resource.version.to_i > 1
+      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", *args, stdin: JSON.generate(upgrade_candidate.configure_hash))
     end
 
     nap 5
