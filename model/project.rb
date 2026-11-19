@@ -337,6 +337,7 @@ class Project < Sequel::Model
     :enable_z3_highmem_highlssd,
     :enable_z3_highmem_standardlssd,
     :free_runner_upgrade_until,
+    :gcp_alien_runners_ratio,
     :github_billing_by_repository,
     :gpu_vm,
     :hard_runner_concurrency_limit,

@@ -110,6 +110,18 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.label).to eq("start")
     end
 
+    it "leaves the IPv4 of a GCP nic without its own interface for GCE to assign" do
+      gcp_project = Project.create(name: "test-gcp-assemble")
+      gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: gcp_project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      gcp_ps = Prog::Vnet::SubnetNexus.assemble(gcp_project.id, name: "test-gcp-ps", location_id: gcp_location.id).subject
+
+      nic = described_class.assemble(gcp_ps.id, name: "runner-nic", use_eip: false, create_network_interface: false).subject
+
+      expect(nic.private_ipv4).to be_nil
+      expect(nic.private_ipv6).not_to be_nil
+    end
+
     it "gives a NIC in the GCP management subnet a single address" do
       service_project = Project.create(name: "pg-service")
       allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)

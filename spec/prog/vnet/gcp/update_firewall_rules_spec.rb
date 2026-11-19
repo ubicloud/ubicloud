@@ -421,13 +421,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
   end
 
-  describe "namespaced name helpers" do
-    it "constructs firewall tag namespaced name from project_id and firewall ubid" do
-      expect(nx.send(:firewall_tag_namespaced_name, firewall)).to eq("test-gcp-project/ubicloud-fw-#{firewall.ubid}/active")
-    end
-
-    it "constructs subnet tag namespaced name from project_id and subnet ubid" do
-      expect(nx.send(:subnet_tag_namespaced_name)).to eq("test-gcp-project/ubicloud-subnet-#{ps.ubid}/active")
+  describe ".desired_tag_values" do
+    it "names the tag of each firewall with rules and the subnet tag, namespaced by project" do
+      expect(described_class.desired_tag_values(vm, "test-gcp-project")).to eq([
+        "test-gcp-project/ubicloud-fw-#{firewall.ubid}/active",
+        "test-gcp-project/ubicloud-subnet-#{ps.ubid}/active",
+      ])
     end
   end
 

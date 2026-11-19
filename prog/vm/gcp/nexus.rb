@@ -4,8 +4,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
-  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
+  frame_reader :unsupported_azs, :swap_size_bytes, :alternative_families
+  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
 
   def before_destroy
     register_deadline(nil, 5 * 60, message: "finish destroying")
@@ -25,13 +25,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # honour the value already set by retry_zone_capacity on later entries.
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = (exclude_zones || [].freeze) + (unsupported_azs || [].freeze)
-      available = gcp_az_suffixes - excluded
-      location_az = location_az_for(available.sample || gcp_az_suffixes.sample)
+      zones = family_az_suffixes
+      available = zones - excluded
+      location_az = location_az_for(available.sample || zones.sample)
       VmGcpResource.create_with_id(vm, location_az_id: location_az.id) unless vm.vm_gcp_resource
       self.gcp_zone_suffix = location_az.az
     end
 
-    service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
+    service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access && !runner
 
     mgmt_nic = vm.management_nic
     cloud_config = {
@@ -47,6 +48,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       ],
     }
     cloud_config["runcmd"] = [dual_nic_netplan(mgmt_nic).script] if mgmt_nic
+
+    if swap_size_bytes
+      cloud_config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
     user_data = "#cloud-config\n" + cloud_config.to_yaml.delete_prefix("---\n")
 
     # An -lssd machine type bundles its local SSDs, so only the boot disk is
@@ -56,7 +62,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # PostgresServer::Gcp#gcp_storage_device_paths).
     boot_volume = vm.vm_storage_volumes_dataset.order(:disk_index).first(boot: true)
     boot_params = {source_image: gce_source_image, disk_size_gb: boot_volume.size_gib}
-    if (boot_disk_type = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:boot_disk_type])
+    if runner
+      # GCE provisions Hyperdisk Balanced above its free baseline by default.
+      boot_params.merge!(disk_type: "zones/#{gcp_zone}/diskTypes/hyperdisk-balanced", provisioned_iops: 3000, provisioned_throughput: 140)
+    elsif (boot_disk_type = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:boot_disk_type])
       boot_params[:disk_type] = "zones/#{gcp_zone}/diskTypes/#{boot_disk_type}"
     end
     disks = [
@@ -87,7 +96,16 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       [network_interface(user_nic, stack_type: "IPV4_IPV6")]
     end
 
+    # The tags of the GitHub runner subnet and its firewall exist long before
+    # a runner VM, so bind them at creation instead of after the VM runs.
+    if runner_subnet?
+      tags = Prog::Vnet::Gcp::UpdateFirewallRules.desired_tag_values(vm, gcp_project_id)
+      params = Google::Cloud::Compute::V1::InstanceParams.new(
+        resource_manager_tags: tags.to_h { |tag| tag.rpartition("/").values_at(0, 2) },
+      )
+    end
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
+      params:,
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
       labels: {"ubicloud" => Config.provider_resource_tag_value},
@@ -131,7 +149,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       # through GCP IAM; until then insert rejects it. Nap and retry.
       nap 10 if service_account_email && e.message.include?(service_account_email)
       raise unless e.message.include?("does not exist in zone")
-      retry_zone_capacity(e.message)
+      # The zone never offers this machine type, so try another one at once.
+      nap bump_excluded_zone(e.message, untried_delay: 0)
     rescue Google::Cloud::PermissionDeniedError => e
       raise unless service_account_email && e.message.include?(service_account_email)
       nap 10
@@ -144,7 +163,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.include?(error_code)
         clear_gcp_op("create_vm")
         # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
-        self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}")
+        # CPU quota is regional and per machine series, so another zone cannot help a runner.
+        self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}", zones_exhausted: error_code == "QUOTA_EXCEEDED" && runner)
         hop_start
       end
       if error_code == "IP_IN_USE_BY_ANOTHER_RESOURCE"
@@ -177,6 +197,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       # delete`.
       Clog.emit("GCP instance created", {gcp_instance_created: "#{vm.name}@#{gcp_zone}"})
     when "TERMINATED", "SUSPENDED"
+      if runner
+        Clog.emit("GCE runner VM entered terminal state during provisioning", {gcp_runner_terminal: {vm: vm.ubid, status: instance.status}})
+        replace_runner
+      end
       Prog::PageNexus.assemble(
         "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",
         ["GceProvisionTerminal", vm.ubid, instance.status],
@@ -196,6 +220,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     else
       [nis.first, nis.first]
     end
+    user_nic.update(private_ipv4: user_ni.network_i_p) unless user_nic.private_ipv4
     public_ipv4 = user_ni&.access_configs&.first&.nat_i_p
     public_ipv6 = user_ni&.ipv6_access_configs&.first&.external_ipv6
     ssh_host = if mgmt_nic && management_ipv6?(mgmt_nic)
@@ -210,25 +235,32 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
     wakeup_waiting_strand("allocated_waiting_strand_id")
 
-    vm.incr_update_firewall_rules
+    vm.incr_update_firewall_rules unless runner_subnet?
     hop_wait_sshable
   end
 
   label def wait_sshable
-    if retval&.dig("msg") == "firewall rule is added"
-      decr_update_firewall_rules
-    end
-
     when_update_firewall_rules_set? do
+      decr_update_firewall_rules
       push vm.update_firewall_rules_prog, {}, "update_firewall_rules"
     end
 
-    addr = vm.management_nic ? vm.sshable.host : vm.ip4
-    hop_create_billing_record unless addr
+    unless ssh_port_open
+      addr = vm.management_nic ? vm.sshable.host : vm.ip4
+      hop_create_billing_record unless addr
 
+      begin
+        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
+    end
+
+    # An open port does not prove the key is installed.
     begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
+      vm.sshable.cmd("true", timeout: 5)
+    rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+      self.ssh_port_open = true
       nap 1
     end
 
@@ -269,6 +301,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   label def update_firewall_rules
     decr_update_firewall_rules
     hop_push :wait, vm.update_firewall_rules_prog, label: :update_firewall_rules
+  end
+
+  label def wait_runner_destroy
+    nap 60 * 60
   end
 
   label def prevent_destroy
@@ -312,7 +348,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def finalize_destroy
-    if Config.gcp_postgres_iam_access || vm.vm_gcp_resource&.service_account_email
+    if (Config.gcp_postgres_iam_access && !runner) || vm.vm_gcp_resource&.service_account_email
       begin
         credential.iam_client.delete_project_service_account("projects/-/serviceAccounts/#{vm_service_account_email}")
       rescue Google::Apis::ClientError => e
@@ -340,7 +376,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     interface = Google::Cloud::Compute::V1::NetworkInterface.new(
       network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
       subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
-      network_i_p: nic.private_ipv4.network.to_s,
+      **({network_i_p: nic.private_ipv4.network.to_s} if nic.private_ipv4),
       stack_type:,
       vlan:,
     )
@@ -349,7 +385,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         name: "External NAT",
         type: "ONE_TO_ONE_NAT",
         network_tier: "STANDARD",
-        nat_i_p: gcp_res.static_ip.to_s,
+        **({nat_i_p: gcp_res.static_ip.to_s} if gcp_res.static_ip),
       )
     end
     if stack_type == "IPV4_IPV6"
@@ -383,6 +419,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     false
   end
 
+  def runner
+    return @runner if defined?(@runner)
+    @runner = GithubRunner[vm_id: vm.id]
+  end
+
+  def runner_subnet?
+    user_nic.private_subnet.gcp_github_runner?
+  end
+
   def credential
     @credential ||= vm.location.location_credential_gcp
   end
@@ -401,7 +446,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   undef_method :gcp_zone_suffix
   def gcp_zone_suffix
-    strand.stack.dig(0, "gcp_zone_suffix") || gcp_az_suffixes.sample
+    strand.stack.dig(0, "gcp_zone_suffix") || family_az_suffixes.sample
   end
 
   def gcp_region
@@ -503,16 +548,23 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap bump_excluded_zone(error_message)
   end
 
-  def bump_excluded_zone(error_message)
+  def bump_excluded_zone(error_message, zones_exhausted: false, untried_delay: 5)
     excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
-    available = gcp_az_suffixes - excluded
+    available = zones_exhausted ? [] : family_az_suffixes - excluded
+    delay = untried_delay
 
     if available.empty?
-      Clog.emit("GCE zone retry exhausted, resetting exclusions",
-        {zone_retry: {failed_zone: gcp_zone, excluded:,
-                      error: error_message}})
+      if runner
+        switch_runner_family(error_message)
+      else
+        Clog.emit("GCE zone retry exhausted, resetting exclusions",
+          {zone_retry: {failed_zone: gcp_zone, excluded:,
+                        error: error_message}})
+        # Wait for capacity to free up.
+        delay = 5 * 60
+      end
       excluded = []
-      available = gcp_az_suffixes
+      available = family_az_suffixes
     else
       Clog.emit("GCE zone retry",
         {zone_retry: {failed_zone: gcp_zone, excluded:,
@@ -525,13 +577,32 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     self.gcp_zone_suffix = new_suffix
     self.exclude_zones = excluded
     vm.reload.vm_gcp_resource.update(location_az_id: location_az_for(new_suffix).id)
-    # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
-    # 5 seconds: still have untried zones. Move on to the next one quickly.
-    (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
+    delay
+  end
+
+  def switch_runner_family(error_message)
+    families = alternative_families || []
+    next_family = families[(families.index(vm.family) || -1) + 1]
+    Clog.emit("GCE runner zones exhausted", {gcp_runner_zones_exhausted: {vm: vm.ubid, family: vm.family, next_family:, error: error_message}})
+    replace_runner unless next_family
+    vm.update(family: next_family)
+  end
+
+  def replace_runner
+    runner.provision_spare_runner
+    runner.incr_destroy
+    register_deadline(nil, 15 * 60, message: "finish destroying after replacing the runner")
+    hop_wait_runner_destroy
   end
 
   def gcp_az_suffixes
     @gcp_az_suffixes ||= vm.location.azs.map(&:az)
+  end
+
+  # Not memoized: a runner switching families changes vm.family.
+  def family_az_suffixes
+    missing = Option::GCP_FAMILY_VM_CONFIG.fetch(vm.family)[:missing_zones] || [].freeze
+    gcp_az_suffixes.reject { missing.include?("#{gcp_region}-#{it}") }
   end
 
   def location_az_for(suffix)

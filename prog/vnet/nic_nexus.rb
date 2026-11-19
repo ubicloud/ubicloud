@@ -21,8 +21,11 @@ class Prog::Vnet::NicNexus < Prog::Base
         ipv4 = ipv4_addr || (allocate_ipv4_from_aws_subnet(subnet, aws_subnet) if create_network_interface)
         ["Vnet::Aws::NicNexus", ipv4&.to_s, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
-        ipv4 = ipv4_addr || (subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4)
-        ["Vnet::Gcp::NicNexus", ipv4.to_s, nil, "active", nil]
+        # Without an interface of our own, GCE assigns the address and
+        # Vm::Gcp::Nexus records it once the instance runs, as on AWS.
+        ipv4 = ipv4_addr
+        ipv4 ||= (subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4) if create_network_interface
+        ["Vnet::Gcp::NicNexus", ipv4&.to_s, nil, "active", nil]
       else
         ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing", nil]
       end

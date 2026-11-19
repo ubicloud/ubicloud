@@ -96,6 +96,13 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       }.to raise_error RuntimeError, "Only metal locations support a nic_ipv4_prefix_len other than 32"
     end
 
+    it "uses the given id and names the subnet after it" do
+      id = PrivateSubnet.generate_uuid
+      ps = described_class.assemble(prj.id, id:).subject
+      expect(ps.id).to eq(id)
+      expect(ps.name).to eq(ps.ubid[0..7])
+    end
+
     it "uses firewall if provided" do
       fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
       ps = described_class.assemble(prj.id, firewall_id: fw.id)
