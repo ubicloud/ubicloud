@@ -33,7 +33,7 @@ class Scheduling::Dispatcher
   # pool_size :: The number of threads in the thread pool.
   # partition_number :: The partition number of the current respirate process. A nil
   #                     value means the process does not use partitioning.
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition_number: nil, listen_timeout: 1, recheck_seconds: listen_timeout * 2, stale_seconds: listen_timeout * 4, telemetry_db: DB)
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition_number: nil, listen_timeout: 1, recheck_seconds: listen_timeout * 5, stale_seconds: listen_timeout * 10 + 1, telemetry_db: DB)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
