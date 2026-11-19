@@ -579,6 +579,13 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
+    it "enables nested virtualization if requested" do
+      refresh_frame(nx, new_values: {"nested_virtualization" => true})
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expect { nx.create_instance }.to hop("wait_instance_created")
+      expect(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:cpu_options]).to eq({nested_virtualization: "enabled"})
+    end
+
     describe "when insufficient capacity error" do
       def set_alternative_families(families)
         refresh_frame(nx, new_values: {"alternative_families" => families})

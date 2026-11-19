@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface, :swap_size_bytes
+  frame_reader :alternative_families, :nested_virtualization, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface, :swap_size_bytes
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open
 
   NETWORKD_DROPINS = <<~SCRIPT
@@ -217,6 +217,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       instance_market_options:,
     }
     params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
+    params[:cpu_options] = {nested_virtualization: "enabled"} if nested_virtualization
     begin
       instance_response = client.run_instances(params)
     rescue Aws::EC2::Errors::InvalidParameterValue => e
