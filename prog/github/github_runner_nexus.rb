@@ -157,11 +157,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.has_workflow_job_info?
 
+    alien = vm.location.aws?
     billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
-    elsif vm.location.aws?
+    elsif alien
       # Alien runners are billed by the label's vCPU count, not the instance's;
       # 30 vCPU labels run on 32 vCPU instances but are still billed for 30.
       "standard-#{label_data["vcpus"]}"
@@ -184,6 +185,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       billed_from = [billed_from, Time.new(started_at)].max
     end
 
+    runner_family = (x64? && installation.premium_runner_enabled?) ? "premium" : label_data["family"]
+    aws_minutes_key = "aws_#{runner_family}_minutes"
     retries = 0
     begin
       begin_time = now.to_date.to_time
@@ -198,6 +201,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
       if today_record
         today_record.amount = Sequel[:amount] + used_amount
+        if alien
+          tags = Sequel.pg_jsonb_op(:resource_tags)
+          aws_minutes = Sequel.function(:coalesce, tags.get_text(aws_minutes_key).cast(:integer), 0) + used_amount
+          today_record.resource_tags = tags.set([aws_minutes_key], Sequel.function(:to_jsonb, aws_minutes))
+        end
         today_record.save_changes(validate: false)
       else
         BillingRecord.create(
@@ -207,6 +215,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount,
+          resource_tags: alien ? {aws_minutes_key => used_amount} : {},
         )
       end
     rescue Sequel::Postgres::ExclusionConstraintViolation
