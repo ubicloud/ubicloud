@@ -543,6 +543,10 @@ DHCP
     else
       ""
     end
+    # The 1400 MTU leaves room for the IPsec encapsulation of private
+    # subnet traffic.  Runner NICs have no IPsec tunnels, so runners use
+    # the full uplink MTU for IPv4, as they already do for IPv6 via RA.
+    mtu = boot_image.include?("github") ? 1500 : 1400
     ip_config = if ipv6_disabled
       <<~IP6_CONFIG
 all-servers
@@ -586,7 +590,7 @@ bogus-priv
 no-resolv
 #{runner_config}
 bind-interfaces
-dhcp-option=26,1400
+dhcp-option=26,#{mtu}
 dns-forward-max=10000
 #{raparams}
 #{interfaces}

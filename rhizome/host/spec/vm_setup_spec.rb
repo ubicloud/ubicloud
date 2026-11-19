@@ -1441,10 +1441,12 @@ NFTABLES_CONF
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
       expect(dnsmasq_conf).to include("address=/ubicloudhostplaceholder.blob.core.windows.net/")
       expect(dnsmasq_conf).to include("address=/.docker.io/::")
+      expect(dnsmasq_conf).to include("dhcp-option=26,1500\n")
     end
 
     it "serves dns from dnsmasq with ipv4 upstreams when ipv6 is disabled" do
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: true)
+      expect(vps.writes["dnsmasq.conf"]).to include("dhcp-option=26,1400\n")
       expect(vps.writes["dnsmasq.conf"]).to end_with(<<~DNS)
         all-servers
         server=8.8.8.8
