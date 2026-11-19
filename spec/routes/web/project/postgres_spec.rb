@@ -1104,16 +1104,15 @@ RSpec.describe Clover, "postgres" do
 
       before do
         allow(Config).to receive(:vpc_peering_enabled).and_return(true)
-        project.set_ff_vpc_peering_aws(true)
       end
 
       it "links the networking tab to the VPC peering tab of the database's private subnet only while VPC peering is enabled" do
-        project.set_ff_vpc_peering_aws(false)
+        allow(Config).to receive(:vpc_peering_enabled).and_return(false)
         visit "#{project.path}#{aws_pg.path}/networking"
         expect(page).to have_content "Firewall Rules"
         expect(page).to have_no_content intro
 
-        project.set_ff_vpc_peering_aws(true)
+        allow(Config).to receive(:vpc_peering_enabled).and_return(true)
         page.refresh
         expect(page).to have_content "VPC Peering"
         expect(page).to have_content intro
@@ -1127,6 +1126,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "hides the link to the VPC peering tab from a user who cannot view the private subnet" do
+        aws_pg
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
         visit "#{project.path}#{aws_pg.path}/networking"
@@ -1170,7 +1170,7 @@ RSpec.describe Clover, "postgres" do
         page.refresh
         expect(page).to have_content delete_note
 
-        project.set_ff_vpc_peering_aws(false)
+        allow(Config).to receive(:vpc_peering_enabled).and_return(false)
         page.refresh
         expect(page).to have_no_content delete_note
       end
