@@ -27,6 +27,12 @@ RSpec.describe PostgresUpgrade do
       expect(upgrade.instance_variable_get(:@version)).to eq(16)
       expect(upgrade.instance_variable_get(:@prev_version)).to eq(15)
     end
+
+    it "uses the given previous version to skip major versions" do
+      upgrade = described_class.new("18", logger, prev_version: "16")
+      expect(upgrade.instance_variable_get(:@version)).to eq(18)
+      expect(upgrade.instance_variable_get(:@prev_version)).to eq(16)
+    end
   end
 
   describe "#create_upgrade_dir" do
@@ -195,6 +201,20 @@ RSpec.describe PostgresUpgrade do
 
       postgres_upgrade.run_post_upgrade_extension_update
     end
+
+    it "runs each script once across all skipped versions" do
+      stub_const("EXTENSION_UPGRADE_SCRIPTS", {
+        17 => {"postgis" => "SELECT postgis_extensions_upgrade();", "ext17" => "SELECT 17;"},
+        19 => {"postgis" => "SELECT postgis_extensions_upgrade();"},
+      })
+      upgrade = described_class.new("19", logger, prev_version: "16")
+      expect(upgrade).to receive(:_run_command).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("postgres\n")
+      expect(upgrade).to receive(:_run_command).with("sudo", "-u", "postgres", "psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'postgis'").and_return("1")
+      expect(upgrade).to receive(:_run_command).with("sudo", "-u", "postgres", "psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1", stdin: "SELECT postgis_extensions_upgrade();").once
+      expect(upgrade).to receive(:_run_command).with("sudo", "-u", "postgres", "psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'ext17'").and_return("")
+
+      upgrade.run_post_upgrade_extension_update
+    end
   end
 
   describe "#run_pg_upgrade_cmd" do
@@ -216,6 +236,16 @@ RSpec.describe PostgresUpgrade do
         "--new-datadir", "/etc/postgresql/17/main/",
         "--check"]
       expect(postgres_upgrade.pg_upgrade_cmdline("--check")).to eq(expected_cmd)
+    end
+
+    it "uses the binaries and data of the given previous version" do
+      expected_cmd = ["sudo", "-u", "postgres", "/usr/lib/postgresql/18/bin/pg_upgrade",
+        "--old-bindir", "/usr/lib/postgresql/16/bin",
+        "--old-datadir", "/etc/postgresql/16/main/",
+        "--new-bindir", "/usr/lib/postgresql/18/bin",
+        "--new-datadir", "/etc/postgresql/18/main/",
+        "--link"]
+      expect(described_class.new("18", logger, prev_version: "16").pg_upgrade_cmdline("--link")).to eq(expected_cmd)
     end
   end
 
