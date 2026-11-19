@@ -1917,14 +1917,23 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Upgrade the read replicas"
       end
 
-      it "starts the upgrade when user clicks on start upgrade button" do
-        old_version_int = pg.version.to_i
+      it "starts the upgrade to the latest version by default" do
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Your database can be upgraded to Postgres 17 or 18."
         click_button "Start Upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 18 is in progress"
         expect(page).to have_flash_notice "Database upgrade started successfully"
-        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+        expect(pg.reload.target_version).to eq("18")
+      end
+
+      it "starts the upgrade to the selected version" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        select "Postgres 17", from: "target_version"
+        click_button "Start Upgrade"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
+        expect(pg.reload.target_version).to eq("17")
       end
 
       it "shows upgrade progress when upgrade is in progress" do
@@ -1934,7 +1943,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "wait_for_maintenance_window")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows database unavailability when upgrade is in progress" do
@@ -1945,7 +1954,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_standby")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows failed upgrade indication when upgrade fails" do

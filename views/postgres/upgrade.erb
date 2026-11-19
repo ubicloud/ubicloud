@@ -55,7 +55,7 @@ end %>
         Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
       </p>
     <% else %>
-      <p>Database upgrade is in progress.</p>
+      <p>Database upgrade to Postgres <%= @pg.target_version %> is in progress.</p>
     <% end %>
     <% upgrade_progress_rows = upgrade_progress
     .map do |stage, description, database_availability_icon, stage_status_icon|
@@ -84,7 +84,8 @@ end %>
     end %>
     <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
   <% elsif @pg.can_upgrade? %>
-    <p>Your database can be upgraded to Postgres <%= @pg.version.to_i + 1 %>.</p>
+    <% target_versions = @pg.upgrade_target_versions %>
+    <p>Your database can be upgraded to Postgres <%= target_versions.join(" or ") %>.</p>
 
     <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
       <%== part("components/form/section", label: "Preparing for an Upgrade",
@@ -110,6 +111,11 @@ end %>
     upgrade_steps << ["read-replica", "Upgrade the read replicas", "Starts once the primary is upgraded"] if @pg.read_replicas.any? %>
 
     <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+      <%== part("components/form/section", label: "Target Version",
+      content_html: part("components/form/select", name: "target_version", selected: target_versions.last,
+      options: target_versions.map { [it, "Postgres #{it}"] },
+      description_html: "Upgrades go directly to the selected version, with a single downtime.")) %>
+
       <%== part("components/form/section", label: "What happens after you start",
       content_html: part("components/step_timeline", steps: upgrade_steps, note: "Your database stays online until the upgrade.")) %>
 
