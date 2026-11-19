@@ -987,10 +987,12 @@ class Clover
           authorize("Postgres:edit", pg.id)
           handle_validation_failure("postgres/show") { @page = "upgrade" }
 
-          Validation.validate_postgres_upgrade(pg)
+          target_version = typecast_params.nonempty_str("target_version") || pg.default_upgrade_target_version
+          Validation.validate_postgres_upgrade(pg, target_version)
+          validate_postgres_config(target_version, pg.user_config, pg.pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
           read_replica_count = DB.transaction do
-            pg.update(target_version: pg.version.to_i + 1)
+            pg.update(target_version:)
             audit_log(pg, "upgrade")
 
             pg.read_replicas_dataset.update(target_version: pg.target_version)

@@ -561,10 +561,12 @@ module Validation
     end
   end
 
-  def self.validate_postgres_upgrade(postgres_resource)
+  def self.validate_postgres_upgrade(postgres_resource, target_version)
     fail ValidationFailed.new({needs_convergence: "Database cluster is waiting for convergence, please wait for it to complete"}) if postgres_resource.needs_convergence?
     fail ValidationFailed.new({read_replica: "Read replicas cannot be upgraded"}) if postgres_resource.read_replica?
     fail ValidationFailed.new({version: "Database is already at the latest version"}) unless postgres_resource.can_upgrade?
+    targets = postgres_resource.upgrade_target_versions
+    fail ValidationFailed.new({target_version: "Cannot upgrade to version #{target_version}. Available versions: #{targets.join(", ")}"}) unless targets.include?(target_version)
   end
 
   def self.validate_postgres_version(version)

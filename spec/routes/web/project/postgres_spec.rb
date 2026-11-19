@@ -1918,14 +1918,13 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "starts the upgrade when user clicks on start upgrade button" do
-        old_version_int = pg.version.to_i
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/upgrade"
         click_button "Start Upgrade"
         expect(page).to have_content "Database upgrade is in progress"
         expect(page).to have_css("#upgrade-stage-start")
         expect(page).to have_flash_notice "Database upgrade started successfully"
-        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+        expect(pg.reload.target_version).to eq(PostgresResource::DEFAULT_VERSION)
       end
 
       it "shows upgrade progress when upgrade is in progress" do

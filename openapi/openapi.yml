@@ -2267,7 +2267,22 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: upgradePostgresDatabase
-      summary: Upgrade a PostgreSQL database to the next major version
+      summary: Upgrade a PostgreSQL database to a later major version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_version:
+                  description: Major version to upgrade to. Defaults to the version that new databases get, or to the next major version if the database is already at that version.
+                  type: string
+                  enum:
+                    - '17'
+                    - '18'
+                    - '19'
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'

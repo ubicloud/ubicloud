@@ -10,14 +10,19 @@ RSpec.describe Clover, "cli pg upgrade" do
     @ref = [@pg.display_location, @pg.name].join("/")
   end
 
-  it "schedules upgrade from version 16 to 17" do
+  it "schedules upgrade from version 16 to the version for new databases" do
     expect(@pg.target_version).to eq "16"
     allow(@pg).to receive(:needs_convergence?).and_return(false)
 
-    expect(cli(%W[pg #{@ref} upgrade])).to eq "Scheduled major version upgrade of PostgreSQL database with id #{@pg.ubid} to version 17.\n"
+    expect(cli(%W[pg #{@ref} upgrade])).to eq "Scheduled major version upgrade of PostgreSQL database with id #{@pg.ubid} to version #{PostgresResource::DEFAULT_VERSION}.\n"
 
     @pg.reload
-    expect(@pg.target_version).to eq "17"
+    expect(@pg.target_version).to eq PostgresResource::DEFAULT_VERSION
+  end
+
+  it "schedules upgrade from version 16 directly to 18" do
+    expect(cli(%W[pg #{@ref} upgrade -v 18])).to eq "Scheduled major version upgrade of PostgreSQL database with id #{@pg.ubid} to version 18.\n"
+    expect(@pg.reload.target_version).to eq "18"
   end
 
   it "fails to upgrade when database cannot be upgraded" do

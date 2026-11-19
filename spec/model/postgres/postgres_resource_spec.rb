@@ -1675,6 +1675,23 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#default_upgrade_target_version" do
+    before do
+      vm = create_hosted_vm(project, private_subnet, "pg-vm-default-target")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
+    end
+
+    it "returns the default version for new databases" do
+      expect(postgres_resource.default_upgrade_target_version).to eq(PostgresResource::DEFAULT_VERSION)
+    end
+
+    it "returns the next version when the database is at the default version" do
+      postgres_resource.representative_server.update(version: PostgresResource::DEFAULT_VERSION)
+      expect(postgres_resource.reload.default_upgrade_target_version).to eq((PostgresResource::DEFAULT_VERSION.to_i + 1).to_s)
+    end
+  end
+
   describe "#can_upgrade?" do
     it "returns true if the postgres resource can be upgraded" do
       postgres_resource.update(target_version: "16")

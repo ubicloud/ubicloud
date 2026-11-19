@@ -884,10 +884,12 @@ RSpec.describe Validation do
           instance_double(
             PostgresResource,
             can_upgrade?: true,
+            upgrade_target_versions: ["17", "18"],
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.not_to raise_error
     end
@@ -903,6 +905,7 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -918,6 +921,7 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: true,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -932,8 +936,21 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when the target version is not available" do
+      pg = create_postgres_resource(project: Project.create(name: "validation-test"), location_id: Location::HETZNER_FSN1_ID)
+      pg.update(target_version: "16")
+      create_postgres_server(resource: pg).update(version: "16")
+
+      expect {
+        described_class.validate_postgres_upgrade(pg.reload, "16")
+      }.to raise_error(described_class::ValidationFailed, "Validation failed for following fields: target_version") { |e|
+        expect(e.details).to eq({target_version: "Cannot upgrade to version 16. Available versions: 17, 18, 19"})
+      }
     end
   end
 
