@@ -92,17 +92,23 @@ RSpec.describe NvmeWriteMetrics do
     end
   end
 
-  describe "#host_written_bytes" do
-    it "converts SMART data units to bytes" do
+  describe "#smart_log" do
+    it "parses the SMART log" do
       expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme1n1").and_return(smart_log)
 
-      expect(nwm.host_written_bytes("/dev/nvme1n1")).to eq 550832190 * 512_000
+      expect(nwm.smart_log("/dev/nvme1n1")).to include("percent_used" => 2, "data_units_written" => 550832190)
     end
 
     it "is nil for a drive whose SMART log cannot be read and says why" do
       expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme1n1").and_raise(CommandFail.new("command failed", "", "No such device\n"))
 
-      expect { expect(nwm.host_written_bytes("/dev/nvme1n1")).to be_nil }.to output("/dev/nvme1n1: smart-log unreadable: No such device\n").to_stderr
+      expect { expect(nwm.smart_log("/dev/nvme1n1")).to be_nil }.to output("/dev/nvme1n1: smart-log unreadable: No such device\n").to_stderr
+    end
+  end
+
+  describe "#host_written_bytes" do
+    it "converts SMART data units to bytes" do
+      expect(nwm.host_written_bytes(JSON.parse(smart_log))).to eq 550832190 * 512_000
     end
   end
 
@@ -127,13 +133,13 @@ RSpec.describe NvmeWriteMetrics do
   end
 
   describe "#render" do
-    it "emits both counters per drive, omits the NAND series where unavailable, and skips an unreadable drive" do
+    it "emits all series per drive, omits the NAND series where unavailable, and skips an unreadable drive" do
       expect(nwm).to receive(:_run_command).with("nvme list -o json").and_return(nvme_list.sub('"SerialNumber":"S64GNN0WC00472"', '"SerialNumber":"S64GNN0WC00473"'))
       expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme0n2").and_raise(CommandFail.new("command failed", "", "No such device"))
       expect(nwm).to receive(:warn).with("/dev/nvme0n2: smart-log unreadable: No such device")
       expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme1n1").and_return(smart_log)
       expect(nwm).to receive(:_run_command).with("nvme ocp smart-add-log -o json /dev/nvme1n1").and_return(ocp_log)
-      expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme0n1").and_return("{\"data_units_written\":869574372}")
+      expect(nwm).to receive(:_run_command).with("nvme smart-log -o json /dev/nvme0n1").and_return("{\"percent_used\":105,\"data_units_written\":869574372}")
       expect(nwm).to receive(:_run_command).with("nvme ocp smart-add-log -o json /dev/nvme0n1").and_raise(CommandFail.new("command failed", "", ""))
 
       expect(nwm.render).to eq <<~PROM
@@ -144,6 +150,10 @@ RSpec.describe NvmeWriteMetrics do
         # HELP nvme_nand_written_bytes_total Bytes the drive has written to its flash over its lifetime (OCP Physical Media Units Written).
         # TYPE nvme_nand_written_bytes_total counter
         nvme_nand_written_bytes_total{device="nvme1n1",model="SAMSUNG MZQL21T9HCJR-00A07",serial="S64GNN0WC00475"} 18447054642118565888
+        # HELP nvme_percentage_used Vendor estimate of drive life used, in percent; may exceed 100 (SMART Percentage Used).
+        # TYPE nvme_percentage_used gauge
+        nvme_percentage_used{device="nvme1n1",model="SAMSUNG MZQL21T9HCJR-00A07",serial="S64GNN0WC00475"} 2
+        nvme_percentage_used{device="nvme0n1",model="SAMSUNG MZQL21T9HCJR-00A07",serial="S64GNN0WC00472"} 105
       PROM
     end
   end
