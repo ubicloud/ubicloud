@@ -1,0 +1,35 @@
+		{name: "<%= v.name %>",
+			changed: func(plan, state *<%= model_type %>) bool {
+				return <%= v.body_attrs.map { "!plan.#{it.go_field}.Equal(state.#{it.go_field})" }.join(" || ") %>
+			},
+			run: func(plan, state *<%= model_type %>) diag.Diagnostics {
+				var diags diag.Diagnostics
+				fail := func(summary, detail string) { diags.AddError(summary, detail) }
+				_ = fail
+<% if g = v.spec[:blocked_when] -%>
+				if !state.<%= Emit.go_field(g[:attr].to_s) %>.IsNull() {
+					fail("<%= g[:summary] %>",
+						"<%= g[:detail] %>")
+					return diags
+				}
+<% end -%>
+				var body api<%= camel %><%= Emit.go_field(v.name) %>Body
+<% v.body_attrs.each do |a| -%>
+<% assign = a.body_assign("plan.#{a.go_field}", cast: body_cast_for(a, v.op)) -%>
+<% if a.pointer -%>
+				if !plan.<%= a.go_field %>.IsNull() && !plan.<%= a.go_field %>.IsUnknown() {
+					body.<%= a.api_go_field %> = <%= assign %>
+				}
+<% else -%>
+				body.<%= a.api_go_field %> = <%= assign %>
+<% end -%>
+<% end -%>
+				apiResp, err := <%= verb_call(v) %>
+<%= verb_guard(v) %>
+<% if v.spec[:recovery] == :persist_name -%>
+				// The rename took server-side; every later call (and any
+				// retry) must address the new name.
+				state.Name = plan.Name
+<% end -%>
+				return diags
+			}},
