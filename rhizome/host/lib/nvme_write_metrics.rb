@@ -13,6 +13,7 @@ class NvmeWriteMetrics
 
   HOST_WRITTEN = "nvme_host_written_bytes_total"
   NAND_WRITTEN = "nvme_nand_written_bytes_total"
+  PERCENTAGE_USED = "nvme_percentage_used"
 
   SERVICE = <<~SERVICE
     [Unit]
@@ -60,12 +61,15 @@ class NvmeWriteMetrics
 
   # An unreadable drive drops out of the file; a failed run would leave the
   # previous file in place and its counters looking flat.
-  def host_written_bytes(path)
-    smart = JSON.parse(r("nvme smart-log -o json :path", path: path))
-    Integer(smart.fetch("data_units_written")) * DATA_UNIT_BYTES
+  def smart_log(path)
+    JSON.parse(r("nvme smart-log -o json :path", path: path))
   rescue CommandFail => e
     warn "#{path}: smart-log unreadable: #{e.stderr.strip}"
     nil
+  end
+
+  def host_written_bytes(smart)
+    Integer(smart.fetch("data_units_written")) * DATA_UNIT_BYTES
   end
 
   # OCP SMART extension log (C0h); nil on drives without it.
@@ -80,11 +84,13 @@ class NvmeWriteMetrics
   def render
     host_lines = []
     nand_lines = []
+    used_lines = []
     devices.each do |dev|
-      next unless (host = host_written_bytes(dev.path))
+      next unless (smart = smart_log(dev.path))
 
       labels = format_labels(dev)
-      host_lines << "#{HOST_WRITTEN}{#{labels}} #{host}"
+      host_lines << "#{HOST_WRITTEN}{#{labels}} #{host_written_bytes(smart)}"
+      used_lines << "#{PERCENTAGE_USED}{#{labels}} #{Integer(smart.fetch("percent_used"))}"
       if (nand = nand_written_bytes(dev.path))
         nand_lines << "#{NAND_WRITTEN}{#{labels}} #{nand}"
       end
@@ -97,6 +103,9 @@ class NvmeWriteMetrics
       "# HELP #{NAND_WRITTEN} Bytes the drive has written to its flash over its lifetime (OCP Physical Media Units Written).",
       "# TYPE #{NAND_WRITTEN} counter",
       *nand_lines,
+      "# HELP #{PERCENTAGE_USED} Vendor estimate of drive life used, in percent; may exceed 100 (SMART Percentage Used).",
+      "# TYPE #{PERCENTAGE_USED} gauge",
+      *used_lines,
     ].join("\n") + "\n"
   end
 
