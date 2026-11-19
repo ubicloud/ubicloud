@@ -81,8 +81,9 @@ RSpec.describe PostgresUpgrade do
   end
 
   describe "#disable_previous_version" do
-    it "disables and stops previous version service" do
+    it "disables and stops previous version service and its io-throttle timer" do
       expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "postgresql@16-main")
+      expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "io-throttle@16-main.timer")
       expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "disk-full-check@17.timer")
       postgres_upgrade.disable_previous_version
     end
@@ -96,6 +97,7 @@ RSpec.describe PostgresUpgrade do
       expect(pg_setup).to receive(:setup_data_directory)
       expect(pg_setup).to receive(:create_cluster)
       expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "postgresql@16-main")
+      expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "io-throttle@16-main.timer")
       expect(postgres_upgrade).to receive(:_run_command).with("sudo", "systemctl", "disable", "--now", "disk-full-check@17.timer")
       postgres_upgrade.initialize_new_version
     end
