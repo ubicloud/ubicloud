@@ -246,7 +246,6 @@ RSpec.describe Clover, "private_subnet" do
         before do
           vp
           allow(Config).to receive(:vpc_peering_enabled).and_return(true)
-          project.set_ff_vpc_peering_aws(true)
         end
 
         it "refuses while a VPC peering is not being deleted" do
@@ -266,7 +265,7 @@ RSpec.describe Clover, "private_subnet" do
         end
 
         it "succeeds while VPC peering is disabled, leaving the peerings to the subnet's destroy" do
-          project.set_ff_vpc_peering_aws(false)
+          allow(Config).to receive(:vpc_peering_enabled).and_return(false)
 
           delete aws_ps_path
 

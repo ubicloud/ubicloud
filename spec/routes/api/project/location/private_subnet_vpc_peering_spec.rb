@@ -58,7 +58,6 @@ RSpec.describe Clover, "private subnet vpc peering" do
     before do
       login_api
       allow(Config).to receive(:vpc_peering_enabled).and_return(true)
-      project.set_ff_vpc_peering_aws(true)
     end
 
     describe "gate" do
@@ -71,13 +70,24 @@ RSpec.describe Clover, "private subnet vpc peering" do
         end
       end
 
-      it "is not found while the project does not have the feature flag" do
-        project.set_ff_vpc_peering_aws(false)
+      it "is open on a managed AWS location without the feature flag" do
+        get peerings_path
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "is not found on a BYOC location while the project does not have the feature flag" do
+        location.update(project_id: project.id, byoc: true)
         all_routes.each do |method, path, body|
           send(method, path, body)
 
           expect(last_response).to have_api_error(404)
         end
+
+        project.set_ff_vpc_peering_aws(true)
+        get peerings_path
+
+        expect(last_response.status).to eq(200)
       end
 
       it "is not found for a private subnet outside AWS" do

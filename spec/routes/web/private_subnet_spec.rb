@@ -511,7 +511,6 @@ RSpec.describe Clover, "private subnet" do
 
       before do
         allow(Config).to receive(:vpc_peering_enabled).and_return(true)
-        project.set_ff_vpc_peering_aws(true)
       end
 
       def submenu_links
@@ -528,8 +527,8 @@ RSpec.describe Clover, "private subnet" do
         click_button "Send peering request"
       end
 
-      it "shows the tab only while VPC peering is enabled for the project" do
-        project.set_ff_vpc_peering_aws(false)
+      it "shows the tab on a managed AWS location, and on a BYOC location only with the project's feature flag" do
+        location.update(project_id: project.id, byoc: true)
         visit "#{project.path}#{aws_ps.path}/overview"
         expect(submenu_links).to eq ["Overview", "Virtual Machines", "Networking", "Settings"]
 
@@ -537,6 +536,11 @@ RSpec.describe Clover, "private subnet" do
         expect(page.status_code).to eq(404)
 
         project.set_ff_vpc_peering_aws(true)
+        visit "#{project.path}#{aws_ps.path}/overview"
+        expect(submenu_links).to eq ["Overview", "Virtual Machines", "Networking", "VPC Peering", "Settings"]
+
+        project.set_ff_vpc_peering_aws(false)
+        location.update(project_id: nil, byoc: false)
         visit "#{project.path}#{aws_ps.path}/overview"
         expect(submenu_links).to eq ["Overview", "Virtual Machines", "Networking", "VPC Peering", "Settings"]
 
@@ -587,6 +591,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.find(card)).to have_no_content "It expires on"
 
         location.update(project_id: project.id, byoc: true)
+        project.set_ff_vpc_peering_aws(true)
         page.refresh
         expect(page.find(card)).to have_content "The request comes from the AWS account of this location (999988887777). Accept only the connection with this exact ID"
         expect(page.find(card)).to have_no_content "for all Ubicloud customers"
