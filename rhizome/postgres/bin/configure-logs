@@ -87,6 +87,17 @@ log_config = OtelLogConfig.new(
 
 safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)
 
+r "mkdir", "-p", "/etc/systemd/system/otelcol-contrib.service.d"
+safe_write_to_file("/etc/systemd/system/otelcol-contrib.service.d/override.conf", <<~OVERRIDE)
+  [Unit]
+  StartLimitIntervalSec=0
+
+  [Service]
+  Restart=always
+  RestartSec=5
+OVERRIDE
+r "systemctl", "daemon-reload"
+
 r "systemctl", "enable", "--now", "otelcol-contrib"
 r "systemctl", "restart", "otelcol-contrib"
 

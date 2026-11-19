@@ -139,8 +139,13 @@ class PostgresSetup
       r "mkdir", "-p", "/etc/systemd/system/#{svc}.service.d"
       path = "/etc/systemd/system/#{svc}.service.d/override.conf"
       override = <<~OVERRIDE
+        [Unit]
+        StartLimitIntervalSec=0
+
         [Service]
         Slice=system-go_services.slice
+        Restart=always
+        RestartSec=5
         Environment=GOMEMLIMIT=#{gomemlimit}
       OVERRIDE
       override += POSTGRES_EXPORTER_ENVIRONMENT if svc == "postgres_exporter"
