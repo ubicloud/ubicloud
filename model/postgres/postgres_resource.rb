@@ -506,6 +506,10 @@ class PostgresResource < Sequel::Model
     target_version.to_i < Option::POSTGRES_VERSION_OPTIONS.map(&:to_i).max
   end
 
+  def upgrade_target_versions
+    Option::POSTGRES_VERSION_OPTIONS.select { it.to_i > version.to_i }.sort_by(&:to_i)
+  end
+
   def ready_for_read_replica?
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
   end
