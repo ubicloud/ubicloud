@@ -7,6 +7,14 @@ GIT
       aws-sdk-rds (~> 1.0)
       pg (~> 1.3)
 
+GIT
+  remote: https://github.com/jeremyevans/roda.git
+  revision: 57c6ffb10263d04891788acf319bd087372eb39b
+  ref: 57c6ffb10263d04891788acf319bd087372eb39b
+  specs:
+    roda (3.110.0)
+      rack
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -418,8 +426,6 @@ GEM
       uber (< 0.2.0)
     retriable (4.2.0)
     rexml (3.4.4)
-    roda (3.110.0)
-      rack
     rodauth (2.51.0)
       roda (>= 2.6.0)
       sequel (>= 4)
@@ -623,7 +629,7 @@ DEPENDENCIES
   rack-unreloader (>= 1.8)
   rake
   refrigerator (>= 1)
-  roda (>= 3.109)
+  roda!
   rodauth (>= 2.48)
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
