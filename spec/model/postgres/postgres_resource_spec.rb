@@ -1632,6 +1632,42 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#upgrade_failed_at" do
+    it "returns nil if there's no upgrade" do
+      expect(postgres_resource.upgrade_failed_at).to be_nil
+    end
+
+    it "returns nil if the upgrade has not failed" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_standby", parent_id: postgres_resource.strand.id, stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+      expect(postgres_resource.upgrade_failed_at).to be_nil
+    end
+
+    it "returns nil if the failure time was not recorded" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id)
+      expect(postgres_resource.upgrade_failed_at).to be_nil
+    end
+
+    it "returns the failure time of a failed upgrade" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id, stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+      expect(postgres_resource.upgrade_failed_at).to eq(Time.utc(2026, 11, 19, 10))
+    end
+  end
+
+  describe "#upgrade_failure_logs_params" do
+    it "covers the hour before the failure" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id, stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+      expect(postgres_resource.upgrade_failure_logs_params).to eq(
+        stream_name: "upgrade", server_role: "", max_log_lines: 500,
+        start: "2026-11-19T09:00:00Z", end: "2026-11-19T10:01:00Z",
+      )
+    end
+
+    it "leaves out the time range if the failure time is unknown" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id)
+      expect(postgres_resource.upgrade_failure_logs_params).to eq(stream_name: "upgrade", server_role: "", max_log_lines: 500)
+    end
+  end
+
   describe "#upgrade_status" do
     it "returns failed if the postgres resource upgrade failed" do
       Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id)

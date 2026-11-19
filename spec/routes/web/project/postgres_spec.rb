@@ -1969,6 +1969,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Database upgrade failed"
         expect(page).to have_css('[role="alert"]', text: "Database upgrade failed")
         expect(page).to have_no_css('[id^="upgrade-stage-"]')
+        expect(page).to have_link "upgrade logs", href: "#{project.path}#{pg.path}/logs?stream_name=upgrade&server_role=&max_log_lines=500"
       end
 
       it "shows latest version message if the database is already on the latest version" do

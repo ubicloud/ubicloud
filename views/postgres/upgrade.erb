@@ -59,6 +59,10 @@ end %>
         id_prefix: "upgrade",
         extra_class: "") %>
       </div>
+      <p class="mt-4">
+        To find the cause, see the
+        <a href="<%= path(@pg) %>/logs?<%= to_query_string(@pg.upgrade_failure_logs_params) %>" class="text-orange-600 hover:underline">upgrade logs</a>.
+      </p>
     <% else %>
       <p>Database upgrade to Postgres <%= @pg.target_version %> is in progress.</p>
       <% upgrade_progress_rows = upgrade_progress

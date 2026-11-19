@@ -488,8 +488,29 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def upgrade_strand
+    strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource")
+  end
+
   def upgrade_stage
-    strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource")&.label
+    upgrade_strand&.label
+  end
+
+  def upgrade_failed_at(failure: upgrade_failure)
+    if (failed_at = failure["upgrade_failed_at"])
+      Time.strptime(failed_at, "%F %T.%N %z")
+    end
+  end
+
+  # Parameters for the logs endpoint covering the upgrade run that failed.
+  # Logs come from the upgrade candidate, which is not the primary.
+  def upgrade_failure_logs_params(failure: upgrade_failure)
+    params = {stream_name: "upgrade", server_role: "", max_log_lines: 500}
+    if (failed_at = upgrade_failed_at(failure:))
+      params[:start] = (failed_at - 60 * 60).utc.iso8601
+      params[:end] = (failed_at + 60).utc.iso8601
+    end
+    params
   end
 
   def upgrade_status

@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_error, :upgrade_error_details, :upgrade_retryable
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_error, :upgrade_error_details, :upgrade_retryable, :upgrade_failed_at
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -189,6 +189,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     self.upgrade_error = message
     self.upgrade_error_details = details
     self.upgrade_retryable = retryable
+    self.upgrade_failed_at = time_string(Time.now)
     hop_upgrade_failed
   end
 end

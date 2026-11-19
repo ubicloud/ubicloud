@@ -5449,6 +5449,21 @@ components:
                   type: object
                   additionalProperties:
                     type: string
+              upgrade_failed_at:
+                description: Time of the upgrade failure, if the upgrade failed
+                type: string
+                format: date-time
+                nullable: true
+              upgrade_logs_start:
+                description: Start of the time range that holds the logs of the failed upgrade
+                type: string
+                format: date-time
+                nullable: true
+              upgrade_logs_end:
+                description: End of the time range that holds the logs of the failed upgrade
+                type: string
+                format: date-time
+                nullable: true
             additionalProperties: false
             required:
               - current_version
