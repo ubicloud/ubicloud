@@ -72,6 +72,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
     alternative_families = []
+    nested_virtualization = false
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
     if alien_allowed? && (github_runner.spill_over_set? || (support_alien? && rand < alien_ratio))
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
@@ -79,7 +80,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
       # instance, but the customer is still billed for 30 vCPUs.
       vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
-      if x64?
+      if x64? && listed_repository?(project.get_ff_kvm_alien_runner_repositories)
+        size = Option.aws_instance_type_name("m8i", vcpus)
+        alternative_families = ["m7i"]
+        nested_virtualization = true
+      elsif x64?
         size = Option.aws_instance_type_name("m8a", vcpus)
         alternative_families = ["m8i", "m7a", "m7i", "m6a"]
       else
@@ -134,6 +139,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
       alternative_families:,
+      nested_virtualization:,
       use_eip: false,
       waiting_strand_id: strand.id,
       allocated_waiting_strand_id: strand.id,
@@ -364,7 +370,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def alien_allowed?
-    !installation.us_only? && !project.get_ff_no_alien_runners && !project.get_ff_no_alien_runner_repositories&.any? { it.casecmp?(github_runner.repository_name) }
+    !installation.us_only? && !project.get_ff_no_alien_runners && !listed_repository?(project.get_ff_no_alien_runner_repositories)
+  end
+
+  def listed_repository?(repository_names)
+    repository_names&.any? { it.casecmp?(github_runner.repository_name) }
   end
 
   def before_destroy
