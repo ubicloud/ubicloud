@@ -19,7 +19,7 @@ source "https://rubygems.org"
 # ships with the new Ruby version.
 #
 # Then run, `mise self-update`, `mise install`, `mise lock --upgrade`, and `bundle install`.
-ruby "4.0.9"
+ruby "4.0.10"
 
 gem "acme-client"
 gem "argon2"

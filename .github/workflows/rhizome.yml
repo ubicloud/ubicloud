@@ -32,7 +32,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Ruby
-      uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
+      uses: ruby/setup-ruby@f9c4492e86def3e644ab32a0ef185eda5b0c20d0 # v1.342.0
       with:
         ruby-version: ${{ matrix.ruby }}
         bundler-cache: true
