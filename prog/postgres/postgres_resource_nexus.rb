@@ -161,9 +161,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start", **strand_args)
 
-      if project.get_ff_postgres_aws_use_different_azs_for_standbys && location.aws?
-        postgres_resource.incr_use_different_az
-      end
+      postgres_resource.incr_use_different_az if postgres_resource.use_different_az_by_default?
 
       strand
     end
