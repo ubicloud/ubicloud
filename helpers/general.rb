@@ -141,6 +141,7 @@ class Clover < Roda
     remove_member
     rename
     reset_superuser_password
+    reset_upgrade
     restart
     restore
     restrict

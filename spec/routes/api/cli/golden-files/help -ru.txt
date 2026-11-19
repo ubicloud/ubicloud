@@ -105,6 +105,7 @@ ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
 ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
 ubi pg (location/pg-name | pg-id) rename new-name
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
+ubi pg (location/pg-name | pg-id) reset-upgrade
 ubi pg (location/pg-name | pg-id) restart
 ubi pg (location/pg-name | pg-id) restore [options] new-db-name restore-time
 ubi pg (location/pg-name | pg-id) set-maintenance-window [options] start-hour

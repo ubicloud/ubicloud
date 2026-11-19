@@ -19,6 +19,7 @@ class UbiCli
           logs_cmd << " --start #{(failed_at - 60 * 60).utc.iso8601} --end #{(failed_at + 60).utc.iso8601}"
         end
         body << "\nTo find the cause of the failure, see the upgrade logs:\n  #{logs_cmd}\n"
+        body << "After you fix the cause, reset the upgrade to try again:\n  ubi pg #{@location}/#{@name} reset-upgrade\n"
       end
       response(body)
     end

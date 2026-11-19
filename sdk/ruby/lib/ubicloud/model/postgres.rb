@@ -206,6 +206,12 @@ module Ubicloud
       merge_into_values(adapter.post(_path("/upgrade"), params))
     end
 
+    # Reset a failed major version upgrade of the database, so it can be
+    # started again.
+    def reset_upgrade
+      merge_into_values(adapter.post(_path("/reset-upgrade")))
+    end
+
     # Show the status of a major version upgrade of the database.
     def upgrade_status
       adapter.get(_path("/upgrade"))

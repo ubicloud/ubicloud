@@ -55,7 +55,13 @@ end %>
         Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
         To find the cause, see the
         <a href="<%= path(@pg) %>/logs?<%= to_query_string(@pg.upgrade_failure_logs_params) %>" class="text-orange-600 hover:underline">upgrade logs</a>.
+        After you fix the cause, reset the upgrade. This removes the server of the failed upgrade, and you can then start a new upgrade.
       </p>
+      <% if @edit_perm %>
+        <% form(action: "#{path(@pg)}/reset-upgrade", method: :post, class: "mt-4") do %>
+          <%== part("components/form/submit_button", text: "Reset Upgrade") %>
+        <% end %>
+      <% end %>
     <% else %>
       <p>Database upgrade to Postgres <%= @pg.target_version %> is in progress.</p>
     <% end %>

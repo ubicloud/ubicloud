@@ -1767,6 +1767,24 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)).to include("upgrade_status" => "failed", "upgrade_failed_at" => "2026-11-19T10:00:00Z")
       end
 
+      it "resets a failed upgrade" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(Semaphore.where(strand_id: st.id, name: "reset_upgrade").count).to eq(1)
+      end
+
+      it "does not reset an upgrade that has not failed" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_standby")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-upgrade"
+
+        expect(last_response).to have_api_error(400, "Only a failed upgrade can be reset")
+        expect(Semaphore.where(strand_id: st.id, name: "reset_upgrade").count).to eq(0)
+      end
+
       it "no ongoing upgrade" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
 

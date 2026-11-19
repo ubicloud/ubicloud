@@ -2,6 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
+  semaphore :reset_upgrade
   frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_failed_at
 
   label def start
@@ -133,7 +134,28 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.representative_server.incr_unfence
     end
 
+    when_reset_upgrade_set? do
+      nap 5 if postgres_resource.representative_server.strand.label == "wait_in_fence"
+      hop_reset_upgrade
+    end
+
     nap 6 * 60 * 60
+  end
+
+  # The candidate promoted itself during the failed upgrade, so it cannot
+  # rejoin as a standby. Destroy it and go back to the current version.
+  label def reset_upgrade
+    decr_reset_upgrade
+    upgrade_candidate.incr_destroy
+    self.servers_to_destroy = [upgrade_candidate.id]
+
+    DB.transaction do
+      postgres_resource.update(target_version: postgres_resource.version)
+      postgres_resource.read_replicas_dataset.update(target_version: postgres_resource.version)
+    end
+    Page.from_tag_parts("PostgresUpgradeFailed", postgres_resource.id)&.incr_resolve
+
+    hop_wait_prune_servers
   end
 
   label def recycle_representative_server

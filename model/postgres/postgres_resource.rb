@@ -496,6 +496,10 @@ class PostgresResource < Sequel::Model
     upgrade_strand&.label
   end
 
+  def incr_reset_upgrade
+    Semaphore.incr(upgrade_strand.id, :reset_upgrade)
+  end
+
   def upgrade_failed_at
     st = upgrade_strand
     if st&.label == "upgrade_failed" && (failed_at = st.stack.first["upgrade_failed_at"])

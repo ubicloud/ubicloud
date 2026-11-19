@@ -39,6 +39,7 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
     expect(output).to include("Status: failed")
     expect(output).to include("Stage: upgrade_failed")
     expect(output).to include("ubi pg #{@ref} get-logs --stream-name upgrade -l 500\n")
+    expect(output).to include("ubi pg #{@ref} reset-upgrade\n")
   end
 
   it "shows the upgrade logs command for the time of the failure" do

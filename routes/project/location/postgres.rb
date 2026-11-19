@@ -549,6 +549,26 @@ class Clover
         end
       end
 
+      r.post "reset-upgrade" do
+        authorize("Postgres:edit", pg)
+
+        unless pg.upgrade_status == "failed"
+          raise CloverError.new(400, "InvalidRequest", "Only a failed upgrade can be reset")
+        end
+
+        DB.transaction do
+          pg.incr_reset_upgrade
+          audit_log(pg, "reset_upgrade")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "The failed upgrade will be reset in a few seconds"
+          r.redirect pg, "/upgrade"
+        end
+      end
+
       r.post "reset-superuser-password" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
