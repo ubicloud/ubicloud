@@ -256,10 +256,24 @@ class Scheduling::Dispatcher
     array = []
     t = Time.now
     while (metric = metrics_queue.pop)
+      next unless metric.complete?
+
+      ControlPlaneMetrics.observe_respirate_dispatch(
+        scan_delay: metric.scan_delay,
+        queue_delay: metric.queue_delay,
+        lease_delay: metric.lease_delay,
+        total_delay: metric.total_delay,
+        queue_size: metric.queue_size,
+        available_workers: metric.available_workers,
+        lease_acquired: metric.lease_acquired,
+        old_strand: metric.old_strand,
+        lease_expired: metric.lease_expired,
+      )
       array << metric
       if array.size == METRICS_EVERY
         new_t = Time.now
         Clog.emit("respirate metrics", {respirate_metrics: metrics_hash(array, new_t - t)})
+        ControlPlaneMetrics.set_respirate_current_strand_delay(@current_strand_delay)
         t = new_t
         array.clear
       end

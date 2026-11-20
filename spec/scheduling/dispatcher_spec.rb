@@ -352,14 +352,29 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#metrics_thread" do
-    it "emits metrics every 200 queue entries" do
+    def delay_sum(stage)
+      control_plane_metric(:respirate_strand_delay_seconds, stage:).fetch("sum")
+    end
+
+    it "records each complete strand dispatch and emits metrics every 200 entries" do
+      t = Time.now
+      metric = Strand::RespirateMetrics.new(t, t + 1, t + 2, t + 3, true, 4, 5)
+      incomplete = Strand::RespirateMetrics.new(t, t + 1)
       q = Queue.new
       n = described_class::METRICS_EVERY
-      n.times { q.push 1 }
+      n.times { q.push metric }
+      q.push incomplete
       q.push nil
-      expect(di).to receive(:metrics_hash).with([1] * n, instance_of(Float)).and_return({})
-      expect(Clog).to receive(:emit).and_call_original
-      di.metrics_thread(q)
+      expect(Clog).to receive(:emit).with("respirate metrics", instance_of(Hash)).and_call_original
+      expect { di.metrics_thread(q) }
+        .to change { delay_sum("scan") }.by(a_value_within(0.001).of(n))
+        .and change { delay_sum("queue") }.by(a_value_within(0.001).of(n))
+        .and change { delay_sum("lease") }.by(a_value_within(0.001).of(n))
+        .and change { delay_sum("total") }.by(a_value_within(0.001).of(3 * n))
+        .and change { control_plane_metric(:respirate_dispatches_total, lease_acquired: "true", old_strand: "false", lease_expired: "false") }.by(n)
+      expect(control_plane_metric(:respirate_queue_size)).to eq 4
+      expect(control_plane_metric(:respirate_available_workers)).to eq 5
+      expect(control_plane_metric(:respirate_current_strand_delay_seconds)).to eq 3
     end
   end
 
