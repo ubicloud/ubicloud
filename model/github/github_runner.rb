@@ -115,6 +115,25 @@ class GithubRunner < Sequel::Model
     !!(job_id || workflow_job)
   end
 
+  # Update the runner with the information from the given workflow job
+  # hash (with string keys), unless the runner already has a conclusion.
+  def update_from_workflow_job(job)
+    this.where(conclusion: nil).update(
+      job_id: job["id"],
+      run_id: job["run_id"],
+      run_attempt: job["run_attempt"],
+      head_branch: job["head_branch"],
+      workflow_name: job["workflow_name"],
+      job_name: job["name"],
+      job_created_at: job["created_at"],
+      job_started_at: job["started_at"],
+      job_completed_at: job["completed_at"],
+      status: job["status"],
+      conclusion: job["conclusion"],
+      workflow_job: Sequel.pg_jsonb(job.except("steps")),
+    )
+  end
+
   def workflow_run_create_date
     unless (create_date = active_workflow_run_dataset.get(:create_date))
       today = Time.now.utc.to_date
