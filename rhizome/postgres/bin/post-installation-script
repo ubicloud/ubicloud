@@ -3,7 +3,8 @@
 
 require_relative "../../common/lib/util"
 
-r "sudo -u postgres createdb ubi_admin"
+exists = r("sudo -u postgres psql -tAc :sql", sql: "SELECT 1 FROM pg_database WHERE datname = 'ubi_admin'")
+r "sudo -u postgres createdb ubi_admin" if exists.empty?
 
 # Initial execution of migration scripts
 r "sudo postgres/bin/migrate"
