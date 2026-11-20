@@ -7,11 +7,19 @@ module ControlPlaneMetrics
   STRAND_RUN_BUCKETS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 45, 60, 75, 90].freeze
   STRAND_LABEL_BUCKETS = [1, 5, 15, 60, 300, 900, 3600, 14400, 86400].freeze
   SSH_BUCKETS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10, 20, 30, 60].freeze
+  MONITOR_PULSE_BUCKETS = [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120].freeze
+  METRICS_EXPORT_BUCKETS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 100].freeze
+
+  UNLABELED_GAUGES = {
+    monitor_active_threads: "Threads in the monitor process beyond its fixed worker and internal threads.",
+    monitor_threads_waiting_for_db: "Threads waiting for a database connection in the monitor process.",
+  }.freeze
 
   attr_reader :registry
 
   def initialize
     @registry = Prometheus::Client::Registry.new
+    @unlabeled_gauges = {}
     @strand_run_duration = @registry.histogram(
       :strand_run_duration_seconds,
       docstring: "Duration of a single strand run.",
@@ -35,6 +43,38 @@ module ControlPlaneMetrics
       docstring: "Duration of establishing new SSH sessions, including the session lock.",
       labels: [:outcome],
       buckets: SSH_BUCKETS,
+    )
+    @monitor_pulse_duration = @registry.histogram(
+      :monitor_pulse_duration_seconds,
+      docstring: "Duration of monitor pulse checks.",
+      labels: [:resource_type],
+      buckets: MONITOR_PULSE_BUCKETS,
+    )
+    @metrics_export_duration = @registry.histogram(
+      :metrics_export_duration_seconds,
+      docstring: "Duration of metrics exports.",
+      labels: [:resource_type, :outcome],
+      buckets: METRICS_EXPORT_BUCKETS,
+    )
+    @monitor_resources = @registry.gauge(
+      :monitor_resources,
+      docstring: "Monitored resources by type and latest pulse reading.",
+      labels: [:resource_type, :reading],
+    )
+    @metrics_export_resources = @registry.gauge(
+      :metrics_export_resources,
+      docstring: "Metrics export resources by type.",
+      labels: [:resource_type],
+    )
+    @monitor_queue_length = @registry.gauge(
+      :monitor_queue_length,
+      docstring: "Jobs waiting in the monitor submit queue.",
+      labels: [:kind],
+    )
+    @monitor_idle_workers = @registry.gauge(
+      :monitor_idle_workers,
+      docstring: "Monitor worker threads waiting for a job.",
+      labels: [:kind],
     )
   end
 
@@ -62,8 +102,40 @@ module ControlPlaneMetrics
     @ssh_connect_duration.observe(duration, labels: {outcome:})
   end
 
+  def observe_monitor_pulse(resource_type:, duration:)
+    return unless Config.control_plane_metrics_report_enabled
+
+    @monitor_pulse_duration.observe(duration, labels: {resource_type:})
+  end
+
+  def observe_metrics_export(resource_type:, outcome:, duration:)
+    return unless Config.control_plane_metrics_report_enabled
+
+    @metrics_export_duration.observe(duration, labels: {resource_type:, outcome:})
+  end
+
+  def set_monitor_state(resources:, export_resources:, queue_lengths:, idle_workers:, active_threads:, threads_waiting_for_db:)
+    return unless Config.control_plane_metrics_report_enabled
+
+    set_labeled(@monitor_resources, resources)
+    set_labeled(@metrics_export_resources, export_resources)
+    set_labeled(@monitor_queue_length, queue_lengths)
+    set_labeled(@monitor_idle_workers, idle_workers)
+    unlabeled_gauge(:monitor_active_threads).set(active_threads)
+    unlabeled_gauge(:monitor_threads_waiting_for_db).set(threads_waiting_for_db)
+  end
+
   def render
     Prometheus::Client::Formats::Text.marshal(@registry)
+  end
+
+  private def unlabeled_gauge(name)
+    @unlabeled_gauges[name] ||= @registry.gauge(name, docstring: UNLABELED_GAUGES.fetch(name))
+  end
+
+  private def set_labeled(gauge, values)
+    (gauge.values.keys - values.keys).each { gauge.set(0, labels: it) }
+    values.each { |labels, value| gauge.set(value, labels:) }
   end
 
   extend self

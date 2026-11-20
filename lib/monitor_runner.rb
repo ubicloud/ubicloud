@@ -90,6 +90,29 @@ class MonitorRunner
     })
   end
 
+  def update_metrics
+    resources = Hash.new(0)
+    @monitor_resources.resources.each_value do |r|
+      [r, *r.attached_resource_list].each do
+        resources[{resource_type: it.resource.class.name, reading: it.reading}] += 1
+      end
+    end
+
+    export_resources = Hash.new(0)
+    @metric_export_resources.resources.each_value do
+      export_resources[{resource_type: it.resource.class.name}] += 1
+    end
+
+    ControlPlaneMetrics.set_monitor_state(
+      resources:,
+      export_resources:,
+      queue_lengths: {{kind: "pulse"} => @monitor_resources.submit_queue.length, {kind: "export"} => @metric_export_resources.submit_queue.length},
+      idle_workers: {{kind: "pulse"} => @monitor_resources.submit_queue.num_waiting, {kind: "export"} => @metric_export_resources.submit_queue.num_waiting},
+      active_threads: Thread.list.count - @internal_threads,
+      threads_waiting_for_db: DB.pool.num_waiting,
+    )
+  end
+
   def check_stuck_pulses
     @resource_types.each(&:check_stuck_pulses)
   end
@@ -159,6 +182,7 @@ class MonitorRunner
       if t > report_after
         report_after = t + @report_every
         emit_metrics
+        update_metrics
       end
 
       # If the time since the last pulse check has exceeded the deadline,
