@@ -19,7 +19,12 @@ class Prog::LearnPci < Prog::Base
   end
 
   def make_model_instances
-    PciDeviceRecord.parse_all(sshable.cmd("/usr/bin/lspci -vnmm -d 10de::")).map do |rec|
+    nvidia = PciDeviceRecord.parse_all(sshable.cmd("/usr/bin/lspci -vnmm -d 10de::"))
+    nvidia_iommu_groups = nvidia.map(&:iommu_group)
+    connectx8 = PciDeviceRecord.parse_all(sshable.cmd("/usr/bin/lspci -vnmm -d 15b3:1023"))
+      .select { nvidia_iommu_groups.include?(it.iommu_group) }
+
+    (nvidia + connectx8).map do |rec|
       PciDevice.new(
         vm_host_id: vm_host.id,
         slot: rec.slot,

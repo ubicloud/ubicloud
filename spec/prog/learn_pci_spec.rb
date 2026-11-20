@@ -30,6 +30,7 @@ SDevice:	16fa
 Rev:	a1
 IOMMUGroup:	13
 EOS
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 15b3:1023").and_return("")
       expect { lp.start }.to hop("learn_gpu_partitions").and change {
         PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
@@ -65,6 +66,7 @@ SDevice:	16fa
 Rev:	a1
 IOMMUGroup:	13
 EOS
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 15b3:1023").and_return("")
       expect { lp.start }.to hop("learn_gpu_partitions").and change {
         PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
@@ -89,7 +91,37 @@ SVendor:	10de
 SDevice:	16fa
 Rev:	a1
 EOS
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 15b3:1023").and_return("")
       expect(lp.make_model_instances).to eq([])
+    end
+
+    it "learns the ConnectX-8s in the IOMMU groups of NVIDIA devices only" do
+      vmh = Prog::Vm::HostNexus.assemble("::1").subject
+      lp = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
+Slot:	04:00.0
+Class:	0302
+Vendor:	10de
+Device:	3182
+NUMANode:	0
+IOMMUGroup:	36
+EOS
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 15b3:1023").and_return(<<EOS)
+Slot:	03:00.0
+Class:	0207
+Vendor:	15b3
+Device:	1023
+NUMANode:	0
+IOMMUGroup:	36
+
+Slot:	a3:00.0
+Class:	0200
+Vendor:	15b3
+Device:	1023
+NUMANode:	1
+IOMMUGroup:	90
+EOS
+      expect(lp.make_model_instances.map { [it.slot, it.device_class, it.iommu_group] }).to eq([["04:00.0", "0302", 36], ["03:00.0", "0207", 36]])
     end
 
     it "can raise a data parse error" do

@@ -27,6 +27,10 @@ class PciDevice < Sequel::Model
     ["0300", "0302"].include? device_class
   end
 
+  def is_nic
+    device_class.start_with?("02")
+  end
+
   def name
     PciDevice.device_name(device)
   end

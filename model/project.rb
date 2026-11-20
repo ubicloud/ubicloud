@@ -340,6 +340,7 @@ class Project < Sequel::Model
     :github_billing_by_repository,
     :gpu_vm,
     :hard_runner_concurrency_limit,
+    :infiniband,
     :invoice_in_eur,
     :ipv6_disabled,
     :no_alien_runner_repositories,

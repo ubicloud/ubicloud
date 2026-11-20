@@ -1621,6 +1621,41 @@ NFTABLES_CONF
     end
   end
 
+  describe "#build_qemu_service with ib devices" do
+    let(:vps) { instance_spy(VmPath, serial_log: "/vm/test/serial.log", cloudinit_img: "/vm/test/cloudinit.img") }
+
+    before do
+      vs.instance_variable_set(:@hypervisor, "qemu")
+      allow(vs).to receive_messages(vp: vps, cpu_vendor: "GenuineIntel")
+    end
+
+    it "puts each GPU and the NICs of its IOMMU group on one root port" do
+      vs.instance_variable_set(:@ib_devices, [["03:00.0", 36]])
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+
+      pci_devices = [["04:00.0", 36], ["14:00.0", 37]]
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], pci_devices, "system.slice", 0, "ubuntu-noble")
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include(<<~QEMU.gsub("\n", " \\\n").strip)
+          -device pcie-root-port,id=rp1,slot=1,chassis=1,bus=pcie.0,hotplug=off,x-speed=64,x-width=16
+          -device vfio-pci,host=0000:04:00.0,bus=rp1,addr=0x0.0,multifunction=on
+          -device vfio-pci,host=0000:03:00.0,bus=rp1,addr=0x0.1
+          -device pcie-root-port,id=rp2,slot=2,chassis=2,bus=pcie.0,hotplug=off
+          -device vfio-pci,host=0000:14:00.0,bus=rp2,addr=0x0
+        QEMU
+      }
+    end
+
+    it "fails for a NIC without a GPU in its IOMMU group" do
+      vs.instance_variable_set(:@ib_devices, [["03:00.0", 36], ["13:00.0", 38]])
+      pci_devices = [["04:00.0", 36]]
+      expect {
+        vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], pci_devices, "system.slice", 0, "ubuntu-noble")
+      }.to raise_error RuntimeError, "BUG: no GPU in the IOMMU group of 13:00.0"
+    end
+  end
+
   describe "#qemu_smp" do
     it "warns when max_vcpus does not match topology product" do
       expect { vs.send(:qemu_smp, "1:1:1:2", 3) }.to output(/Warning: max_vcpus=3 does not match topology product=2/).to_stderr

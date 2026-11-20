@@ -31,7 +31,8 @@ vm_setup = VmSetup.new(vm_name,
   hypervisor: params.fetch("hypervisor", "ch"),
   ch_version: params["ch_version"],
   firmware_version: params["firmware_version"],
-  append_serial_console: params.fetch("append_serial_console", false))
+  append_serial_console: params.fetch("append_serial_console", false),
+  ib_devices: params.fetch("ib_devices", []))
 
 if action == "delete"
   vm_setup.purge

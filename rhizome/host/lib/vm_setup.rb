@@ -19,8 +19,9 @@ require_relative "csum_guard_setup"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil, append_serial_console: false)
+  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil, append_serial_console: false, ib_devices: [])
     @vm_name = vm_name
+    @ib_devices = ib_devices
     @hugepages = hugepages
     @hypervisor = hypervisor
     @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
@@ -919,11 +920,18 @@ DNSMASQ_SERVICE
       ]
     }
 
-    pci_parts = pci_devices.map.with_index(1) do |(bdf), i|
-      [
-        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},bus=pcie.0,hotplug=off",
-        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0",
-      ]
+    unpaired = @ib_devices.reject { |_, group| pci_devices.any? { |_, g| g == group } }
+    fail "BUG: no GPU in the IOMMU group of #{unpaired.map(&:first).join(", ")}" unless unpaired.empty?
+
+    pci_parts = pci_devices.map.with_index(1) do |(bdf, iommu_group), i|
+      root_port = "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},bus=pcie.0,hotplug=off"
+      nics = @ib_devices.select { |_, group| group == iommu_group }
+      if nics.empty?
+        [root_port, "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0"]
+      else
+        ["#{root_port},x-speed=64,x-width=16", "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0.0,multifunction=on"] +
+          nics.map.with_index(1) { |(nic), fn| "-device vfio-pci,host=0000:#{nic},bus=rp#{i},addr=0x0.#{fn}" }
+      end
     end.flatten
 
     serial_parts = [

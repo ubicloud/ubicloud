@@ -18,6 +18,12 @@ RSpec.describe PciDevice do
     expect(d.is_gpu).to be_falsy
   end
 
+  it "returns whether a device is a network controller" do
+    expect(described_class.new(device_class: "0207").is_nic).to be true
+    expect(described_class.new(device_class: "0200").is_nic).to be true
+    expect(described_class.new(device_class: "0302").is_nic).to be false
+  end
+
   it "returns correct names" do
     expect(described_class.new(device_class: "0302", vendor: "10de", device: "20b5").name).to equal("NVIDIA A100 80GB PCIe")
     expect(described_class.new(device_class: "0300", vendor: "10de", device: "27b0").name).to equal("NVIDIA RTX 4000 SFF Ada Generation")

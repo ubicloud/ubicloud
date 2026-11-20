@@ -695,6 +695,20 @@ RSpec.describe Vm do
       expect(json["gpu_partition_id"]).to eq(3)
     end
 
+    it "passes ConnectX-8s through only with the infiniband feature flag" do
+      PciDevice.create(vm_host_id: vmh.id, vm_id: vm.id, slot: "04:00.0", device_class: "0302", vendor: "10de", device: "3182", numa_node: 0, iommu_group: 36)
+      PciDevice.create(vm_host_id: vmh.id, vm_id: vm.id, slot: "03:00.0", device_class: "0207", vendor: "15b3", device: "1023", numa_node: 0, iommu_group: 36)
+
+      json = JSON.parse(vm.params_json)
+      expect(json["pci_devices"]).to eq([["04:00.0", 36]])
+      expect(json["ib_devices"]).to eq([])
+
+      project.set_ff_infiniband(true)
+      json = JSON.parse(vm.reload.params_json)
+      expect(json["pci_devices"]).to eq([["04:00.0", 36]])
+      expect(json["ib_devices"]).to eq([["03:00.0", 36]])
+    end
+
     it "does not append the serial console for non-runner vms" do
       expect(JSON.parse(vm.params_json)["append_serial_console"]).to be false
     end
