@@ -37,6 +37,24 @@ RSpec.describe PgBouncerSetup do
       expect(config).to include("pool_mode = transaction")
     end
 
+    it "ignores extra_float_digits by default" do
+      expect(config).to include("ignore_startup_parameters = extra_float_digits\n")
+    end
+
+    it "allows user_config to override ignored startup parameters" do
+      setup = described_class.new(version, max_connections, num_instances, {"ignore_startup_parameters" => "options"})
+      settings = setup.pgbouncer_ini_content(1).lines.grep(/^ignore_startup_parameters = /)
+
+      expect(settings).to eq(["ignore_startup_parameters = extra_float_digits\n", "ignore_startup_parameters = options\n"])
+    end
+
+    it "allows user_config to disable ignored startup parameters" do
+      setup = described_class.new(version, max_connections, num_instances, {"ignore_startup_parameters" => ""})
+      settings = setup.pgbouncer_ini_content(1).lines.grep(/^ignore_startup_parameters = /)
+
+      expect(settings).to eq(["ignore_startup_parameters = extra_float_digits\n", "ignore_startup_parameters = \n"])
+    end
+
     it "sets peer_id based on instance_id" do
       config_1 = pgbouncer_setup.pgbouncer_ini_content(1)
       config_2 = pgbouncer_setup.pgbouncer_ini_content(2)
