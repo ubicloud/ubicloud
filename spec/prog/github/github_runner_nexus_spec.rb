@@ -829,6 +829,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#wait_concurrency_limit" do
+    def admissions(decision)
+      control_plane_metric(:runner_admissions_total, decision:)
+    end
+
     before do
       [
         [Location::HETZNER_FSN1_ID, "x64", "standard"],
@@ -869,21 +873,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     context "when standard runner" do
       it "waits if standard utilization is high" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect { nx.wait_concurrency_limit }.to nap
+        expect { nx.wait_concurrency_limit }.to nap.and change { admissions("high_utilization") }.by(1)
       end
 
       it "waits if reputation is limited" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         project.update(reputation: "limited")
-        expect { nx.wait_concurrency_limit }.to nap
+        expect { nx.wait_concurrency_limit }.to nap.and change { admissions("limited_reputation") }.by(1)
       end
 
       it "waits if the project has a hard concurrency limit" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         project.set_ff_hard_runner_concurrency_limit(true)
-        expect { nx.wait_concurrency_limit }.to nap
+        expect { nx.wait_concurrency_limit }.to nap.and change { admissions("hard_concurrency_limit") }.by(1)
       end
 
       it "waits if utilization is high and spill over enabled but not waited enough" do
@@ -902,7 +906,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
         create_aws_vm(vcpus: 16)
 
-        expect { nx.wait_concurrency_limit }.to nap
+        expect { nx.wait_concurrency_limit }.to nap.and change { admissions("spill_capacity_exceeded") }.by(1)
         expect(runner.spill_over_set?).to be(false)
       end
 
@@ -946,7 +950,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         project.set_ff_spill_to_alien_runners(true)
         runner.update(created_at: now - 40)
 
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm").and change { admissions("spilled_over") }.by(1)
         expect(runner.spill_over_set?).to be(true)
       end
 
@@ -982,7 +986,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       it "allocates if standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot").and change { admissions("low_utilization") }.by(1)
       end
 
       it "allocates if standard utilization is low in the installation's locations" do

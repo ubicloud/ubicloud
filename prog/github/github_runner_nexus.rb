@@ -487,11 +487,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if project.reputation == "limited"
+      ControlPlaneMetrics.count_runner_admission(decision: "limited_reputation")
       Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
     if project.get_ff_hard_runner_concurrency_limit
+      ControlPlaneMetrics.count_runner_admission(decision: "hard_concurrency_limit")
       Clog.emit("not allowed because of hard concurrency limit", {hard_concurrency_limit: {label: github_runner.label, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
@@ -528,15 +530,18 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
       if should_spill_over
         unless aws_spill_capacity_available?
+          ControlPlaneMetrics.count_runner_admission(decision: "spill_capacity_exceeded")
           Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 
+        ControlPlaneMetrics.count_runner_admission(decision: "spilled_over")
         Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
         github_runner.incr_spill_over
         hop_allocate_vm
       end
 
+      ControlPlaneMetrics.count_runner_admission(decision: "high_utilization")
       Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
@@ -544,6 +549,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if x64? && ((prem_util > 80) || (installation.free_runner_upgrade? && prem_util > 50))
       github_runner.incr_not_upgrade_premium
     end
+    ControlPlaneMetrics.count_runner_admission(decision: "low_utilization")
     Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
 
     hop_apply_custom_label_quota if github_runner.custom_label

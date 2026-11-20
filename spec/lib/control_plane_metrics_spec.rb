@@ -25,6 +25,7 @@ RSpec.describe ControlPlaneMetrics do
     metrics.set_monitor_state(resources: {}, export_resources: {}, queue_lengths: {}, idle_workers: {}, active_threads: 1, threads_waiting_for_db: 1)
     metrics.observe_respirate_dispatch(scan_delay: 1, queue_delay: 1, lease_delay: 1, total_delay: 1, queue_size: 1, available_workers: 1, lease_acquired: true, old_strand: false, lease_expired: false)
     metrics.set_respirate_current_strand_delay(1)
+    metrics.count_runner_admission(decision: "low_utilization")
     expect(metrics.render.lines.reject { it.start_with?("#") }).to be_empty
   end
 
