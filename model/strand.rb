@@ -67,6 +67,10 @@ class Strand < Sequel::Model
     def total_delay
       lease_checked - scheduled
     end
+
+    def complete?
+      !!(scan_picked_up && worker_started && lease_checked)
+    end
   end
 
   # If the lease time is after this, we must be dealing with an
