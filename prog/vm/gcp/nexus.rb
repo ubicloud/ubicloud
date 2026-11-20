@@ -240,7 +240,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   label def create_billing_record
     vm.update(display_state: "running", provisioned_at: Time.now)
 
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, **vm.observe_provisioned("gcp")}}])
+    Clog.emit("vm provisioned", {provision: {vm_ubid: vm.ubid, **vm.observe_provisioned("gcp")}})
 
     project = vm.project
     hop_wait_and_wakeup_waiting_strand unless project.billable

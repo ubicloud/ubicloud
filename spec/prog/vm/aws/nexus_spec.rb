@@ -1206,7 +1206,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       aws_instance
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       vm.update(allocated_at: now - 100)
-      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_call_original
     end
 
     it "not create billing records when the project is not billable" do

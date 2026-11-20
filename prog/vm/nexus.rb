@@ -234,8 +234,10 @@ class Prog::Vm::Nexus < Prog::Base
   def self.miv_validation_failed(name, location_id, is_base_boot_image, details)
     if is_base_boot_image
       # For base boot images, we fall back to using a BootImage if no suitable
-      # machine image version is found. So, just log the error and return nil
-      # here.
+      # machine image version is found. GitHub runner images are always
+      # BootImages, so only log the fallback for other images.
+      return if name.start_with?("github-")
+
       Clog.emit("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
         base_machine_image_version_not_found: {
           boot_image: name,

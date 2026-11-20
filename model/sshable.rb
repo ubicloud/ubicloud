@@ -27,6 +27,8 @@ class Sshable < Sequel::Model
     IOError,
   ].freeze
 
+  SLOW_CMD_LOG_SECONDS = 5
+
   dataset_module do
     order :by_id, :id
     exclude :with_host_keys, host_keys: nil
@@ -97,7 +99,7 @@ class Sshable < Sequel::Model
     JSON.parse(cmd(cmd, **args))
   end
 
-  def cmd(cmd, stdin: nil, log: true, timeout: :default, session: nil)
+  def cmd(cmd, stdin: nil, log: :on_error_or_slow, timeout: :default, session: nil)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -165,7 +167,7 @@ class Sshable < Sequel::Model
     end
     observe_ssh_command(outcome, duration)
 
-    if log == true || (log == :on_error && !success)
+    if log == true || (log && !success) || (log == :on_error_or_slow && duration > SLOW_CMD_LOG_SECONDS)
       embed = {ubid:, start:, finish:, timeout:, duration:,
                cmd:, exit_code:, exit_signal:}
 
@@ -197,7 +199,7 @@ class Sshable < Sequel::Model
     cmd("common/bin/daemonizer2 clean :unit_name", unit_name:)
   end
 
-  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: true)
+  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: :on_error_or_slow)
     cmd("common/bin/daemonizer2 run :unit_name :shelljoin_run_command", unit_name:, shelljoin_run_command:, stdin:, log:)
   end
 
