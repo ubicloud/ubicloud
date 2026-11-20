@@ -61,10 +61,18 @@ class Repartitioner
     @shutdown = true
   end
 
-  # Notify the channel that we exist, so that other processes
-  # can repartition appropriately if needed.
+  # Notify the channel that we exist if we are highest known active
+  # channel or second highest known active channel, so that other
+  # processes can repartition appropriately if needed. This is always
+  # true at startup, so we always notify at startup.
+  #
+  # When removing processes, it is best to remove them one at a time
+  # starting with the highest active channel and working down, waiting
+  # at least stale_seconds between channel removals.
   def notify(db: @db)
-    db.notify(@channel, payload: @partition_number_string)
+    if @partition_number >= @num_partitions - 1
+      db.notify(@channel, payload: @partition_number_string)
+    end
   end
 
   # Listens on the channel to determine what other processes are
