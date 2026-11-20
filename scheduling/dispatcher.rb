@@ -52,10 +52,11 @@ class Scheduling::Dispatcher
 
     needed_db_connections = 1
     needed_db_connections += 1 if partition_number
+    needed_db_connections += 1 if Config.control_plane_metrics_report_enabled
     # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
     # use more threads than database connections (db_pool_respirate - 1),
-    # and we need separate database connections for the scan thread and the
-    # repartition thread.
+    # and we need separate database connections for the scan thread, the
+    # repartition thread, and the metrics reporter thread.
     pool_size = pool_size.clamp(1, Config.db_pool_respirate - 1 - needed_db_connections)
 
     # The queue size is 4 times the size of the thread pool by default, as that should
