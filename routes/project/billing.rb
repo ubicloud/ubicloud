@@ -110,11 +110,7 @@ class Clover
         end
 
         flash["notice"] = "Payment method added successfully. $#{preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money."
-        if session["github_actions_setup"]
-          r.redirect "/?setup=github_actions"
-        else
-          r.redirect billing_path
-        end
+        r.redirect(session.delete("github_actions_setup_path") || billing_path)
       end
 
       r.on "payment-method" do

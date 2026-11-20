@@ -16,24 +16,29 @@ class Clover
       if api?
         paginated_result(ds, Serializers::GithubInstallation)
       else
-        if (installation = ds.first)
+        if (installation = ds.first) && (@project.billing_info_id || !Config.stripe_secret_key)
           r.redirect installation, "/runner"
         end
-        view "github/index"
+        r.redirect @project, "/github/setup"
       end
     end
 
     r.get web?, "create" do
       session["github_installation_project_id"] = @project.id
+      r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
+    end
 
-      unless session["github_actions_setup"]
-        handle_validation_failure("github/index")
-        unless @project.has_valid_payment_method?
-          raise_web_error("Project doesn't have valid billing information")
-        end
+    r.get web?, "setup" do
+      @step = if @project.github_installations_dataset.empty?
+        2
+      elsif Config.stripe_secret_key && !@project.billing_info_id
+        3
+      else
+        4
       end
 
-      r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
+      session["github_actions_setup_path"] = "#{@project.path}/github/setup" unless @step == 4
+      view "github/setup"
     end
 
     r.on GITHUB_INSTALLATION_NAME_OR_UBID do |installation_name, installation_id|

@@ -74,8 +74,8 @@ class Clover
       )
 
       flash["notice"] = "GitHub runner integration is enabled for #{project.name} project."
-      if session["github_actions_setup"]
-        r.redirect "/?setup=github_actions"
+      if (setup_path = session.delete("github_actions_setup_path"))
+        r.redirect setup_path
       else
         r.redirect installation, "/runner"
       end
