@@ -132,7 +132,7 @@ RSpec.describe Clover, "github" do
 
   it "creates installation with project from session" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
-    expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
+    expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {id: 678, login: "test-user", type: "User"}}]})
 
     visit "/set_github_installation_project_id/#{project.ubid}"
     visit "/github/callback?code=123123&installation_id=345"
@@ -143,5 +143,7 @@ RSpec.describe Clover, "github" do
     expect(installation.name).to eq("test-user")
     expect(installation.type).to eq("User")
     expect(installation.project_id).to eq(project.id)
+    strand = Strand.first(prog: "Github::CheckGithubInstallationFraud")
+    expect(strand.stack.first).to eq({"subject_id" => installation.id, "account_id" => user.id, "github_account_id" => 678})
   end
 end
