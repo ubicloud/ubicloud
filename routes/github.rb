@@ -66,12 +66,16 @@ class Clover
         r.redirect project, "/dashboard"
       end
 
-      installation = GithubInstallation.create(
-        installation_id:,
-        name: installation_response[:account][:login] || installation_response[:account][:name],
-        type: installation_response[:account][:type],
-        project_id: project.id,
-      )
+      github_account = installation_response[:account]
+      DB.transaction do
+        installation = GithubInstallation.create(
+          installation_id:,
+          name: github_account[:login] || github_account[:name],
+          type: github_account[:type],
+          project_id: project.id,
+        )
+        Prog::Github::CheckGithubInstallationFraud.assemble(installation, current_account, github_account[:id])
+      end
 
       flash["notice"] = "GitHub runner integration is enabled for #{project.name} project."
       if (setup_path = session.delete("github_actions_setup_path"))
