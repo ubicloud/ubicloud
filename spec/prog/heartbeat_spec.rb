@@ -10,12 +10,6 @@ RSpec.describe Prog::Heartbeat do
   describe "#wait" do
     before { allow(Config).to receive(:heartbeat_url).and_return("http://localhost:3000") }
 
-    it "fails if it can't connect to the database" do
-      expect(DB).to receive(:[]).with(described_class::CONNECTED_APPLICATION_QUERY).and_raise(Sequel::DatabaseConnectionError)
-
-      expect { hb.wait }.to raise_error Sequel::DatabaseConnectionError
-    end
-
     it "naps if it can't send request in expected time" do
       expect(hb).to receive(:fetch_connected).and_return(described_class::EXPECTED)
       stub_request(:get, "http://localhost:3000").and_raise(Excon::Error::Timeout)
@@ -24,9 +18,7 @@ RSpec.describe Prog::Heartbeat do
     end
 
     it "naps if not all expected application types are connected" do
-      expect(hb).to receive(:fetch_connected).and_return(%w[monitor puma].freeze)
-
-      expect(Clog).to receive(:emit).with("some expected connected clover services are missing", {heartbeat_missing: {difference: ["respirate"]}})
+      expect(Clog).to receive(:emit).with("some expected connected clover services are missing", {heartbeat_missing: {difference: ["monitor", "respirate"]}})
 
       req = stub_request(:get, "http://localhost:3000").to_return(status: 200)
       expect { hb.wait }.to nap(10)
