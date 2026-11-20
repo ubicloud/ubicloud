@@ -23,6 +23,7 @@ pgsetup.configure_memory_overcommit(strict: configure_hash["strict_overcommit"],
 pgsetup.configure_service_slice
 pgsetup.configure_journald
 pgsetup.quiet_periodic_units
+pgsetup.configure_needrestart
 
 # Update /etc/hosts
 hosts = <<-HOSTS

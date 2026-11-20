@@ -222,6 +222,43 @@ RSpec.describe PostgresSetup do
     end
   end
 
+  describe "#configure_needrestart" do
+    let(:path) { "/etc/needrestart/conf.d/82-clover-postgres.conf" }
+
+    it "excludes the database services from automatic restarts" do
+      expect(PostgresSetup::NEEDRESTART_CONF).to eq(<<~'CONF')
+        $nrconf{override_rc}{qr(^postgresql@.+\.service$)} = 0;
+        $nrconf{override_rc}{qr(^pgbouncer@.+\.service$)} = 0;
+      CONF
+    end
+
+    it "writes the override" do
+      expect(File).to receive(:exist?).with(path).and_return(false)
+      expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/needrestart/conf.d")
+      expect(pg_setup).to receive(:safe_write_to_file).with(path, PostgresSetup::NEEDRESTART_CONF)
+
+      pg_setup.configure_needrestart
+    end
+
+    it "skips the write when the override already matches" do
+      expect(File).to receive(:exist?).with(path).and_return(true)
+      expect(File).to receive(:read).with(path).and_return(PostgresSetup::NEEDRESTART_CONF)
+      expect(pg_setup).not_to receive(:safe_write_to_file)
+      expect(pg_setup).not_to receive(:_run_command)
+
+      pg_setup.configure_needrestart
+    end
+
+    it "rewrites an override whose content differs" do
+      expect(File).to receive(:exist?).with(path).and_return(true)
+      expect(File).to receive(:read).with(path).and_return("$nrconf{restart} = 'l';\n")
+      expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/needrestart/conf.d")
+      expect(pg_setup).to receive(:safe_write_to_file).with(path, PostgresSetup::NEEDRESTART_CONF)
+
+      pg_setup.configure_needrestart
+    end
+  end
+
   describe "#quiet_periodic_units" do
     let(:dropin) { PostgresSetup::PERIODIC_UNIT_DROPIN }
     let(:units) { PostgresSetup::PERIODIC_UNITS }
