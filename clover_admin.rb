@@ -583,13 +583,20 @@ class CloverAdmin < Roda
         run(&github_page_run)
       end
 
-      action "force_stop_runners", "Force Stop All Runners" do
-        flash "Force stop scheduled for all runners of GitHub installation"
-        run do |obj|
-          runner_ids = obj.runners_dataset.select(:id)
+      action "force_stop_resources", "Force Stop Resources" do
+        resources = %w[runners repositories active_workflow_runs private_subnets].freeze
+        flash "Force stop scheduled for selected resources of GitHub installation"
+        param :resources, typecast: [:array!, :nonempty_str], type: :checkboxset, options: resources, value: resources, tag_wrapper: :div, required: nil
+        run do |obj, selected|
           DB.transaction do
-            GithubRunner.incr_skip_deregistration(runner_ids)
-            GithubRunner.incr_destroy(runner_ids)
+            if selected.include?("runners")
+              runner_ids = obj.runners_dataset.select(:id)
+              GithubRunner.incr_skip_deregistration(runner_ids)
+              GithubRunner.incr_destroy(runner_ids)
+            end
+            GithubRepository.incr_destroy(obj.repositories_dataset.select(:id)) if selected.include?("repositories")
+            GithubActiveWorkflowRun.incr_destroy(obj.active_workflow_runs_dataset.select(:id)) if selected.include?("active_workflow_runs")
+            obj.destroy_private_subnets if selected.include?("private_subnets")
           end
         end
       end
@@ -1730,7 +1737,7 @@ class CloverAdmin < Roda
 
             r.post(action_type != :direct) do
               begin
-                params = @params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
+                params = @params.map { |k, v| typecast_params.send(*v[:typecast], k.to_s) }
               rescue Roda::RodaPlugins::TypecastParams::Error => e
                 flash.now["error"] = "Invalid parameter submitted: #{e.param_name}"
                 next view("object_action")

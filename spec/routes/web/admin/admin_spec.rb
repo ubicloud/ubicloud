@@ -2027,17 +2027,48 @@ RSpec.describe CloverAdmin do
     expect(page.driver.response.headers["Location"]).to eq "http://github.com/test-org"
   end
 
-  it "supports force stopping all runners for GithubInstallation" do
-    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
-    runner = GithubRunner.create(installation_id: ins.id, repository_name: "test-org/test-repo", label: "ubicloud")
-    Strand.create(prog: "Github::GithubRunnerNexus", label: "start") { it.id = runner.id }
+  it "supports force stopping selected resources for GithubInstallation" do
+    project = Project.create(name: "test")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization", project_id: project.id)
+    repository = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+    Strand.create_with_id(repository, prog: "Github::GithubRepositoryNexus", label: "wait")
+    runner = GithubRunner.create(installation_id: ins.id, repository_name: repository.name, label: "ubicloud")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
+    workflow_run = GithubActiveWorkflowRun.create(installation_id: ins.id, repository_id: repository.id, repository_name: repository.name, run_id: 111, run_attempt: 1, create_date: Date.today, event: "push", status: "queued", display_title: "CI", actor_login: "al", cache_scope: "main")
+    Strand.create_with_id(workflow_run, prog: "Github::GithubActiveWorkflowRunNexus", label: "wait")
+    private_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, allow_only_ssh: true).subject
+    ins.add_private_subnet(private_subnet)
+    firewall = private_subnet.firewalls.first
 
     visit "/model/GithubInstallation/#{ins.ubid}"
-    click_link "Force Stop All Runners"
-    click_button "Force Stop All Runners"
+    click_link "Force Stop Resources"
+    expect(page.all(:checkbox).select(&:checked?).map(&:value)).to eq %w[runners repositories active_workflow_runs private_subnets]
+    uncheck "repositories"
+    uncheck "private_subnets"
+    click_button "Force Stop Resources"
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
-    expect(page).to have_flash_notice "Force stop scheduled for all runners of GitHub installation"
-    expect(runner.reload.semaphores.map(&:name).sort).to eq ["destroy", "skip_deregistration"]
+    expect(page).to have_flash_notice "Force stop scheduled for selected resources of GitHub installation"
+    expect(runner.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "skip_deregistration"]
+    expect(workflow_run.semaphores_dataset.select_order_map(:name)).to eq ["destroy"]
+    expect(repository.semaphores_dataset.select_order_map(:name)).to eq []
+    expect(private_subnet.destroy_set?(cached: false)).to be false
+    expect(firewall).to exist
+
+    click_link "Force Stop Resources"
+    uncheck "runners"
+    uncheck "active_workflow_runs"
+    click_button "Force Stop Resources"
+    expect(page).to have_flash_notice "Force stop scheduled for selected resources of GitHub installation"
+    expect(runner.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "skip_deregistration"]
+    expect(workflow_run.semaphores_dataset.select_order_map(:name)).to eq ["destroy"]
+    expect(repository.semaphores_dataset.select_order_map(:name)).to eq ["destroy"]
+    expect(private_subnet.destroy_set?(cached: false)).to be true
+    expect(firewall).not_to exist
+
+    click_link "Force Stop Resources"
+    page.all(:checkbox).each(&:uncheck)
+    click_button "Force Stop Resources"
+    expect(page).to have_flash_error "Invalid parameter submitted: resources"
   end
 
   it "supports moving GithubInstallation to US" do
