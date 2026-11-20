@@ -22,6 +22,10 @@ RSpec.describe Sshable do
       transport: instance_double(Net::SSH::Transport::Session, socket:), **)
   end
 
+  def ssh_connect_count(outcome)
+    control_plane_metric(:ssh_connect_duration_seconds, outcome:).fetch("+Inf")
+  end
+
   it "can encrypt and decrypt a field" do
     sa.save_changes
 
@@ -71,24 +75,75 @@ LOCK
       end
 
       it "runs the session lock script if SSH_SESSION_LOCK_NAME is set" do
-        expect(sa).to receive(:_cmd).with(lock_script, log: false)
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false)
         sa.connect
       end
 
       it "swallows a failure to obtain a file descriptor with an obscure exit code" do
-        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
         sa.connect
       end
 
       it "swallows lock conflicts when an obscure exit code is raised" do
-        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
         sa.connect
       end
 
       it "swallows unrecognized errors" do
-        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
         sa.connect
       end
+
+      it "records a successful connect when the session lock is held elsewhere" do
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect { sa.connect }.to change { ssh_connect_count("success") }.by(1)
+      end
+
+      it "records a failed connect when the session lock loses the connection" do
+        err = Net::SSH::Disconnect.new("gone")
+        expect(sa).to receive(:_cmd).with(lock_script, log: false, observe: false).and_raise(err)
+        expect { sa.connect }
+          .to raise_error(err)
+          .and change { ssh_connect_count("error") }.by(1)
+      end
+    end
+  end
+
+  describe "connect metrics" do
+    around do |ex|
+      Thread.new {
+        ex.run
+      }.join
+    end
+
+    it "records a new session by outcome only, whichever strand opens it" do
+      Thread.current[:strand_run] = ["Vm::HostNexus", "wait"]
+      expect(Net::SSH).to receive(:start).and_return(ssh_session(close: nil))
+      expect { sa.connect }.to change { ssh_connect_count("success") }.by(1)
+    end
+
+    it "does not record a connect when reusing a cached session" do
+      expect(Net::SSH).to receive(:start).once.and_return(ssh_session(close: nil, closed?: false, process: true))
+      sa.connect
+      expect { sa.connect }.not_to change { ssh_connect_count("success") }
+    end
+
+    it "records a failed connect" do
+      err = Net::SSH::ConnectionTimeout.new
+      expect(sa).to receive(:start_fresh_session).and_raise(err)
+      expect { sa.connect }
+        .to raise_error(err)
+        .and change { ssh_connect_count("error") }.by(1)
+    end
+
+    it "records a failed connect from a command as a connect, not a command" do
+      err = Net::SSH::ConnectionTimeout.new
+      expect(sa).to receive(:start_fresh_session).and_raise(err)
+      command_errors = -> { control_plane_metric(:ssh_command_duration_seconds, prog: "", label: "", outcome: "error").fetch("+Inf") }
+      expect { sa.cmd("irrelevant", _skip_command_checking: true) }
+        .to raise_error(err)
+        .and change { ssh_connect_count("error") }.by(1)
+        .and not_change(&command_errors)
     end
   end
 
@@ -540,6 +595,10 @@ LOCK
       end
     end
 
+    def ssh_command_count(outcome, prog: "", label: "")
+      control_plane_metric(:ssh_command_duration_seconds, prog:, label:, outcome:).fetch("+Inf")
+    end
+
     it "can run a command" do
       [false, true].each do |repl_value|
         [false, true].each do |log_value|
@@ -567,9 +626,24 @@ LOCK
       end
     end
 
+    it "records the duration of a successful command" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect { sa.cmd("echo hello", log: false, timeout: nil, _skip_command_checking: true) }.to change { ssh_command_count("success") }.by(1)
+    end
+
+    it "records the prog and label of the strand running the command" do
+      Thread.current[:strand_run] = ["Vm::HostNexus", "wait"]
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect { sa.cmd("echo hello", log: false, timeout: nil, _skip_command_checking: true) }.to change { ssh_command_count("success", prog: "Vm::HostNexus", label: "wait") }.by(1)
+    ensure
+      Thread.current[:strand_run] = nil
+    end
+
     it "raises an SshError with a non-zero exit status" do
       simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }
+        .to raise_error(Sshable::SshError, "command exited with an error: exit 1")
+        .and change { ssh_command_count("failure") }.by(1)
     end
 
     it "does not log a successful command when log: :on_error" do
@@ -586,7 +660,9 @@ LOCK
 
     it "raises an SshError with a nil exit status" do
       simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }
+        .to raise_error(Sshable::SshTimeout, "command timed out: exit 1")
+        .and change { ssh_command_count("timeout") }.by(1)
     end
 
     it "supports custom timeout" do
@@ -611,7 +687,23 @@ LOCK
       err = IOError.new("the party is over")
       expect(session).to receive(:open_channel).and_raise err
       expect(sa).to receive(:invalidate_cache_entry)
-      expect { sa.cmd("irrelevant", _skip_command_checking: true) }.to raise_error err
+      expect { sa.cmd("irrelevant", _skip_command_checking: true) }
+        .to raise_error(err)
+        .and change { ssh_command_count("error") }.by(1)
+    end
+
+    it "does not record a command run with observe: false" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect { sa.cmd("echo hello", log: false, timeout: nil, observe: false, _skip_command_checking: true) }.not_to change { ssh_command_count("success") }
+    end
+
+    it "does not record a failed command run with observe: false" do
+      err = IOError.new("the party is over")
+      expect(session).to receive(:open_channel).and_raise err
+      expect(sa).to receive(:invalidate_cache_entry)
+      expect { sa.cmd("irrelevant", observe: false, _skip_command_checking: true) }
+        .to raise_error(err)
+        .and not_change { ssh_command_count("error") }
     end
   end
 

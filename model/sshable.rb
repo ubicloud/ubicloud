@@ -97,7 +97,7 @@ class Sshable < Sequel::Model
     JSON.parse(cmd(cmd, **args))
   end
 
-  def cmd(cmd, stdin: nil, log: true, timeout: :default, session: nil)
+  def cmd(cmd, stdin: nil, log: true, timeout: :default, session: nil, observe: true)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -117,8 +117,11 @@ class Sshable < Sequel::Model
       start + timeout + 0.5
     end
 
+    command_start = nil
     begin
-      ch = (session || connect).open_channel do |ch|
+      sess = session || connect
+      command_start = Time.now
+      ch = sess.open_channel do |ch|
         channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
@@ -147,16 +150,26 @@ class Sshable < Sequel::Model
       # A caller-supplied session is not in the thread-local cache and its
       # lifecycle is owned by the caller, so leave the cache alone.
       invalidate_cache_entry unless session
+      observe_ssh_command("error", Time.now - command_start) if observe && command_start
       raise
     end
 
     stdout_str = stdout.string.freeze
     stderr_str = stderr.string.freeze
     success = exit_code&.zero?
+    finish = Time.now
+    duration = finish - start
+    outcome = if success
+      "success"
+    elsif exit_code
+      "failure"
+    else
+      "timeout"
+    end
+    observe_ssh_command(outcome, finish - command_start) if observe
 
     if log == true || (log == :on_error && !success)
-      finish = Time.now
-      embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+      embed = {ubid:, start:, finish:, timeout:, duration:,
                cmd:, exit_code:, exit_signal:}
 
       # Suppress large outputs to avoid annoyance in duplication
@@ -231,24 +244,30 @@ class Sshable < Sequel::Model
 
     # Cache miss.
     start = Time.now
-    sess = start_fresh_session
-    @connect_duration = Time.now - start
-    sess.transport.socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
-    Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
+    begin
+      sess = start_fresh_session
+      @connect_duration = Time.now - start
+      sess.transport.socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+      Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
 
-    if (lock_name = maybe_ssh_session_lock_name)
-      lock_contents = <<LOCK
+      if (lock_name = maybe_ssh_session_lock_name)
+        lock_contents = <<LOCK
 exec 999>/dev/shm/session-lock-:lock_name || exit 92
 flock -xn 999 || { echo "Another session active: " :lock_name; exit 124; }
 sleep infinity </dev/null >/dev/null 2>&1 &
 disown
 LOCK
 
-      begin
-        cmd(lock_contents, lock_name:, log: false)
-      rescue SshError
+        begin
+          cmd(lock_contents, lock_name:, log: false, observe: false)
+        rescue SshError
+        end
       end
+    rescue
+      ControlPlaneMetrics.observe_ssh_connect(outcome: "error", duration: Time.now - start)
+      raise
     end
+    ControlPlaneMetrics.observe_ssh_connect(outcome: "success", duration: Time.now - start)
 
     sess
   end
@@ -404,6 +423,11 @@ LOCK
 
       false
     end
+  end
+
+  def observe_ssh_command(outcome, duration)
+    prog, label = Thread.current[:strand_run]
+    ControlPlaneMetrics.observe_ssh_command(prog: prog || "", label: label || "", outcome:, duration:)
   end
 
   def channel_wait(ch, wait_deadline)

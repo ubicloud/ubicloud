@@ -14,6 +14,8 @@ RSpec.describe ControlPlaneMetrics do
     allow(Config).to receive(:control_plane_metrics_report_enabled).and_return(false)
     metrics.observe_strand_run(prog: "Test", label: "start", duration: 1)
     metrics.observe_strand_label(prog: "Test", label: "start", outcome: "exit", to: "", duration: 1)
+    metrics.observe_ssh_command(prog: "", label: "", outcome: "success", duration: 1)
+    metrics.observe_ssh_connect(outcome: "success", duration: 1)
     expect(metrics.render.lines.reject { it.start_with?("#") }).to be_empty
   end
 end
