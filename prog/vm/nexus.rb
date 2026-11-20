@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
-    exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, alternative_families: [],
+    exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, alternative_families: [], nested_virtualization: false,
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
     use_separate_management_nic: false, use_eip: true, management_nic_use_eip: true, remote_storage_server_id: nil,
     waiting_strand_id: nil, allocated_waiting_strand_id: nil)
@@ -196,6 +196,7 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
+          "nested_virtualization" => nested_virtualization,
           "private_subnet_id" => subnet.id,
           "waiting_strand_id" => waiting_strand_id,
           "allocated_waiting_strand_id" => allocated_waiting_strand_id,
