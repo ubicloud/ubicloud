@@ -64,11 +64,38 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:package_url).and_return("package_url")
       expect(spdk_setup).to receive(:puts).with("Downloading SPDK package from package_url")
       expect(spdk_setup).to receive(:install_path).and_return("install_path").at_least(:once)
-      expect(spdk_setup).to receive(:_run_command).with("curl", "-L3", "-o", "/tmp/spdk.tar.gz", "package_url")
+      expect(spdk_setup).to receive(:_run_command).with("curl", "--fail", "--location", "--output", "/tmp/spdk.tar.gz", "package_url")
       expect(FileUtils).to receive(:mkdir_p).with("install_path")
       expect(FileUtils).to receive(:cd).with("install_path").and_yield
       expect(spdk_setup).to receive(:_run_command).with("tar", "-xzf", "/tmp/spdk.tar.gz", "--strip-components=1")
       spdk_setup.install_package(os_version: "ubuntu-22.04")
+    end
+
+    it "fails at the fetch when the package is not there, not at the tar" do
+      # curl exits 0 on a 404 unless it is asked not to: it writes the error
+      # body to --output, and the run dies two steps later as "tar: not in
+      # gzip format", which reads as a corrupt package on a host whose actual
+      # problem is a URL that names nothing. The double below is curl's own
+      # contract on the argv this method builds -- a 404 is exit 22 with
+      # --fail and a success without it -- so this example fails while the
+      # fetch is unguarded, by reaching tar, and passes once it cannot.
+      expect(spdk_setup).to receive(:package_url).and_return("package_url")
+      allow(spdk_setup).to receive(:puts)
+      allow(spdk_setup).to receive(:install_path).and_return("install_path")
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(FileUtils).to receive(:cd).and_yield
+      ran = []
+      allow(spdk_setup).to receive(:_run_command) do |*argv|
+        ran << argv.first
+        if argv.first == "curl" && argv.include?("--fail")
+          raise CommandFail.new("command failed: " + argv.join(" "), "",
+            "curl: (22) The requested URL returned error: 404")
+        end
+        ""
+      end
+
+      expect { spdk_setup.install_package(os_version: "ubuntu-22.04") }.to raise_error(CommandFail, /404/)
+      expect(ran).to eq(["curl"])
     end
   end
 
