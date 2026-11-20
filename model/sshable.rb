@@ -147,16 +147,26 @@ class Sshable < Sequel::Model
       # A caller-supplied session is not in the thread-local cache and its
       # lifecycle is owned by the caller, so leave the cache alone.
       invalidate_cache_entry unless session
+      observe_ssh_command("error", Time.now - start)
       raise
     end
 
     stdout_str = stdout.string.freeze
     stderr_str = stderr.string.freeze
     success = exit_code&.zero?
+    finish = Time.now
+    duration = finish - start
+    outcome = if success
+      "success"
+    elsif exit_code
+      "failure"
+    else
+      "timeout"
+    end
+    observe_ssh_command(outcome, duration)
 
     if log == true || (log == :on_error && !success)
-      finish = Time.now
-      embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+      embed = {ubid:, start:, finish:, timeout:, duration:,
                cmd:, exit_code:, exit_signal:}
 
       # Suppress large outputs to avoid annoyance in duplication
@@ -404,6 +414,11 @@ LOCK
 
       false
     end
+  end
+
+  def observe_ssh_command(outcome, duration)
+    prog, label = Thread.current[:strand_run]
+    ControlPlaneMetrics.observe_ssh_command(prog: prog || "", label: label || "", outcome:, duration:)
   end
 
   def channel_wait(ch, wait_deadline)
