@@ -7,19 +7,7 @@ version = "1.24.0"
 backend = "core:go"
 specifiers = ["1.24.0"]
 
-[tools.go."platforms.linux-arm64"]
-checksum = "sha256:c3fa6d16ffa261091a5617145553c71d21435ce547e44cc6dfb7470865527cc7"
-url = "https://dl.google.com/go/go1.24.0.linux-arm64.tar.gz"
-
-[tools.go."platforms.linux-arm64-musl"]
-checksum = "sha256:c3fa6d16ffa261091a5617145553c71d21435ce547e44cc6dfb7470865527cc7"
-url = "https://dl.google.com/go/go1.24.0.linux-arm64.tar.gz"
-
 [tools.go."platforms.linux-x64"]
-checksum = "sha256:dea9ca38a0b852a74e81c26134671af7c0fbe65d81b0dc1c5bfe22cf7d4c8858"
-url = "https://dl.google.com/go/go1.24.0.linux-amd64.tar.gz"
-
-[tools.go."platforms.linux-x64-musl"]
 checksum = "sha256:dea9ca38a0b852a74e81c26134671af7c0fbe65d81b0dc1c5bfe22cf7d4c8858"
 url = "https://dl.google.com/go/go1.24.0.linux-amd64.tar.gz"
 
@@ -27,46 +15,18 @@ url = "https://dl.google.com/go/go1.24.0.linux-amd64.tar.gz"
 checksum = "sha256:fd9cfb5dd6c75a347cfc641a253f0db1cebaca16b0dd37965351c6184ba595e4"
 url = "https://dl.google.com/go/go1.24.0.darwin-arm64.tar.gz"
 
-[tools.go."platforms.macos-x64"]
-checksum = "sha256:7af054e5088b68c24b3d6e135e5ca8d91bbd5a05cb7f7f0187367b3e6e9e05ee"
-url = "https://dl.google.com/go/go1.24.0.darwin-amd64.tar.gz"
-
-[tools.go."platforms.windows-x64"]
-checksum = "sha256:96b7280979205813759ee6947be7e3bb497da85c482711116c00522e3bb41ff1"
-url = "https://dl.google.com/go/go1.24.0.windows-amd64.zip"
-
 [[tools.node]]
 version = "24.12.0"
 backend = "core:node"
 specifiers = ["24.12.0"]
 
-[tools.node."platforms.linux-arm64"]
-checksum = "sha256:9b2a2eeb98a8eb37361224e2a1d060300ad2dd143af58dfdb16de785df0f1228"
-url = "https://nodejs.org/dist/v24.12.0/node-v24.12.0-linux-arm64.tar.gz"
-
-[tools.node."platforms.linux-arm64-musl"]
-checksum = "sha256:ef0dc66e375a19442d54b25c28e2481059319a3ecd7118a530372ed80fbf86ac"
-url = "https://unofficial-builds.nodejs.org/download/release/v24.12.0/node-v24.12.0-linux-arm64-musl.tar.gz"
-
 [tools.node."platforms.linux-x64"]
 checksum = "sha256:6159227e0af7d7c3c6bb2fa900452b04a6cb8841a702a79acc613209d70b04d0"
 url = "https://nodejs.org/dist/v24.12.0/node-v24.12.0-linux-x64.tar.gz"
 
-[tools.node."platforms.linux-x64-musl"]
-checksum = "sha256:7ad71a3170aac1c5448f2ef3dca05557e6e89e1201fa23e8600c73eebd4a352f"
-url = "https://unofficial-builds.nodejs.org/download/release/v24.12.0/node-v24.12.0-linux-x64-musl.tar.gz"
-
 [tools.node."platforms.macos-arm64"]
 checksum = "sha256:319f221adc5e44ff0ed57e8a441b2284f02b8dc6fc87b8eb92a6a93643fd8080"
 url = "https://nodejs.org/dist/v24.12.0/node-v24.12.0-darwin-arm64.tar.gz"
-
-[tools.node."platforms.macos-x64"]
-checksum = "sha256:b82ea4c62fd08e250cab59d625e75d77cc5b0a3d60c6698ebee4545c88a169c5"
-url = "https://nodejs.org/dist/v24.12.0/node-v24.12.0-darwin-x64.tar.gz"
-
-[tools.node."platforms.windows-x64"]
-checksum = "sha256:9c125f61ae947b52e779095830f9cac267846a043ef7192183c84016aaad2812"
-url = "https://nodejs.org/dist/v24.12.0/node-v24.12.0-win-x64.zip"
 
 [[tools.ruby]]
 version = "4.0.10"
@@ -78,19 +38,7 @@ compile = "true"
 ruby_build_repo = "https://github.com/rbenv/ruby-build.git"
 ruby_install = "false"
 
-[tools.ruby."platforms.linux-arm64"]
-checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
-url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
-
-[tools.ruby."platforms.linux-arm64-musl"]
-checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
-url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
-
 [tools.ruby."platforms.linux-x64"]
-checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
-url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
-
-[tools.ruby."platforms.linux-x64-musl"]
 checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
 url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
 
@@ -98,40 +46,12 @@ url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
 checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
 url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
 
-[tools.ruby."platforms.macos-x64"]
-checksum = "sha256:b53eef3371fa5d3e3b74340edcd015f06d5d8853968d4e539a5264fce41ed9f1"
-url = "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.10.tar.gz"
-
-[[tools.ruby]]
-version = "4.0.10"
-backend = "core:ruby"
-specifiers = ["4.0.10"]
-
-[tools.ruby."platforms.windows-x64"]
-checksum = "sha256:0d8f693bb4027378d2c92c285c0bb405f9825623bfbf2caad0d52acabbd4978c"
-url = "https://github.com/oneclick/rubyinstaller2/releases/download/RubyInstaller-4.0.10-1/rubyinstaller-4.0.10-1-x64.7z"
-
 [[tools.victoria-metrics]]
 version = "v1.148.0"
 backend = "aqua:VictoriaMetrics/VictoriaMetrics/victoria-metrics"
 specifiers = ["v1.148.0"]
 
-[tools.victoria-metrics."platforms.linux-arm64"]
-checksum = "sha256:91a737da317c848198e0d4ef89261e02f2484e8a39af2a0ad257e74f6b40a41d"
-url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-linux-arm64-v1.148.0.tar.gz"
-url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386911"
-
-[tools.victoria-metrics."platforms.linux-arm64-musl"]
-checksum = "sha256:91a737da317c848198e0d4ef89261e02f2484e8a39af2a0ad257e74f6b40a41d"
-url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-linux-arm64-v1.148.0.tar.gz"
-url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386911"
-
 [tools.victoria-metrics."platforms.linux-x64"]
-checksum = "sha256:805fef95f7114173da531b1dd6187657a0637b74ebd4492dde5d7a522b6462e3"
-url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-linux-amd64-v1.148.0.tar.gz"
-url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386799"
-
-[tools.victoria-metrics."platforms.linux-x64-musl"]
 checksum = "sha256:805fef95f7114173da531b1dd6187657a0637b74ebd4492dde5d7a522b6462e3"
 url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-linux-amd64-v1.148.0.tar.gz"
 url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386799"
@@ -140,13 +60,3 @@ url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases
 checksum = "sha256:e0c7044bb6724b7a5f06db2a033cd50f7878c4419880bd3faf2c14ff770b299d"
 url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-darwin-arm64-v1.148.0.tar.gz"
 url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386543"
-
-[tools.victoria-metrics."platforms.macos-x64"]
-checksum = "sha256:2be6dd204c830e44282acc4c8b57d9e79dcbaf302f7acd1465777a7c506c0c59"
-url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-darwin-amd64-v1.148.0.tar.gz"
-url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386460"
-
-[tools.victoria-metrics."platforms.windows-x64"]
-checksum = "sha256:0bcb4a742ccdde815bf450d6101887e172c5b506475f65723ac7213c72330a50"
-url = "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.148.0/victoria-metrics-windows-amd64-v1.148.0.zip"
-url_api = "https://api.github.com/repos/VictoriaMetrics/VictoriaMetrics/releases/assets/480386230"
