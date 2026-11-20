@@ -289,6 +289,31 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect { prog.sync_zones }.to nap(5)
     end
 
+    it "naps if any pending apex rectification semaphore is set" do
+      dzs
+      Semaphore.where(name: "refresh_dns_servers").delete
+      dzs.first.incr_rectify_apex
+      expect { prog.sync_zones }.to nap(5)
+    end
+
+    it "writes the configured apex into the zone file" do
+      dz = DnsZone.create(project_id: project.id, name: "c0.example.com", apex_nameservers: ["NS1-c0.example.net", "ns2-c0.example.net."], soa_email: "DNS.Admin@example.org")
+      dz.add_dns_server(ds)
+
+      zone_file = <<-CONF
+c0.example.com.          3600    SOA     ns1-c0.example.net. dns\\.admin.example.org. 37 86400 7200 1209600 3600
+c0.example.com.          3600    NS      ns1-c0.example.net.
+c0.example.com.          3600    NS      ns2-c0.example.net.
+      CONF
+
+      expect(prog.sshable).to receive(:_cmd).with("sudo rm -f /var/lib/knot/*.zone /var/lib/knot/journal/*")
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/c0.example.com.zone > /dev/null", stdin: zone_file)
+      expect(prog.sshable).to receive(:_cmd).with("sudo systemctl restart knot")
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: "zone-abort c0.example.com\nzone-begin c0.example.com\nzone-commit c0.example.com\nzone-flush c0.example.com")
+
+      expect { prog.sync_zones }.to hop("validate")
+    end
+
     it "writes knot zone template for each zone" do
       dzs
       Semaphore.where(name: "refresh_dns_servers").delete

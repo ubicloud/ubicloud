@@ -70,4 +70,205 @@ RSpec.describe DnsZone do
     expect(dns_zone.add_dot_if_missing("pg-name.postgres.ubicloud.com")).to eq("pg-name.postgres.ubicloud.com.")
     expect(dns_zone.add_dot_if_missing("pg-name.postgres.ubicloud.com.")).to eq("pg-name.postgres.ubicloud.com.")
   end
+
+  describe "apex" do
+    let(:dz) { described_class.create(project_id:, name: "c0.example.com") }
+    let(:ds) { DnsServer.create(name: "c0.example.com") }
+    let(:vm) {
+      vm = create_vm(project_id:, name: "dns-vm")
+      Sshable.create_with_id(vm, host: "dns.test")
+      vm
+    }
+    let(:read_stdin) { "zone-read c0.example.com @ NS\nzone-read c0.example.com @ SOA" }
+    let(:default_apex) {
+      <<~OUT
+        c0.example.com. 3600 NS c0.example.com.
+        c0.example.com. 3600 SOA ns.c0.example.com. c0.example.com. 41 86400 7200 1209600 3600
+      OUT
+    }
+
+    describe "apex validation" do
+      it "accepts unset and well-formed apex values" do
+        expect(dz).to be_valid
+        dz.update(apex_nameservers: ["ns1-c0.example.net", "NS2-c0.example.net."], soa_email: "dns.admin+pg@example.org")
+        expect(dz.reload.apex_nameservers).to eq ["ns1-c0.example.net", "NS2-c0.example.net."]
+      end
+
+      it "rejects an empty nameserver list" do
+        expect { dz.update(apex_nameservers: []) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+      end
+
+      it "rejects nameservers that are not hostnames" do
+        expect { dz.update(apex_nameservers: ["ns1.example.net", "ns2.example.net\nzone-purge c0.example.com"]) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+        expect { dz.update(apex_nameservers: ["localhost"]) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+        expect { dz.update(apex_nameservers: ["ns1.example.net ns2.example.net"]) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+        expect { dz.update(apex_nameservers: Sequel.pg_array(["ns1.example.net", nil], :text)) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+      end
+
+      it "rejects nameservers that differ only in case or a trailing dot" do
+        dz.apex_nameservers = ["ns1.example.net", "NS1.example.net."]
+        expect(dz).not_to be_valid
+        expect(dz.errors[:apex_nameservers]).to eq ["must be unique"]
+      end
+
+      it "rejects a malformed SOA email" do
+        expect { dz.update(soa_email: "hostmaster example.org") }.to raise_error Sequel::ValidationFailed, "soa_email is invalid"
+        expect { dz.update(soa_email: "hostmaster@example.org\nzone-purge c0.example.com") }.to raise_error Sequel::ValidationFailed, "soa_email is invalid"
+      end
+    end
+
+    describe "#update_apex" do
+      def rectify_requests
+        Semaphore.where(strand_id: dz.id, name: "rectify_apex").count
+      end
+
+      before { Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait") }
+
+      it "does nothing when the values do not change" do
+        expect(Clog).not_to receive(:emit)
+        dz.update_apex(apex_nameservers: nil, soa_email: nil)
+        expect(dz.reload).to have_attributes(apex_nameservers: nil, soa_email: nil)
+        expect(rectify_requests).to eq 0
+      end
+
+      it "stores the apex and requests a rectification only when it changes" do
+        expect(Clog).to receive(:emit).with("DNS zone apex changed", {dns_zone_apex: {ubid: dz.ubid, name: "c0.example.com", apex_nameservers: ["ns1-c0.example.com", "ns2-c0.example.com"], soa_email: "hostmaster@example.com"}}).and_call_original
+        dz.update_apex(apex_nameservers: ["ns1-c0.example.com", "ns2-c0.example.com"], soa_email: "hostmaster@example.com")
+        expect(dz.reload).to have_attributes(apex_nameservers: ["ns1-c0.example.com", "ns2-c0.example.com"], soa_email: "hostmaster@example.com")
+        expect(rectify_requests).to eq 1
+
+        dz.update_apex(apex_nameservers: ["ns1-c0.example.com", "ns2-c0.example.com"], soa_email: "hostmaster@example.com")
+        expect(rectify_requests).to eq 1
+      end
+
+      it "requests a rectification when the values are removed" do
+        dz.update(apex_nameservers: ["ns1-c0.example.com"], soa_email: "hostmaster@example.com")
+        expect(Clog).to receive(:emit).with("DNS zone apex changed", {dns_zone_apex: {ubid: dz.ubid, name: "c0.example.com", apex_nameservers: nil, soa_email: nil}}).and_call_original
+        dz.update_apex(apex_nameservers: nil, soa_email: nil)
+        expect(dz.reload).to have_attributes(apex_nameservers: nil, soa_email: nil)
+        expect(rectify_requests).to eq 1
+      end
+
+      it "rejects invalid apex values without requesting a rectification" do
+        expect { dz.update_apex(apex_nameservers: ["not a hostname"], soa_email: nil) }.to raise_error Sequel::ValidationFailed, "apex_nameservers is invalid"
+        expect(rectify_requests).to eq 0
+      end
+    end
+
+    describe "apex values" do
+      it "defaults to the DNS server name and the historical SOA names" do
+        expect(dz.apex_ns_names(ds)).to eq ["c0.example.com."]
+        expect(dz.soa_mname).to eq "ns.c0.example.com."
+        expect(dz.soa_rname).to eq "c0.example.com."
+      end
+
+      it "uses the configured nameservers, the first one as SOA MNAME" do
+        dz.update(apex_nameservers: ["NS1-c0.example.net", "ns2-c0.example.net."])
+        expect(dz.apex_ns_names(ds)).to eq ["ns1-c0.example.net.", "ns2-c0.example.net."]
+        expect(dz.soa_mname).to eq "ns1-c0.example.net."
+        expect(dz.soa_rname).to eq "c0.example.com."
+      end
+
+      it "turns the SOA email into an RNAME, escaping dots in the local part" do
+        dz.update(soa_email: "DNS.Admin@Example.org")
+        expect(dz.apex_ns_names(ds)).to eq ["c0.example.com."]
+        expect(dz.soa_rname).to eq "dns\\.admin.example.org."
+      end
+    end
+
+    describe "#apex_commands" do
+      before { dz.update(apex_nameservers: ["ns1-c0.example.net", "ns2-c0.example.net"], soa_email: "dns.admin@example.org") }
+
+      it "replaces the NS set and rewrites the SOA with the next serial" do
+        expect(dz.apex_commands(ds, default_apex)).to eq [
+          "zone-unset c0.example.com @ NS c0.example.com.",
+          "zone-set c0.example.com @ 3600 NS ns1-c0.example.net.",
+          "zone-set c0.example.com @ 3600 NS ns2-c0.example.net.",
+          "zone-set c0.example.com @ 3600 SOA ns1-c0.example.net. dns\\\\.admin.example.org. 42 86400 7200 1209600 3600",
+        ]
+      end
+
+      it "returns nothing when the apex already matches" do
+        current = <<~OUT
+          c0.example.com. 3600 NS ns2-c0.example.net.
+          c0.example.com. 3600 NS ns1-c0.example.net.
+          c0.example.com. 3600 SOA ns1-c0.example.net. dns\\.admin.example.org. 42 86400 7200 1209600 3600
+        OUT
+        expect(dz.apex_commands(ds, current)).to be_empty
+      end
+
+      it "only touches what differs" do
+        current = <<~OUT
+          c0.example.com. 3600 NS ns1-c0.example.net.
+          c0.example.com. 3600 SOA ns1-c0.example.net. dns\\.admin.example.org. 42 86400 7200 1209600 30
+        OUT
+        expect(dz.apex_commands(ds, current)).to eq ["zone-set c0.example.com @ 3600 NS ns2-c0.example.net."]
+      end
+
+      it "reads the zone-prefixed output of older knotc versions" do
+        current = <<~OUT
+          [c0.example.com.] c0.example.com. 3600 NS ns2-c0.example.net.
+          [c0.example.com.] c0.example.com. 3600 NS ns1-c0.example.net.
+          [c0.example.com.] c0.example.com. 3600 SOA ns1-c0.example.net. dns\\.admin.example.org. 42 86400 7200 1209600 3600
+        OUT
+        expect(dz.apex_commands(ds, current)).to be_empty
+        expect(dz.apex_commands(ds, default_apex.gsub(/^/, "[c0.example.com.] "))).to eq dz.apex_commands(ds, default_apex)
+      end
+
+      it "ignores lines for other owners and knotc errors" do
+        current = "error: (no such record in zone found)\nwww.c0.example.com. 60 A 192.0.2.1\n#{default_apex}"
+        expect(dz.apex_commands(ds, current).length).to eq 4
+      end
+
+      it "fails when the zone has no SOA" do
+        expect { dz.apex_commands(ds, "c0.example.com. 3600 NS c0.example.com.\n") }.to raise_error RuntimeError, "Zone c0.example.com has no SOA record"
+      end
+    end
+
+    describe "#rectify_apex" do
+      it "writes the default apex back when no values are configured" do
+        current = "c0.example.com. 3600 NS ns1-c0.example.net.\nc0.example.com. 3600 SOA ns1-c0.example.net. hostmaster.example.org. 42 86400 7200 1209600 3600\n"
+        commands = [
+          "zone-abort c0.example.com",
+          "zone-begin c0.example.com",
+          "zone-unset c0.example.com @ NS ns1-c0.example.net.",
+          "zone-set c0.example.com @ 3600 NS c0.example.com.",
+          "zone-set c0.example.com @ 3600 SOA ns.c0.example.com. c0.example.com. 43 86400 7200 1209600 3600",
+          "zone-commit c0.example.com",
+        ]
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(current)
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: commands.join("\n")).and_return("OK\n" * 6)
+        dz.rectify_apex(ds, vm)
+      end
+
+      it "does nothing beyond reading when the apex already matches" do
+        dz.update(apex_nameservers: ["c0.example.com"])
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex.sub("ns.c0", "c0"))
+        dz.rectify_apex(ds, vm)
+      end
+
+      it "applies the changes in one transaction" do
+        dz.update(apex_nameservers: ["ns1-c0.example.net"])
+        commands = [
+          "zone-abort c0.example.com",
+          "zone-begin c0.example.com",
+          "zone-unset c0.example.com @ NS c0.example.com.",
+          "zone-set c0.example.com @ 3600 NS ns1-c0.example.net.",
+          "zone-set c0.example.com @ 3600 SOA ns1-c0.example.net. c0.example.com. 42 86400 7200 1209600 3600",
+          "zone-commit c0.example.com",
+        ]
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex)
+        expect(Clog).to receive(:emit).with("Updating DNS zone apex", {dns_zone: "c0.example.com", vm_ubid: vm.ubid, commands:}).and_call_original
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: commands.join("\n")).and_return("error: (no active transaction)\nOK\nOK\nOK\nOK\nOK")
+        dz.rectify_apex(ds, vm)
+      end
+
+      it "raises when knotc reports an error" do
+        dz.update(soa_email: "hostmaster@example.org")
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: read_stdin, log: false).and_return(default_apex)
+        expect(vm.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: /zone-set c0.example.com @ 3600 SOA ns.c0.example.com. hostmaster.example.org. 42 /).and_return("OK\nOK\nOK\nerror: (semantic check) [c0.example.com]")
+        expect { dz.rectify_apex(ds, vm) }.to raise_error RuntimeError, "Updating apex of c0.example.com failed on #{vm.ubid}. Command: zone-commit c0.example.com. Output: error: (semantic check) [c0.example.com]"
+      end
+    end
+  end
 end
