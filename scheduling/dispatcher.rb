@@ -212,14 +212,13 @@ class Scheduling::Dispatcher
   end
 
   def setup_prepared_statements(strand_id_range:)
-    # A prepared statement to get the strands to run.  A prepared statement
-    # is used to reduce parsing/planning work in the database.
+    # Actual prepared statements do not work with pgBouncer, so this emulates
+    # a prepared statement approach using a Sequel PlaceholderLiteralizer.
     ds = Strand
       .where(Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
       .where(exitval: nil)
       .order_by(:schedule)
       .limit(@queue_size)
-      .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
       .select(:id, :schedule, :lease)
       .for_no_key_update
       .skip_locked
@@ -230,19 +229,23 @@ class Scheduling::Dispatcher
     if strand_id_range
       # The old strand prepared statement does not change based on the
       # number of partitions, so no reason to reprepare it.
-      @old_strand_ps ||= ds
-        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast(Sequel.cast(:$old_strand_delay, String) + " seconds", :interval))
-        .prepare(:select, :get_old_strand_cohort)
+      @old_strand_pl ||= Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(ds) do |pl, ds|
+        ds
+          .exclude(id: Sequel.function(:ANY, Sequel.cast(pl.arg, "uuid[]")))
+          .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast(Sequel.cast(pl.arg, String) + " seconds", :interval))
+      end
 
       ds = ds.where(id: strand_id_range)
       Clog.emit("respirate repartitioning", {partition: strand_id_range})
     else
-      @old_strand_ps = nil
+      @old_strand_pl = nil
     end
 
-    @strand_ps = ds
-      .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
-      .prepare(:select, :get_strand_cohort)
+    @strand_pl = Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(ds) do |pl, ds|
+      ds
+        .exclude(id: Sequel.function(:ANY, Sequel.cast(pl.arg, "uuid[]")))
+        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
+    end
   end
 
   # Thread responsible for collecting and emitting metrics. This emits after every
@@ -406,7 +409,7 @@ class Scheduling::Dispatcher
   # If respirate processes are partitioned, this will only return
   # strands for the current partition.
   def scan
-    @shutting_down ? [] : @strand_ps.call(skip_strands:).each(&:scan_picked_up!)
+    @shutting_down ? [] : @strand_pl.all(skip_strands, &:scan_picked_up!)
   end
 
   # Similar to scan, but return older strands which may not be
@@ -415,7 +418,10 @@ class Scheduling::Dispatcher
   # crashes or experiences apoptosis.
   def scan_old
     unless @shutting_down
-      @old_strand_ps&.call(skip_strands:, old_strand_delay:)&.each(&:scan_picked_up!)&.each(&:old_strand!)
+      @old_strand_pl&.all(skip_strands, old_strand_delay) do
+        it.scan_picked_up!
+        it.old_strand!
+      end
     end || []
   end
 
