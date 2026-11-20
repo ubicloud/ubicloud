@@ -5,3 +5,4 @@ go = "1.24.0"
 victoria-metrics = "v1.148.0"
 [settings]
 ruby.compile = true
+lockfile_platforms = ["linux-x64", "macos-arm64"]
