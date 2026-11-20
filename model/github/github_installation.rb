@@ -81,6 +81,7 @@ end
 #  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{"family_filter": ["premium", "standard"]}'::jsonb
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
+#  github_created_at     | timestamp with time zone |
 # Indexes:
 #  github_installation_pkey                  | PRIMARY KEY btree (id)
 #  github_installation_installation_id_index | UNIQUE btree (installation_id)
