@@ -491,6 +491,10 @@ RSpec.configure do |config|
       prog.strand.stack.first[key]
     end
 
+    def control_plane_metric(name, **labels)
+      ControlPlaneMetrics.registry.get(name).get(labels:)
+    end
+
     def hibernate
       nap(60 * 60 * 24 * 365 * 1000)
     end
