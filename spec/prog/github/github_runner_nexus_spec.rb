@@ -33,6 +33,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     allow(Time).to receive(:now).and_return(now)
   end
 
+  def runner_duration(stage)
+    control_plane_metric(:github_runner_duration_seconds, stage:, vm_size: "standard-4", arch: "x64")
+  end
+
   def add_aws_vpc(installation)
     location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
     expect(Config).to receive(:github_runner_aws_location_id).at_least(:once).and_return(location.id)
@@ -393,10 +397,24 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "bills from the job start when the runner waited for a job" do
-      runner.update(ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:55:00Z"})
-      nx.update_billing_record
+      runner.update(created_at: now - 12 * 60, ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:55:00Z"})
+      expect { nx.update_billing_record }
+        .to change { runner_duration("pickup").fetch("sum") }.by(a_value_within(0.001).of(5 * 60))
+        .and change { runner_duration("wait").fetch("sum") }.by(a_value_within(0.001).of(7 * 60))
+        .and change { runner_duration("job").fetch("sum") }.by(a_value_within(0.001).of(5 * 60))
 
       expect(BillingRecord[resource_id: installation.id].amount).to eq(5)
+    end
+
+    it "records a zero pickup when the job started before the runner was ready" do
+      runner.update(created_at: now - 12 * 60, ready_at: now - 10 * 60, workflow_job: {"id" => 123, "started_at" => "2026-02-05T18:49:00Z"})
+      expect { nx.update_billing_record }
+        .to change { runner_duration("pickup").fetch("+Inf") }.by(1)
+        .and change { runner_duration("pickup").fetch("sum") }.by(0)
+        .and change { runner_duration("wait").fetch("sum") }.by(a_value_within(0.001).of(60))
+        .and change { runner_duration("job").fetch("sum") }.by(a_value_within(0.001).of(10 * 60))
+
+      expect(BillingRecord[resource_id: installation.id].amount).to eq(10)
     end
 
     it "bills from ready_at when the job has no started_at" do
@@ -925,7 +943,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       picked_vm = create_vm(name: "picked-vm")
       expect(nx).to receive(:pick_vm).and_return(picked_vm)
       expect(Clog).to receive(:emit).with("runner_allocated", instance_of(Hash)).and_call_original
-      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect { nx.allocate_vm }.to hop("wait_vm").and change { runner_duration("allocation").fetch("+Inf") }.by(1)
       expect(runner.vm_id).to eq(picked_vm.id)
       expect(runner.location_id).to eq(picked_vm.location_id)
       expect(runner.allocated_at).to eq(now)
@@ -1355,7 +1373,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
-      expect { nx.register_runner }.to hop("wait")
+      expect { nx.register_runner }.to hop("wait").and change { runner_duration("registration").fetch("+Inf") }.by(1)
       expect(runner.runner_id).to eq(123)
       expect(runner.ready_at).to eq(now)
     end

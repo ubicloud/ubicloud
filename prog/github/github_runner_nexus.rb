@@ -175,16 +175,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     billed_from = github_runner.ready_at
     if (started_at = github_runner.workflow_job["started_at"])
-      billed_from = [billed_from, Time.new(started_at)].max
+      started_at = Time.new(started_at)
+      github_runner.observe_duration("pickup", [started_at - billed_from, 0].max)
+      github_runner.observe_duration("wait", started_at - github_runner.created_at)
+      billed_from = [billed_from, started_at].max
     end
+
+    duration = Time.now - billed_from
+    used_amount = (duration / 60).ceil
+    github_runner.observe_duration("job", duration)
+    github_runner.log_duration("runner_completed", duration)
 
     retries = 0
     begin
       begin_time = now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
-      duration = Time.now - billed_from
-      used_amount = (duration / 60).ceil
-      github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
         .where(project_id: project.id, resource_id:, billing_rate_id: rate_id)
         .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
@@ -211,6 +216,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       retry unless retries > 4
       raise
     end
+  end
+
+  def log_registered
+    registration = github_runner.ready_at - github_runner.allocated_at
+    github_runner.observe_duration("registration", registration)
+    github_runner.log_duration("runner_registered", registration)
   end
 
   def client
@@ -549,7 +560,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
-    github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
+    github_runner.reload
+    allocation = github_runner.allocated_at - github_runner.created_at
+    github_runner.observe_duration("allocation", allocation)
+    github_runner.log_duration("runner_allocated", allocation)
 
     hop_wait_vm
   end
@@ -685,7 +699,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
     sudo systemctl start runner-script.service
     COMMAND
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
+    log_registered
 
     hop_wait
   rescue Octokit::Conflict => e
@@ -777,7 +791,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     sudo systemctl start runner-script.service
     COMMAND
     github_runner.update(ready_at: Time.now, encoded_jit_config: nil)
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
+    log_registered
 
     hop_wait
   end
