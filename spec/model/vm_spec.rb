@@ -78,6 +78,34 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#observe_provisioned" do
+    def provision_sum(stage, provider:, arch:, runner:, family: "")
+      control_plane_metric(:vm_provision_duration_seconds, provider:, stage:, arch:, family:, runner:).fetch("sum")
+    end
+
+    it "records allocation and provisioning durations by host family and returns them for logging" do
+      now = Time.now
+      host = create_vm_host(arch: "arm64", family: "premium")
+      vm = described_class.new(arch: "arm64", project_id: Project.generate_uuid, vm_host_id: host.id, created_at: now - 50, allocated_at: now - 40, provisioned_at: now)
+      durations = nil
+      expect { durations = vm.observe_provisioned("metal") }
+        .to change { provision_sum("allocation", provider: "metal", arch: "arm64", family: "premium", runner: "false") }.by(a_value_within(0.001).of(10))
+        .and change { provision_sum("provisioning", provider: "metal", arch: "arm64", family: "premium", runner: "false") }.by(a_value_within(0.001).of(40))
+      expect(durations).to eq(duration: 40, allocation_duration: 10)
+    end
+
+    it "counts VMs in the runner service and VM pool projects as runners" do
+      now = Time.now
+      runner_project_id = Project.generate_uuid
+      pool_project_id = Project.generate_uuid
+      allow(Config).to receive_messages(github_runner_service_project_id: runner_project_id, vm_pool_project_id: pool_project_id)
+      [runner_project_id, pool_project_id].each do |project_id|
+        vm = described_class.new(arch: "x64", project_id:, boot_image: "ami-029bfa2717bc076d5", created_at: now - 3, allocated_at: now - 2, provisioned_at: now)
+        expect { vm.observe_provisioned("aws") }.to change { provision_sum("provisioning", provider: "aws", arch: "x64", runner: "true") }.by(a_value_within(0.001).of(2))
+      end
+    end
+  end
+
   describe "#load_balancer_state" do
     it "returns nil if there is no related object" do
       expect(vm.load_balancer_state).to be_nil
