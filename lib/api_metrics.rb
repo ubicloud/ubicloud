@@ -4,7 +4,7 @@ require "prometheus/client"
 require "prometheus/client/formats/text"
 
 # Holds the Prometheus registry for API request metrics, recorded by
-# ApiMetricsMiddleware and reported to VictoriaMetrics by ApiMetricsReporter.
+# ApiMetricsMiddleware and reported to VictoriaMetrics by MetricsReporter.
 module ApiMetrics
   DURATION_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60].freeze
 

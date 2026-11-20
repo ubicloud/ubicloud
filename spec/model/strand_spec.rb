@@ -249,6 +249,42 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
+  describe "strand run context" do
+    it "exposes the running prog and label to the thread and restores the outer value" do
+      Thread.current[:strand_run] = ["Outer", "label"]
+      st = described_class.create(prog: "Test", label: "deferred_transaction_hopper")
+      seen = nil
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("deferred_transaction_hopper outside transaction") { seen = Thread.current[:strand_run] }
+      st.unsynchronized_run
+      expect(seen).to eq ["Test", "deferred_transaction_hopper"]
+      expect(Thread.current[:strand_run]).to eq ["Outer", "label"]
+    ensure
+      Thread.current[:strand_run] = nil
+    end
+  end
+
+  describe "label duration metric" do
+    def label_count(**labels)
+      control_plane_metric(:strand_label_duration_seconds, **labels).fetch("+Inf")
+    end
+
+    it "records the target label of a hop within the same prog" do
+      st = described_class.create(prog: "Test", label: "hop_entry")
+      expect { st.unsynchronized_run }.to change { label_count(prog: "Test", label: "hop_entry", outcome: "hop", to: "hop_exit") }.by(1)
+    end
+
+    it "records the target prog and label of a push into another prog" do
+      st = described_class.create(prog: "Test2", label: "pusher1")
+      expect { st.unsynchronized_run }.to change { label_count(prog: "Test2", label: "pusher1", outcome: "hop", to: "Test.pusher2") }.by(1)
+    end
+
+    it "records an empty target on exit" do
+      st = described_class.create(prog: "Test", label: "hop_exit")
+      expect { st.unsynchronized_run }.to change { label_count(prog: "Test", label: "hop_exit", outcome: "exit", to: "") }.by(1)
+    end
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"
@@ -256,6 +292,6 @@ RSpec.describe Strand do
     expect(Time).to receive(:now).and_return(now - 10)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
     expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
-    st.unsynchronized_run
+    expect { st.unsynchronized_run }.to change { control_plane_metric(:strand_run_duration_seconds, prog: "Test", label: "napper").fetch("sum") }.by(a_value_within(0.001).of(10))
   end
 end

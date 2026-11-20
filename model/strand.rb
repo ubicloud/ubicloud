@@ -67,6 +67,10 @@ class Strand < Sequel::Model
     def total_delay
       lease_checked - scheduled
     end
+
+    def complete?
+      !!(scan_picked_up && worker_started && lease_checked)
+    end
   end
 
   # If the lease time is after this, we must be dealing with an
@@ -230,7 +234,11 @@ SQL
 
   def unsynchronized_run
     start_time = Time.now
-    prog_label = "#{prog}.#{label}"
+    run_prog = prog
+    run_label = label
+    prog_label = "#{run_prog}.#{run_label}"
+    outer_strand_run = Thread.current[:strand_run]
+    Thread.current[:strand_run] = [run_prog, run_label]
     top_frame = stack.first
 
     if label == top_frame["deadline_target"]
@@ -322,8 +330,10 @@ SQL
           save_changes(validate: false)
         when Prog::Base::Hop
           hp = prog_action
-          last_changed_at = Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+          label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
+          Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: label_duration, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+          to = (hp.new_prog == run_prog) ? hp.new_label.to_s : "#{hp.new_prog}.#{hp.new_label}"
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", to:, duration: label_duration)
           top_frame["last_label_changed_at"] = time_string(Time.now)
           modified!(:stack)
           set(**hp.strand_update_args, try: 0)
@@ -334,8 +344,9 @@ SQL
           save_changes(validate: false)
         when Prog::Base::Exit
           ext = prog_action
-          last_changed_at = Time.new(top_frame["last_label_changed_at"])
-          Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
+          label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
+          Clog.emit("exited", {strand_exited: {strand: ubid, duration: label_duration, from: prog_label}})
+          ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", to: "", duration: label_duration)
 
           self.exitval = ext.exitval
           self.retval = nil
@@ -371,7 +382,9 @@ SQL
       raise RunError.new(self)
     end
   ensure
+    Thread.current[:strand_run] = outer_strand_run
     duration = Time.now - start_time
+    ControlPlaneMetrics.observe_strand_run(prog: run_prog, label: run_label, duration:)
     Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > 1
   end
 

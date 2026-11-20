@@ -27,6 +27,8 @@ checkout_telemetry.setup_and_run_thread
 
 clover_freeze
 
+metrics_reporter = MetricsReporter.new(metrics: ControlPlaneMetrics, name: "monitor").tap(&:run_thread) if Config.control_plane_metrics_report_enabled
+
 # Information (seconds, log message, log key) for stuck pulses for monitor jobs.
 monitor_pulse_info = [120, "Pulse check has stuck.", :pulse_check_stuck].freeze
 
@@ -47,7 +49,7 @@ if Config.test?
   runner_args = {scan_every: 1, report_every: 1, enqueue_every: 1, check_stuck_pulses_every: 1}
   host_attached_types = []
 else
-  runner_args = {ignore_threads: 2}
+  runner_args = {ignore_threads: metrics_reporter ? 3 : 2}
   monitor_models = [
     VmHost.exclude(allocation_state: "unprepared"),
     PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
@@ -132,5 +134,7 @@ Thread.new do
   # If all threads exit within two seconds, exit 0 to indicate clean shutdown.
   exit_status = 0
 end.join(2)
+
+metrics_reporter&.shutdown!
 
 exit exit_status

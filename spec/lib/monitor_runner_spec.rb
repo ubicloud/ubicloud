@@ -152,6 +152,51 @@ RSpec.describe MonitorRunner do
     end
   end
 
+  describe "#update_metrics" do
+    it "sets monitor state metrics" do
+      monitor_runner.update_metrics
+      expect(ControlPlaneMetrics.registry.get(:monitor_resources).values.values).to all(eq 0)
+      expect(ControlPlaneMetrics.registry.get(:metrics_export_resources).values.values).to all(eq 0)
+      expect(control_plane_metric(:monitor_queue_length, kind: "pulse")).to eq 0
+      expect(control_plane_metric(:monitor_queue_length, kind: "export")).to eq 0
+      expect(control_plane_metric(:monitor_idle_workers, kind: "pulse")).to be <= 1
+      expect(control_plane_metric(:monitor_idle_workers, kind: "export")).to be <= 1
+      expect(control_plane_metric(:monitor_active_threads)).to be_a Float
+      expect(control_plane_metric(:monitor_threads_waiting_for_db)).to eq 0
+
+      vmh = VmHost.new_with_id
+      vm = Vm.new_with_id
+      pg = PostgresResource.new_with_id
+      mvmh = MonitorableResource.new(vmh)
+      mvmh.instance_variable_set(:@pulse, {reading: "up"})
+      mvm = MonitorableResource.new(vm)
+      mvm.instance_variable_set(:@pulse, {reading: "down"})
+      mvmh.attached_resources[vm.id] = mvm
+      monitor_resources.resources[vmh.id] = mvmh
+      monitor_resources.resources[pg.id] = MonitorableResource.new(pg)
+      metric_export_resources.resources["90000000-0000-0000-0000-000000000000"] = instance_double(MetricsTargetResource, resource: vmh)
+      metric_export_resources.resources["a0000000-0000-0000-0000-000000000000"] = instance_double(MetricsTargetResource, resource: vmh)
+
+      mr = MonitorableResource.new(nil)
+      q2 = Queue.new
+      expect(mr).to receive(:open_resource_session).twice do
+        q2.pop(timeout: 1)
+      end
+      2.times { monitor_resources.submit_queue.push(mr) }
+
+      monitor_runner.update_metrics
+      expect(control_plane_metric(:monitor_resources, resource_type: "VmHost", reading: "up")).to eq 1
+      expect(control_plane_metric(:monitor_resources, resource_type: "Vm", reading: "down")).to eq 1
+      expect(control_plane_metric(:monitor_resources, resource_type: "PostgresResource", reading: "")).to eq 1
+      expect(control_plane_metric(:metrics_export_resources, resource_type: "VmHost")).to eq 2
+      expect(control_plane_metric(:monitor_queue_length, kind: "pulse")).to eq 1
+      expect(control_plane_metric(:monitor_queue_length, kind: "export")).to eq 0
+      expect(control_plane_metric(:monitor_idle_workers, kind: "pulse")).to eq 0
+      expect(control_plane_metric(:monitor_idle_workers, kind: "export")).to eq 1
+      2.times { q2.push nil }
+    end
+  end
+
   describe "#check_stuck_pulses" do
     it "emits for stuck pulses" do
       i = 0

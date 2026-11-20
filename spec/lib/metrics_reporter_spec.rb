@@ -2,8 +2,8 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe ApiMetricsReporter do
-  let(:reporter) { described_class.new(interval: @interval || 15) }
+RSpec.describe MetricsReporter do
+  let(:reporter) { described_class.new(name: "api", metrics: ApiMetrics, interval: @interval || 15) }
 
   after do
     expect(reporter.shutdown!).to be_nil
@@ -20,6 +20,18 @@ RSpec.describe ApiMetricsReporter do
     expect(thread.value).to be true
   end
 
+  it "#shutdown! stops waiting for the thread after the shutdown timeout" do
+    blocked = Queue.new
+    custom = described_class.new(name: "api", metrics: ApiMetrics, interval: 0, shutdown_timeout: 0.05)
+    expect(custom).to receive(:report).at_least(:once) { blocked.pop }
+    thread = custom.run_thread
+    expect(custom.shutdown!).to be_nil
+    expect(thread.alive?).to be true
+  ensure
+    blocked << true
+    thread&.join(1)
+  end
+
   it "#run_thread emits if run method fails" do
     expect(reporter).to receive(:run).and_raise(RuntimeError)
     expect(Clog).to receive(:emit).with("api metrics reporter thread exiting due to unexpected error", Hash).and_call_original
@@ -27,10 +39,10 @@ RSpec.describe ApiMetricsReporter do
     expect(thread.join(1).value).to be false
   end
 
-  it "#run reports once per tick until shutdown" do
+  it "#run reports once per tick until shutdown, then a final time" do
     @interval = 0
     count = 0
-    expect(reporter).to receive(:report).twice do
+    expect(reporter).to receive(:report).exactly(3).times do
       count += 1
       reporter.shutdown_queue.push(true) if count == 2
     end
@@ -55,7 +67,7 @@ RSpec.describe ApiMetricsReporter do
   end
 
   it "#report uses the instance keyword argument for the instance label" do
-    custom = described_class.new(instance: "spec-instance")
+    custom = described_class.new(name: "api", metrics: ApiMetrics, instance: "spec-instance")
     expect(Config).to receive(:victoria_metrics_endpoint_override).twice.and_return("https://vm.example")
     client = instance_double(VictoriaMetrics::Client)
     expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "https://vm.example").and_return(client)
@@ -67,12 +79,27 @@ RSpec.describe ApiMetricsReporter do
     custom.shutdown!
   end
 
+  it "#report uses the name keyword argument in log messages" do
+    custom = described_class.new(name: "respirate", metrics: ApiMetrics)
+    expect(Clog).to receive(:emit).with("respirate metrics report skipped because VictoriaMetrics is not configured").and_call_original
+    expect(custom.report).to be_nil
+  ensure
+    custom.shutdown!
+  end
+
   it "#report emits and continues when the client fails" do
     expect(Config).to receive(:victoria_metrics_endpoint_override).twice.and_return("https://vm.example")
     client = instance_double(VictoriaMetrics::Client)
     expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "https://vm.example").and_return(client)
     expect(client).to receive(:import_prometheus).and_raise(VictoriaMetrics::ClientError.new("boom"))
     expect(Clog).to receive(:emit).with("api metrics report failed", Hash).and_call_original
+    expect(reporter.report).to be_nil
+  end
+
+  it "#report uses the VictoriaMetrics resource of the control plane metrics project" do
+    project_id = Project.generate_uuid
+    expect(Config).to receive(:control_plane_metrics_project_id).and_return(project_id)
+    expect(VictoriaMetricsResource).to receive(:client_for_project).with(project_id).and_return(nil)
     expect(reporter.report).to be_nil
   end
 
