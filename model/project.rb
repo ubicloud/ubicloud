@@ -31,6 +31,7 @@ class Project < Sequel::Model
 
   SERVICE_PROJECT_ID_CONFIGS = %i[
     api_metrics_service_project_id
+    control_plane_metrics_service_project_id
     dns_service_project_id
     github_runner_service_project_id
     inference_endpoint_service_project_id
