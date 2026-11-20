@@ -807,6 +807,71 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#export_github_runner_metrics" do
+    let(:file) { "20261102T140000000000000.jsonl" }
+    let(:vm) { create_vm(vm_host_id: vm_host.id, boot_image: "github-ubuntu-2404") }
+    let(:runner) { GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, location_id: vm.location_id, installation_id: GithubInstallation.create(name: "inst", installation_id: 1, type: "User", project_id: vm.project_id).id) }
+    let(:read_command) { "sudo host/bin/runner-metrics-collect read #{vm.inhost_name}" }
+    let(:ack_command) { "printf '%s' #{"#{vm.inhost_name} #{file}".shellescape} | sudo host/bin/runner-metrics-collect ack" }
+
+    before do
+      allow(Config).to receive(:github_runner_metrics_project_id).and_return(Project.generate_uuid)
+      runner.installation.project.set_ff_github_runner_metrics(true)
+    end
+
+    it "imports the samples of the host's runners of projects with runner metrics and acknowledges their files" do
+      other_project_vm = create_vm(vm_host_id: vm_host.id)
+      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "other-repo", vm_id: other_project_vm.id, location_id: other_project_vm.location_id, installation_id: GithubInstallation.create(name: "other", installation_id: 2, type: "User", project_id: other_project_vm.project_id).id)
+      other_host_vm = create_vm(vm_host_id: create_vm_host.id)
+      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: other_host_vm.id, location_id: other_host_vm.location_id, installation_id: runner.installation_id)
+      now = Time.at(Time.now.to_i)
+      now_ms = now.to_i * 1000
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(Config).to receive(:victoria_metrics_endpoint_override).and_return("http://victoria-metrics.test").twice
+      stats = {"timestamp" => {"date" => now.utc.strftime("%Y-%m-%d"), "time" => now.utc.strftime("%H:%M:%S")}, "queue" => {"ldavg-1" => 0.5}}
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("#{vm.inhost_name} #{file}\n#{vm.inhost_name} #{file} #{JSON.generate({"seq" => 1, "sysstat" => {"hosts" => [{"statistics" => [stats]}]}})}\n")
+      import = stub_request(:post, "http://victoria-metrics.test/api/v1/import/prometheus?timestamp=#{now_ms}")
+        .with { Zlib.gunzip(it.body) == "runner_queue_ldavg_1{ubicloud_resource_id=\"#{runner.ubid}\",vm=\"#{vm.ubid}\",vm_host=\"#{vm_host.ubid}\"} 0.5 #{now_ms}\n" }
+        .to_return(status: 204)
+      expect(ssh_session).to receive(:_exec!).with(ack_command)
+
+      vm_host.export_github_runner_metrics(session)
+      expect(import).to have_been_requested
+    end
+
+    it "acknowledges files without samples without importing" do
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("#{vm.inhost_name} #{file}\n")
+      expect(ssh_session).to receive(:_exec!).with(ack_command)
+
+      vm_host.export_github_runner_metrics(session)
+    end
+
+    it "does nothing when there are no files" do
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("")
+
+      vm_host.export_github_runner_metrics(session)
+    end
+
+    it "does nothing when no runner's project enables runner metrics" do
+      runner.installation.project.set_ff_github_runner_metrics(false)
+
+      expect(vm_host.export_github_runner_metrics(session)).to be_nil
+    end
+
+    it "does nothing when no project is configured" do
+      expect(Config).to receive(:github_runner_metrics_project_id).and_return(nil)
+
+      expect(vm_host.export_github_runner_metrics(session)).to be_nil
+    end
+
+    it "collects runner metrics before exporting the host's metrics" do
+      expect(ssh_session).to receive(:_exec!).with(read_command).ordered.and_return("")
+      expect(ssh_session).to receive(:_exec!).with("ls /home/rhizome/host/metrics/done | sort | head -n 4").ordered.and_return("")
+
+      vm_host.export_metrics(session:, tsdb_client: nil)
+    end
+  end
+
   describe "#metrics_config" do
     it "returns the right metrics config" do
       expect(Config).to receive(:monitoring_service_project_id).and_return("d272dc1f-52ba-4e52-9bcc-f90dce42a226")

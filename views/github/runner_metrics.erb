@@ -1,0 +1,48 @@
+<% @page_title = "Runner #{@runner.ubid}" %>
+<% @enable_echarts = true %>
+<% if (job_started_at = @runner.job_started_at)
+     window_start = job_started_at
+     window_name = "Since the job started"
+   else
+     window_start = @runner.created_at
+     window_name = "Since the runner started"
+   end %>
+
+<%== render("github/tabbar") %>
+
+<div class="mb-5 overflow-hidden rounded-lg bg-white p-4 shadow">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <div>
+      <h3 class="text-base font-semibold text-gray-900"><%= @runner.ubid %></h3>
+
+      <p class="mt-1 text-sm text-gray-500">
+        <%= @runner.repository_name %>
+
+        <% if @runner.has_workflow_job_info? %>
+          | <%= @runner.workflow_name %> / <%= @runner.job_name %>
+        <% end %>
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800"><%= @runner.label %></div>
+
+      <% if @runner.has_workflow_job_info? %>
+        <%== part("components/button", text: "View on GitHub", link: @runner.job_url, icon: "github") %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <%== part(
+    "components/metrics_charts",
+    resource: @runner,
+    metrics: Metrics::GITHUB_RUNNER_METRICS,
+    running_subject: "runner",
+    metrics_url: "#{path(@installation)}/runner/#{@runner.ubid}",
+    available: @runner.vm_id,
+    start_time: window_start - 60,
+    window_name:
+  ) %>
+</div>

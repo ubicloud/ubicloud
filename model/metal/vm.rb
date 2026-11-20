@@ -86,7 +86,7 @@ class Vm < Sequel::Model
       project.get_ff_ipv6_disabled || vm_host.ipv6_disabled
     end
 
-    def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
+    def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil, runner_metrics: false)
       topo = cloud_hypervisor_cpu_topology
 
       project_public_keys = project.get_ff_vm_public_ssh_keys || []
@@ -124,6 +124,7 @@ class Vm < Sequel::Model
         init_script: init_script&.init_script || "",
         ipv6_disabled: ipv6_disabled?,
         append_serial_console: location_id == Location::GITHUB_RUNNERS_ID,
+        runner_metrics:,
       )
     end
 

@@ -15,6 +15,26 @@ RSpec.describe Clover, "github" do
     allow(Config).to receive(:github_app_name).and_return("runner-app")
   end
 
+  def expect_runner_load_average_json(path, runner_ubid)
+    end_time = Time.at(Time.now.to_i).utc
+    start_time = end_time - 30 * 60
+    range = {"start" => start_time.to_i.to_s, "end" => end_time.to_i.to_s, "step" => "15"}
+    expect(Config).to receive(:victoria_metrics_endpoint_override).and_return("http://victoria-metrics.test").twice
+    stub_request(:get, "http://victoria-metrics.test/api/v1/query_range")
+      .with(query: {"query" => "sum(runner_queue_ldavg_1{ubicloud_resource_id=\"#{runner_ubid}\"})"}.merge(range))
+      .to_return(body: JSON.generate({"status" => "success", "data" => {"resultType" => "matrix", "result" => [{"metric" => {}, "values" => [[end_time.to_i, "1.5"]]}]}}))
+    %w[5 15].each do |minutes|
+      stub_request(:get, "http://victoria-metrics.test/api/v1/query_range")
+        .with(query: {"query" => "sum(runner_queue_ldavg_#{minutes}{ubicloud_resource_id=\"#{runner_ubid}\"})"}.merge(range))
+        .to_return(body: JSON.generate({"status" => "success", "data" => {"resultType" => "matrix", "result" => []}}))
+    end
+
+    page.driver.get "#{path}/metrics?key=load_average&start=#{start_time.iso8601}&end=#{end_time.iso8601}", {}, {"HTTP_ACCEPT" => "application/json"}
+
+    expect(page.status_code).to eq(200)
+    expect(JSON.parse(page.body)).to eq("metrics" => [{"key" => "load_average", "name" => "Load Average", "unit" => "count", "description" => "Average number of runnable and uninterruptible tasks", "series" => [{"labels" => {"name" => "1m"}, "values" => [[end_time.to_i, "1.5"]]}]}])
+  end
+
   it "disabled when GitHub app name not provided" do
     allow(Config).to receive(:github_app_name).and_return(nil)
 
@@ -291,12 +311,12 @@ RSpec.describe Clover, "github" do
       expect(page).to have_no_content runner_deleted.ubid
       displayed_runner_rows = page.all("table.min-w-full tbody tr").map { |row| row.all("td").map(&:text) }
       expect(displayed_runner_rows).to eq [
-        ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
-        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
-        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
-        ["my-repo", "#{runner_allocation_slot.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Queued for provisioning\nWaiting for 1m", "", ""],
-        ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
-        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
+        ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", "", ""],
+        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", "", ""],
+        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", "", ""],
+        ["my-repo", "#{runner_allocation_slot.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Queued for provisioning\nWaiting for 1m", "", "", ""],
+        ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", "", ""],
+        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", "", ""],
       ]
       expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
         ["Allocated vCPU", "4 vCPU"],
@@ -396,6 +416,71 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "You've reached your vCPU concurrency limit"
       expect(page).to have_content "we recommend updating your account email to your company email address"
       expect(page).to have_link "updating your account email", href: "/account/change-login"
+    end
+
+    it "shows the metrics of an active runner" do
+      project.set_ff_github_runner_metrics(true)
+      vm = create_vm(project_id: project.id, name: "runner-vm", location_id: Location::GITHUB_RUNNERS_ID)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner.update(vm_id: vm.id, location_id: vm.location_id, run_id: 456, job_id: 123, workflow_name: "test-workflow", job_name: "test-job", job_created_at: Time.now, job_started_at: Time.now)
+
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      within("#runner-#{runner.ubid}") { click_link "Metrics" }
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Runner #{runner.ubid}")
+      expect(page).to have_content "my-repo | test-workflow / test-job"
+      expect(page).to have_link "View on GitHub", href: "http://github.com/my-repo/actions/runs/456/job/123"
+      expect(page.find_by_id("metrics-container")["data-metrics-url"]).to eq("#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}")
+      expect(page.all("#time-range option").map(&:text)).to eq(["Since the job started"])
+      expect(page.all(".metric-chart").map { it["data-metric-key"] }).to eq(Metrics::GITHUB_RUNNER_METRICS.keys.map(&:to_s))
+    end
+
+    it "returns the metrics of a runner as JSON" do
+      project.set_ff_github_runner_metrics(true)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+
+      expect_runner_load_average_json("#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}", runner.ubid)
+    end
+
+    it "bounds the charts of a runner without a job to the runner's lifetime" do
+      project.set_ff_github_runner_metrics(true)
+      vm = create_vm(project_id: project.id, name: "runner-vm", location_id: Location::GITHUB_RUNNERS_ID)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner.update(vm_id: vm.id, location_id: vm.location_id, created_at: Time.now - 900)
+
+      visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+
+      expect(page.find_by_id("metrics-container")["data-start"]).to eq((runner.created_at - 60).utc.iso8601)
+      expect(page.all("#time-range option").map(&:text)).to eq(["Since the runner started", "Last 5 minutes", "Last 15 minutes"])
+    end
+
+    it "shows no charts for a runner without a vm" do
+      project.set_ff_github_runner_metrics(true)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+
+      visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "Metrics will be available once the runner is running."
+    end
+
+    it "raises not found for a runner of another installation" do
+      project.set_ff_github_runner_metrics(true)
+      other = GithubInstallation.create(installation_id: 456, name: "other-user", type: "User", project_id: project.id)
+      runner = Prog::Github::GithubRunnerNexus.assemble(other, label: "ubicloud", repository_name: "my-repo").subject
+
+      visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+
+      expect(page.status_code).to eq(404)
+    end
+
+    it "raises not found for runner metrics when the project does not enable them" do
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+
+      visit "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+
+      expect(page.status_code).to eq(404)
     end
   end
 
@@ -904,6 +989,18 @@ RSpec.describe Clover, "github" do
         expect(row).to have_content "Started just now"
       end
 
+      it "links each job to its runner metrics when the project enables runner metrics" do
+        project.set_ff_github_runner_metrics(true)
+        today = Time.now.utc.to_date
+        create_active_run(1005, run_attempt: 2, status: "in_progress", run_started_at: Time.now - 60)
+        runner = create_runner(30, status: "in_progress", job_started_at: Time.now - 30)
+        create_completed_job(20)
+
+        visit "#{run_path_prefix}/#{today}/1005/2"
+        expect(find_by_id("job-30")).to have_link "Metrics", href: "#{project.path}/github/#{installation.ubid}/runner/#{runner.ubid}"
+        expect(find_by_id("job-20")).to have_link "Metrics", href: "#{run_path_prefix}/#{today}/1005/2/20"
+      end
+
       it "shows details of a completed workflow run and its jobs" do
         today = Time.now.utc.to_date
         create_completed_run(1005, create_date: today - 2, run_attempt: 2)
@@ -1009,6 +1106,33 @@ RSpec.describe Clover, "github" do
           rows = page.all("dl div").to_h { [it.find("dt").text, it.find("dd").text] }
           expect(rows).to include("Workflow Name" => "-", "Workflow Run" => "Completed 1005-1", "Status" => "Success", "Completed At" => completed_at.getutc.strftime("%Y-%m-%d %H:%M:%S UTC"), "Duration" => "45s")
           expect(rows).not_to have_key "GitHub Workflow Job Duration"
+        end
+
+        it "shows metrics of a completed job for its run window when the project enables runner metrics" do
+          project.set_ff_github_runner_metrics(true)
+          now = Time.now
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2)
+          create_completed_job(20, job_started_at: now - 1200, job_completed_at: now - 5)
+
+          visit "#{run_path_prefix}/#{today}/1005/2/20"
+          expect(page.status_code).to eq(200)
+          container = page.find_by_id("metrics-container")
+          expect(container["data-metrics-url"]).to eq("#{run_path_prefix}/#{today}/1005/2/20")
+          expect(container["data-start"]).to eq((now - 1260).utc.iso8601)
+          expect(container["data-end"]).to eq((now + 55).utc.iso8601)
+          expect(page.all("#time-range option").map(&:text)).to eq(["Whole job", "Last 5 minutes", "Last 15 minutes"])
+          expect(page.all(".metric-chart").map { it["data-metric-key"] }).to eq(Metrics::GITHUB_RUNNER_METRICS.keys.map(&:to_s))
+        end
+
+        it "returns the metrics of a completed job's runner as JSON" do
+          project.set_ff_github_runner_metrics(true)
+          today = Time.now.utc.to_date
+          create_active_run(1005, run_attempt: 2)
+          runner_id = GithubRunner.generate_uuid
+          create_completed_job(20, runner_id:)
+
+          expect_runner_load_average_json("#{run_path_prefix}/#{today}/1005/2/20", UBID.to_ubid(runner_id))
         end
 
         it "returns 404 for missing job" do

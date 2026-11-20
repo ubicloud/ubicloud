@@ -985,9 +985,20 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
 
 function updateMetricsCharts() {
   let start_time, end_time;
+  // A window (data-start, and data-end or now) bounds the charts to a job.
+  const windowStart = $('#metrics-container').attr('data-start');
   if (metricsZoomRange) {
     start_time = metricsZoomRange.start;
     end_time = metricsZoomRange.end;
+  } else if (windowStart) {
+    const windowEnd = $('#metrics-container').attr('data-end');
+    const timeRange = $('#metrics-container #time-range').val();
+    end_time = windowEnd ? new Date(windowEnd) : new Date();
+    if (timeRange === 'window') {
+      start_time = new Date(windowStart);
+    } else {
+      start_time = new Date(end_time.getTime() - durationToSeconds(timeRange) * 1000);
+    }
   } else {
     const timeDuration = $('#metrics-container #time-range').val() || "1h";
     const timeDurationSeconds = durationToSeconds(timeDuration);

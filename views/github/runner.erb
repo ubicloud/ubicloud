@@ -49,7 +49,7 @@
 
   <%== part(
     "components/table_card",
-    headers: ["Repository", "Runner", "Workflow Job", "", ""],
+    headers: ["Repository", "Runner", "Workflow Job", "", "", ""],
     rows:
       @runners.map do |runner|
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
@@ -119,6 +119,11 @@
                   "Started in #{format_time_diff(runner.job_created_at, runner.job_started_at)}"
                 ], {}
               ]
+            else
+              ""
+            end,
+            if @project.get_ff_github_runner_metrics
+              ["Metrics", {link: "#{path(@installation)}/runner/#{runner.ubid}"}]
             else
               ""
             end,

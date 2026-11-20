@@ -699,6 +699,10 @@ RSpec.describe Vm do
       expect(JSON.parse(vm.params_json)["append_serial_console"]).to be false
     end
 
+    it "passes whether the vm gets the runner metrics disk" do
+      expect(JSON.parse(vm.params_json(runner_metrics: true))["runner_metrics"]).to be true
+    end
+
     it "appends the serial console for github runner vms" do
       vm.update(location_id: Location::GITHUB_RUNNERS_ID)
       expect(JSON.parse(vm.params_json)["append_serial_console"]).to be true

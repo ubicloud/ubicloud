@@ -127,6 +127,19 @@ class Clover
           flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
           r.redirect @project, "/github/#{@installation.ubid}/runner"
         end
+
+        r.on @project.get_ff_github_runner_metrics == true, :ubid_uuid do |id|
+          @runner = @installation.runners_dataset.with_pk(id)
+          check_found_object(@runner)
+
+          r.get "metrics", r.accepts_json? do
+            metrics_response(Metrics::GITHUB_RUNNER_METRICS, @runner.ubid, VictoriaMetricsResource.client_for_project(Config.github_runner_metrics_project_id))
+          end
+
+          r.get true do
+            view "github/runner_metrics"
+          end
+        end
       end
 
       r.get web?, "cache" do
@@ -275,9 +288,16 @@ class Clover
               view "github/run"
             end
 
-            r.get Integer do |job_id|
+            r.on Integer do |job_id|
               next unless (@job = @run.completed_workflow_jobs_dataset.first(job_id:))
-              view "github/job"
+
+              r.get true do
+                view "github/job"
+              end
+
+              r.get @project.get_ff_github_runner_metrics == true, "metrics", r.accepts_json? do
+                metrics_response(Metrics::GITHUB_RUNNER_METRICS, UBID.to_ubid(@job.runner_id), VictoriaMetricsResource.client_for_project(Config.github_runner_metrics_project_id))
+              end
             end
           end
 

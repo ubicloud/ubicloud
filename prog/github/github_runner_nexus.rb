@@ -47,7 +47,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # Pool VMs are provisioned without installation context, so they cannot
     # honor per-installation location preferences; allocate a fresh VM instead.
     has_location_preferences = installation.allocator_preferences.values_at("location_filter", "location_preference").any?
-    skip_pool = project.get_ff_skip_runner_pool || (alien_allowed? && github_runner.spill_over_set?) || has_location_preferences
+    metrics_enabled = project.get_ff_github_runner_metrics == true
+    skip_pool = project.get_ff_skip_runner_pool || (alien_allowed? && github_runner.spill_over_set?) || has_location_preferences || metrics_enabled
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
@@ -91,6 +92,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if location_id == Location::GITHUB_RUNNERS_ID && rand * 100 < Config.github_actions_ch_53_percent
       ch_version = "53.0"
     end
+    runner_metrics = metrics_enabled && location_id == Location::GITHUB_RUNNERS_ID
 
     if location_id != Location::GITHUB_RUNNERS_ID
       unless (ps = installation_private_subnet(location_id))
@@ -138,6 +140,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       waiting_strand_id: strand.id,
       allocated_waiting_strand_id: strand.id,
       ch_version:,
+      runner_metrics:,
     )
 
     vm_st.subject
@@ -627,6 +630,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       command << NetSsh.command(<<~COMMAND, private_ipv4:)
         echo :private_ipv4" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
       COMMAND
+    elsif project.get_ff_github_runner_metrics
+      command << GithubRunnerMetrics.install_command
     end
 
     if (cache_proxy_url = project.get_ff_cache_proxy_download_url&.dig(label_data["arch"]))
