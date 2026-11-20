@@ -334,6 +334,7 @@ SQL
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
           to = (hp.new_prog == run_prog) ? hp.new_label.to_s : "#{hp.new_prog}.#{hp.new_label}"
           ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "hop", to:, duration: label_duration)
+          record_timeline(label_duration)
           top_frame["last_label_changed_at"] = time_string(Time.now)
           modified!(:stack)
           set(**hp.strand_update_args, try: 0)
@@ -346,6 +347,15 @@ SQL
           ext = prog_action
           label_duration = Time.now - Time.new(top_frame["last_label_changed_at"])
           ControlPlaneMetrics.observe_strand_label(prog: run_prog, label: run_label, outcome: "exit", to: "", duration: label_duration)
+          if (timeline = record_timeline(label_duration))
+            Clog.emit("strand timeline", {strand_timeline: {
+              strand: ubid,
+              prog:,
+              started_at: stack.last["timeline_started_at"],
+              total: (Time.now - Time.new(stack.last["timeline_started_at"])).round(1),
+              timeline: timeline.map { |key, entry| [key, *entry] }.sort_by { it[3] },
+            }})
+          end
 
           self.exitval = ext.exitval
           self.retval = nil
@@ -413,7 +423,42 @@ SQL
     prog_verify(Prog::LearnHypervisor),
   ].freeze
 
+  TIMELINE_PROGS = [
+    "Github::GithubRunnerNexus",
+    "Kubernetes::KubernetesClusterNexus",
+    "Kubernetes::KubernetesNodeNexus",
+    "Kubernetes::KubernetesNodepoolNexus",
+    "Kubernetes::ProvisionKubernetesNode",
+    "Kubernetes::UpgradeKubernetesNode",
+    "Postgres::PostgresResourceNexus",
+    "Postgres::PostgresServerNexus",
+    "Vm::Aws::Nexus",
+    "Vm::Gcp::Nexus",
+    "Vm::HostNexus",
+    "Vm::Metal::Nexus",
+  ].freeze
+
   private
+
+  def timeline_prog?(root_prog)
+    TIMELINE_PROGS.include?(root_prog)
+  end
+
+  def record_timeline(duration)
+    return unless (root_frame = stack.last)
+
+    root_prog = (stack.length > 1) ? stack[-2].dig("link", 0) : prog
+    return unless timeline_prog?(root_prog)
+
+    entered_at = Time.now - duration
+    started_at = Time.new(root_frame["timeline_started_at"] ||= time_string(entered_at))
+    timeline = (root_frame["timeline"] ||= {})
+    key = (prog == root_prog) ? label : "#{prog}.#{label}"
+    count, total = timeline[key]
+    timeline[key] = [count.to_i + 1, (total.to_f + duration).round(1), (entered_at - started_at).round(3)]
+    modified!(:stack)
+    timeline
+  end
 
   def create_deleted_record
     super unless prog.end_with?("Nexus") || PROGS_WITHOUT_DELETED_RECORD.include?(prog)
