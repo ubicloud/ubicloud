@@ -3541,6 +3541,48 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
   end
 
+  it "shows weekly GitHub runner revenue on metal and spilled to AWS since the first recorded day" do
+    rows = -> { page.all(".github-runner-revenue-table tbody tr").map { it.all("td").map(&:text) } }
+
+    today = Date.new(2026, 11, 20)
+    expect(Date).to receive(:today).at_least(:once) { today }
+    click_link "GitHub Runner Revenue"
+    expect(page.title).to eq "Ubicloud Admin - GitHub Runner Revenue"
+    expect(page).to have_content("No data available for By Week table")
+
+    today = Date.new(2026, 12, 20)
+    week_label = ->(week) { (today - 7 * week - 7).to_s }
+    project = Project.create(name: "customer")
+    resource_id = GithubInstallation.generate_uuid
+    runner_rate_id = ->(family) { BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global")["id"] }
+    create_record = lambda do |billing_rate_id, days_ago, amount, resource_tags = {}|
+      BillingRecord.create(project_id: project.id, resource_id:, resource_name: "Daily Usage", billing_rate_id:, span: Sequel.pg_range((today - days_ago).to_time...(today - days_ago + 1).to_time), amount:, resource_tags:)
+    end
+    create_record.call(runner_rate_id.call("standard-2"), 0, 1000, {"aws_standard_minutes" => 400})
+    create_record.call(runner_rate_id.call("standard-2"), 1, 2000, {"aws_standard_minutes" => 400, "aws_premium_minutes" => 200})
+    create_record.call(BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"], 1, 2)
+    create_record.call(runner_rate_id.call("premium-2"), 3, 500, {"aws_premium_minutes" => 100})
+    create_record.call(runner_rate_id.call("standard-4"), 8, 600)
+    create_record.call(runner_rate_id.call("standard-2"), 22, 800)
+    create_record.call(runner_rate_id.call("standard-2"), 33, 400)
+
+    recent_weeks = [
+      [week_label.call(0), "$1.75", "$0.50", "$0.80", "$0.45", "$3.50", "27.1%"],
+      [week_label.call(1), "$1.50", "$0.00", "$0.00", "$0.00", "$1.50", "0.0%"],
+    ]
+    page.refresh
+    expect(page.all(".github-runner-revenue-table thead th").map(&:text)).to eq ["Week", "Metal Standard", "Spilled Standard", "Metal Premium", "Spilled Premium", "Total", "Spilled Share"]
+    expect(rows.call).to eq [
+      *recent_weeks,
+      [week_label.call(2), "$0.00", "$0.00", "$0.00", "$0.00", "$0.00", "-"],
+      [week_label.call(3), "$1.00", "$0.00", "$0.00", "$0.00", "$1.00", "0.0%"],
+    ]
+
+    fill_in "Weeks", with: "2"
+    click_button "Show Revenue"
+    expect(rows.call).to eq recent_weeks
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")

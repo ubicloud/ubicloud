@@ -1,0 +1,10 @@
+<% @page_title = "GitHub Runner Revenue" %>
+
+<p>Weekly revenue at list price since <%= @first_day %>, each week starting on the date shown.</p>
+
+<% form(id: "github_runner_revenue_form", class: "form-vertical") do |f| %>
+  <%== f.input(:number, key: "weeks", label: "Weeks", value: @weeks, min: 1, max: 52) %>
+  <%== f.button("Show Revenue") %>
+<% end %>
+
+<%== part("components/table", title: "By Week", table_class: "github-runner-revenue-table", data: @data, use_admin_label: false) %>

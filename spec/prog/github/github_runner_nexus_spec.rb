@@ -446,7 +446,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.billed_vm_size).to eq("standard-2")
     end
 
-    it "uses standard billing rate for alien runners" do
+    it "uses standard billing rate and records the AWS minutes for alien runners of installations without premium runners" do
+      installation.update(allocator_preferences: {})
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       vm.update(location_id: location.id, family: "m7a")
@@ -458,7 +459,43 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(br.resource_tags).to eq({"aws_standard_minutes" => 5})
       expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "uses standard billing rate and records the AWS minutes under the premium label family for alien premium runners" do
+      runner.update(label: "ubicloud-premium-2", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a")
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: installation.id]
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(br.resource_tags).to eq({"aws_premium_minutes" => 5})
+    end
+
+    it "records the AWS minutes under premium for x64 alien runners of installations with premium runners enabled" do
+      installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]})
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a")
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: installation.id]
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(br.resource_tags).to eq({"aws_premium_minutes" => 5})
+    end
+
+    it "records the AWS minutes under standard for arm64 alien runners of installations with premium runners enabled" do
+      installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]})
+      runner.update(label: "ubicloud-arm", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m8g")
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: installation.id]
+      expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
+      expect(br.resource_tags).to eq({"aws_standard_minutes" => 5})
     end
 
     it "bills 30 vCPUs for alien runners running on 32 vCPU instances" do
@@ -485,6 +522,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.update_billing_record }
         .to change { BillingRecord[resource_id: installation.id].amount }.from(5).to(10)
+    end
+
+    it "adds the AWS minutes of alien runners to the existing billing record" do
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+      nx.update_billing_record
+
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a")
+      expect { nx.update_billing_record }
+        .to change { BillingRecord[resource_id: installation.id].amount }.from(5).to(10)
+        .and change { BillingRecord[resource_id: installation.id].resource_tags }.from({}).to({"aws_premium_minutes" => 5})
+
+      nx.update_billing_record
+      expect(BillingRecord[resource_id: installation.id].resource_tags).to eq({"aws_premium_minutes" => 10})
     end
 
     it "aggregates billing records by repository when the feature flag is enabled" do
