@@ -162,6 +162,22 @@ RSpec.describe MetricsTargetResource do
       expect { resource.export_metrics }.not_to raise_error
     end
 
+    def export_count(outcome)
+      control_plane_metric(:metrics_export_duration_seconds, resource_type: "PostgresServer", outcome:).fetch("+Inf")
+    end
+
+    it "records the duration of successful exports" do
+      resource.instance_variable_set(:@session, {ssh_session: Net::SSH::Connection::Session.allocate})
+      expect(postgres_server).to receive(:export_metrics)
+      expect { resource.export_metrics }.to change { export_count("success") }.by(1)
+    end
+
+    it "records the duration of failed exports" do
+      expect(postgres_server).to receive(:export_metrics).and_raise(StandardError.new("Export failed"))
+      expect(Clog).to receive(:emit).and_call_original
+      expect { resource.export_metrics }.to change { export_count("failure") }.by(1)
+    end
+
     it "skips export if resource is deleted" do
       resource.instance_variable_set(:@deleted, true)
       expect(postgres_server).not_to receive(:export_metrics)

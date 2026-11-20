@@ -311,6 +311,11 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.check_pulse
     end
 
+    it "records the pulse check duration" do
+      expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 13})
+      expect { r_w_event_loop.check_pulse }.to change { control_plane_metric(:monitor_pulse_duration_seconds, resource_type: "PostgresServer").fetch("+Inf") }.by(1)
+    end
+
     it "logs the pulse if reading is up and reading_rpt is every 20th reading" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 21})
       expect(Clog).to receive(:emit).and_call_original
