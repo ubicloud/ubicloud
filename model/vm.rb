@@ -239,6 +239,14 @@ class Vm < Sequel::Model
     (offset % 24) < MAINTENANCE_DURATION_IN_HOURS
   end
 
+  def observe_provisioned(provider)
+    allocation = allocated_at - created_at
+    provisioning = provisioned_at - allocated_at
+    runner = [Config.github_runner_service_project_id, Config.vm_pool_project_id].include?(project_id)
+    ControlPlaneMetrics.observe_vm_provision(provider:, arch:, family: vm_host&.family || "", runner:, allocation:, provisioning:)
+    {duration: provisioning.round(3), allocation_duration: allocation.round(3)}
+  end
+
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")

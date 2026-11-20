@@ -26,6 +26,7 @@ RSpec.describe ControlPlaneMetrics do
     metrics.observe_respirate_dispatch(scan_delay: 1, queue_delay: 1, lease_delay: 1, total_delay: 1, queue_size: 1, available_workers: 1, lease_acquired: true, old_strand: false, lease_expired: false)
     metrics.set_respirate_current_strand_delay(1)
     metrics.count_runner_admission(decision: "low_utilization")
+    metrics.observe_vm_provision(provider: "metal", arch: "x64", family: "standard", runner: false, allocation: 1, provisioning: 1)
     expect(metrics.render.lines.reject { it.start_with?("#") }).to be_empty
   end
 
