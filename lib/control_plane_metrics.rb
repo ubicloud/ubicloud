@@ -11,6 +11,7 @@ module ControlPlaneMetrics
   METRICS_EXPORT_BUCKETS = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 100].freeze
   RESPIRATE_DELAY_BUCKETS = [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60].freeze
   VM_PROVISION_BUCKETS = [1, 2.5, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 1800, 3600].freeze
+  GITHUB_RUNNER_BUCKETS = [0.5, 1, 2.5, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600, 1800, 3600, 7200, 21600, 43200, 86400, 172800, 432000].freeze
 
   UNLABELED_GAUGES = {
     monitor_active_threads: "Threads in the monitor process beyond its fixed worker and internal threads.",
@@ -103,6 +104,12 @@ module ControlPlaneMetrics
       labels: [:provider, :stage, :arch, :family, :runner],
       buckets: VM_PROVISION_BUCKETS,
     )
+    @github_runner_duration = @registry.histogram(
+      :github_runner_duration_seconds,
+      docstring: "GitHub runner lifecycle durations by stage, requested VM size and architecture, and whether the runner was over its installation's concurrency limit.",
+      labels: [:stage, :vm_size, :arch, :concurrency_limited],
+      buckets: GITHUB_RUNNER_BUCKETS,
+    )
   end
 
   def observe_strand_run(prog:, label:, duration:)
@@ -181,6 +188,12 @@ module ControlPlaneMetrics
 
     @vm_provision_duration.observe(allocation, labels: {provider:, stage: "allocation", arch:, family:, runner: runner.to_s})
     @vm_provision_duration.observe(provisioning, labels: {provider:, stage: "provisioning", arch:, family:, runner: runner.to_s})
+  end
+
+  def observe_github_runner(stage:, vm_size:, arch:, concurrency_limited:, duration:)
+    return unless Config.control_plane_metrics_report_enabled
+
+    @github_runner_duration.observe(duration, labels: {stage:, vm_size:, arch:, concurrency_limited: concurrency_limited.to_s})
   end
 
   def render
