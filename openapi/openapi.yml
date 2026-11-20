@@ -2146,6 +2146,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-upgrade:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: resetPostgresDatabaseUpgrade
+      summary: Reset a failed major version upgrade of a PostgreSQL database, so it can be started again
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restart:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2266,7 +2281,21 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: upgradePostgresDatabase
-      summary: Upgrade a PostgreSQL database to the next major version
+      summary: Upgrade a PostgreSQL database to a later major version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_version:
+                  description: Major version to upgrade to. Defaults to the next major version.
+                  type: string
+                  enum:
+                    - '17'
+                    - '18'
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
@@ -5417,6 +5446,11 @@ components:
                 type: string
               upgrade_stage:
                 type: string
+                nullable: true
+              upgrade_failed_at:
+                description: Time of the upgrade failure, if the upgrade failed
+                type: string
+                format: date-time
                 nullable: true
             additionalProperties: false
             required:

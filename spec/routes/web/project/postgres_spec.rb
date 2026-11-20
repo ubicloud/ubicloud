@@ -1917,14 +1917,23 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Upgrade the read replicas"
       end
 
-      it "starts the upgrade when user clicks on start upgrade button" do
-        old_version_int = pg.version.to_i
+      it "starts the upgrade to the latest version by default" do
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Your database can be upgraded to Postgres 17 or 18."
         click_button "Start Upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 18 is in progress"
         expect(page).to have_flash_notice "Database upgrade started successfully"
-        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+        expect(pg.reload.target_version).to eq("18")
+      end
+
+      it "starts the upgrade to the selected version" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        select "Postgres 17", from: "target_version"
+        click_button "Start Upgrade"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
+        expect(pg.reload.target_version).to eq("17")
       end
 
       it "shows upgrade progress when upgrade is in progress" do
@@ -1934,7 +1943,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "wait_for_maintenance_window")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows database unavailability when upgrade is in progress" do
@@ -1945,7 +1954,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_standby")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows failed upgrade indication when upgrade fails" do
@@ -1957,6 +1966,30 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_link "upgrade logs", href: "#{project.path}#{pg.path}/logs?stream_name=upgrade&server_role=&max_log_lines=500"
+      end
+
+      it "resets a failed upgrade when user clicks on reset upgrade button" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        click_button "Reset Upgrade"
+        expect(page).to have_flash_notice "The failed upgrade will be reset in a few seconds"
+        expect(page).to have_current_path "#{project.path}#{pg.path}/upgrade", ignore_query: true
+        expect(Semaphore.where(strand_id: st.id, name: "reset_upgrade").count).to eq(1)
+      end
+
+      it "does not show reset upgrade button when user has read only permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        pg_wo_permission.strand.update(label: "wait")
+        pg_wo_permission.update(target_version: "17")
+        Strand.create(parent_id: pg_wo_permission.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/upgrade"
+        expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_no_button "Reset Upgrade"
       end
 
       it "shows latest version message if the database is already on the latest version" do

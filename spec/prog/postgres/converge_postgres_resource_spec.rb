@@ -559,15 +559,27 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.upgrade_standby }.to hop("update_metadata")
     end
 
-    it "hops to upgrade_failed when upgrade fails" do
+    it "records the failure time and hops to upgrade_failed when upgrade fails" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
       expect { nx.upgrade_standby }.to hop("upgrade_failed")
+      expect(Time.parse(nx.strand.stack[0]["upgrade_failed_at"])).to be_within(5).of(Time.now)
     end
 
     it "starts upgrade when not started" do
+      create_server(is_representative: true, version: "17")
+      pg.update(target_version: "18")
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
       expect(candidate).to receive(:configure_hash).and_return({"user_config" => {"wal_level" => "logical"}})
-      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", pg.target_version, stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "18", stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
+      expect { nx.upgrade_standby }.to nap(5)
+    end
+
+    it "passes the source version when skipping major versions" do
+      create_server(is_representative: true, version: "16")
+      pg.update(target_version: "18")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
+      expect(candidate).to receive(:configure_hash).and_return({"user_config" => {}})
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "18", "16", stdin: JSON.generate({"user_config" => {}}))
       expect { nx.upgrade_standby }.to nap(5)
     end
 
@@ -661,6 +673,53 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
 
       expect(primary.unfence_set?(cached: false)).to be false
+    end
+
+    it "waits for the primary to be unfenced before resetting the upgrade" do
+      primary.incr_unfence
+      Semaphore.incr(strand.id, :reset_upgrade)
+
+      expect { nx.upgrade_failed }.to nap(5)
+    end
+
+    it "hops to reset_upgrade when requested and the primary is unfenced" do
+      primary.strand.update(label: "wait")
+      Semaphore.incr(strand.id, :reset_upgrade)
+
+      expect { nx.upgrade_failed }.to hop("reset_upgrade")
+    end
+  end
+
+  describe "#reset_upgrade" do
+    it "destroys the candidate, reverts the target version and resolves the page" do
+      primary = create_server(is_representative: true, version: "16")
+      pg.update(target_version: "18")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      replica = create_postgres_resource(project:, location_id:)
+      replica.update(parent_id: pg.id, target_version: "18")
+      Prog::PageNexus.assemble("#{pg.ubid} upgrade failed", ["PostgresUpgradeFailed", pg.id], pg.ubid, resource_id: pg.id)
+      strand.update(label: "reset_upgrade")
+      Semaphore.incr(strand.id, :reset_upgrade)
+
+      expect { nx.reset_upgrade }.to hop("wait_prune_servers")
+      expect(candidate.destroy_set?(cached: false)).to be true
+      expect(primary.destroy_set?(cached: false)).to be false
+      expect(nx.strand.stack[0]["servers_to_destroy"]).to eq([candidate.id])
+      expect(pg.reload.target_version).to eq("16")
+      expect(replica.reload.target_version).to eq("16")
+      expect(Page.from_tag_parts("PostgresUpgradeFailed", pg.id).resolve_set?).to be true
+      expect(Semaphore.where(strand_id: strand.id, name: "reset_upgrade").count).to eq(0)
+    end
+
+    it "resets the upgrade when no page was raised" do
+      create_server(is_representative: true, version: "16")
+      pg.update(target_version: "17")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      strand.update(label: "reset_upgrade")
+
+      expect { nx.reset_upgrade }.to hop("wait_prune_servers")
+      expect(candidate.destroy_set?(cached: false)).to be true
+      expect(pg.reload.target_version).to eq("16")
     end
   end
 

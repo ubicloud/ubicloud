@@ -884,10 +884,12 @@ RSpec.describe Validation do
           instance_double(
             PostgresResource,
             can_upgrade?: true,
+            upgrade_target_versions: ["17", "18"],
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.not_to raise_error
     end
@@ -903,6 +905,7 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -918,6 +921,7 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: true,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -932,8 +936,24 @@ RSpec.describe Validation do
             ongoing_failover?: false,
             read_replica?: false,
           ),
+          "17",
         )
       }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when the target version is not available" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            can_upgrade?: true,
+            upgrade_target_versions: ["17", "18"],
+            needs_convergence?: false,
+            read_replica?: false,
+          ),
+          "16",
+        )
+      }.to raise_error(described_class::ValidationFailed, /target_version/)
     end
   end
 

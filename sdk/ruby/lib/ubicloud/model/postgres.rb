@@ -198,9 +198,18 @@ module Ubicloud
       Postgres.new(adapter, adapter.post(_path("/restore"), name:, restore_target:, **params))
     end
 
-    # Schedule a major version upgrade of the database.
-    def upgrade
-      merge_into_values(adapter.post(_path("/upgrade")))
+    # Schedule a major version upgrade of the database. Upgrades to the next
+    # major version by default.
+    def upgrade(target_version: nil)
+      params = {}
+      params[:target_version] = target_version if target_version
+      merge_into_values(adapter.post(_path("/upgrade"), params))
+    end
+
+    # Reset a failed major version upgrade of the database, so it can be
+    # started again.
+    def reset_upgrade
+      merge_into_values(adapter.post(_path("/reset-upgrade")))
     end
 
     # Show the status of a major version upgrade of the database.

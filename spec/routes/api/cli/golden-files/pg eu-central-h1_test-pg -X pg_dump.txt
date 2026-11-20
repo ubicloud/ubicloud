@@ -42,6 +42,7 @@ Post Commands:
     remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
     rename                             Rename a PostgreSQL database
     reset-superuser-password           Reset the superuser password for a PostgreSQL database
+    reset-upgrade                      Reset a failed major version upgrade of the PostgreSQL database
     restart                            Restart a PostgreSQL database cluster
     restore                            Restore a PostgreSQL database backup to a new database
     set-maintenance-window             Set the maintenance window for a PostgreSQL database

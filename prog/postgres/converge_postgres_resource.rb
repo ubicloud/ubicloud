@@ -2,7 +2,8 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  semaphore :reset_upgrade
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_failed_at
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -96,9 +97,14 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       upgrade_candidate.vm.sshable.d_clean("upgrade_postgres")
       hop_update_metadata
     when "Failed"
+      self.upgrade_failed_at = time_string(Time.now)
       hop_upgrade_failed
     when "NotStarted"
-      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version, stdin: JSON.generate(upgrade_candidate.configure_hash))
+      args = [postgres_resource.target_version]
+      # Pass the source version only when skipping versions, so a candidate
+      # with older rhizome that takes a single argument can still upgrade.
+      args << postgres_resource.version if postgres_resource.target_version.to_i - postgres_resource.version.to_i > 1
+      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", *args, stdin: JSON.generate(upgrade_candidate.configure_hash))
     end
 
     nap 5
@@ -128,7 +134,28 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.representative_server.incr_unfence
     end
 
+    when_reset_upgrade_set? do
+      nap 5 if postgres_resource.representative_server.strand.label == "wait_in_fence"
+      hop_reset_upgrade
+    end
+
     nap 6 * 60 * 60
+  end
+
+  # The candidate promoted itself during the failed upgrade, so it cannot
+  # rejoin as a standby. Destroy it and go back to the current version.
+  label def reset_upgrade
+    decr_reset_upgrade
+    upgrade_candidate.incr_destroy
+    self.servers_to_destroy = [upgrade_candidate.id]
+
+    DB.transaction do
+      postgres_resource.update(target_version: postgres_resource.version)
+      postgres_resource.read_replicas_dataset.update(target_version: postgres_resource.version)
+    end
+    Page.from_tag_parts("PostgresUpgradeFailed", postgres_resource.id)&.incr_resolve
+
+    hop_wait_prune_servers
   end
 
   label def recycle_representative_server

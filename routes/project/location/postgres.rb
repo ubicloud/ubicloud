@@ -549,6 +549,26 @@ class Clover
         end
       end
 
+      r.post "reset-upgrade" do
+        authorize("Postgres:edit", pg)
+
+        unless pg.upgrade_status == "failed"
+          raise CloverError.new(400, "InvalidRequest", "Only a failed upgrade can be reset")
+        end
+
+        DB.transaction do
+          pg.incr_reset_upgrade
+          audit_log(pg, "reset_upgrade")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "The failed upgrade will be reset in a few seconds"
+          r.redirect pg, "/upgrade"
+        end
+      end
+
       r.post "reset-superuser-password" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
@@ -987,10 +1007,12 @@ class Clover
           authorize("Postgres:edit", pg.id)
           handle_validation_failure("postgres/show") { @page = "upgrade" }
 
-          Validation.validate_postgres_upgrade(pg)
+          target_version = typecast_params.nonempty_str("target_version") || (pg.version.to_i + 1).to_s
+          Validation.validate_postgres_upgrade(pg, target_version)
+          validate_postgres_config(target_version, pg.user_config, pg.pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
           read_replica_count = DB.transaction do
-            pg.update(target_version: pg.version.to_i + 1)
+            pg.update(target_version:)
             audit_log(pg, "upgrade")
 
             pg.read_replicas_dataset.update(target_version: pg.target_version)

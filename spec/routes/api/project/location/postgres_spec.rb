@@ -1694,6 +1694,31 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
       end
 
+      it "upgrades directly to a later version when target_version is given" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "18"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("current_version" => "16", "target_version" => "18")
+        expect(pg.reload.target_version).to eq("18")
+      end
+
+      it "fails when target_version is not later than the current version" do
+        pg.representative_server.update(version: "17")
+        pg.update(target_version: "17")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "17"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: target_version")
+        expect(pg.reload.target_version).to eq("17")
+      end
+
+      it "fails when the configuration is not valid for the target version" do
+        pg.update(user_config: {"old_snapshot_threshold" => "-1"})
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade", {target_version: "18"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.old_snapshot_threshold")
+        expect(pg.reload.target_version).to eq("16")
+      end
+
       it "logs the upgrade request" do
         expect(Clog).to receive(:emit).with("Postgres database upgrade requested", {postgres_upgrade: {
           resource_ubid: pg.ubid,
@@ -1731,6 +1756,33 @@ RSpec.describe Clover, "postgres" do
         expect(response["current_version"]).to eq(pg.version)
         expect(response["target_version"]).to eq(pg.reload.target_version)
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "returns the failure time of a failed upgrade" do
+        pg.update(target_version: "17")
+        Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", stack: [{"upgrade_failed_at" => "2026-11-19 10:00:00.000000 +0000"}])
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("upgrade_status" => "failed", "upgrade_failed_at" => "2026-11-19T10:00:00Z")
+      end
+
+      it "resets a failed upgrade" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(Semaphore.where(strand_id: st.id, name: "reset_upgrade").count).to eq(1)
+      end
+
+      it "does not reset an upgrade that has not failed" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_standby")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-upgrade"
+
+        expect(last_response).to have_api_error(400, "Only a failed upgrade can be reset")
+        expect(Semaphore.where(strand_id: st.id, name: "reset_upgrade").count).to eq(0)
       end
 
       it "no ongoing upgrade" do
