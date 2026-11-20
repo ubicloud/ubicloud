@@ -117,24 +117,25 @@ class Strand < Sequel::Model
   # priority, e.g. when strand handling is running behind.
   SCHEDULE_NO_LATER_THAN_NOW = Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP) - Sequel.cast("1 microsecond", :interval)
 
-  TAKE_LEASE_PS = DB[:strand]
-    .returning
-    .where(
-      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_no_key_update.skip_locked, exitval: nil] &
-        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP),
-    )
-    .prepare_sql_type(:update)
-    .prepare(:first, :strand_take_lease_and_reload,
-      lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
-      try: Sequel[:try] + 1,
-      schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
+  TAKE_LEASE = Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(DB.dataset) do |pl, ds|
+    ds.with_sql("UPDATE strand
+SET
+  lease = (CURRENT_TIMESTAMP + CAST('120 seconds' AS interval)),
+  try = (try + 1),
+  schedule = (CURRENT_TIMESTAMP + (#{DB.literal(ps_sch)} * CAST('1 second' AS interval)))
+WHERE ((id IN (SELECT id FROM strand WHERE (id = ?) FOR NO KEY UPDATE SKIP LOCKED))
+  AND (exitval IS NULL)
+  AND (lease < CURRENT_TIMESTAMP))
+RETURNING *".freeze,
+      pl.arg)
+  end
 
-  RELEASE_LEASE_PS = DB[<<SQL, :$id, :$lease_time].prepare(:update, :strand_release_lease)
-UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
-SQL
+  RELEASE_LEASE = Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(DB.dataset) do |pl, ds|
+    ds.with_sql("UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ? RETURNING id", pl.arg, pl.arg)
+  end
 
   def take_lease_and_reload
-    affected = TAKE_LEASE_PS.call(id:)
+    affected = TAKE_LEASE.first(id)
     lease_checked!(affected)
     return false unless affected
 
@@ -154,7 +155,7 @@ SQL
         end
       else
         begin
-          unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
+          unless RELEASE_LEASE.get(id, lease_time) == id
             Clog.emit("lease violated data", {lease_clear_debug_snapshot: this.all})
             raise InternalError, "BUG: lease violated"
           end
