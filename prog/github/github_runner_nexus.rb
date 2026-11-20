@@ -11,7 +11,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  frame_accessor :boot_bug_checked, :vm_family
+  frame_accessor :boot_bug_checked, :vm_family, :concurrency_limited
 
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
@@ -193,8 +193,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     billed_from = github_runner.ready_at
     if (started_at = github_runner.workflow_job["started_at"])
-      billed_from = [billed_from, Time.new(started_at)].max
+      started_at = Time.new(started_at)
+      observe_duration("pickup", [started_at - billed_from, 0].max)
+      observe_duration("wait", started_at - github_runner.created_at)
+      billed_from = [billed_from, started_at].max
     end
+
+    duration = Time.now - billed_from
+    used_amount = (duration / 60).ceil
+    observe_duration("job", duration)
+    github_runner.log_duration("runner_completed", duration)
 
     runner_family = (x64? && installation.premium_runner_enabled?) ? "premium" : label_data["family"]
     alien_minutes_key = "#{vm.location.provider}_#{runner_family}_minutes"
@@ -202,9 +210,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     begin
       begin_time = now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
-      duration = Time.now - billed_from
-      used_amount = (duration / 60).ceil
-      github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
         .where(project_id: project.id, resource_id:, billing_rate_id: rate_id)
         .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
@@ -237,6 +242,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       retry unless retries > 4
       raise
     end
+  end
+
+  def observe_duration(stage, duration)
+    github_runner.observe_duration(stage, duration, concurrency_limited: !!concurrency_limited)
+  end
+
+  def log_registered
+    registration = github_runner.ready_at - github_runner.allocated_at
+    observe_duration("registration", registration)
+    github_runner.log_duration("runner_registered", registration)
   end
 
   def client
@@ -486,6 +501,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       hop_wait_allocation_slot
     end
 
+    self.concurrency_limited = true unless concurrency_limited
+
     if project.reputation == "limited"
       ControlPlaneMetrics.count_runner_admission(decision: "limited_reputation")
       Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
@@ -593,7 +610,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id, location_id: picked_vm.location_id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
-    github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
+    github_runner.reload
+    allocation = github_runner.allocated_at - github_runner.created_at
+    observe_duration("allocation", allocation)
+    github_runner.log_duration("runner_allocated", allocation)
 
     hop_wait_vm
   end
@@ -729,7 +749,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
     sudo systemctl start runner-script.service
     COMMAND
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
+    log_registered
 
     hop_wait
   rescue Octokit::Conflict => e
@@ -821,7 +841,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     sudo systemctl start runner-script.service
     COMMAND
     github_runner.update(ready_at: Time.now, encoded_jit_config: nil)
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
+    log_registered
 
     hop_wait
   end
