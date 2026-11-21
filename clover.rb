@@ -49,7 +49,7 @@ class Clover < Roda
 
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :disallow_file_uploads
+  plugin :disallow_multipart_parsing
   plugin :flash
   plugin :forme_route_csrf
   plugin :h
@@ -261,7 +261,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowMultipartParsing::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s

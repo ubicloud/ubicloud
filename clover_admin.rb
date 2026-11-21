@@ -82,6 +82,7 @@ class CloverAdmin < Roda
   plugin :public
   plugin :flash
   plugin :h
+  plugin :disallow_multipart_parsing
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
