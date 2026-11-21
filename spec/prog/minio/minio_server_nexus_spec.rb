@@ -542,32 +542,6 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
   end
 
-  describe "#wait_refresh_public_cert" do
-    let(:cert) do
-      Prog::Vnet::CertNexus.assemble(nx.minio_server.hostname, nx.minio_server.cluster.dns_zone.id).subject
-    end
-
-    before do
-      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
-      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
-      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil)
-      refresh_frame(nx, new_values: {"refresh_cert_id" => cert.id})
-    end
-
-    it "naps if the cert is not ready" do
-      expect { nx.wait_refresh_public_cert }.to nap(600)
-    end
-
-    it "stores the cert, reconfigures the server, and hops to wait" do
-      peer_cert, peer_cert_key = Util.create_certificate(subject: "/CN=peer", duration: 60 * 60 * 24 * 29)
-      cert.update(cert: peer_cert.to_pem, csr_key: peer_cert_key.to_der)
-
-      expect { nx.wait_refresh_public_cert }.to hop("wait")
-      expect(nx.minio_server.reload.cert).to eq peer_cert.to_pem
-      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "reconfigure").count).to eq(1)
-    end
-  end
-
   describe "#switch_to_public_certs" do
     before do
       DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)

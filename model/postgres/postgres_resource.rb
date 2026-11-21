@@ -76,7 +76,7 @@ class PostgresResource < Sequel::Model
     representative_server.version
   end
 
-  RUNNING_STRAND_LABELS = %w[wait refresh_certificates wait_refresh_public_cert refresh_dns_record].freeze
+  RUNNING_STRAND_LABELS = %w[wait refresh_certificates refresh_dns_record].freeze
   UNAVAILABLE_STRAND_LABELS = %w[unavailable lockout wait_lockout_attempt wait_locked_out].freeze
 
   def display_state
