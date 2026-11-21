@@ -43,7 +43,8 @@ pending_file_path = "#{metrics_dir}/pending/#{filename}.txt"
 File.open(pending_file_path, "w") do |file|
   endpoints.each do |endpoint|
     # An endpoint can be a plain URL string, or a hash carrying basic auth
-    # credentials: {"url" => ..., "username" => ..., "password" => ...}.
+    # credentials: {"url" => ..., "username" => ..., "password" => ...}, or a
+    # bearer token: {"url" => ..., "bearer_token" => ...}.
     endpoint = {"url" => endpoint} if endpoint.is_a?(String)
     uri = URI(endpoint["url"])
     http = Net::HTTP.new(uri.host, uri.port)
@@ -55,6 +56,7 @@ File.open(pending_file_path, "w") do |file|
     request = Net::HTTP::Get.new(uri.request_uri)
     request["Accept-Encoding"] = "identity" # don't compress over localhost
     request.basic_auth(endpoint["username"], endpoint["password"]) if endpoint["username"]
+    request["Authorization"] = "Bearer #{endpoint["bearer_token"]}" if endpoint["bearer_token"]
 
     http.request(request) do |response|
       fail "HTTP request failed with status: #{response.code}" unless response.is_a?(Net::HTTPSuccess)

@@ -111,5 +111,14 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       MinioServer.where(minio_pool_id: nx.minio_pool.id).destroy
       expect { nx.wait_servers_destroyed }.to exit({"msg" => "pool destroyed"})
     end
+
+    it "moves the cluster-wide metrics scrape to the lowest index server left in the cluster" do
+      remaining_pool = described_class.assemble(nx.minio_pool.cluster_id, 5, 2, 2, 100, "standard-2").subject
+      MinioServer.where(minio_pool_id: nx.minio_pool.id).destroy
+      expect { nx.wait_servers_destroyed }.to exit({"msg" => "pool destroyed"})
+      lowest, other = remaining_pool.servers.sort_by(&:index)
+      expect(Semaphore.where(strand_id: lowest.id, name: "configure_metrics").count).to eq(1)
+      expect(Semaphore.where(strand_id: other.id, name: "configure_metrics").count).to eq(0)
+    end
   end
 end
