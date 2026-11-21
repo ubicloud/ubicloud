@@ -271,8 +271,13 @@ RSpec.describe PostgresSetup do
   describe "#configure_service_slice" do
     def override_for(svc, lim)
       content = <<~OVERRIDE
+        [Unit]
+        StartLimitIntervalSec=0
+
         [Service]
         Slice=system-go_services.slice
+        Restart=always
+        RestartSec=5
         Environment=GOMEMLIMIT=#{lim}
       OVERRIDE
       content += PostgresSetup::POSTGRES_EXPORTER_ENVIRONMENT if svc == "postgres_exporter"

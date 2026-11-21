@@ -41,6 +41,7 @@ class PostgresUpgrade
 
   def disable_previous_version
     r "sudo", "systemctl", "disable", "--now", "disk-full-check@#{@version}.timer"
+    r "sudo", "systemctl", "disable", "--now", "io-throttle@#{@prev_version}-main.timer"
     r "sudo", "systemctl", "disable", "--now", "postgresql@#{@prev_version}-main"
   end
 
