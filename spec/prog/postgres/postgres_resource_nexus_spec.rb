@@ -881,36 +881,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
   end
 
-  describe "#wait_refresh_public_cert" do
-    let(:cert) do
-      Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).subject
-    end
-
-    before do
-      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      allow(Config).to receive(:postgres_service_hostname_v3).and_return("postgres.ubicloud.com")
-      postgres_server
-      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "refresh_cert_id" => cert.id})
-    end
-
-    it "naps if cert not ready" do
-      expect { nx.wait_refresh_public_cert }.to nap(600)
-    end
-
-    it "updates cert and hops if cert is ready" do
-      server_cert, server_cert_key = Util.create_certificate(
-        subject: "/CN=Test Server",
-        extensions: ["keyUsage=digitalSignature"],
-        duration: 60 * 60 * 24 * 29,
-      )
-      cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
-      expect { nx.wait_refresh_public_cert }.to hop("wait")
-      expect(postgres_resource.reload.server_cert).to eq server_cert.to_pem
-      expect(postgres_resource.server_cert_key).to eq server_cert_key.to_pem
-      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
-    end
-  end
-
   describe "#wait_servers" do
     it "naps if server not ready" do
       postgres_server

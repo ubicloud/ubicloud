@@ -155,14 +155,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     hop_wait
   end
 
-  # Remove after no strands at label
-  label def wait_refresh_public_cert
-    wait_for_public_cert("refresh_cert_id")
-    minio_cluster.save_changes
-    MinioServer.incr_reconfigure(server_ids_dataset)
-    hop_wait
-  end
-
   label def reconfigure
     decr_reconfigure
     MinioServer.incr_reconfigure(server_ids_dataset)
