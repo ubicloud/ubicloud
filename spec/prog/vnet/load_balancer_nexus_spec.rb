@@ -196,40 +196,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
   end
 
-  describe "#wait_cert_provisioning" do
-    it "naps for 600 seconds if need_certificates? is true" do
-      expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
-      expect { nx.wait_cert_provisioning }.to nap(600)
-    end
-
-    it "naps for 600 seconds if cert is set in frame but does not have valid cert entry" do
-      cert = Cert.create(hostname: nx.load_balancer.hostname)
-      refresh_frame(nx, new_values: {"cert" => cert.id})
-      expect { nx.wait_cert_provisioning }.to nap(600)
-    end
-
-    it "hops to wait_cert_broadcast if certificate is ready and refresh_cert is set" do
-      vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
-      nx.load_balancer.add_vm(vm)
-      nx.load_balancer.incr_refresh_cert
-      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
-      cert = Cert.create(hostname: nx.load_balancer.hostname, cert: "a")
-      refresh_frame(nx, new_values: {"cert" => cert.id})
-      expect { nx.wait_cert_provisioning }.to hop("wait_cert_broadcast")
-      expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 1
-    end
-
-    it "hops to wait need_certificates? and refresh_cert are false" do
-      vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
-      nx.load_balancer.add_vm(vm)
-      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
-      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
-      expect { nx.wait_cert_provisioning }.to hop("wait")
-      expect(st.stack[0].fetch("cert")).to be_nil
-      expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").all).to be_empty
-    end
-  end
-
   describe "#wait_cert_broadcast" do
     it "naps for 1 second if not all children are done" do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
@@ -237,20 +203,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_broadcast }.to nap(1)
     end
 
-    it "decrements cert_renewed but not refresh_cert if cert_renewed is set" do
+    it "decrements cert_renewed if cert_renewed is set" do
       nx.incr_cert_renewed
       nx.incr_refresh_cert
       expect(nx).to receive(:reap).and_yield
       expect { nx.wait_cert_broadcast }.to hop("wait")
       expect(nx.load_balancer.cert_renewed_set?(cached: false)).to be false
-      expect(nx.load_balancer.refresh_cert_set?(cached: false)).to be true
-    end
-
-    it "decrements refresh_cert if cert_renewed is not set" do
-      nx.incr_refresh_cert
-      expect(nx).to receive(:reap).and_yield
-      expect { nx.wait_cert_broadcast }.to hop("wait")
-      expect(nx.load_balancer.refresh_cert_set?(cached: false)).to be false
     end
 
     it "hops to wait if all children are done and no certs to remove and there is no active cert" do

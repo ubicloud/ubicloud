@@ -187,13 +187,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     hop_wait
   end
 
-  # Remove after no strands at label
-  label def wait_refresh_public_cert
-    wait_for_public_cert("refresh_cert_id")
-    incr_reconfigure
-    hop_wait
-  end
-
   label def switch_to_public_certs
     nap 10 unless cluster.uses_publicly_signed_certificates? && cluster.server_cert
 

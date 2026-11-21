@@ -397,15 +397,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     hop_wait
   end
 
-  label def wait_refresh_public_cert
-    # Can remove this label after no strands at label
-    wait_for_public_cert("refresh_cert_id")
-    postgres_resource.save_changes
-    PostgresServer.incr_refresh_certificates(server_ids_dataset)
-    decr_refresh_certificates
-    hop_wait
-  end
-
   label def wait_servers
     nap 5 unless Strand.where(id: server_ids_dataset).exclude(label: "wait").empty?
     hop_update_billing_records

@@ -345,36 +345,6 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
   end
 
-  describe "#wait_refresh_public_cert" do
-    let(:cert) do
-      Prog::Vnet::CertNexus.assemble(nx.minio_cluster.hostname, nx.minio_cluster.dns_zone.id).subject
-    end
-
-    before do
-      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
-      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
-      nx.minio_cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil)
-      refresh_frame(nx, new_values: {"refresh_cert_id" => cert.id})
-    end
-
-    it "naps if the cert is not ready" do
-      expect { nx.wait_refresh_public_cert }.to nap(600)
-    end
-
-    it "stores the cert, reconfigures the servers (no restart), and hops to wait" do
-      server_cert, server_cert_key = Util.create_certificate(subject: "/CN=minio", duration: 60 * 60 * 24 * 29)
-      cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
-      server_ids = nx.minio_cluster.servers.map(&:id)
-
-      expect { nx.wait_refresh_public_cert }.to hop("wait")
-      expect(nx.minio_cluster.reload.server_cert).to eq server_cert.to_pem
-      server_ids.each do |id|
-        expect(Semaphore.where(strand_id: id, name: "reconfigure").count).to eq(1)
-        expect(Semaphore.where(strand_id: id, name: "restart").count).to eq(0)
-      end
-    end
-  end
-
   describe "#reconfigure" do
     it "increments reconfigure semaphore of all minio servers and hops to wait" do
       expect(nx).to receive(:decr_reconfigure)
