@@ -117,6 +117,18 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.start_rekey }.to raise_error(RuntimeError, "BUG: unexpected start_rekey signal (retval=nil, phase=outbound, locked=true)")
     end
 
+    it "leaves the pass and wakes the coordinator when it cannot take part in inbound setup" do
+      nic.update(rekey_payload: {"reqid" => 1, "spi4" => "0xe2222222", "spi6" => "0xe3333333"})
+      nic.strand.update(retval: {"msg" => "nic cannot take part in rekey"})
+      expect { nx.start_rekey }.to hop("wait")
+      nic.reload
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq "idle"
+      expect(nic.rekey_payload).to be_nil
+      expect(nic.encryption_key).to be_nil
+      expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq 1
+    end
+
     it "fails if the nic is not locked when inbound_setup completes" do
       nic.update(rekey_coordinator_id: nil)
       nic.strand.update(retval: {"msg" => "inbound_setup is complete"})
@@ -134,6 +146,15 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_outbound_trigger }.to hop("wait_rekey_old_state_drop_trigger")
       expect(nic.reload.rekey_phase).to eq "outbound"
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq 1
+    end
+
+    it "leaves the pass when it cannot take part in outbound setup" do
+      nic.update(rekey_phase: "inbound")
+      nic.strand.update(retval: {"msg" => "nic cannot take part in rekey"})
+      expect { nx.wait_rekey_outbound_trigger }.to hop("wait")
+      nic.reload
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq "idle"
     end
 
     it "fails if outbound_setup completes when the phase is not inbound" do
@@ -171,6 +192,16 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nic.state).to eq "active"
       expect(nic.rekey_phase).to eq "old_drop"
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq 1
+    end
+
+    it "leaves the pass without activating the nic when it cannot take part in dropping old state" do
+      nic.update(state: "creating", rekey_phase: "outbound")
+      nic.strand.update(retval: {"msg" => "nic cannot take part in rekey"})
+      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+      nic.reload
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq "idle"
+      expect(nic.state).to eq "creating"
     end
 
     it "fails if drop_old_state completes when the phase is not outbound" do

@@ -46,6 +46,8 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       hop_wait_rekey_outbound_trigger
     end
 
+    leave_rekey_if_cannot_take_part
+
     # RekeyNicTunnel must not modify rekey_phase or rekey_coordinator_id.
     push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
   end
@@ -59,6 +61,8 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
       hop_wait_rekey_old_state_drop_trigger
     end
+
+    leave_rekey_if_cannot_take_part
 
     when_trigger_outbound_update_set? do
       decr_trigger_outbound_update
@@ -81,6 +85,8 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       hop_wait
     end
 
+    leave_rekey_if_cannot_take_part
+
     when_old_state_drop_trigger_set? do
       decr_old_state_drop_trigger
       # Looks redundant, but semaphore ordering is the only guarantee that
@@ -90,6 +96,18 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     end
 
     hibernate
+  end
+
+  # Release the claim so the coordinator finishes the pass without this
+  # NIC. A later pass rekeys it.
+  def leave_rekey_if_cannot_take_part
+    return unless retval&.dig("msg") == "nic cannot take part in rekey"
+
+    coordinator_id = nic.rekey_coordinator_id
+    Clog.emit("NIC leaving rekey pass", {nic_rekey_leave: {nic_id: nic.id, coordinator_id:, phase: nic.rekey_phase}})
+    nic.update(rekey_coordinator_id: nil, rekey_phase: "idle", rekey_payload: nil, encryption_key: nil)
+    PrivateSubnet.incr_nic_phase_done(coordinator_id)
+    hop_wait
   end
 
   label def destroy

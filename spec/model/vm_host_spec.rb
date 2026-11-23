@@ -25,6 +25,10 @@ RSpec.describe VmHost do
     expect(vm_host).not_to respond_to(:add_vhost_block_backend)
   end
 
+  it "lists only Vm::HostNexus labels as down strand labels" do
+    expect(VmHost::DOWN_STRAND_LABELS.map(&:to_sym) - Prog::Vm::HostNexus.labels).to eq []
+  end
+
   describe "#ip6_random_vm_network" do
     it "can generate random ipv6 subnets" do
       expect(vm_host.ip6_random_vm_network.contains(vm_host.ip6)).to be false
