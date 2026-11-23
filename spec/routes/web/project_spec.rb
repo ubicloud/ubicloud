@@ -275,6 +275,36 @@ RSpec.describe Clover, "project" do
         expect(project.access_control_entries.count).to eq 2
         expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member].freeze
         expect(user.projects).to include project
+        expect(project.usage_alerts_dataset.all).to be_empty
+      end
+
+      it "copies spending cutoff of default project to new project" do
+        default_project = user.projects_dataset.first(name: "Default")
+        user.default_project = default_project
+        UsageAlert.create(project_id: default_project.id, user_id: user.id, name: "-", cutoff: true, limit: 500)
+
+        visit "/project/create"
+        fill_in "Name", with: "new-project"
+        click_button "Create"
+        expect(page).to have_flash_notice("Project created")
+
+        project = Project[name: "new-project"]
+        expect(project.usage_alerts_dataset.all.map { [it.user_id, it.name, it.cutoff, it.limit] }).to eq [[user.id, "-", true, 500]]
+        expect(default_project.usage_alerts_dataset.count).to eq 1
+      end
+
+      it "does not add spending cutoff to new project if default project does not have spending cutoff" do
+        default_project = user.projects_dataset.first(name: "Default")
+        user.default_project = default_project
+        UsageAlert.create(project_id: default_project.id, user_id: user.id, name: "-", cutoff: false, limit: 500)
+        UsageAlert.create(project_id: default_project.id, user_id: user.id, name: "other", cutoff: true, limit: 500)
+
+        visit "/project/create"
+        fill_in "Name", with: "new-project"
+        click_button "Create"
+        expect(page).to have_flash_notice("Project created")
+
+        expect(Project[name: "new-project"].usage_alerts_dataset.all).to be_empty
       end
 
       it "limits number of projects per account to 10" do

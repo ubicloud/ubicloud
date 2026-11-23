@@ -18,6 +18,9 @@ class Clover
 
         DB.transaction do
           @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
+          if (limit = current_account.default_spending_cutoff_limit)
+            UsageAlert.create(project_id: @project.id, user_id: current_account_id, name: "-", cutoff: true, limit:)
+          end
           audit_log(@project, "create")
         end
 

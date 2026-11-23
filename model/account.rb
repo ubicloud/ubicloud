@@ -40,6 +40,12 @@ class Account < Sequel::Model(:accounts)
     Project.where(id: projects_dataset.select(:id), reputation: "limited").update(reputation: "new")
   end
 
+  def default_spending_cutoff_limit
+    if (project = default_project)
+      UsageAlert.where(project_id: project.id, user_id: id, name: "-", cutoff: true).get(:limit)
+    end
+  end
+
   def create_project_with_default_policy(name, reputation: "new", default_policy: true)
     reputation = "limited" if free_email? && projects.none? { it.reputation == "verified" }
     project = Project.create(name:, reputation:)
