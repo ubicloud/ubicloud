@@ -62,6 +62,7 @@ RSpec.describe LocationCredentialGcp do
   {
     crm_client: Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService,
     iam_client: Google::Apis::IamV1::IamService,
+    iap_client: Google::Apis::IapV1::CloudIAPService,
   }.each do |method, service|
     it "returns a #{service.name.split("::").last} with 8 second open, send and read timeouts" do
       client = location_credential_gcp.public_send(method)

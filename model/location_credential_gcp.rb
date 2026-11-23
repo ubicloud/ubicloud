@@ -5,6 +5,7 @@ require "google/cloud/compute/v1"
 require "google/cloud/storage"
 require "google/apis/cloudresourcemanager_v3"
 require "google/apis/iam_v1"
+require "google/apis/iap_v1"
 require "googleauth"
 
 class LocationCredentialGcp < Sequel::Model
@@ -76,6 +77,10 @@ class LocationCredentialGcp < Sequel::Model
 
   def iam_client
     @iam_client ||= api_service(Google::Apis::IamV1::IamService.new)
+  end
+
+  def iap_client
+    @iap_client ||= api_service(Google::Apis::IapV1::CloudIAPService.new)
   end
 
   private

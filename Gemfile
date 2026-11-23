@@ -32,6 +32,7 @@ gem "aws-sdk-s3"
 gem "cgi" # google-cloud-storage requires it; cgi is removed from Ruby 4.0 stdlib
 gem "google-apis-cloudresourcemanager_v3"
 gem "google-apis-iam_v1"
+gem "google-apis-iap_v1"
 gem "google-cloud-compute-v1", "~> 3.4"
 gem "google-cloud-storage", "~> 1.58"
 gem "bcrypt_pbkdf"
