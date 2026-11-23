@@ -239,6 +239,20 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content "No active runners"
       expect(page).to have_no_content "You’re eligible for an exclusive 50% off premium runners"
+      expect(page).to have_no_css "#spending-cutoff-warning"
+    end
+
+    it "shows warning when project has exceeded its spending cutoff" do
+      project.update(cutoff_at: Time.now)
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      within("#spending-cutoff-warning") do
+        expect(page).to have_content "This project has exceeded its spending cutoff and cannot create additional runners unless the spending cutoff is increased or removed."
+        expect(page).to have_link "the spending cutoff", href: "#{project.path}/billing#cutoff-alert"
+      end
+
+      project.update(cutoff_at: Time.now - 60 * 60 * 24 * 45)
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page).to have_no_css "#spending-cutoff-warning"
     end
 
     it "can list active runners" do
