@@ -13,6 +13,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   DENY_RULE_BASE_PRIORITY = 65534
   MANAGEMENT_SSH_ALLOW_PRIORITY = 1000
   MANAGEMENT_EGRESS_DENY_PRIORITY = 1002
+  IAP_TCP_FORWARDING_RANGES = ["35.235.240.0/20", "2600:2d00:1:7::/64"].freeze
   DENY_RULE_DIRECTIONS = {"INGRESS" => :src_ip_ranges, "EGRESS" => :dest_ip_ranges}.freeze
   VERIFY_ASSOC_MAX_TRIES = 5
   DELETE_TAG_VALUE_MAX_TRIES = 30
@@ -193,7 +194,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def create_management_rules
-    ipv6_cidrs, ipv4_cidrs = Config.control_plane_outbound_cidrs.partition { it.include?(":") }
+    cidrs = Config.control_plane_outbound_cidrs
+    cidrs += IAP_TCP_FORWARDING_RANGES if Config.gcp_postgres_mgmt_iap
+    ipv6_cidrs, ipv4_cidrs = cidrs.partition { it.include?(":") }
     [ipv4_cidrs, ipv6_cidrs].each_with_index do |cidrs, i|
       priority = MANAGEMENT_SSH_ALLOW_PRIORITY + i
       if cidrs.empty?
