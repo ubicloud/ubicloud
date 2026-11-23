@@ -63,11 +63,11 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     SecureRandom.random_number(1...100000)
   end
 
-  # All locked NICs were destroyed mid-rekey: abort the pass back to idle.
+  # All locked NICs were released mid-rekey: abort the pass back to idle.
   def abort_rekey_if_no_nics(nics)
     return unless nics.empty?
-    Clog.emit("All locked NICs destroyed during rekey, aborting")
-    private_subnet.update(state: "waiting")
+    Clog.emit("All locked NICs released during rekey, aborting")
+    private_subnet.update(state: "waiting", last_rekey_at: Time.now)
     hop_wait
   end
 

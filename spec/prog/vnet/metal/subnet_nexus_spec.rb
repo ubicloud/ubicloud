@@ -199,10 +199,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
-    it "aborts to wait if all claimed nics are gone" do
-      ps.update(state: "refreshing_keys")
+    it "aborts to wait and stamps last_rekey_at if all claimed nics are gone" do
+      ps.update(state: "refreshing_keys", last_rekey_at: Time.now - 60 * 60 * 24 - 1)
       expect { nx.wait_inbound_setup }.to hop("wait")
-      expect(ps.reload.state).to eq "waiting"
+      ps.reload
+      expect(ps.state).to eq "waiting"
+      expect(ps.last_rekey_at).to be_within(5).of(Time.now)
     end
 
     it "fails if a nic is beyond the inbound phase" do
