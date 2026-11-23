@@ -2378,7 +2378,7 @@ RSpec.describe CloverAdmin do
     end
   end
 
-  it "allows adding and removing allowed domains for OidcProviders" do
+  it "allows adding and removing allowed and locked domains for OidcProviders" do
     op = OidcProvider.create(
       display_name: "TestOIDC",
       client_id: "client_id_test",
@@ -2412,9 +2412,22 @@ RSpec.describe CloverAdmin do
     expect(page.all("#allowed-domains li").map(&:text)).to eq []
 
     expect(page.all("#locked-domains li").map(&:text)).to eq []
-    LockedDomain.create(domain: "foo.com", oidc_provider_id: op.id)
-    page.refresh
+
+    click_link "Add Locked Domain"
+
+    fill_in "domain", with: "foo.com"
+    click_button "Add Locked Domain"
+    expect(page).to have_flash_notice("Added locked domain")
+    expect(LockedDomain.where(oidc_provider_id: op.id).select_order_map(:domain)).to eq ["foo.com"]
     expect(page.all("#locked-domains li").map(&:text)).to eq ["foo.com"]
+
+    click_link "Remove Locked Domain"
+
+    select "foo.com"
+    click_button "Remove Locked Domain"
+    expect(page).to have_flash_notice("Removed locked domain")
+    expect(LockedDomain.where(oidc_provider_id: op.id).count).to eq 0
+    expect(page.all("#locked-domains li").map(&:text)).to eq []
   end
 
   it "supports setting quota of Project" do

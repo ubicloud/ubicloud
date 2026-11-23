@@ -65,6 +65,10 @@ class OidcProvider < Sequel::Model
     allowed_domain_ds.where(domain:).delete
   end
 
+  def remove_locked_domain(domain)
+    locked_domains_dataset.where(domain:).destroy
+  end
+
   def callback_url
     "#{Config.base_url}/auth/#{ubid}/callback"
   end
