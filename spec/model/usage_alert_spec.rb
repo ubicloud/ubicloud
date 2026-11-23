@@ -32,7 +32,7 @@ RSpec.describe UsageAlert do
       greeting: "Hello User1,",
       body: ["The spending cutoff you set for project project1 (id: #{project.ubid}) has been triggered.",
         "Current cost: $110.0",
-        "New resource creation will no longer be allowed this month unless you increase or remove the spending cutoff."],
+        "New resource creation will no longer be allowed this month unless you increase or remove the spending cutoff. You can do so on the project's billing page, using the button below."],
       button_title: "See usage",
       button_link: "#{Config.base_url}#{project.path}/billing")
     expect(project.cutoff_at).to be_nil

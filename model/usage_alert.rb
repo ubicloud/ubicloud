@@ -19,7 +19,7 @@ class UsageAlert < Sequel::Model
     if cutoff
       type = "Spending cutoff"
       body1 = "The spending cutoff"
-      body2 = "New resource creation will no longer be allowed this month unless you increase or remove the spending cutoff."
+      body2 = "New resource creation will no longer be allowed this month unless you increase or remove the spending cutoff. You can do so on the project's billing page, using the button below."
     else
       type = "Usage alert is triggered"
       body1 = "The usage alert, #{name},"
