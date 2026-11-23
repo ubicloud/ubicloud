@@ -250,7 +250,10 @@ RSpec.describe Clover, "auth" do
 
     visit verify_link
     expect(page.title).to eq("Ubicloud - Verify Account")
-    expect(Account.first(email: TEST_USER_EMAIL).default_project.name).to eq "Default"
+    account = Account.first(email: TEST_USER_EMAIL)
+    project = account.default_project
+    expect(project.name).to eq "Default"
+    expect(UsageAlert.where(project_id: project.id).order(:name).all.map { [it.user_id, it.name, it.cutoff, it.limit] }).to eq [[account.id, "-", true, 1000], [account.id, "New Account Default", false, 250]]
 
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - Projects")
@@ -1381,7 +1384,9 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_content("Step 2 of 4")
 
-      account.default_project.destroy
+      project = account.default_project
+      project.usage_alerts_dataset.destroy
+      project.destroy
       visit "/?setup=github_actions"
       expect(page).to have_current_path "/project", ignore_query: true
     end
