@@ -712,11 +712,27 @@ class CloverAdmin < Roda
         end
       end
 
+      action "add_locked_domain", "Add Locked Domain" do
+        flash "Added locked domain"
+        param :domain, typecast: :nonempty_str!
+        run do |obj, domain|
+          obj.add_locked_domain(domain:)
+        end
+      end
+
       action "remove_allowed_domain", "Remove Allowed Domain" do
         flash "Removed allowed domain"
         param :domain, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options: ->(obj) { obj.allowed_domains }
         run do |obj, domain|
           obj.remove_allowed_domain(domain)
+        end
+      end
+
+      action "remove_locked_domain", "Remove Locked Domain" do
+        flash "Removed locked domain"
+        param :domain, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options: ->(obj) { obj.locked_domains_dataset.select_order_map(:domain) }
+        run do |obj, domain|
+          obj.remove_locked_domain(domain)
         end
       end
     end
