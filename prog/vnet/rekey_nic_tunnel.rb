@@ -10,7 +10,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   end
 
   label def setup_inbound
-    nic.dst_ipsec_tunnels.each do |tunnel|
+    nic.dst_ipsec_tunnels(eager: {src_nic: :vm, dst_nic: :vm}).each do |tunnel|
       args = tunnel.src_nic.rekey_payload
       next unless args
 
@@ -23,11 +23,15 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   end
 
   label def setup_outbound
-    nic.src_ipsec_tunnels.each do |tunnel|
+    nic.src_ipsec_tunnels(eager: {src_nic: :vm, dst_nic: :vm}).each do |tunnel|
       args = tunnel.src_nic.rekey_payload
       next unless args
+      next unless tunnel.dst_nic.vm&.ephemeral_net6
 
       policy = Xfrm.new(nic, tunnel, "out")
+      # A peer outside this pass can only decrypt the SA its existing policy uses
+      next if !tunnel.dst_nic.rekey_payload && policy.exists?
+
       policy.create_state
       policy.upsert_policy
       policy.create_private_routes
@@ -37,26 +41,39 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   end
 
   label def drop_old_state
-    if nic.src_ipsec_tunnels.empty? && nic.dst_ipsec_tunnels.empty?
+    src_tunnels = nic.src_ipsec_tunnels(eager: {dst_nic: :vm})
+    dst_tunnels = nic.dst_ipsec_tunnels(eager: {src_nic: :vm})
+    if src_tunnels.empty? && dst_tunnels.empty?
       nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state deleteall", vm_name: nic.vm.inhost_name)
       pop "drop_old_state is complete early"
     end
 
     new_spis = [nic.rekey_payload["spi4"], nic.rekey_payload["spi6"]]
-    new_spis += nic.dst_ipsec_tunnels.map do |tunnel|
+    new_spis += dst_tunnels.map do |tunnel|
       next unless tunnel.src_nic.rekey_payload
 
       [tunnel.src_nic.rekey_payload["spi4"], tunnel.src_nic.rekey_payload["spi6"]]
     end.flatten
 
-    vm_name = nic.src_ipsec_tunnels.first.vm_name(nic)
+    vm_name = src_tunnels.first.vm_name(nic)
     state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state", vm_name:, log: :on_error)
 
     # Extract SPIs along with src and dst from state data
     states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+)/m)
 
+    # Peers outside this pass keep using the states they share with this NIC
+    kept_addresses = []
+    peers = src_tunnels.map(&:dst_nic) + dst_tunnels.map(&:src_nic)
+    peers.each do |peer|
+      next if peer.rekey_payload || !peer.vm&.ephemeral_net6
+
+      kept_addresses << Xfrm.tunnel_address(peer.vm).addr
+    end
+
     # Identify which states to drop
-    states_to_drop = states.reject { |(_, _, spi)| new_spis.include?(spi) }
+    states_to_drop = states.reject do |src, dst, spi|
+      new_spis.include?(spi) || kept_addresses.include?(NetAddr.parse_ip(src).addr) || kept_addresses.include?(NetAddr.parse_ip(dst).addr)
+    end
     states_to_drop.each do |src, dst, spi|
       nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state delete src :src dst :dst proto esp spi :spi", vm_name:, src:, dst:, spi:)
     end
@@ -67,12 +84,18 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   class Xfrm
     FORWARD = "fwd"
 
+    def self.tunnel_address(vm)
+      net = vm.ephemeral_net6
+      halved = net.resize(net.netmask.prefix_len + 1)
+      halved.next_sib.network
+    end
+
     def initialize(nic, tunnel, direction)
       @nic = nic
       @tunnel = tunnel
       @namespace = tunnel.vm_name(nic)
-      @tmpl_src = subdivide_network(tunnel.src_nic.vm.ephemeral_net6).network
-      @tmpl_dst = subdivide_network(tunnel.dst_nic.vm.ephemeral_net6).network
+      @tmpl_src = Xfrm.tunnel_address(tunnel.src_nic.vm)
+      @tmpl_dst = Xfrm.tunnel_address(tunnel.dst_nic.vm)
       @reqid = tunnel.src_nic.rekey_payload["reqid"]
       @dir = direction
       @args = tunnel.src_nic.rekey_payload
@@ -81,6 +104,11 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     def upsert_policy
       apply_policy(@tunnel.src_nic.private_ipv4, @tunnel.dst_nic.private_ipv4)
       apply_policy(@tunnel.src_nic.private_ipv6, @tunnel.dst_nic.private_ipv6)
+    end
+
+    def exists?
+      policy_exists?(@tunnel.src_nic.private_ipv4, @tunnel.dst_nic.private_ipv4) &&
+        policy_exists?(@tunnel.src_nic.private_ipv6, @tunnel.dst_nic.private_ipv6)
     end
 
     def create_state
@@ -134,12 +162,6 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       end
 
       [base, kw]
-    end
-
-    def subdivide_network(net)
-      prefix = net.netmask.prefix_len + 1
-      halved = net.resize(prefix)
-      halved.next_sib
     end
   end
 end

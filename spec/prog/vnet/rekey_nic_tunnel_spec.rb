@@ -129,6 +129,34 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect(tunnel.src_nic).to receive(:rekey_payload).and_return(nil)
       expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
     end
+
+    it "keeps the existing policies toward a nic outside the rekey pass" do
+      tunnel.dst_nic.update(rekey_payload: nil)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir out").and_return("non_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out").and_return("non_empty")
+      expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
+    end
+
+    it "creates state and policies toward a nic outside the rekey pass that has none" do
+      tunnel.dst_nic.update(rekey_payload: nil)
+      sshable = tunnel.src_nic.vm.vm_host.sshable
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir out").and_return("").twice
+      expect(sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      expect(sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy add src 10.0.0.1/32 dst 10.0.0.2/32 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out").and_return("")
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy add src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm route replace fd10:9b0b:6b4b:8fbb:def::/128 dev vethihellovm")
+      expect(sshable).to receive(:_cmd).with("sudo ip -n hellovm route replace 10.0.0.2/32 dev vethihellovm")
+      expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
+    end
+
+    it "skips a peer that has no vm" do
+      vmless_nic = Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:456::", private_ipv4: "10.0.0.4", mac: "00:00:00:00:00:00", name: "vmless-nic", state: "initializing")
+      vmless_tunnel = IpsecTunnel.create(src_nic_id: tunnel.src_nic.id, dst_nic_id: vmless_nic.id)
+      allow(tunnel.src_nic).to receive(:src_ipsec_tunnels).and_return([vmless_tunnel])
+      expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
+    end
   end
 
   describe "#drop_old_state" do
@@ -178,10 +206,29 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete early"})
     end
 
-    it "skips if the dst tunnel nic is not rekeying" do
-      src_nic = instance_double(Nic, rekey_payload: nil)
-      not_rekeying_nic_tun = instance_double(IpsecTunnel, src_nic:)
-      expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([not_rekeying_nic_tun])
+    it "keeps the states shared with a peer outside the rekey pass" do
+      outside_vm = create_vm(name: "outsidevm", vm_host_id: tunnel.src_nic.vm.vm_host_id, ephemeral_net6: "2a01:4f8:10a:0:1536::/79")
+      outside_nic = Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:123::", private_ipv4: "10.0.0.3", mac: "00:00:00:00:00:00", name: "outside-nic", vm_id: outside_vm.id, state: "active")
+      IpsecTunnel.create(src_nic_id: tunnel.src_nic.id, dst_nic_id: outside_nic.id)
+      IpsecTunnel.create(src_nic_id: outside_nic.id, dst_nic_id: tunnel.src_nic.id)
+      # NetAddr#to_s gives 2a01:4f8:10a:0:1537:0:0:0 for the outside tunnel address
+      states = <<~STATES
+        src 2a01:4f8:10a:0:1537:: dst 2a01:4f8:10a:128b:4919::
+        \tproto esp spi 0x11111111 reqid 1 mode tunnel
+        src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:0:1537::
+        \tproto esp spi 0x22222222 reqid 2 mode tunnel
+        src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537::
+        \tproto esp spi 0x22222222 reqid 2 mode tunnel
+      STATES
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state", log: :on_error).and_return(states)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x22222222").and_return(true)
+      expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
+    end
+
+    it "drops the states of a peer outside the rekey pass that has no vm" do
+      vmless_nic = Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:456::", private_ipv4: "10.0.0.4", mac: "00:00:00:00:00:00", name: "vmless-nic", state: "initializing")
+      IpsecTunnel.create(src_nic_id: tunnel.src_nic.id, dst_nic_id: vmless_nic.id)
+      IpsecTunnel.create(src_nic_id: vmless_nic.id, dst_nic_id: tunnel.src_nic.id)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state", log: :on_error).and_return(states_data)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
