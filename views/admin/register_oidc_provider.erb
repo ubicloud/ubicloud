@@ -1,0 +1,8 @@
+<% @page_title = "Register OIDC Provider" %>
+
+<% form({method: "post", id: "register-oidc-provider"}, button: "Register OIDC Provider", wrapper: :div) do |f| %>
+  <%== f.input(:text, key: :nickname, label: "Nickname", required: true) %>
+  <%== f.input(:text, key: :config_url, label: "Config URL", required: true, placeholder: "https://example.com/.well-known/openid-configuration") %>
+  <%== f.input(:text, key: :client_id, label: "Client ID", required: true) %>
+  <%== f.input(:password, key: :client_secret, label: "Client Secret", required: true) %>
+<% end %>

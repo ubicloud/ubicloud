@@ -2781,6 +2781,19 @@ class CloverAdmin < Roda
       view("table_row_counts")
     end
 
+    r.is "register-oidc-provider" do
+      r.get do
+        view("register_oidc_provider")
+      end
+
+      r.post do
+        nickname, config_url, client_id, client_secret = typecast_params.nonempty_str!(%w[nickname config_url client_id client_secret])
+        op = OidcProvider.register(nickname, config_url, client_id:, client_secret:)
+        flash["notice"] = "OidcProvider created"
+        r.redirect "/model/OidcProvider/#{op.ubid}"
+      end
+    end
+
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
