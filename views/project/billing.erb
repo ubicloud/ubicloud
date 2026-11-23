@@ -333,6 +333,32 @@ end
       button_title: "Add new billing information"
     ) %>
   <% end %>
+  <div id="spending-cutoff-note" class="mx-auto mt-6 max-w-2xl rounded-md p-4 <%= @cutoff_alert ? "bg-green-50 text-green-800" : "bg-orange-50 text-orange-700" %>">
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <%== part("components/icon", name: @cutoff_alert ? "hero-check-circle-mini" : "hero-information-circle", classes: "h-5 w-5") %>
+      </div>
+
+      <div class="ml-3 text-sm">
+        <% if @cutoff_alert %>
+          <p>
+            This project currently has a spending cutoff of <span class="font-semibold">$<%= @cutoff_alert.limit %></span>,
+            which you can update using the <a href="#cutoff-alert" class="font-semibold underline">form below</a>.
+          </p>
+        <% else %>
+          <p>
+            This project does not currently have a spending cutoff. You can add one using the
+            <a href="#cutoff-alert" class="font-semibold underline">form below</a>.
+          </p>
+
+          <p class="mt-2">
+            Without a spending cutoff, there is no limit on the resources that can be allocated in this project, so
+            misconfigured automation or compromised credentials could result in unexpectedly large charges.
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </div>
   <br>
   <%== part("components/discount_code") %>
 <% end %>

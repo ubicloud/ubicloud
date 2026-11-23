@@ -66,6 +66,25 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "Forbidden"
     end
 
+    it "shows spending cutoff note when there is no billing info" do
+      visit "#{project.path}/billing"
+      within("#spending-cutoff-note") do
+        expect(page).to have_content "This project does not currently have a spending cutoff. You can add one using the form below."
+        expect(page).to have_content "Without a spending cutoff, there is no limit on the resources"
+        expect(page).to have_no_content "This project currently has a spending cutoff"
+      end
+
+      UsageAlert.create(project_id: project.id, user_id: user.id, name: "-", limit: 250, cutoff: true)
+      visit "#{project.path}/billing"
+      within("#spending-cutoff-note") do
+        expect(page).to have_content "This project currently has a spending cutoff of $250, which you can update using the form below."
+        expect(page).to have_no_content "does not currently have a spending cutoff"
+        click_link "form below"
+      end
+      expect(page.title).to eq "Ubicloud - Project Billing"
+      expect(find_by_id("cutoff_limit").value).to eq "250"
+    end
+
     it "can create billing info" do
       # rubocop:disable RSpec/VerifiedDoubles
       expect(checkout_sessions_service).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
