@@ -224,7 +224,7 @@ class Clover < Roda
     $stderr
     # simplecov:enable
   end
-  plugin :common_logger, logger
+  plugin :common_logger, logger, use_request_ip: true
 
   plugin :not_found do
     next if runtime?
