@@ -2,6 +2,7 @@
 
 require "google/cloud/compute/v1"
 require "google/apis/cloudresourcemanager_v3"
+require "google/apis/iap_v1"
 require "googleauth"
 
 RSpec.describe Prog::Vnet::Gcp::VpcNexus do
@@ -32,6 +33,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   let(:nfp_client) { instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client) }
   let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }
   let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
+  let(:iap_client) { instance_double(Google::Apis::IapV1::CloudIAPService) }
   let(:done_op) { Google::Cloud::Compute::V1::Operation.new(status: :DONE) }
 
   before do
@@ -40,6 +42,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     allow(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client).to receive(:new).and_return(global_ops_client)
     allow(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService).to receive(:new).and_return(crm_client)
     allow(crm_client).to receive_messages("authorization=": nil, client_options: Google::Apis::ClientOptions.new)
+    allow(Google::Apis::IapV1::CloudIAPService).to receive(:new).and_return(iap_client)
+    allow(iap_client).to receive_messages("authorization=": nil, client_options: Google::Apis::ClientOptions.new)
     allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
     stub_fetch_all_via_list(crm_client)
   end
@@ -550,7 +554,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       allow(Config).to receive(:gcp_postgres_mgmt_iap).and_return(true)
       added = capture_added_rules(4)
 
-      expect { nx.create_management_rules }.to hop("wait")
+      expect { nx.create_management_rules }.to hop("create_iap_dest_group")
       expect(added.first(2).map { [it.priority, it.match.src_ip_ranges.to_a] }).to eq([
         [1000, ["1.2.3.0/24", "35.235.240.0/20"]],
         [1001, ["2001:db8::/32", "2600:2d00:1:7::/64"]],
@@ -596,6 +600,32 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       gcp_vpc.incr_update_firewall_rules
       expect { nx.update_firewall_rules }.to hop("create_management_rules")
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(0)
+    end
+
+    describe "#create_iap_dest_group" do
+      before do
+        ps = PrivateSubnet.create(name: "mgmt", location_id: location.id, project_id: project.id,
+          net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "100.64.32.0/19", state: "waiting")
+        gcp_vpc.update(dedicated_for_subnet_id: ps.id)
+      end
+
+      it "creates a destination group for the management range, named after the VPC" do
+        expect(iap_client).to receive(:create_project_iap_tunnel_location_dest_group) do |parent, group, tunnel_dest_group_id:|
+          expect([parent, group.cidrs, tunnel_dest_group_id]).to eq(["projects/test-gcp-project/iap_tunnel/locations/us-central1", ["100.64.32.0/19"], vpc_name])
+          group
+        end
+        expect { nx.create_iap_dest_group }.to hop("wait")
+      end
+
+      it "accepts a destination group that already exists" do
+        expect(iap_client).to receive(:create_project_iap_tunnel_location_dest_group).and_raise(Google::Apis::ClientError.new("exists", status_code: 409))
+        expect { nx.create_iap_dest_group }.to hop("wait")
+      end
+
+      it "raises other IAP errors" do
+        expect(iap_client).to receive(:create_project_iap_tunnel_location_dest_group).and_raise(Google::Apis::ClientError.new("SERVICE_DISABLED", status_code: 403))
+        expect { nx.create_iap_dest_group }.to raise_error(Google::Apis::ClientError, "SERVICE_DISABLED")
+      end
     end
   end
 
@@ -761,6 +791,29 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(gcp_vpc.destroy_set?(cached: false)).to be(false)
       expect(gcp_vpc.destroying_set?(cached: false)).to be(false)
       expect(nx.strand.stack.first["deadline_target"]).to be_nil
+    end
+
+    it "deletes the IAP destination group first for a management VPC when IAP is on" do
+      gcp_vpc.update(is_management: true)
+      allow(Config).to receive(:gcp_postgres_mgmt_iap).and_return(true)
+      expect { nx.destroy }.to hop("delete_iap_dest_group")
+    end
+  end
+
+  describe "#delete_iap_dest_group" do
+    it "deletes the destination group named after the VPC" do
+      expect(iap_client).to receive(:delete_project_iap_tunnel_location_dest_group).with("projects/test-gcp-project/iap_tunnel/locations/us-central1/destGroups/#{vpc_name}")
+      expect { nx.delete_iap_dest_group }.to hop("enumerate_destroy_state")
+    end
+
+    it "accepts a destination group that is already gone" do
+      expect(iap_client).to receive(:delete_project_iap_tunnel_location_dest_group).and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
+      expect { nx.delete_iap_dest_group }.to hop("enumerate_destroy_state")
+    end
+
+    it "raises other IAP errors" do
+      expect(iap_client).to receive(:delete_project_iap_tunnel_location_dest_group).and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
+      expect { nx.delete_iap_dest_group }.to raise_error(Google::Apis::ClientError, "denied")
     end
   end
 

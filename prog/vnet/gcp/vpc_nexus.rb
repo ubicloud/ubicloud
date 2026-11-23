@@ -210,6 +210,17 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       ensure_firewall_policy_rule(priority: MANAGEMENT_EGRESS_DENY_PRIORITY + i, direction: "EGRESS", action: "deny", dest_ip_ranges: ranges, layer4_configs: [{ip_protocol: "all"}])
     end
 
+    hop_create_iap_dest_group if Config.gcp_postgres_mgmt_iap
+    hop_wait
+  end
+
+  label def create_iap_dest_group
+    begin
+      credential.iap_client.create_project_iap_tunnel_location_dest_group(iap_dest_group_parent,
+        Google::Apis::IapV1::TunnelDestGroup.new(cidrs: [gcp_vpc.dedicated_for_private_subnet.net4.to_s]), tunnel_dest_group_id: gcp_vpc.name)
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 409
+    end
     hop_wait
   end
 
@@ -246,6 +257,16 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     register_deadline("destroy", 10 * 60, message: "finish destroying")
+    hop_delete_iap_dest_group if gcp_vpc.is_management && Config.gcp_postgres_mgmt_iap
+    hop_enumerate_destroy_state
+  end
+
+  label def delete_iap_dest_group
+    begin
+      credential.iap_client.delete_project_iap_tunnel_location_dest_group("#{iap_dest_group_parent}/destGroups/#{gcp_vpc.name}")
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 404
+    end
     hop_enumerate_destroy_state
   end
 
@@ -626,5 +647,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   def gcp_project_id
     @gcp_project_id ||= credential.project_id
+  end
+
+  def iap_dest_group_parent
+    "projects/#{gcp_project_id}/iap_tunnel/locations/#{gcp_vpc.location.name.delete_prefix("gcp-")}"
   end
 end
