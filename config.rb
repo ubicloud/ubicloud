@@ -182,6 +182,10 @@ module Config
   override :api_metrics_report_enabled, false, bool
   override :api_metrics_store_dir, File.join(Dir.pwd, "var", "api_metrics"), string
 
+  # Object growth reports (memory leak checking) (0 disables)
+  override :object_growth_report_interval, 0, int
+  override :object_growth_report_top, 20, int
+
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string
 
