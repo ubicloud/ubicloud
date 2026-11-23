@@ -22,7 +22,7 @@ class Account < Sequel::Model(:accounts)
 
   alias_method :admin_label, :email
 
-  FREE_EMAIL_SUFFIXES = %w[@gmail.com @outlook.com @hotmail.com @yahoo.com @icloud.com @protonmail.com @proton.me].freeze
+  FREE_EMAIL_SUFFIXES = %w[@gmail.com @hey.com @outlook.com @hotmail.com @yahoo.com @icloud.com @protonmail.com @proton.me].freeze
 
   def self.open_with_email(email)
     exclude(status_id: 3)[email:]

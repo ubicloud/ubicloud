@@ -84,6 +84,12 @@ RSpec.describe Account do
       expect(project.reputation).to eq("limited")
     end
 
+    it "sets reputation limited if the email is from hey" do
+      account.email = "test@hey.com"
+      project = account.create_project_with_default_policy("project-2")
+      expect(project.reputation).to eq("limited")
+    end
+
     it "sets reputation limited if the email domain is from gmail with uppercase letters" do
       account.email = "test@GMail.com"
       project = account.create_project_with_default_policy("project-2")
