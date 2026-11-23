@@ -218,7 +218,9 @@ class Clover < Roda
 
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
-    account.default_project = account.create_project_with_default_policy("Default")
+    project = account.default_project = account.create_project_with_default_policy("Default")
+    UsageAlert.create(project_id: project.id, user_id: account_id, name: "New Account Default", cutoff: false, limit: 250)
+    UsageAlert.create(project_id: project.id, user_id: account_id, name: "-", cutoff: true, limit: 1000)
     if (sources = session["account_source"])
       DB[:account_source].import([:account_id, :source, :detail], sources.map { [account.id, *it] })
     end
