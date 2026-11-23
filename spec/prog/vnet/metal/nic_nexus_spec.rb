@@ -74,9 +74,14 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait }.to hop("start_rekey")
     end
 
-    it "naps if repopulate is set" do
-      expect(nx).to receive(:when_repopulate_set?).and_yield
-      expect { nx.wait }.to hibernate
+    it "refreshes keys and clears rekey_skipped when repopulating" do
+      ps_strand
+      Strand.create_with_id(nic, prog: "Vnet::Metal::NicNexus", label: "wait")
+      nic.incr_repopulate
+      nic.incr_rekey_skipped
+      expect { described_class.new(nic.strand).wait }.to hibernate
+      expect(nic.semaphores_dataset.select_map(:name)).to eq []
+      expect(ps.refresh_keys_set?(cached: false)).to be true
     end
   end
 
@@ -127,6 +132,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nic.rekey_payload).to be_nil
       expect(nic.encryption_key).to be_nil
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq 1
+      expect(nic.rekey_skipped_set?(cached: false)).to be true
     end
 
     it "fails if the nic is not locked when inbound_setup completes" do
@@ -148,13 +154,15 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq 1
     end
 
-    it "leaves the pass when it cannot take part in outbound setup" do
+    it "leaves the pass without adding a second rekey_skipped when it cannot take part in outbound setup" do
       nic.update(rekey_phase: "inbound")
+      nic.incr_rekey_skipped
       nic.strand.update(retval: {"msg" => "nic cannot take part in rekey"})
       expect { nx.wait_rekey_outbound_trigger }.to hop("wait")
       nic.reload
       expect(nic.rekey_coordinator_id).to be_nil
       expect(nic.rekey_phase).to eq "idle"
+      expect(nic.semaphores_dataset.where(name: "rekey_skipped").count).to eq 1
     end
 
     it "fails if outbound_setup completes when the phase is not inbound" do

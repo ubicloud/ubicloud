@@ -769,13 +769,23 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.unavailable }.to nap(30)
     end
 
-    it "checks the boot_id and hops to wait if an available host did not reboot" do
+    it "checks the boot_id, repopulates its vms' nics that skipped a rekey and hops to wait if an available host did not reboot" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       vm_host.update(last_boot_id: "boot-id")
       expect(nx).to receive(:get_boot_id).and_return("boot-id")
+      ps = PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id)
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "nic").subject
+      nic.update(vm_id: create_vm(vm_host_id: vm_host.id).id)
+      nic.incr_rekey_skipped
+      not_skipped_nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "not-skipped-nic").subject
+      not_skipped_nic.update(vm_id: create_vm(vm_host_id: vm_host.id).id)
+      other_host_nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "other-host-nic").subject
+      other_host_nic.update(vm_id: create_vm(vm_host_id: create_vm_host.id).id)
+      other_host_nic.incr_rekey_skipped
       expect { nx.unavailable }.to hop("wait")
       expect(nx.checkup_set?).to be false
+      expect(Semaphore.where(name: "repopulate").select_map(:strand_id)).to eq [nic.id]
     end
 
     it "restarts the VMs when an available host had an out-of-band reboot" do

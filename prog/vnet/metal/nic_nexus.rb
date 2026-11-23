@@ -27,6 +27,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     when_repopulate_set? do
       nic.private_subnet.incr_refresh_keys
       decr_repopulate
+      decr_rekey_skipped
     end
 
     when_start_rekey_set? do
@@ -107,6 +108,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     Clog.emit("NIC leaving rekey pass", {nic_rekey_leave: {nic_id: nic.id, coordinator_id:, phase: nic.rekey_phase}})
     nic.update(rekey_coordinator_id: nil, rekey_phase: "idle", rekey_payload: nil, encryption_key: nil)
     PrivateSubnet.incr_nic_phase_done(coordinator_id)
+    incr_rekey_skipped unless rekey_skipped_set?
     hop_wait
   end
 
