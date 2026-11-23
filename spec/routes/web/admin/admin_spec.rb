@@ -4785,6 +4785,45 @@ RSpec.describe CloverAdmin do
     expect(rows.map(&:last)).to all(match(/\A(-1|\d+)\z/))
   end
 
+  describe "register oidc provider" do
+    before do
+      click_link "Register OIDC Provider"
+    end
+
+    it "registers an OIDC provider using the discovery configuration" do
+      stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body: {
+        issuer: "https://example.com/issuer",
+        authorization_endpoint: "https://example.com/auth",
+        token_endpoint: "https://example.com/tok",
+        userinfo_endpoint: "https://example.com/ui",
+        jwks_uri: "https://example.com/jw",
+        code_challenge_methods_supported: ["S256"],
+      }.to_json)
+
+      expect(page.title).to eq "Ubicloud Admin - Register OIDC Provider"
+      fill_in "Nickname", with: "TestOIDC"
+      fill_in "Config URL", with: "https://example.com"
+      fill_in "Client ID", with: "123"
+      fill_in "Client Secret", with: "456"
+      click_button "Register OIDC Provider"
+
+      op = OidcProvider.first
+      expect(page).to have_flash_notice("OidcProvider created")
+      expect(page.title).to eq "Ubicloud Admin - OidcProvider #{op.ubid}"
+      expect(%i[display_name url client_id client_secret authorization_endpoint token_endpoint userinfo_endpoint jwks_uri pkce_supported].map { op.public_send(it) }).to eq [
+        "TestOIDC", "https://example.com/issuer", "123", "456", "/auth", "/tok", "/ui", "https://example.com/jw", true,
+      ]
+    end
+
+    it "requires all fields" do
+      fill_in "Nickname", with: "TestOIDC"
+      fill_in "Config URL", with: "https://example.com"
+      fill_in "Client ID", with: "123"
+      expect { click_button "Register OIDC Provider" }.to raise_error(Roda::RodaPlugins::TypecastParams::Error, "empty string provided for parameter client_secret")
+      expect(OidcProvider.count).to eq 0
+    end
+  end
+
   it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
     vm_host = create_vm_host
     other_vm_host = create_vm_host
