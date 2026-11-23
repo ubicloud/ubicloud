@@ -21,15 +21,31 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
     end
   end
 
+  DESTROY_RUN_OCTOKIT_ERRORS = Regexp.union(
+    "Repository level self-hosted runners are disabled",
+    "GitHub Actions is disabled on this repository",
+    "your IP address is not permitted to access this resource",
+    "Resource not accessible by integration",
+  )
+
   label def start
     hop_destroy if Time.now > github_active_workflow_run.created_at + MAX_SECONDS
 
     run = github_active_workflow_run
     begin
       data = run.installation.client.get("repos/#{run.repository_name}/actions/runs/#{run.run_id}/attempts/#{run.run_attempt}")
+    rescue Octokit::InstallationSuspended
+      hop_destroy
     rescue Octokit::ClientError => ex
       hop_destroy if ex.response_status == 404
       Clog.emit("Could not fetch the workflow run", {workflow_run_poll_failure: Util.exception_to_hash(ex, into: {run_ubid: run.ubid, repository_ubid: run.repository.ubid, run_id: run.run_id, run_attempt: run.run_attempt})})
+      if DESTROY_RUN_OCTOKIT_ERRORS.match?(ex.message)
+        if Time.now - run.created_at > 60 * 60 * 6
+          hop_destroy
+        else
+          nap(60 * 60 * 6)
+        end
+      end
     rescue Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError => ex
       Clog.emit("Could not fetch the workflow run", {workflow_run_poll_failure: Util.exception_to_hash(ex, into: {run_ubid: run.ubid, repository_ubid: run.repository.ubid, run_id: run.run_id, run_attempt: run.run_attempt})})
     else
@@ -45,7 +61,21 @@ class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
       end
     end
 
-    nap(60 * 60 * ((run.conclusion == "action_required") ? 24 : 1))
+    run_hours = (Time.now - run.created_at) / 3600
+    nap_hours = if run_hours < 6
+      1
+    elsif run_hours < 24
+      6
+    elsif run_hours < 24 * 4
+      24
+    else
+      24 * 4
+    end
+
+    if run.conclusion == "action_required"
+      nap_hours = nap_hours.clamp(24, nil)
+    end
+    nap(60 * 60 * nap_hours)
   end
 
   label def destroy
