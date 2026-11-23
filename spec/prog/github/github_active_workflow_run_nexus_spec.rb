@@ -169,8 +169,40 @@ RSpec.describe Prog::Github::GithubActiveWorkflowRunNexus do
       expect { nx.start }.to hop("destroy")
     end
 
+    it "hops to destroy if the installation is suspended" do
+      expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::InstallationSuspended.new({status: 403, body: "This installation has been suspended"}))
+      expect { nx.start }.to hop("destroy")
+    end
+
+    [
+      "Repository level self-hosted runners are disabled on this repository",
+      "GitHub Actions is disabled on this repository",
+      "Although you appear to have the correct authorization credentials, the `ubicloud` organization has an IP allow list enabled, and your IP address is not permitted to access this resource",
+      "Resource not accessible by integration",
+    ].each do |message|
+      it "logs and naps for 6 hours if the workflow run is less than 6 hours old and the error message is #{message.inspect}" do
+        workflow_run.update(created_at: Time.now - 60 * 60 * 5)
+        expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::Forbidden.new({status: 403, body: message}))
+        expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
+        expect { nx.start }.to nap(60 * 60 * 6)
+      end
+
+      it "logs and hops to destroy if the workflow run is more than 6 hours old and the error message is #{message.inspect}" do
+        workflow_run.update(created_at: Time.now - 60 * 60 * 7)
+        expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::Forbidden.new({status: 403, body: message}))
+        expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
+        expect { nx.start }.to hop("destroy")
+      end
+    end
+
+    it "logs and naps for an hour on Octokit::Forbidden errors with other messages" do
+      expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::Forbidden.new({status: 403, body: "Some other error"}))
+      expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
+      expect { nx.start }.to nap(60 * 60)
+    end
+
     it "logs and naps for an hour on other client errors" do
-      expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::Forbidden.new({status: 403}))
+      expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::ClientError.new({status: 400}))
       expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
       expect { nx.start }.to nap(60 * 60)
     end
@@ -186,6 +218,31 @@ RSpec.describe Prog::Github::GithubActiveWorkflowRunNexus do
       expect(client).to receive(:get).with(attempt_path).and_raise(Octokit::InternalServerError)
       expect(Clog).to receive(:emit).with("Could not fetch the workflow run", instance_of(Hash)).and_call_original
       expect { nx.start }.to nap(60 * 60)
+    end
+
+    [
+      [5, 1],
+      [7, 6],
+      [25, 24],
+      [24 * 4 + 1, 24 * 4],
+    ].each do |run_hours, nap_hours|
+      it "naps for #{nap_hours} hours if the workflow run is #{run_hours} hours old and has not completed" do
+        workflow_run.update(created_at: Time.now - 60 * 60 * run_hours, status: "in_progress")
+        expect(client).to receive(:get).with(attempt_path).and_return({status: "in_progress", conclusion: nil, updated_at: Time.now})
+        expect { nx.start }.to nap(60 * 60 * nap_hours)
+      end
+    end
+
+    [
+      [7, 24],
+      [25, 24],
+      [24 * 4 + 1, 24 * 4],
+    ].each do |run_hours, nap_hours|
+      it "naps for #{nap_hours} hours if the workflow run is #{run_hours} hours old and is awaiting approval" do
+        workflow_run.update(created_at: Time.now - 60 * 60 * run_hours, status: "completed", conclusion: "action_required")
+        expect(client).to receive(:get).with(attempt_path).and_return({status: "completed", conclusion: "action_required", updated_at: Time.now})
+        expect { nx.start }.to nap(60 * 60 * nap_hours)
+      end
     end
   end
 
