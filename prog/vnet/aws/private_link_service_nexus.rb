@@ -149,14 +149,28 @@ class Prog::Vnet::Aws::PrivateLinkServiceNexus < Prog::Base
     hop_wait_nlb_active
   end
 
+  # Access is controlled by the VPC endpoint ID allowlist, not source IP
+  # ranges. AWS only accepts the setting on an NLB with security groups.
+  def stop_enforcing_security_groups_on_private_link_traffic(lb)
+    return if lb.security_groups.to_a.empty? || lb.enforce_security_group_inbound_rules_on_private_link_traffic == "off"
+
+    elbv2_client.set_security_groups(
+      load_balancer_arn: nlb_arn,
+      security_groups: lb.security_groups,
+      enforce_security_group_inbound_rules_on_private_link_traffic: "off",
+    )
+  end
+
   # active_impaired still serves. A failed NLB never recovers on its own: it
   # is deleted and recreated, and once that has failed NLB_PROVISION_ATTEMPTS
   # times it pages with the reason AWS gives.
   label def wait_nlb_active
-    state = elbv2_client.describe_load_balancers(load_balancer_arns: [nlb_arn]).load_balancers.first.state
+    lb = elbv2_client.describe_load_balancers(load_balancer_arns: [nlb_arn]).load_balancers.first
+    state = lb.state
     case state.code
     when "active", "active_impaired"
       Clog.emit("private link service NLB active but impaired", {private_link_service_nlb_impaired: {ubid: private_link_service.ubid, arn: nlb_arn, reason: state.reason}}) if state.code == "active_impaired"
+      stop_enforcing_security_groups_on_private_link_traffic(lb)
       nlb_failed_page&.incr_resolve
       forget_nlb_failures
       hop_ensure_listeners

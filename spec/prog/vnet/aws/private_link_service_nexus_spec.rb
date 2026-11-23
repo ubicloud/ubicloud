@@ -721,6 +721,35 @@ RSpec.describe Prog::Vnet::Aws::PrivateLinkServiceNexus do
       expect { nx.wait_nlb_active }.to hop("ensure_listeners")
     end
 
+    it "stops enforcing security groups on private link traffic once active" do
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active"}, security_groups: ["sg-0123456789abcdef0"], enforce_security_group_inbound_rules_on_private_link_traffic: "on"}])
+      elbv2.stub_responses(:set_security_groups, {})
+      expect(elbv2).to receive(:set_security_groups).with(load_balancer_arn: "arn:nlb", security_groups: ["sg-0123456789abcdef0"], enforce_security_group_inbound_rules_on_private_link_traffic: "off").and_call_original
+
+      expect { nx.wait_nlb_active }.to hop("ensure_listeners")
+    end
+
+    it "leaves security group enforcement alone when it is already off" do
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active"}, security_groups: ["sg-0123456789abcdef0"], enforce_security_group_inbound_rules_on_private_link_traffic: "off"}])
+      expect(elbv2).not_to receive(:set_security_groups)
+
+      expect { nx.wait_nlb_active }.to hop("ensure_listeners")
+    end
+
+    it "leaves security group enforcement alone on an NLB without security groups" do
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active"}, security_groups: [], enforce_security_group_inbound_rules_on_private_link_traffic: "on"}])
+      expect(elbv2).not_to receive(:set_security_groups)
+
+      expect { nx.wait_nlb_active }.to hop("ensure_listeners")
+    end
+
+    it "does not touch security group enforcement while provisioning" do
+      elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "provisioning"}, security_groups: ["sg-0123456789abcdef0"], enforce_security_group_inbound_rules_on_private_link_traffic: "on"}])
+      expect(elbv2).not_to receive(:set_security_groups)
+
+      expect { nx.wait_nlb_active }.to nap(10)
+    end
+
     it "treats an impaired NLB as active, with a log line" do
       elbv2.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active_impaired", reason: "AZ usw2-az2 is unhealthy"}}])
       expect(Clog).to receive(:emit).with("private link service NLB active but impaired", hash_including(private_link_service_nlb_impaired: hash_including(reason: "AZ usw2-az2 is unhealthy"))).and_call_original
