@@ -545,6 +545,18 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(added[0].target_secure_tags).to be_empty
     end
 
+    it "also allows SSH from the IAP TCP forwarding ranges when IAP is on" do
+      expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.0/24", "2001:db8::/32"])
+      allow(Config).to receive(:gcp_postgres_mgmt_iap).and_return(true)
+      added = capture_added_rules(4)
+
+      expect { nx.create_management_rules }.to hop("wait")
+      expect(added.first(2).map { [it.priority, it.match.src_ip_ranges.to_a] }).to eq([
+        [1000, ["1.2.3.0/24", "35.235.240.0/20"]],
+        [1001, ["2001:db8::/32", "2600:2d00:1:7::/64"]],
+      ])
+    end
+
     it "removes the SSH rule of an address family that has no control plane CIDR" do
       expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.0/24"])
       added = capture_added_rules(3)
