@@ -112,7 +112,7 @@ jobs:
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
     timeout-minutes: 85
-    concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (matrix.provider == 'gcp' && format('E2E-gcp-{0}', github.run_id)) || (needs.setup.outputs.has_github_runner == 'true' && 'E2E-aws') || format('E2E-aws-{0}', github.run_id) }}
+    concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (needs.setup.outputs.has_github_runner == 'true' && format('E2E-{0}', matrix.provider)) || format('E2E-{0}-{1}', matrix.provider, github.run_id) }}
     env:
       # Set repo variable E2E_PAUSE_METAL=true to halt metal e2e runs while
       # debugging the shared metal host. The metal job then fails fast without
@@ -186,6 +186,8 @@ jobs:
         ENV["IS_E2E"] = "true"
         ENV["GITHUB_RUNNER_SERVICE_PROJECT_ID"] = "89841457-35a2-8ed2-a88a-424ea5ddd83b"
         ENV["GITHUB_RUNNER_AWS_LOCATION_ID"] = "88adf710-4d8b-8c20-a480-618cbbef802d"
+        ENV["GITHUB_RUNNER_GCP_LOCATION_ID"] = "5279330d-3144-8020-a2a6-2d36b11b383e"
+        ENV["GITHUB_RUNNER_GCP_PRIVATE_SUBNET_ID"] = "0ef88e4f-351c-86d9-8700-9f356c9d21c1"
         ENV["POSTGRES_SERVICE_PROJECT_ID"] = "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
         ENV["KUBERNETES_SERVICE_PROJECT_ID"] = "4e762e09-2a22-82d2-93c2-cfbefbda8c69"
         ENV["MINIO_SERVICE_PROJECT_ID"] = "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
