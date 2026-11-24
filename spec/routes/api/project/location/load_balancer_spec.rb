@@ -127,6 +127,20 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
       end
+
+      it "fails for a private subnet in a location closed to new resources" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location::HETZNER_HEL1_ID).subject
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
+          private_subnet_id: ps.ubid,
+          stack: LoadBalancer::Stack::IPV4,
+          src_port: "80", dst_port: "8080",
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet is in location \"eu-north-h1\", which does not accept new resources"})
+        expect(LoadBalancer.count).to eq(0)
+      end
     end
 
     describe "delete" do

@@ -160,6 +160,14 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
         expect(page).to have_content "Private subnet not found"
       end
+
+      it "only offers private subnets in locations open to new resources" do
+        Prog::Vnet::SubnetNexus.assemble(project.id, name: "fsn1-ps", location_id: Location::HETZNER_FSN1_ID)
+        Prog::Vnet::SubnetNexus.assemble(project.id, name: "hel1-ps", location_id: Location::HETZNER_HEL1_ID)
+        visit "#{project.path}/load-balancer/create"
+
+        expect(page).to have_select("private_subnet_id", options: ["Select private subnet", "fsn1-ps"])
+      end
     end
 
     describe "show" do

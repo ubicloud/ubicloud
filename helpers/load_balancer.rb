@@ -25,6 +25,10 @@ class Clover
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
 
+    unless ps.location.visible_or_for_project?(@project.id, @project.visible_location_names)
+      fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet is in location \"#{ps.display_location}\", which does not accept new resources")
+    end
+
     lb = nil
     DB.transaction do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(
@@ -53,7 +57,8 @@ class Clover
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
     options.add_option(name: "description")
-    options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: it.ubid, display_name: it.name} })
+    open_location_ids = Location.visible_or_for_project(@project.id, @project.visible_location_names).select(:id)
+    options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset.where(location_id: open_location_ids), "PrivateSubnet:view").map { {value: it.ubid, display_name: it.name} })
     options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: it.downcase.tr(" ", "_"), display_name: it} })
     options.add_option(name: "stack", values: LoadBalancer.stack_options.map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
     options.add_option(name: "src_port")
