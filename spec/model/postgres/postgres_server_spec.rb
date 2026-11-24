@@ -640,20 +640,14 @@ RSpec.describe PostgresServer do
 
     it "returns nil if lsn difference is too hign for async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "2/0")
+      DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "2/0")
       expect(postgres_server.failover_target).to be_nil
-    ensure
-      # POSTGRES_MONITOR_DB doesn't use transactional testing, so it must be manually cleaned up
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
     it "returns the standby with highest lsn if lsn difference is not high in async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "1/11")
+      DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "1/11")
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
-    ensure
-      # POSTGRES_MONITOR_DB doesn't use transactional testing, so it must be manually cleaned up
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
     it "returns standby with physical_slot_ready_id nil as fallback for unplanned failover" do
@@ -1800,7 +1794,7 @@ RSpec.describe PostgresServer do
     replica_lag_query = "SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int"
 
     def set_primary_lsn(lsn)
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: lsn)
+      DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: lsn)
     end
 
     it "does nothing for a primary" do
@@ -1977,7 +1971,7 @@ RSpec.describe PostgresServer do
       resource.update(parent: parent_resource)
       postgres_server.update(timeline_access: "fetch")
       Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
-      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: parent_primary.id, last_known_lsn: "10/00000000")
+      DB[:postgres_lsn_monitor].insert(postgres_server_id: parent_primary.id, last_known_lsn: "10/00000000")
 
       expect(postgres_server.read_replica?).to be(true)
       session[:replica_lag_breach_count] = 4
@@ -2087,10 +2081,6 @@ RSpec.describe PostgresServer do
       {ssh_session: Net::SSH::Connection::Session.allocate}
     }
 
-    after do
-      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: postgres_server.id).delete
-    end
-
     it "observe_data_disk_usage upserts the observed percent with a timestamp" do
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  42%\n")
       postgres_server.observe_data_disk_usage(session)
@@ -2107,7 +2097,7 @@ RSpec.describe PostgresServer do
     it "observed_disk_usage_percent returns fresh observations and nil for stale or missing ones" do
       expect(postgres_server.observed_disk_usage_percent).to be_nil
 
-      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now - PostgresServer::DISK_USAGE_MAX_AGE_SECONDS - 60)
+      DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now - PostgresServer::DISK_USAGE_MAX_AGE_SECONDS - 60)
       expect(postgres_server.observed_disk_usage_percent).to be_nil
 
       postgres_server.disk_usage_monitor_ds.update(observed_at: Time.now)
@@ -2115,9 +2105,9 @@ RSpec.describe PostgresServer do
     end
 
     it "deletes the monitor row on destroy" do
-      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now)
+      DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now)
       postgres_server.destroy
-      expect(POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: postgres_server.id).count).to eq(0)
+      expect(DB[:postgres_disk_usage_monitor].where(postgres_server_id: postgres_server.id).count).to eq(0)
     end
   end
 

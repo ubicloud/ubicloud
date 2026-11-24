@@ -369,7 +369,7 @@ class PostgresServer < Sequel::Model
   end
 
   def lsn_monitor_ds
-    POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
+    DB[:postgres_lsn_monitor].where(postgres_server_id: id)
   end
 
   def last_known_lsn
@@ -379,7 +379,7 @@ class PostgresServer < Sequel::Model
   DISK_USAGE_MAX_AGE_SECONDS = 15 * 60
 
   def disk_usage_monitor_ds
-    POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: id)
+    DB[:postgres_disk_usage_monitor].where(postgres_server_id: id)
   end
 
   def observed_disk_usage_percent(max_age: DISK_USAGE_MAX_AGE_SECONDS)
@@ -490,19 +490,21 @@ class PostgresServer < Sequel::Model
     end
     pulse = aggregate_readings(previous_pulse:, reading:, data: {last_known_lsn:})
 
-    DB.transaction do
-      if pulse[:reading] == "up"
-        minute_tick = pulse[:reading_rpt] % 12 == 1
-        session[:lsn_catch_up_in_progress] = lsn_catch_up_in_progress? if minute_tick
-        if minute_tick || session[:lsn_catch_up_in_progress]
-          begin
-            update_last_known_lsn(last_known_lsn)
-          rescue Sequel::Error => ex
-            Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
-          end
+    # Kept outside the transaction below so that a failed update does not
+    # abort it.
+    if pulse[:reading] == "up"
+      minute_tick = pulse[:reading_rpt] % 12 == 1
+      session[:lsn_catch_up_in_progress] = lsn_catch_up_in_progress? if minute_tick
+      if minute_tick || session[:lsn_catch_up_in_progress]
+        begin
+          update_last_known_lsn(last_known_lsn)
+        rescue Sequel::Error => ex
+          Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
         end
       end
+    end
 
+    DB.transaction do
       # A lost privilege freezes last_known_lsn, which blocks the async-HA
       # failover guard. configure re-applies the grant on the writable
       # primary, so ask for one heal at the detection threshold and page
@@ -533,7 +535,7 @@ class PostgresServer < Sequel::Model
   end
 
   def update_last_known_lsn(last_known_lsn)
-    POSTGRES_MONITOR_DB[:postgres_lsn_monitor]
+    DB[:postgres_lsn_monitor]
       .insert_conflict(target: :postgres_server_id, update: {last_known_lsn:})
       .insert(postgres_server_id: id, last_known_lsn:)
   end
@@ -837,7 +839,7 @@ class PostgresServer < Sequel::Model
   def observe_data_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     session[:disk_usage_percent] = disk_usage_percent
-    POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor]
+    DB[:postgres_disk_usage_monitor]
       .insert_conflict(target: :postgres_server_id, update: {data_disk_usage_percent: disk_usage_percent, observed_at: Sequel::CURRENT_TIMESTAMP})
       .insert(postgres_server_id: id, data_disk_usage_percent: disk_usage_percent, observed_at: Sequel::CURRENT_TIMESTAMP)
     if reload.primary?

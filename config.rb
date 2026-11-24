@@ -213,8 +213,6 @@ module Config
   override :postgres_service_hostname_v3, "pg.ubicloud.app", string
   override :postgres_hostname_version_default, "v3", string
   override :postgres_default_image_family, "ubuntu-2604", string
-  override :postgres_monitor_database_url, Config.clover_database_url, string, clear: true
-  optional :postgres_monitor_database_root_certs, string
   optional :postgres_notification_email, string
   override :postgres_unplanned_failover_notification_enabled, false, bool
   override :aws_postgres_iam_access, false, bool
