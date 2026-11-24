@@ -11,6 +11,7 @@ preload_app!
 
 before_fork do
   Sequel::DATABASES.each(&:disconnect)
+  Process.warmup
 end
 before_worker_boot do |index|
   CONNECTION_CHECKOUT_TELEMETRY&.run_thread
