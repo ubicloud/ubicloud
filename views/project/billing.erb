@@ -1,7 +1,7 @@
 <% @page_title = "Project Billing"
 
-if @project.billing_info
-  @invoices = @project.invoices.prepend(@project.current_invoice)
+if (billing_info = @project.billing_info)
+  @invoices = @project.invoices.prepend(@project.current_invoice(billing_info:))
 end
 
 @usage_alerts = @project.usage_alerts_dataset.eager(:user).all

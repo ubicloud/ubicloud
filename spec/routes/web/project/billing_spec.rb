@@ -526,6 +526,23 @@ RSpec.describe Clover, "billing" do
         )
       end
 
+      it "fetches billing info from Stripe once per page load" do
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        vm = create_vm(project_id: project.id)
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: vm.name,
+          span: Sequel::Postgres::PGRange.new(Time.utc(2023, 6), nil),
+          billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"],
+          amount: vm.vcpus,
+        )
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+      end
+
       it "list invoices of project" do
         expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))

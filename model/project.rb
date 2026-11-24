@@ -207,11 +207,11 @@ class Project < Sequel::Model
     cutoff_at > Time.utc(now.year, now.month)
   end
 
-  def current_invoice(since: nil, discounts_and_credits_hashes: nil)
+  def current_invoice(since: nil, discounts_and_credits_hashes: nil, billing_info: nil)
     end_time = Time.now.utc
     begin_time = since || invoices_dataset.where(Sequel[:end_time] < end_time).get(:end_time) || Time.utc(end_time.year, end_time.month)
 
-    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id], discounts_and_credits_hashes:).run.first)
+    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id], discounts_and_credits_hashes:, billing_info:).run.first)
       return invoice
     end
 
