@@ -528,15 +528,7 @@ RSpec.describe Clover, "billing" do
 
       it "fetches billing info from Stripe once per page load" do
         expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
-        vm = create_vm(project_id: project.id)
-        BillingRecord.create(
-          project_id: project.id,
-          resource_id: vm.id,
-          resource_name: vm.name,
-          span: Sequel::Postgres::PGRange.new(Time.utc(2023, 6), nil),
-          billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"],
-          amount: vm.vcpus,
-        )
+        billing_record(Time.utc(2023, 6), nil)
 
         visit "#{project.path}/billing"
 
@@ -661,6 +653,99 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "Current Usage Summary"
         expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
         expect(page).to have_content "less than $0.001"
+      end
+
+      it "shows the projected amount on the current invoice row only" do
+        now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        month_start = Time.utc(2026, 11)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        br = billing_record(month_start, nil)
+        ResourceCredit.create(project_id: project.id, amount: 1, active_from: month_start, name: "Test Credit")
+        previous_invoice = Invoice.create(
+          project_id: project.id,
+          content: {"invoice_version" => 2, "resources" => [], "subtotal" => 1.0, "discounts" => [], "credits" => [], "discount" => 0.0, "credit" => 0.0, "cost" => 1.0},
+          begin_time: Time.utc(2026, 10),
+          end_time: month_start,
+          invoice_number: "1",
+          status: "paid",
+        )
+
+        subtotal = (br.amount.to_f * 672 * 60 * br.billing_rate["unit_price"]).round(3)
+        cost = (subtotal - 1).round(3)
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-current") do
+          expect(page).to have_content "Projected: $%0.02f ($%0.02f)" % [cost, subtotal]
+        end
+        within("#invoice-#{previous_invoice.ubid}") do
+          expect(page).to have_no_content "Projected:"
+        end
+      end
+
+      it "shows projected totals in the current usage summary" do
+        now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        month_start = Time.utc(2026, 11)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "DE"}, "metadata" => {}}).once
+        br = billing_record(month_start, nil)
+        ResourceDiscount.create(project_id: project.id, discount_percent: 20, active_from: month_start, name: "Startup Discount")
+        ResourceCredit.create(project_id: project.id, amount: 5, active_from: month_start, name: "Startup Credit")
+
+        to_date_subtotal = (br.amount.to_f * 14 * 24 * 60 * br.billing_rate["unit_price"]).round(3)
+        to_date_discount = (to_date_subtotal * 0.2).round(3)
+        to_date_cost = (to_date_subtotal - to_date_discount - 5).round(3)
+        to_date_vat = (to_date_cost * 0.21).round(3)
+        to_date_total = (to_date_cost + to_date_vat).round(3)
+        projected_subtotal = (br.amount.to_f * 672 * 60 * br.billing_rate["unit_price"]).round(3)
+        projected_discount = (projected_subtotal * 0.2).round(3)
+        projected_cost = (projected_subtotal - projected_discount - 5).round(3)
+        projected_vat = (projected_cost * 0.21).round(3)
+        projected_total = (projected_cost + projected_vat).round(3)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(page.title).to eq("Ubicloud - Current Usage Summary")
+        expect(page).to have_content "To date"
+        expect(page).to have_content "Projected"
+        expect(find_by_id("invoice-subtotal").text).to eq("$%0.02f" % to_date_subtotal)
+        expect(find_by_id("invoice-subtotal").find(:xpath, "following-sibling::dd").text).to eq("$%0.02f" % projected_subtotal)
+        expect(find_by_id("invoice-startup-discount").text).to eq("-$%0.02f" % to_date_discount)
+        expect(find_by_id("invoice-startup-discount").find(:xpath, "following-sibling::dd").text).to eq("-$%0.02f" % projected_discount)
+        expect(find_by_id("invoice-startup-credit").text).to eq("-$%0.02f" % 5)
+        expect(find_by_id("invoice-startup-credit").find(:xpath, "following-sibling::dd").text).to eq("-$%0.02f" % 5)
+        vat_to_date = find("dt", text: "VAT (21%):").find(:xpath, "following-sibling::dd[1]")
+        expect(vat_to_date.text).to eq("$%0.02f" % to_date_vat)
+        expect(vat_to_date.find(:xpath, "following-sibling::dd").text).to eq("$%0.02f" % projected_vat)
+        expect(find_by_id("invoice-total").text).to eq("$%0.02f" % to_date_total)
+        expect(find_by_id("invoice-total").find(:xpath, "following-sibling::dd").text).to eq("$%0.02f" % projected_total)
+        expect(page).to have_content "Projected through November 30 if resources running now keep running."
+        expect(page).to have_no_content "usage-based charges so far"
+      end
+
+      it "shows usage-based charges in the projected totals" do
+        now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        month_start = Time.utc(2026, 11)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: GithubRunner.generate_uuid,
+          resource_name: "runner",
+          span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+          billing_rate_id: rate["id"],
+          amount: 100,
+        )
+        expected_usage = (100 * rate["unit_price"]).round(3)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(page).to have_content "Includes $%0.02f of usage-based charges so far (runner minutes, inference tokens). Further usage adds to this." % expected_usage
+        expect(find_by_id("invoice-github-runner-credit").text).to eq("-$%0.02f" % expected_usage)
+        expect(find_by_id("invoice-github-runner-credit").find(:xpath, "following-sibling::dd").text).to eq("-$%0.02f" % expected_usage)
+        expect(find_by_id("invoice-total").text).to eq("$0.00")
       end
 
       it "show finalized invoice as PDF from US issuer without VAT" do

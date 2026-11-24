@@ -2,6 +2,7 @@
 
 if (billing_info = @project.billing_info)
   @invoices = @project.invoices.prepend(@project.current_invoice(billing_info:))
+  @projected_invoice = @project.projected_invoice(billing_info:)
 end
 
 @usage_alerts = @project.usage_alerts_dataset.eager(:user).all
@@ -292,6 +293,12 @@ end
 
                     <% if inv.cost != inv.subtotal %>
                       <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
+                    <% end %>
+
+                    <% if inv.status == "current" %>
+                      <div class="text-xs">
+                        Projected: <%= money(@projected_invoice.cost) %><% if @projected_invoice.cost != @projected_invoice.subtotal %> (<%= money(@projected_invoice.subtotal) %>)<% end %>
+                      </div>
                     <% end %>
                   </td>
 

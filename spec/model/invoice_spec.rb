@@ -51,6 +51,21 @@ RSpec.describe Invoice do
     end
   end
 
+  describe "#amount_billed_usage" do
+    it "returns zero without amount-billed line items" do
+      update_content(resources: [{"line_items" => [{"resource_type" => "VmVCpu", "cost" => 10.0}]}])
+      expect(invoice.amount_billed_usage).to eq(0)
+    end
+
+    it "sums amount-billed line items" do
+      update_content(resources: [
+        {"line_items" => [{"resource_type" => "VmVCpu", "cost" => 10.0}]},
+        {"line_items" => [{"resource_type" => "GitHubRunnerMinutes", "cost" => 0.16}, {"resource_type" => "InferenceTokens", "cost" => 2.5}]},
+      ])
+      expect(invoice.amount_billed_usage).to eq(2.66)
+    end
+  end
+
   describe ".send_failure_email" do
     it "sends failure email to accounts with billing permissions in addition to the provided billing email" do
       accounts = [nil, ActionType::NAME_MAP["Vm:view"], ActionType::NAME_MAP["Project:billing"]].each_with_index.map do |action_id, index|
