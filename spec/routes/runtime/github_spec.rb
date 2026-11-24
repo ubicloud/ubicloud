@@ -575,6 +575,32 @@ RSpec.describe Clover, "github" do
         expect(runner.head_branch).to eq("dev")
       end
 
+      it "skips nil jobs returned by the GitHub API when looking for the runner" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        client = instance_double(Octokit::Client)
+        expect(Github).to receive(:installation_client).and_return(client).twice
+        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [nil, {head_branch: "dev", runner_name: runner.ubid}]}))
+        expect(client).to receive(:workflow_run).and_return(sawyer_resource({event: "push"}))
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
+        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "dev"])
+        expect(runner.reload.head_branch).to eq("dev")
+      end
+
+      it "fails to get head branch if all jobs returned by the GitHub API are nil" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return(sawyer_resource({jobs: [nil]}))
+        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
+
+        expect(last_response.status).to eq(204)
+      end
+
       it "uses the cache_scope of the associated workflow run instead of issuing API request to github" do
         workflow_run
         runner.update(run_id: 111, run_attempt: 1, workflow_job: nil)

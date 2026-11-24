@@ -41,6 +41,7 @@ class Clover < Roda
         return
       end
 
+      jobs.compact!
       if (job = jobs.find { it[:runner_name] == runner.ubid })
         update_github_runner_from_workflow_job(runner, JSON.parse(JSON.generate(job.to_h)))
         runner.reload
