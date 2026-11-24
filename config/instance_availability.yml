@@ -15,6 +15,8 @@ providers:
           baseline_throughput_mbps: 1781.25
           maximum_iops: 50000
           maximum_throughput_mbps: 1781.25
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c6gd.16xlarge:
         vcpus: 64
         memory_gib: 128
@@ -28,6 +30,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c6gd.2xlarge:
         vcpus: 8
         memory_gib: 16
@@ -41,6 +45,8 @@ providers:
           baseline_throughput_mbps: 296.875
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6gd.4xlarge:
         vcpus: 16
         memory_gib: 32
@@ -54,6 +60,8 @@ providers:
           baseline_throughput_mbps: 593.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6gd.8xlarge:
         vcpus: 32
         memory_gib: 64
@@ -67,6 +75,8 @@ providers:
           baseline_throughput_mbps: 1187.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1187.5
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6gd.large:
         vcpus: 2
         memory_gib: 4
@@ -80,6 +90,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6gd.medium:
         vcpus: 1
         memory_gib: 2
@@ -93,6 +105,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6gd.metal:
         vcpus: 64
         memory_gib: 128
@@ -106,6 +120,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       c6gd.xlarge:
         vcpus: 4
         memory_gib: 8
@@ -119,6 +135,8 @@ providers:
           baseline_throughput_mbps: 148.5
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6id.12xlarge:
         vcpus: 48
         memory_gib: 96
@@ -132,6 +150,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c6id.16xlarge:
         vcpus: 64
         memory_gib: 128
@@ -145,6 +165,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c6id.24xlarge:
         vcpus: 96
         memory_gib: 192
@@ -158,6 +180,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       c6id.2xlarge:
         vcpus: 8
         memory_gib: 16
@@ -171,6 +195,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6id.32xlarge:
         vcpus: 128
         memory_gib: 256
@@ -184,6 +210,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       c6id.4xlarge:
         vcpus: 16
         memory_gib: 32
@@ -197,6 +225,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6id.8xlarge:
         vcpus: 32
         memory_gib: 64
@@ -210,6 +240,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6id.large:
         vcpus: 2
         memory_gib: 4
@@ -223,6 +255,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c6id.metal:
         vcpus: 128
         memory_gib: 256
@@ -236,6 +270,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       c6id.xlarge:
         vcpus: 4
         memory_gib: 8
@@ -249,6 +285,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.12xlarge:
         vcpus: 48
         memory_gib: 96
@@ -262,6 +300,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c7gd.16xlarge:
         vcpus: 64
         memory_gib: 128
@@ -275,6 +315,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       c7gd.2xlarge:
         vcpus: 8
         memory_gib: 16
@@ -288,6 +330,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.4xlarge:
         vcpus: 16
         memory_gib: 32
@@ -301,6 +345,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.8xlarge:
         vcpus: 32
         memory_gib: 64
@@ -314,6 +360,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.large:
         vcpus: 2
         memory_gib: 4
@@ -327,6 +375,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.medium:
         vcpus: 1
         memory_gib: 2
@@ -340,6 +390,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c7gd.metal:
         vcpus: 64
         memory_gib: 128
@@ -353,6 +405,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       c7gd.xlarge:
         vcpus: 4
         memory_gib: 8
@@ -366,6 +420,8 @@ providers:
           baseline_throughput_mbps: 156.25039999999998
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       c8gd.12xlarge:
         vcpus: 48
         memory_gib: 96
@@ -379,6 +435,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.16xlarge:
         vcpus: 64
         memory_gib: 128
@@ -392,6 +450,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       c8gd.24xlarge:
         vcpus: 96
         memory_gib: 192
@@ -405,6 +465,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       c8gd.2xlarge:
         vcpus: 8
         memory_gib: 16
@@ -418,6 +480,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.48xlarge:
         vcpus: 192
         memory_gib: 384
@@ -431,6 +495,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       c8gd.4xlarge:
         vcpus: 16
         memory_gib: 32
@@ -444,6 +510,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.8xlarge:
         vcpus: 32
         memory_gib: 64
@@ -457,6 +525,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.large:
         vcpus: 2
         memory_gib: 4
@@ -470,6 +540,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.medium:
         vcpus: 1
         memory_gib: 2
@@ -483,6 +555,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8gd.metal-24xl:
         vcpus: 96
         memory_gib: 192
@@ -496,6 +570,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       c8gd.metal-48xl:
         vcpus: 192
         memory_gib: 384
@@ -509,6 +585,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       c8gd.xlarge:
         vcpus: 4
         memory_gib: 8
@@ -522,6 +600,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.12xlarge:
         vcpus: 48
         memory_gib: 96
@@ -535,6 +615,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.16xlarge:
         vcpus: 64
         memory_gib: 128
@@ -548,6 +630,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       c8id.24xlarge:
         vcpus: 96
         memory_gib: 192
@@ -561,6 +645,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       c8id.2xlarge:
         vcpus: 8
         memory_gib: 16
@@ -574,6 +660,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.32xlarge:
         vcpus: 128
         memory_gib: 256
@@ -587,6 +675,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 88
+          attachment_limit_type: dedicated
       c8id.48xlarge:
         vcpus: 192
         memory_gib: 384
@@ -600,6 +690,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       c8id.4xlarge:
         vcpus: 16
         memory_gib: 32
@@ -613,6 +705,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.8xlarge:
         vcpus: 32
         memory_gib: 64
@@ -626,6 +720,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.96xlarge:
         vcpus: 384
         memory_gib: 768
@@ -639,6 +735,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       c8id.large:
         vcpus: 2
         memory_gib: 4
@@ -652,6 +750,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       c8id.metal-48xl:
         vcpus: 192
         memory_gib: 384
@@ -665,6 +765,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       c8id.metal-96xl:
         vcpus: 384
         memory_gib: 768
@@ -678,6 +780,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       c8id.xlarge:
         vcpus: 4
         memory_gib: 8
@@ -691,6 +795,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -704,6 +810,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -717,6 +825,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       i7i.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -730,6 +840,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       i7i.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -743,6 +855,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -756,6 +870,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       i7i.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -769,6 +885,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -782,6 +900,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.large:
         vcpus: 2
         memory_gib: 16
@@ -795,6 +915,8 @@ providers:
           baseline_throughput_mbps: 78.125
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7i.metal-24xl:
         vcpus: 96
         memory_gib: 768
@@ -808,6 +930,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       i7i.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -821,6 +945,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       i7i.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -834,6 +960,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -847,6 +975,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.18xlarge:
         vcpus: 72
         memory_gib: 576
@@ -860,6 +990,8 @@ providers:
           baseline_throughput_mbps: 2812.5
           maximum_iops: 90000
           maximum_throughput_mbps: 2812.5
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       i7ie.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -873,6 +1005,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       i7ie.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -886,6 +1020,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.3xlarge:
         vcpus: 12
         memory_gib: 96
@@ -899,6 +1035,8 @@ providers:
           baseline_throughput_mbps: 468.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -912,6 +1050,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       i7ie.6xlarge:
         vcpus: 24
         memory_gib: 192
@@ -925,6 +1065,8 @@ providers:
           baseline_throughput_mbps: 937.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.large:
         vcpus: 2
         memory_gib: 16
@@ -938,6 +1080,8 @@ providers:
           baseline_throughput_mbps: 78.125
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i7ie.metal-24xl:
         vcpus: 96
         memory_gib: 768
@@ -951,6 +1095,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       i7ie.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -964,6 +1110,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       i7ie.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -977,6 +1125,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -990,6 +1140,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -1003,6 +1155,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       i8g.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -1016,6 +1170,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       i8g.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -1029,6 +1185,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -1042,6 +1200,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       i8g.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -1055,6 +1215,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -1068,6 +1230,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.large:
         vcpus: 2
         memory_gib: 16
@@ -1081,6 +1245,8 @@ providers:
           baseline_throughput_mbps: 78.125
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8g.metal-24xl:
         vcpus: 96
         memory_gib: 768
@@ -1094,6 +1260,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       i8g.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -1107,6 +1275,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       i8g.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -1120,6 +1290,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -1133,6 +1305,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.18xlarge:
         vcpus: 72
         memory_gib: 576
@@ -1146,6 +1320,8 @@ providers:
           baseline_throughput_mbps: 2812.5
           maximum_iops: 90000
           maximum_throughput_mbps: 2812.5
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       i8ge.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -1159,6 +1335,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       i8ge.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -1172,6 +1350,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.3xlarge:
         vcpus: 12
         memory_gib: 96
@@ -1185,6 +1365,8 @@ providers:
           baseline_throughput_mbps: 468.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -1198,6 +1380,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       i8ge.6xlarge:
         vcpus: 24
         memory_gib: 192
@@ -1211,6 +1395,8 @@ providers:
           baseline_throughput_mbps: 937.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.large:
         vcpus: 2
         memory_gib: 16
@@ -1224,6 +1410,8 @@ providers:
           baseline_throughput_mbps: 78.125
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       i8ge.metal-24xl:
         vcpus: 96
         memory_gib: 768
@@ -1237,6 +1425,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       i8ge.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -1250,6 +1440,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       i8ge.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -1263,6 +1455,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m6a.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1272,6 +1466,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1281,6 +1477,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -1290,6 +1488,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1299,6 +1499,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.32xlarge:
         vcpus: 128
         memory_gib: 512
@@ -1308,6 +1510,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -1317,6 +1521,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1326,6 +1532,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1335,6 +1543,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.large:
         vcpus: 2
         memory_gib: 8
@@ -1344,6 +1554,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6a.metal:
         vcpus: 192
         memory_gib: 768
@@ -1353,6 +1565,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       m6a.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1362,6 +1576,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m6gd.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1375,6 +1591,8 @@ providers:
           baseline_throughput_mbps: 1781.25
           maximum_iops: 50000
           maximum_throughput_mbps: 1781.25
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m6gd.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1388,6 +1606,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m6gd.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1401,6 +1621,8 @@ providers:
           baseline_throughput_mbps: 296.875
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6gd.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1414,6 +1636,8 @@ providers:
           baseline_throughput_mbps: 593.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6gd.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1427,6 +1651,8 @@ providers:
           baseline_throughput_mbps: 1187.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1187.5
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6gd.large:
         vcpus: 2
         memory_gib: 8
@@ -1440,6 +1666,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6gd.medium:
         vcpus: 1
         memory_gib: 4
@@ -1453,6 +1681,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6gd.metal:
         vcpus: 64
         memory_gib: 256
@@ -1466,6 +1696,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       m6gd.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1479,6 +1711,8 @@ providers:
           baseline_throughput_mbps: 148.5
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6id.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1492,6 +1726,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m6id.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1505,6 +1741,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m6id.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -1518,6 +1756,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       m6id.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1531,6 +1771,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6id.32xlarge:
         vcpus: 128
         memory_gib: 512
@@ -1544,6 +1786,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       m6id.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1557,6 +1801,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6id.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1570,6 +1816,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6id.large:
         vcpus: 2
         memory_gib: 8
@@ -1583,6 +1831,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m6id.metal:
         vcpus: 128
         memory_gib: 512
@@ -1596,6 +1846,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       m6id.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1609,6 +1861,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7a.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1618,6 +1872,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1627,6 +1883,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m7a.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -1636,6 +1894,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m7a.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1645,6 +1905,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.32xlarge:
         vcpus: 128
         memory_gib: 512
@@ -1654,6 +1916,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 88
+          attachment_limit_type: dedicated
       m7a.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -1663,6 +1927,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m7a.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1672,6 +1938,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1681,6 +1949,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.large:
         vcpus: 2
         memory_gib: 8
@@ -1690,6 +1960,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.medium:
         vcpus: 1
         memory_gib: 4
@@ -1699,6 +1971,8 @@ providers:
           baseline_throughput_mbps: 40.625
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7a.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -1708,6 +1982,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m7a.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1717,6 +1993,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7g.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1726,6 +2004,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1735,6 +2015,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1744,6 +2026,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1753,6 +2037,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1762,6 +2048,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.large:
         vcpus: 2
         memory_gib: 8
@@ -1771,6 +2059,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.medium:
         vcpus: 1
         memory_gib: 4
@@ -1780,6 +2070,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7g.metal:
         vcpus: 64
         memory_gib: 256
@@ -1789,6 +2081,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       m7g.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1798,6 +2092,8 @@ providers:
           baseline_throughput_mbps: 156.25039999999998
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 27
+          attachment_limit_type: shared
       m7gd.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1811,6 +2107,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m7gd.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1824,6 +2122,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       m7gd.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1837,6 +2137,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7gd.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1850,6 +2152,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7gd.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1863,6 +2167,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7gd.large:
         vcpus: 2
         memory_gib: 8
@@ -1876,6 +2182,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7gd.medium:
         vcpus: 1
         memory_gib: 4
@@ -1889,6 +2197,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7gd.metal:
         vcpus: 64
         memory_gib: 256
@@ -1902,6 +2212,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       m7gd.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -1915,6 +2227,8 @@ providers:
           baseline_throughput_mbps: 156.25039999999998
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       m7i.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -1924,6 +2238,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7i.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -1933,6 +2249,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m7i.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -1942,6 +2260,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m7i.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -1951,6 +2271,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7i.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -1960,6 +2282,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m7i.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -1969,6 +2293,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7i.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -1978,6 +2304,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7i.large:
         vcpus: 2
         memory_gib: 8
@@ -1987,6 +2315,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m7i.metal-24xl:
         vcpus: 96
         memory_gib: 384
@@ -1996,6 +2326,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       m7i.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2005,6 +2337,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m7i.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2014,6 +2348,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2023,6 +2359,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2032,6 +2370,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m8a.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2041,6 +2381,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8a.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2050,6 +2392,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2059,6 +2403,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8a.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2068,6 +2414,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2077,6 +2425,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.large:
         vcpus: 2
         memory_gib: 8
@@ -2086,6 +2436,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.medium:
         vcpus: 1
         memory_gib: 4
@@ -2095,6 +2447,8 @@ providers:
           baseline_throughput_mbps: 40.625
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8a.metal-24xl:
         vcpus: 96
         memory_gib: 384
@@ -2104,6 +2458,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8a.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2113,6 +2469,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m8a.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2122,6 +2480,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2131,6 +2491,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2140,6 +2502,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m8g.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2149,6 +2513,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8g.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2158,6 +2524,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2167,6 +2535,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8g.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2176,6 +2546,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2185,6 +2557,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.large:
         vcpus: 2
         memory_gib: 8
@@ -2194,6 +2568,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.medium:
         vcpus: 1
         memory_gib: 4
@@ -2203,6 +2579,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8g.metal-24xl:
         vcpus: 96
         memory_gib: 384
@@ -2212,6 +2590,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       m8g.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2221,6 +2601,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m8g.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2230,6 +2612,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2243,6 +2627,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2256,6 +2642,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m8gd.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2269,6 +2657,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8gd.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2282,6 +2672,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2295,6 +2687,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8gd.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2308,6 +2702,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2321,6 +2717,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.large:
         vcpus: 2
         memory_gib: 8
@@ -2334,6 +2732,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.medium:
         vcpus: 1
         memory_gib: 4
@@ -2347,6 +2747,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8gd.metal-24xl:
         vcpus: 96
         memory_gib: 384
@@ -2360,6 +2762,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       m8gd.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2373,6 +2777,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m8gd.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2386,6 +2792,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2395,6 +2803,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2404,6 +2814,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m8i.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2413,6 +2825,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8i.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2422,6 +2836,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.32xlarge:
         vcpus: 128
         memory_gib: 512
@@ -2431,6 +2847,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 88
+          attachment_limit_type: dedicated
       m8i.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2440,6 +2858,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8i.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2449,6 +2869,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2458,6 +2880,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.96xlarge:
         vcpus: 384
         memory_gib: 1536
@@ -2467,6 +2891,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8i.large:
         vcpus: 2
         memory_gib: 8
@@ -2476,6 +2902,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8i.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2485,6 +2913,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8i.metal-96xl:
         vcpus: 384
         memory_gib: 1536
@@ -2494,6 +2924,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m8i.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2503,6 +2935,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2516,6 +2950,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2529,6 +2965,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m8id.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2542,6 +2980,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8id.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2555,6 +2995,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.32xlarge:
         vcpus: 128
         memory_gib: 512
@@ -2568,6 +3010,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 88
+          attachment_limit_type: dedicated
       m8id.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2581,6 +3025,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8id.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2594,6 +3040,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2607,6 +3055,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.96xlarge:
         vcpus: 384
         memory_gib: 1536
@@ -2620,6 +3070,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m8id.large:
         vcpus: 2
         memory_gib: 8
@@ -2633,6 +3085,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m8id.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2646,6 +3100,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m8id.metal-96xl:
         vcpus: 384
         memory_gib: 1536
@@ -2659,6 +3115,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m8id.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2672,6 +3130,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.12xlarge:
         vcpus: 48
         memory_gib: 192
@@ -2681,6 +3141,8 @@ providers:
           baseline_throughput_mbps: 2250.0
           maximum_iops: 72000
           maximum_throughput_mbps: 2250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.16xlarge:
         vcpus: 64
         memory_gib: 256
@@ -2690,6 +3152,8 @@ providers:
           baseline_throughput_mbps: 3000.0
           maximum_iops: 96000
           maximum_throughput_mbps: 3000.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       m9g.24xlarge:
         vcpus: 96
         memory_gib: 384
@@ -2699,6 +3163,8 @@ providers:
           baseline_throughput_mbps: 4500.0
           maximum_iops: 144000
           maximum_throughput_mbps: 4500.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       m9g.2xlarge:
         vcpus: 8
         memory_gib: 32
@@ -2708,6 +3174,8 @@ providers:
           baseline_throughput_mbps: 375.0
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.48xlarge:
         vcpus: 192
         memory_gib: 768
@@ -2717,6 +3185,8 @@ providers:
           baseline_throughput_mbps: 9000.0
           maximum_iops: 288000
           maximum_throughput_mbps: 9000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       m9g.4xlarge:
         vcpus: 16
         memory_gib: 64
@@ -2726,6 +3196,8 @@ providers:
           baseline_throughput_mbps: 750.0
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.8xlarge:
         vcpus: 32
         memory_gib: 128
@@ -2735,6 +3207,8 @@ providers:
           baseline_throughput_mbps: 1500.0
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.large:
         vcpus: 2
         memory_gib: 8
@@ -2744,6 +3218,8 @@ providers:
           baseline_throughput_mbps: 95.0
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.medium:
         vcpus: 1
         memory_gib: 4
@@ -2753,6 +3229,8 @@ providers:
           baseline_throughput_mbps: 47.5
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       m9g.metal-48xl:
         vcpus: 192
         memory_gib: 768
@@ -2762,6 +3240,8 @@ providers:
           baseline_throughput_mbps: 9000.0
           maximum_iops: 288000
           maximum_throughput_mbps: 9000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       m9g.xlarge:
         vcpus: 4
         memory_gib: 16
@@ -2771,6 +3251,8 @@ providers:
           baseline_throughput_mbps: 187.5
           maximum_iops: 48000
           maximum_throughput_mbps: 1500.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r6gd.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -2784,6 +3266,8 @@ providers:
           baseline_throughput_mbps: 1781.25
           maximum_iops: 50000
           maximum_throughput_mbps: 1781.25
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r6gd.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -2797,6 +3281,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r6gd.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -2810,6 +3296,8 @@ providers:
           baseline_throughput_mbps: 296.875
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6gd.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -2823,6 +3311,8 @@ providers:
           baseline_throughput_mbps: 593.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6gd.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -2836,6 +3326,8 @@ providers:
           baseline_throughput_mbps: 1187.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1187.5
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6gd.large:
         vcpus: 2
         memory_gib: 16
@@ -2849,6 +3341,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6gd.medium:
         vcpus: 1
         memory_gib: 8
@@ -2862,6 +3356,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6gd.metal:
         vcpus: 64
         memory_gib: 512
@@ -2875,6 +3371,8 @@ providers:
           baseline_throughput_mbps: 2375.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2375.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       r6gd.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -2888,6 +3386,8 @@ providers:
           baseline_throughput_mbps: 148.5
           maximum_iops: 20000
           maximum_throughput_mbps: 593.75
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6id.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -2901,6 +3401,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r6id.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -2914,6 +3416,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r6id.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -2927,6 +3431,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       r6id.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -2940,6 +3446,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6id.32xlarge:
         vcpus: 128
         memory_gib: 1024
@@ -2953,6 +3461,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 23
+          attachment_limit_type: shared
       r6id.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -2966,6 +3476,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6id.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -2979,6 +3491,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6id.large:
         vcpus: 2
         memory_gib: 16
@@ -2992,6 +3506,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r6id.metal:
         vcpus: 128
         memory_gib: 1024
@@ -3005,6 +3521,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       r6id.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -3018,6 +3536,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -3031,6 +3551,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r7gd.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -3044,6 +3566,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 25
+          attachment_limit_type: shared
       r7gd.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -3057,6 +3581,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -3070,6 +3596,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -3083,6 +3611,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.large:
         vcpus: 2
         memory_gib: 16
@@ -3096,6 +3626,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.medium:
         vcpus: 1
         memory_gib: 8
@@ -3109,6 +3641,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r7gd.metal:
         vcpus: 64
         memory_gib: 512
@@ -3122,6 +3656,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 31
+          attachment_limit_type: shared
       r7gd.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -3135,6 +3671,8 @@ providers:
           baseline_throughput_mbps: 156.25039999999998
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 26
+          attachment_limit_type: shared
       r8gd.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -3148,6 +3686,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -3161,6 +3701,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       r8gd.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -3174,6 +3716,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       r8gd.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -3187,6 +3731,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -3200,6 +3746,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       r8gd.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -3213,6 +3761,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -3226,6 +3776,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.large:
         vcpus: 2
         memory_gib: 16
@@ -3239,6 +3791,8 @@ providers:
           baseline_throughput_mbps: 78.75
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.medium:
         vcpus: 1
         memory_gib: 8
@@ -3252,6 +3806,8 @@ providers:
           baseline_throughput_mbps: 39.375
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8gd.metal-24xl:
         vcpus: 96
         memory_gib: 768
@@ -3265,6 +3821,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 39
+          attachment_limit_type: dedicated
       r8gd.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -3278,6 +3836,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 240000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       r8gd.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -3291,6 +3851,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.12xlarge:
         vcpus: 48
         memory_gib: 384
@@ -3304,6 +3866,8 @@ providers:
           baseline_throughput_mbps: 1875.0
           maximum_iops: 60000
           maximum_throughput_mbps: 1875.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.16xlarge:
         vcpus: 64
         memory_gib: 512
@@ -3317,6 +3881,8 @@ providers:
           baseline_throughput_mbps: 2500.0
           maximum_iops: 80000
           maximum_throughput_mbps: 2500.0
+          maximum_attachments: 48
+          attachment_limit_type: dedicated
       r8id.24xlarge:
         vcpus: 96
         memory_gib: 768
@@ -3330,6 +3896,8 @@ providers:
           baseline_throughput_mbps: 3750.0
           maximum_iops: 120000
           maximum_throughput_mbps: 3750.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       r8id.2xlarge:
         vcpus: 8
         memory_gib: 64
@@ -3343,6 +3911,8 @@ providers:
           baseline_throughput_mbps: 312.5
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.32xlarge:
         vcpus: 128
         memory_gib: 1024
@@ -3356,6 +3926,8 @@ providers:
           baseline_throughput_mbps: 5000.0
           maximum_iops: 160000
           maximum_throughput_mbps: 5000.0
+          maximum_attachments: 88
+          attachment_limit_type: dedicated
       r8id.48xlarge:
         vcpus: 192
         memory_gib: 1536
@@ -3369,6 +3941,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       r8id.4xlarge:
         vcpus: 16
         memory_gib: 128
@@ -3382,6 +3956,8 @@ providers:
           baseline_throughput_mbps: 625.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.8xlarge:
         vcpus: 32
         memory_gib: 256
@@ -3395,6 +3971,8 @@ providers:
           baseline_throughput_mbps: 1250.0
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.96xlarge:
         vcpus: 384
         memory_gib: 3072
@@ -3408,6 +3986,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 128
+          attachment_limit_type: dedicated
       r8id.large:
         vcpus: 2
         memory_gib: 16
@@ -3421,6 +4001,8 @@ providers:
           baseline_throughput_mbps: 81.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
       r8id.metal-48xl:
         vcpus: 192
         memory_gib: 1536
@@ -3434,6 +4016,8 @@ providers:
           baseline_throughput_mbps: 7500.0
           maximum_iops: 240000
           maximum_throughput_mbps: 7500.0
+          maximum_attachments: 64
+          attachment_limit_type: dedicated
       r8id.metal-96xl:
         vcpus: 384
         memory_gib: 3072
@@ -3447,6 +4031,8 @@ providers:
           baseline_throughput_mbps: 10000.0
           maximum_iops: 480000
           maximum_throughput_mbps: 10000.0
+          maximum_attachments: 79
+          attachment_limit_type: dedicated
       r8id.xlarge:
         vcpus: 4
         memory_gib: 32
@@ -3460,6 +4046,8 @@ providers:
           baseline_throughput_mbps: 156.25
           maximum_iops: 40000
           maximum_throughput_mbps: 1250.0
+          maximum_attachments: 32
+          attachment_limit_type: dedicated
     locations:
       ap-northeast-1:
         families:
