@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :backup_requested
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -10,7 +10,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     timeline = postgres_resource.effective_timeline
     nap 60 if timeline.take_backup_for_converge_set?
 
-    if timeline.latest_backup_size_in_gib.nil? || postgres_resource.latest_backup_too_large_for_target?
+    # The WAL check runs only until a backup is requested, because a backup
+    # whose sentinel cannot be read leaves latest_backup_lsn stale.
+    if timeline.latest_backup_size_in_gib.nil? || postgres_resource.latest_backup_too_large_for_target? ||
+        (!backup_requested && postgres_resource.wal_since_latest_backup_too_large?)
+      self.backup_requested = true
       timeline.incr_take_backup_for_converge
       register_deadline("wait_for_maintenance_window", 6 * 60 * 60, message: "finish taking backup for converge")
       nap 60

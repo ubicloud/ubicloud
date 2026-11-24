@@ -115,6 +115,27 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         expect { nx.start }.to hop("provision_servers")
       end
     end
+
+    context "when more WAL than the backup size was written since the latest backup" do
+      before do
+        timeline.update(latest_backup_size_in_gib: 1, latest_backup_lsn: "0/0")
+        create_server(timeline:, resource: pg, is_representative: true).update_last_known_lsn("0/40000001")
+      end
+
+      it "takes a fresh backup before provisioning servers" do
+        expect { nx.start }.to nap(60)
+        expect(timeline.take_backup_for_converge_set?(cached: false)).to be(true)
+        expect(nx.strand.stack[0]["deadline_target"]).to eq("wait_for_maintenance_window")
+      end
+
+      it "does not request another backup when latest_backup_lsn stays stale" do
+        expect { nx.start }.to nap(60)
+        timeline.decr_take_backup_for_converge
+
+        expect { nx.start }.to hop("provision_servers")
+        expect(timeline.take_backup_for_converge_set?(cached: false)).to be(false)
+      end
+    end
   end
 
   describe "#provision_servers" do
