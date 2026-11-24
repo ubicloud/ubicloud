@@ -404,22 +404,20 @@ RSpec.describe Clover, "postgres" do
       it "can scale down storage if the requested size is enough for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64,
         }.to_json
 
         expect(pg.reload.target_storage_size_gib).to eq(64)
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "does not scale down storage if the requested size is too small for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 95, observed_at: Time.now)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 95, observed_at: Time.now)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64,
@@ -427,8 +425,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(pg.reload.target_storage_size_gib).to eq(128)
         expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_size", {"storage_size" => "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "returns error message if current usage is unknown" do
@@ -443,7 +439,7 @@ RSpec.describe Clover, "postgres" do
       it "blocks scale down if the disk usage observation is stale" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now - PostgresServer::DISK_USAGE_MAX_AGE_SECONDS - 60)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now - PostgresServer::DISK_USAGE_MAX_AGE_SECONDS - 60)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64,
@@ -451,8 +447,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics unavailable right now to verify scale down safety")
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "blocks scale down if there is no disk usage observation" do

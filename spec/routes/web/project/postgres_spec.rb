@@ -619,7 +619,7 @@ RSpec.describe Clover, "postgres" do
       it "can update PostgreSQL instance size configuration" do
         # Low disk usage, so that no storage option is disabled for not
         # holding the data in use.
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now)
         visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
@@ -633,8 +633,6 @@ RSpec.describe Clover, "postgres" do
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
         expect(pg.target_storage_size_gib).to eq(256)
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "cannot update PostgreSQL instance size configuration if project has hit spending cutoff" do
@@ -649,15 +647,13 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "disables the storage sizes that cannot hold the data in use" do
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 60, observed_at: Time.now)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 60, observed_at: Time.now)
         visit "#{project.path}#{pg.path}/resize"
 
         expect(page).to have_content "76.8 GB of 128 GB is used"
         expect(page).to have_content "Too small for 76.8 GB used"
         expect(page).to have_css("label.form_size_standard-2.option-unavailable input[value='64'][disabled]")
         expect(page).to have_no_css("label.form_size_standard-2.option-unavailable input[value='128']")
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "disables the smaller storage sizes when the disk usage is unknown" do
@@ -694,15 +690,13 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows pending resize and high disk usage on the resize page" do
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 90, observed_at: Time.now)
+        DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 90, observed_at: Time.now)
         pg.update(target_vm_size: "standard-4", target_storage_size_gib: 256)
         visit "#{project.path}#{pg.path}/resize"
 
         expect(page).to have_content("Resizing to standard-4")
         expect(page).to have_content("Resizing to 256 GB")
         expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90%)")
-      ensure
-        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
       end
 
       it "can update PostgreSQL high availability" do
