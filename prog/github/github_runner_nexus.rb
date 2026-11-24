@@ -902,23 +902,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
     end
 
-    if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
+    if (cache_proxy_log = vm.sshable.cmd(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false))
       cache_proxy_log.each_line do |line|
         line.strip!
         next if line.empty?
-        message = if cache_proxy_log.start_with?("{")
-          # New cache proxy log format
-          begin
-            parsed = JSON.parse(line)
-            next if parsed["level"] == "INFO" || (parsed["error_type"] == "backend" && [204, 409].include?(parsed["status_code"]))
-            parsed
-          rescue JSON::ParserError
-            line
-          end
-        else
-          # Old cache proxy log format
-          next if !line.include?("Error") && (!line.include?("failed") || line.match?(/code:\s*204/))
-          line.gsub!(/ host: \S+/, "")
+        message = begin
+          JSON.parse(line)
+        rescue JSON::ParserError
           line
         end
         Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion:, vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
