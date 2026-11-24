@@ -21,7 +21,7 @@ RSpec.describe Option do
 
   describe ".locations" do
     it "orders visible locations by display name so the default location is stable" do
-      expect(described_class.locations.map(&:display_name)).to eq(%w[eu-central-h1 eu-north-h1 us-east-a2])
+      expect(described_class.locations.map(&:display_name)).to eq(%w[eu-central-h1 us-east-a2])
     end
   end
 

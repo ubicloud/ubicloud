@@ -475,6 +475,7 @@ RSpec.describe "Web UI JavaScript" do # rubocop:disable RSpec/DescribeClass
     it "updates the available child options when parent options are changed" do
       fsn1 = Location[Location::HETZNER_FSN1_ID]
       hel1 = Location[Location::HETZNER_HEL1_ID]
+      project.set_ff_visible_locations([hel1.name])
       PrivateSubnet.create(name: "my-subnet", location_id: fsn1.id, project_id: project.id, net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26")
       visit "#{project.path}/vm/create"
 

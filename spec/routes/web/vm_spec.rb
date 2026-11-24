@@ -448,7 +448,7 @@ RSpec.describe Clover, "vm" do
 
         click_button "Create"
         expect(page).to have_content "GPU"
-        expect(page).to have_content "Finland"
+        expect(page).to have_content "Virginia, US"
         expect(page).to have_content "Burstable"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
@@ -460,7 +460,7 @@ RSpec.describe Clover, "vm" do
         choose option: "standard-2"
         choose option: "1:20b5"
         expect(page).to have_content "GPU"
-        expect(page).to have_content "Finland"
+        expect(page).to have_content "Virginia, US"
         expect(page).to have_content "Burstable"
 
         click_button "Create"
@@ -516,7 +516,7 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
         expect(page).to have_content "GPU"
-        expect(page).to have_no_content "Finland"
+        expect(page).to have_no_content "Virginia, US"
         expect(page).to have_no_content "Burstable"
         click_button "Create"
         expect(page).to have_flash_error("empty string provided for parameter public_key")
@@ -529,7 +529,7 @@ RSpec.describe Clover, "vm" do
         choose option: "standard-2"
         choose option: "1:20b5"
         expect(page).to have_content "GPU"
-        expect(page).to have_no_content "Finland"
+        expect(page).to have_no_content "Virginia, US"
         expect(page).to have_no_content "Burstable"
 
         click_button "Create"
@@ -569,7 +569,7 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         expect(page).to have_no_content "GPU"
-        expect(page).to have_content "Finland"
+        expect(page).to have_content "Virginia, US"
         expect(page).to have_content "Burstable"
 
         click_button "Create"
@@ -583,7 +583,7 @@ RSpec.describe Clover, "vm" do
         choose option: "standard-2"
 
         expect(page).to have_no_content "GPU"
-        expect(page).to have_content "Finland"
+        expect(page).to have_content "Virginia, US"
         expect(page).to have_content "Burstable"
       end
 

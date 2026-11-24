@@ -50,8 +50,8 @@ RSpec.describe Clover, "cli vm create" do
 
   it "creates vm with all options, specifying private subnet by id" do
     expect(Vm.count).to eq 0
-    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
-    body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid}] << "b b")
+    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::LEASEWEB_WDC02_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
+    body = cli(%W[vm us-east-a2/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid}] << "b b")
     vm = Vm.first
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
@@ -59,7 +59,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm.name).to eq "test-vm2"
     expect(vm.public_key).to eq "b b"
     expect(vm.init_script).to be_nil
-    expect(vm.display_location).to eq "eu-north-h1"
+    expect(vm.display_location).to eq "us-east-a2"
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"
     expect(vm.ip4_enabled).to be false
@@ -70,15 +70,15 @@ RSpec.describe Clover, "cli vm create" do
 
   it "creates vm with all options, specifying private subnet by name" do
     expect(Vm.count).to eq 0
-    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
-    body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p test-ps] << "b b")
+    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::LEASEWEB_WDC02_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
+    body = cli(%W[vm us-east-a2/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p test-ps] << "b b")
     vm = Vm.first
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
     expect(vm).to be_a Vm
     expect(vm.name).to eq "test-vm2"
     expect(vm.public_key).to eq "b b"
-    expect(vm.display_location).to eq "eu-north-h1"
+    expect(vm.display_location).to eq "us-east-a2"
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"
     expect(vm.ip4_enabled).to be false
@@ -88,7 +88,7 @@ RSpec.describe Clover, "cli vm create" do
   end
 
   it "translates LF to CRLF in public keys to work with multiple public keys" do
-    body = cli(%w[vm eu-north-h1/test-vm2 create] << "a b\nb c")
+    body = cli(%w[vm us-east-a2/test-vm2 create] << "a b\nb c")
     vm = Vm.first
     expect(vm.public_key).to eq "a b\r\nb c"
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
@@ -97,10 +97,10 @@ RSpec.describe Clover, "cli vm create" do
   it "shows errors if trying to create a vm with an invalid private subnet" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
-    expect(cli(%W[vm eu-north-h1/test-vm2 create -p #{ps.ubid}] << "c c", status: 400)).to eq(<<~END)
+    expect(cli(%W[vm us-east-a2/test-vm2 create -p #{ps.ubid}] << "c c", status: 400)).to eq(<<~END)
       ! Unexpected response status: 400
       Details: Validation failed for following fields: private_subnet_id
-        private_subnet_id: Private subnet with the given id "#{ps.ubid}" is not found in the location "eu-north-h1"
+        private_subnet_id: Private subnet with the given id "#{ps.ubid}" is not found in the location "us-east-a2"
     END
     expect(Vm.count).to eq 0
   end
@@ -112,8 +112,8 @@ RSpec.describe Clover, "cli vm create" do
 
   it "shows errors if trying to create a vm with an invalid number of arguments" do
     expect(Vm.count).to eq 0
-    expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (requires: 1, given: 0)")
-    expect(cli(%W[vm eu-north-h1/test-vm2 create c d], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (requires: 1, given: 2)")
+    expect(cli(%W[vm us-east-a2/test-vm2 create], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (requires: 1, given: 0)")
+    expect(cli(%W[vm us-east-a2/test-vm2 create c d], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (requires: 1, given: 2)")
     expect(Vm.count).to eq 0
   end
 end
