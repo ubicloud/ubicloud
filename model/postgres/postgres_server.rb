@@ -746,7 +746,7 @@ class PostgresServer < Sequel::Model
 
   def observe_archival_backlog(session)
     oldest_pending = session[:ssh_session].exec!(
-      "sudo -u postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
+      "sudo -iu postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
       version:,
     ).strip
     oldest_pending = nil if oldest_pending.empty?
