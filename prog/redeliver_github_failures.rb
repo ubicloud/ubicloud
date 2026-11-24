@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::RedeliverGithubFailures < Prog::Base
-  frame_reader :delivery_ids
-  frame_accessor :last_check_at
+  frame_accessor :delivery_ids, :last_check_at
 
   label def wait
     last_check_time = Time.new(last_check_at)
@@ -24,7 +23,13 @@ class Prog::RedeliverGithubFailures < Prog::Base
   end
 
   label def redeliver
-    delivery_ids.each { client.post("/app/hook/deliveries/#{it}/attempts") }
+    delivery_ids.each_with_index do |id, i|
+      client.post("/app/hook/deliveries/#{id}/attempts")
+    rescue Octokit::TooManyRequests
+      # Raising would roll back the frame, so save the progress and nap.
+      self.delivery_ids = delivery_ids[i..]
+      nap rand(15..60)
+    end
     pop "redelivered failures"
   end
 
