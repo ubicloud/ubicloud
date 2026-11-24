@@ -157,7 +157,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.has_workflow_job_info?
 
-    alien = vm.location.aws?
+    alien = !vm.location.metal?
     billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
@@ -186,7 +186,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     runner_family = (x64? && installation.premium_runner_enabled?) ? "premium" : label_data["family"]
-    aws_minutes_key = "aws_#{runner_family}_minutes"
+    alien_minutes_key = "#{vm.location.provider}_#{runner_family}_minutes"
     retries = 0
     begin
       begin_time = now.to_date.to_time
@@ -203,8 +203,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         today_record.amount = Sequel[:amount] + used_amount
         if alien
           tags = Sequel.pg_jsonb_op(:resource_tags)
-          aws_minutes = Sequel.function(:coalesce, tags.get_text(aws_minutes_key).cast(:integer), 0) + used_amount
-          today_record.resource_tags = tags.set([aws_minutes_key], Sequel.function(:to_jsonb, aws_minutes))
+          alien_minutes = Sequel.function(:coalesce, tags.get_text(alien_minutes_key).cast(:integer), 0) + used_amount
+          today_record.resource_tags = tags.set([alien_minutes_key], Sequel.function(:to_jsonb, alien_minutes))
         end
         today_record.save_changes(validate: false)
       else
@@ -215,7 +215,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount,
-          resource_tags: alien ? {aws_minutes_key => used_amount} : {},
+          resource_tags: alien ? {alien_minutes_key => used_amount} : {},
         )
       end
     rescue Sequel::Postgres::ExclusionConstraintViolation
@@ -642,7 +642,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
-    if vm.location.aws?
+    unless vm.location.metal?
       command << NetSsh.command(<<~COMMAND, private_ipv4:)
         echo :private_ipv4" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
       COMMAND
