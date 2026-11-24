@@ -201,9 +201,11 @@ class Prog::Vnet::CertNexus < Prog::Base
       pop "self-signed certificate destroyed"
     end
 
+    certificate = cert.cert || unfetched_certificate
+
     # the reason is chosen as "cessationOfOperation"
     begin
-      acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
+      acme_client.revoke(certificate:, reason: REVOKE_REASON) if certificate
     rescue Acme::Client::Error::AlreadyRevoked => ex
       Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::NotFound => ex
@@ -233,6 +235,15 @@ class Prog::Vnet::CertNexus < Prog::Base
     # If the order_url is set, acme_client cannot be nil, so, this is nullref safe
     if cert.order_url
       @acme_order ||= acme_client.order(url: cert.order_url)
+    end
+  end
+
+  def unfetched_certificate
+    case acme_order&.status
+    when "processing"
+      nap 10
+    when "valid"
+      acme_order.certificate
     end
   end
 

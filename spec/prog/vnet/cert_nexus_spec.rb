@@ -28,7 +28,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       authorizations << private_authorization
     end
 
-    order = instance_double(Acme::Client::Resources::Order, authorizations:, url: "test-order-url") if with_order
+    order = instance_double(Acme::Client::Resources::Order, authorizations:, url: "test-order-url", status: "pending") if with_order
 
     unless new_order
       expect(Acme::Client).to receive(:new).and_return(client)
@@ -515,8 +515,24 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert).not_to exist
     end
 
+    it "waits for the order if it is still being processed and the certificate doesn't exist" do
+      expect(setup_order).to receive(:status).and_return("processing")
+
+      expect { nx.destroy }.to nap(10)
+      expect(cert).to exist
+    end
+
+    it "revokes the certificate of a valid order if the certificate doesn't exist" do
+      order = setup_order
+      expect(order).to receive(:status).and_return("valid")
+      expect(order).to receive(:certificate).and_return("unfetched-cert")
+      expect(client).to receive(:revoke).with(certificate: "unfetched-cert", reason: "cessationOfOperation")
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+      expect(cert).not_to exist
+    end
+
     it "skips deleting the dns record if acme_order doesn't exist" do
-      expect(nx).to receive(:acme_order).and_return(nil)
       expect(cert).to exist
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
