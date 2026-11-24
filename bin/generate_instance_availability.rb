@@ -138,7 +138,8 @@ class InstanceAvailabilityGenerator
   # What a type offers in every region. Local storage is recorded only as
   # identical NVMe SSDs, [count, size_gb], whose sizes add up to the total AWS
   # reports, and storage_size_options is derived from them; EBS limits are
-  # in MB/s.
+  # in MB/s. A shared `maximum_attachments` already excludes the type's
+  # NVMe disks and its primary network interface.
   def instance_type_facts(instance_type)
     facts = {
       "vcpus" => instance_type.v_cpu_info.default_v_cpus,
@@ -156,11 +157,15 @@ class InstanceAvailabilityGenerator
       facts["storage_size_options"] = [disk.count * disk.size_in_gb]
     end
     if (ebs = instance_type.ebs_info&.ebs_optimized_info)
+      limit_type = instance_type.ebs_info.attachment_limit_type
+      fail "#{instance_type.instance_type}: EBS attachment limit is #{limit_type.inspect}, not shared or dedicated" unless %w[shared dedicated].include?(limit_type)
       facts["ebs"] = {
         "baseline_iops" => ebs.baseline_iops,
         "baseline_throughput_mbps" => ebs.baseline_throughput_in_m_bps,
         "maximum_iops" => ebs.maximum_iops,
         "maximum_throughput_mbps" => ebs.maximum_throughput_in_m_bps,
+        "maximum_attachments" => instance_type.ebs_info.maximum_ebs_attachments,
+        "attachment_limit_type" => limit_type,
       }
     end
     facts
