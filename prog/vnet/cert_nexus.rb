@@ -188,6 +188,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     when_restarted_set? do
       decr_restarted
       self.restarted += 1
+      hand_off_finalized_order
       hop_start
     end
 
@@ -236,6 +237,22 @@ class Prog::Vnet::CertNexus < Prog::Base
     if cert.order_url
       @acme_order ||= acme_client.order(url: cert.order_url)
     end
+  end
+
+  def hand_off_finalized_order
+    return unless cert.csr_key && cert.order_url
+
+    abandoned = Cert.create(
+      hostname: cert.hostname,
+      private_hostname: cert.private_hostname,
+      dns_zone_id: cert.dns_zone_id,
+      kid: cert.kid,
+      account_key: cert.account_key,
+      order_url: cert.order_url,
+    )
+    Strand.create_with_id(abandoned, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
+    abandoned.incr_destroy
+    cert.update(csr_key: nil)
   end
 
   def unfetched_certificate

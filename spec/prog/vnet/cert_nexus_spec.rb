@@ -484,6 +484,39 @@ RSpec.describe Prog::Vnet::CertNexus do
       nx.incr_restarted
       expect { nx.restart }.to hop("start")
         .and change { Semaphore.where(name: "restarted").count }.from(1).to(0)
+        .and not_change(Cert, :count)
+    end
+
+    it "does not hand off the order if it was not finalized" do
+      refresh_frame(nx, new_values: {"restarted" => 0})
+      cert.update(order_url: "test-order-url", account_key: account_key.to_der, kid: "x")
+      nx.incr_restarted
+      expect { nx.restart }.to hop("start")
+        .and not_change(Cert, :count)
+    end
+
+    it "hands a finalized order off to a cert that is destroyed" do
+      refresh_frame(nx, new_values: {"restarted" => 0})
+      cert.update(order_url: "test-order-url", account_key: account_key.to_der, kid: "x", csr_key: Clec::Cert.ec_key.to_der, private_hostname: "private.cert-hostname.test-dns-zone.com")
+      nx.incr_restarted
+      expect { nx.restart }.to hop("start")
+        .and change(Cert, :count).from(1).to(2)
+
+      expect(cert.reload.csr_key).to be_nil
+      abandoned = Cert.exclude(id: cert.id).first
+      expect(abandoned.values.slice(:hostname, :private_hostname, :dns_zone_id, :kid, :order_url, :cert)).to eq(cert.values.slice(:hostname, :private_hostname, :dns_zone_id, :kid, :order_url, :cert))
+      expect(abandoned.account_key).to eq(account_key.to_der)
+      expect(abandoned.destroy_set?).to be true
+
+      abandoned_nx = described_class.new(abandoned.strand)
+      expect { abandoned_nx.before_run }.to hop("destroy")
+      expect(Acme::Client).to receive(:new).with(hash_including(kid: "x")).and_return(client)
+      order = instance_double(Acme::Client::Resources::Order, authorizations: [], status: "valid", certificate: "unfetched-cert")
+      expect(client).to receive(:order).with(url: "test-order-url").and_return(order)
+      expect(client).to receive(:revoke).with(certificate: "unfetched-cert", reason: "cessationOfOperation")
+      expect { described_class.new(abandoned.strand.reload).destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+      expect(abandoned).not_to exist
+      expect(cert).to exist
     end
   end
 
