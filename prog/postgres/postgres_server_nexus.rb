@@ -579,13 +579,13 @@ SQL
     if (current_lsn = postgres_server.last_known_lsn)
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
         self.previous_lsn = current_lsn
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
+        register_catch_up_deadline
       end
     else
       disk_usage = postgres_server.data_disk_usage
       if disk_usage > (previous_disk_usage || 0)
         self.previous_disk_usage = disk_usage
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
+        register_catch_up_deadline
       end
     end
     nap 30
@@ -1053,6 +1053,17 @@ SQL
   # Only these return to wait_catch_up after configure.
   def catching_up_standby?
     postgres_server.standby? && postgres_server.synchronization_status != "ready"
+  end
+
+  CATCH_UP_DISK_PAGE_PERCENT = 95
+
+  def register_catch_up_deadline
+    disk_usage_percent = resource.representative_server.observed_disk_usage_percent
+    if disk_usage_percent&.>=(CATCH_UP_DISK_PAGE_PERCENT)
+      register_deadline("wait", 10 * 60, allow_extension: 2 * 60 * 60, message: "finish catching up (representative server disk #{disk_usage_percent}% full)")
+    else
+      register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60, message: "finish catching up")
+    end
   end
 
   def available?
