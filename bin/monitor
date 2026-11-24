@@ -120,6 +120,7 @@ end
 Signal.trap("INT", &do_shutdown)
 Signal.trap("TERM", &do_shutdown)
 
+Process.warmup
 runner.run
 
 # If not all threads exit within two seconds, exit 1 to indicate
