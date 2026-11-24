@@ -42,11 +42,22 @@ RSpec.describe Prog::RedeliverGithubFailures do
   end
 
   describe "#redeliver" do
+    subject(:prog) {
+      described_class.new(Strand.create(prog: "RedeliverGithubFailures", label: "redeliver", stack: [{"delivery_ids" => ["11", "21", "31"]}]))
+    }
+
     it "redelivers the given delivery ids" do
-      expect(prog).to receive(:frame).and_return({"delivery_ids" => ["11", "21"]}).at_least(:once)
       expect(app_client).to receive(:post).with("/app/hook/deliveries/11/attempts")
       expect(app_client).to receive(:post).with("/app/hook/deliveries/21/attempts")
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/31/attempts")
       expect { prog.redeliver }.to exit({"msg" => "redelivered failures"})
+    end
+
+    it "keeps the remaining delivery ids and naps when rate limited" do
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/11/attempts")
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/21/attempts").and_raise(Octokit::TooManyRequests)
+      expect { prog.redeliver }.to nap(15..60)
+      expect(prog.strand.stack.first["delivery_ids"]).to eq(["21", "31"])
     end
   end
 
