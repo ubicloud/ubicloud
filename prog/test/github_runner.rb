@@ -11,7 +11,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   BRANCH_NAME = "main"
 
   frame_reader :provider, :customer_project_id, :labels, :boot_images, :vm_host_id
-  frame_accessor :vm_pool_id, :fail_message, :test_run_id
+  frame_accessor :vm_pool_id, :fail_message, :test_run_id, :gcp_runner_labels
 
   def self.assemble(test_cases, provider: "metal", vm_host_id: nil)
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
@@ -23,6 +23,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       customer_project.set_ff_aws_alien_runners_ratio(1)
       location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
       Prog::Test::Base.ensure_aws_e2e_credential(location)
+    elsif provider == "gcp"
+      customer_project.set_ff_aws_alien_runners_ratio(1)
+      customer_project.set_ff_gcp_alien_runners_ratio(1)
+      location = Location.create_with_id(Config.github_runner_gcp_location_id, name: "gcp-europe-west3", provider: "gcp", project_id: service_project.id, display_name: "gcp-e2e", ui_name: "gcp-e2e", visible: true)
+      Prog::Test::Base.ensure_gcp_e2e_credential(location)
+      Prog::Vnet::SubnetNexus.assemble(service_project.id, name: PrivateSubnet::GCP_GITHUB_RUNNER_SUBNET_NAME, location_id: location.id, ipv4_range_size: 16, allow_only_ssh: true, id: Config.github_runner_gcp_private_subnet_id)
     end
 
     if (url = Config.e2e_cache_proxy_download_url) && !url.empty?
@@ -41,10 +47,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       created_at: Time.now - 8 * 24 * 60 * 60,
     )
 
+    # GCP takes only x64 runners of 8, 16 or 30 vCPUs.
+    size = (provider == "gcp") ? "premium-8" : "standard-2"
     labels = []
-    labels << "ubicloud-standard-2-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
-    labels << "ubicloud-standard-2-ubuntu-2404" if test_cases.any? { it["name"].include?("2404") }
-    labels << "ubicloud-standard-2-ubuntu-2604" if test_cases.any? { it["name"].include?("2604") }
+    labels << "ubicloud-#{size}-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
+    labels << "ubicloud-#{size}-ubuntu-2404" if test_cases.any? { it["name"].include?("2404") }
+    labels << "ubicloud-#{size}-ubuntu-2604" if test_cases.any? { it["name"].include?("2604") }
 
     if provider == "aws"
       labels << "ubicloud-standard-2-arm-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
@@ -61,6 +69,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
         "provider" => provider,
         "customer_project_id" => customer_project.id,
         "labels" => labels,
+        "gcp_runner_labels" => [],
         "boot_images" => boot_images,
         "vm_host_id" => vm_host_id,
       }],
@@ -68,7 +77,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def start
-    hop_trigger_test_run if provider == "aws"
+    hop_trigger_test_run unless provider == "metal"
 
     boot_images.each { vm_host.download_boot_image(it) }
     hop_wait_image_downloads
@@ -119,12 +128,17 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def check_test_run
+    record_gcp_runner_placement if provider == "gcp"
     run = client.workflow_run(repository_name, test_run_id)
     conclusion = run[:conclusion]
     if FAIL_CONCLUSIONS.include?(conclusion)
       self.fail_message = "Test run failed with conclusion: #{conclusion}"
     elsif IN_PROGRESS_CONCLUSIONS.include?(conclusion) || conclusion.nil?
       nap 15
+    end
+
+    if provider == "gcp" && !(missing = labels - gcp_runner_labels).empty?
+      self.fail_message ||= "No runner ran on GCP for #{missing.join(", ")}"
     end
 
     hop_clean_resources
@@ -167,6 +181,18 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    if (runner_subnet = PrivateSubnet[Config.github_runner_gcp_private_subnet_id])
+      runner_subnet.firewalls_dataset.destroy
+      runner_subnet.incr_destroy
+      Clog.emit("Waiting GCP runner subnet to be destroyed")
+      nap 15
+    end
+
+    if GcpVpc[location_id: Config.github_runner_gcp_location_id]
+      Clog.emit("Waiting GCP runner VPC to be destroyed")
+      nap 15
+    end
+
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
     if (project = Project[customer_project_id])
@@ -190,6 +216,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   def vm_host
     @vm_host ||= VmHost[vm_host_id]
+  end
+
+  def record_gcp_runner_placement
+    placed = GithubRunner.where(label: labels).exclude(location_id: nil).select_hash_groups(:location_id, :label)
+    self.gcp_runner_labels |= placed.delete(Config.github_runner_gcp_location_id) || []
+    self.fail_message ||= "Runners ran outside GCP for #{placed.values.flatten.uniq.join(", ")}" unless placed.empty?
   end
 
   def repository_name

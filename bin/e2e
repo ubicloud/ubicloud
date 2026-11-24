@@ -209,6 +209,10 @@ def test_gcp(options, test_cases)
   mgmt_subnets.each { wait_until(it, "wait") }
 
   tests_to_wait = []
+  if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
+    tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, provider: "gcp")
+  end
+
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << with_gcp_dual_nic { Prog::Test::PostgresResource.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4") }
   end
