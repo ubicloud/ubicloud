@@ -96,14 +96,6 @@ class Strand < Sequel::Model
     respirate_metrics.old_strand = true
   end
 
-  # simplecov:disable
-  ps_sch = if Config.development?
-    Sequel.function(:least, 5, :try)
-  # simplecov:enable
-  else
-    Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
-  end
-
   # schedule also is an optimistic concurrency control key for the nap
   # handler's compare-and-set in #unsynchronized_run, which detects a
   # mid-run wake-up only by the stored value having changed.
@@ -122,11 +114,11 @@ class Strand < Sequel::Model
 SET
   lease = (CURRENT_TIMESTAMP + CAST('120 seconds' AS interval)),
   try = (try + 1),
-  schedule = (CURRENT_TIMESTAMP + (#{DB.literal(ps_sch)} * CAST('1 second' AS interval)))
+  schedule = (CURRENT_TIMESTAMP + ((least(power(2, least(try, 20)), 600) * random()) * CAST('1 second' AS interval)))
 WHERE ((id IN (SELECT id FROM strand WHERE (id = ?) FOR NO KEY UPDATE SKIP LOCKED))
   AND (exitval IS NULL)
   AND (lease < CURRENT_TIMESTAMP))
-RETURNING *".freeze,
+RETURNING *",
       pl.arg)
   end
 
