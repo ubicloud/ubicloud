@@ -1214,6 +1214,44 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#wal_since_latest_backup_too_large?" do
+    let(:primary) { create_postgres_server(resource: postgres_resource, timeline:) }
+
+    before do
+      timeline.update(latest_backup_size_in_gib: 1, latest_backup_lsn: "1/0")
+    end
+
+    it "returns true when more WAL than the backup size was written since the backup" do
+      primary.update_last_known_lsn("1/40000001")
+      expect(postgres_resource.wal_since_latest_backup_too_large?).to be(true)
+    end
+
+    it "returns false when the WAL since the backup fits in the backup size" do
+      primary.update_last_known_lsn("1/40000000")
+      expect(postgres_resource.wal_since_latest_backup_too_large?).to be(false)
+    end
+
+    it "returns false when the current LSN is unknown" do
+      primary
+      expect(postgres_resource.wal_since_latest_backup_too_large?).to be(false)
+    end
+
+    it "returns false when the backup LSN is unknown" do
+      primary.update_last_known_lsn("9/0")
+      timeline.update(latest_backup_lsn: nil)
+      expect(postgres_resource.wal_since_latest_backup_too_large?).to be(false)
+    end
+
+    it "measures against the parent's primary for read replicas" do
+      parent_resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource: parent_resource, timeline:).update_last_known_lsn("1/40000001")
+      replica = create_postgres_resource(project:, location_id:)
+      replica.update(parent_id: parent_resource.id)
+
+      expect(replica.wal_since_latest_backup_too_large?).to be(true)
+    end
+  end
+
   it "#pg_firewall_rules returns empty array when there is no customer firewall" do
     # Set up private_subnet so customer_firewall query works (returns nil since no matching firewall)
     postgres_resource.update(private_subnet_id: private_subnet.id)
