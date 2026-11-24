@@ -51,13 +51,17 @@ end %>
     <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
     <% if @pg.upgrade_stage == "upgrade_failed" %>
-      <p>
-        Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
-      </p>
+      <% failure = @pg.upgrade_failure %>
+      <div class="mt-4" role="alert">
+        <%== part("components/flash_message",
+        messages: {"error" => failure["upgrade_error"] || "Database upgrade failed. We have reverted the database to the previous version, and it is now available again."},
+        details: failure["upgrade_error_details"] || [],
+        id_prefix: "upgrade",
+        extra_class: "") %>
+      </div>
     <% else %>
       <p>Database upgrade is in progress.</p>
-    <% end %>
-    <% upgrade_progress_rows = upgrade_progress
+      <% upgrade_progress_rows = upgrade_progress
     .map do |stage, description, database_availability_icon, stage_status_icon|
       [
         [
@@ -82,7 +86,8 @@ end %>
         { id: "upgrade-stage-#{stage}" }
       ]
     end %>
-    <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
+      <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
+    <% end %>
   <% elsif @pg.can_upgrade? %>
     <p>Your database can be upgraded to Postgres <%= @pg.version.to_i + 1 %>.</p>
 

@@ -502,6 +502,11 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def upgrade_failure
+    strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+      .get(:stack)&.first || {}
+  end
+
   def can_upgrade?
     target_version.to_i < Option::POSTGRES_VERSION_OPTIONS.map(&:to_i).max
   end
