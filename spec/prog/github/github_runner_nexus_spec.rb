@@ -2022,8 +2022,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(%({"level":"ERROR","msg":"Request failed","error_type":"r2","function_name":"UploadChunk","status_code":500}\n))
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: {"level" => "ERROR", "msg" => "Request failed", "error_type" => "r2", "function_name" => "UploadChunk", "status_code" => 500}, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
 
       nx.collect_final_telemetry
     end
@@ -2036,8 +2036,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(%({"level":"ERROR","msg":"Request failed","error_type":"r2","function_name":"UploadChunk","status_code":500}\n))
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: {"level" => "ERROR", "msg" => "Request failed", "error_type" => "r2", "function_name" => "UploadChunk", "status_code" => 500}, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -2050,37 +2050,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(%({"level":"ERROR","msg":"Request failed","error_type":"r2","function_name":"UploadChunk","status_code":500}\n))
 
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-
-      nx.collect_final_telemetry
-    end
-
-    it "Logs docker limits and cache proxy log if workflow_job is successful" do
-      runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("docker-ratelimit-source: 192.168.1.1\nx-ratelimit-limit: 100;w=21600\nratelimit-limit: 100;w=21600\nx-ratelimit-remaining: 98;w=21600\nratelimit-remaining: 98;w=21600\n")
-        TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
-        curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
-      COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
-        Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172_27_211_181:51123
-        Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172.27.211.182:51123
-        Received request - method: POST urlPath: /random_token/_apis/artifactcache/caches host: 10_0_0_1:51123
-        ReserveCache request failed with status code: 409
-        ReserveCache request failed with status code: 409
-        Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled
-        PUT request failed with status code: 500
-
-        GetCacheEntry request failed with status code: 204
-        Starting cache proxy server
-
-      LOG
-
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}}).twice
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "PUT request failed with status code: 500", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: {"level" => "ERROR", "msg" => "Request failed", "error_type" => "r2", "function_name" => "UploadChunk", "status_code" => 500}, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -2091,13 +2063,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
-        {"time":"2026-02-16T16:20:55.11602513Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"GET","url_path":"/random_token/_apis/artifactcache/cache","host":"10.67.229.168:51123"}
-        {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":204}
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(<<~LOG)
         {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":500}
-        {"time":"2026-02-16T16:20:55.146956456Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"POST","url_path":"/random_token/_apis/artifactcache/caches","host":"10.67.229.168:51123"}
         {"time":"2026-02-16T16:20:55.730648373Z","level":"WARN","msg":"Retrying request","version":"0.7.0","error_type":"r2","retry_count":1,"max_retries":3,"error":"write tcp: connection reset by peer","status_code":0}
-        {"time":"2026-02-16T16:20:55.730648373Z","level":"ERROR","msg":"Request failed","version":"0.7.0","error_type":"backend","function_name":"ReserveCache","status_code":409}
+
         invalid json line
       LOG
 
@@ -2119,7 +2088,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return("")
 
       nx.collect_final_telemetry
     end
@@ -2131,7 +2100,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(nil)
 
       nx.collect_final_telemetry
     end
@@ -2143,7 +2112,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: nil}})
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false).and_return(nil)
+
+      nx.collect_final_telemetry
+    end
+
+    it "logs a failure when the cache proxy log does not exist" do
+      runner.update(workflow_job: {"conclusion" => "success"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
+        TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
+      expect(vm.sshable).to receive(:_cmd).with(%q(sudo test -f /var/log/cacheproxy.log && sudo grep -vE -e '"level":"INFO"' -e '"error_type":"backend".*"status_code":(204|409)[,}]' /var/log/cacheproxy.log | tail -n 200), log: false)
+        .and_raise(Sshable::SshError.new("test -f", "", "", 1, nil))
+      expect(Clog).to receive(:emit).with("Failed to collect final telemetry", instance_of(GithubRunner)).and_call_original
 
       nx.collect_final_telemetry
     end
