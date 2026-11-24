@@ -371,6 +371,16 @@ RSpec.describe Prog::Vnet::CertNexus do
         expect { nx.cert_finalization }.to hop("wait_cert_finalization")
       end
     end
+
+    ["processing", "valid"].each do |status|
+      it "does not finalize again if the order is already #{status}" do
+        cert.update(csr_key: Clec::Cert.ec_key.to_der)
+        order = setup_order
+        expect(order).to receive(:status).and_return(status)
+        expect(order).not_to receive(:finalize)
+        expect { nx.cert_finalization }.to hop("wait_cert_finalization")
+      end
+    end
   end
 
   describe "#wait_cert_finalization" do

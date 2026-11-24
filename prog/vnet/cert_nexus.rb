@@ -12,6 +12,8 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   ACME_ORDER_LABELS = %w[wait_dns_update wait_dns_validation cert_finalization wait_cert_finalization].freeze
 
+  FINALIZED_ORDER_STATUSES = %w[processing valid].freeze
+
   ACME_CLIENT_OPTIONS = {
     connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
     bad_nonce_retry: 3,
@@ -151,9 +153,12 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def cert_finalization
-    names = [cert.private_hostname]
-    names.compact!
-    acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
+    unless FINALIZED_ORDER_STATUSES.include?(acme_order.status)
+      names = [cert.private_hostname]
+      names.compact!
+      acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
+    end
+
     hop_wait_cert_finalization
   end
 
