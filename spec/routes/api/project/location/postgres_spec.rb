@@ -176,7 +176,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid location" do
-        post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
+        project.set_ff_visible_locations(["latitude-fra"])
+        post "/project/#{project.ubid}/location/eu-central-a1/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
           ha_type: "sync",

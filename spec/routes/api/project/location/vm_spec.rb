@@ -180,7 +180,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
         }.to_json
 
-        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: eu-north-h1, us-east-a2"})
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: us-east-a2"})
       end
 
       it "failure with invisible location" do
@@ -190,7 +190,7 @@ RSpec.describe Clover, "vm" do
           size: "standard-2",
         }.to_json
 
-        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: eu-north-h1, us-east-a2"})
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: us-east-a2"})
       end
 
       it "success with storage size" do
@@ -449,6 +449,18 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
+      it "success in a location closed to new resources" do
+        vm.update(location_id: Location::HETZNER_HEL1_ID)
+        get "/project/#{project.ubid}/location/eu-north-h1/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["location"]).to eq("eu-north-h1")
+
+        post "/project/#{project.ubid}/location/eu-north-h1/vm/test-vm", {public_key: "ssh key"}.to_json
+
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: eu-central-h1, us-east-a2"})
+      end
+
       it "not found" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/not-exists-vm"
 
@@ -513,7 +525,7 @@ RSpec.describe Clover, "vm" do
         delete "/project/#{project.ubid}/location/us-east-a3/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
+        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
@@ -523,7 +535,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
+        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 

@@ -18,25 +18,25 @@ RSpec.describe Clover, "cli ps create" do
   end
 
   it "creates ps with -f option with id" do
-    fw = Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f")
-    Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f", name: "test-fw")
-    body = cli(%W[ps eu-north-h1/test-ps2 create -f #{fw.ubid}])
+    fw = Firewall.create(project_id: @project.id, location_id: Location::LEASEWEB_WDC02_ID)
+    Firewall.create(project_id: @project.id, location_id: Location::LEASEWEB_WDC02_ID, name: "test-fw")
+    body = cli(%W[ps us-east-a2/test-ps2 create -f #{fw.ubid}])
     expect(PrivateSubnet.count).to eq 1
     ps = PrivateSubnet.first
     expect(ps.name).to eq "test-ps2"
-    expect(ps.display_location).to eq "eu-north-h1"
+    expect(ps.display_location).to eq "us-east-a2"
     expect(ps.firewalls).to eq [fw]
     expect(body).to eq "Private subnet created with id: #{ps.ubid}\n"
   end
 
   it "creates ps with -f option with name" do
-    fw = Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f", name: "test-fw2")
-    Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f", name: "test-fw")
-    body = cli(%W[ps eu-north-h1/test-ps2 create -f test-fw2])
+    fw = Firewall.create(project_id: @project.id, location_id: Location::LEASEWEB_WDC02_ID, name: "test-fw2")
+    Firewall.create(project_id: @project.id, location_id: Location::LEASEWEB_WDC02_ID, name: "test-fw")
+    body = cli(%W[ps us-east-a2/test-ps2 create -f test-fw2])
     expect(PrivateSubnet.count).to eq 1
     ps = PrivateSubnet.first
     expect(ps.name).to eq "test-ps2"
-    expect(ps.display_location).to eq "eu-north-h1"
+    expect(ps.display_location).to eq "us-east-a2"
     expect(ps.firewalls).to eq [fw]
     expect(body).to eq "Private subnet created with id: #{ps.ubid}\n"
   end
