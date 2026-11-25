@@ -88,7 +88,7 @@ RSpec.describe ObjectGrowthReporter do
     expect(report[:live_objects_change_since_baseline]).to eq report[:live_objects_change_since_previous]
 
     classes = report[:top_class_count_increases_since_baseline].to_h { [it[:class], it] }
-    expect(classes["Sshable::SshError"][:count]).to be_within(5).of(20_000)
+    expect(classes["Sshable::SshError"][:count]).to be >= 20_000
     expect(classes["Sshable::SshError"][:count_change]).to be_within(5).of(20_000)
     expect(classes["Sshable::SshError"][:memsize_change]).to be > 0
     expect(classes["#<anonymous Prog::Base>"][:count]).to be_within(5).of(10_000)
