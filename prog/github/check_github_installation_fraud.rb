@@ -4,7 +4,7 @@ class Prog::Github::CheckGithubInstallationFraud < Prog::Base
   subject_is :github_installation
   frame_reader :account_id, :github_account_id
 
-  NEW_GITHUB_ACCOUNT_AGE = 6 * 60 * 60
+  NEW_GITHUB_ACCOUNT_AGE = 10 * 60
 
   def self.assemble(installation, account, github_account_id)
     Strand.create(
