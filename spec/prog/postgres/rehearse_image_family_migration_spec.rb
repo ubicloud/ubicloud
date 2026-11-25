@@ -180,6 +180,7 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
       refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "clean", "reindex_jobs" => {}}})
       expect { nx.migrate }.to hop("wait_converge")
       expect(fork.reload.target_image_family).to eq("ubuntu-2604")
+      expect(frame_value(nx, "old_primary_id")).to eq(fork.representative_server.id)
     end
 
     it "stops for review when the scan has no jobs" do
@@ -227,19 +228,73 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
   end
 
   describe "#wait_migrated" do
-    it "naps while the fork converges, and hops once the converge exits and its servers run the target family" do
+    let(:jobs) { {"app" => ["REINDEX INDEX a"], "shop" => ["REINDEX INDEX s"]} }
+
+    def migrating_fork
       fork = with_fork
       fork.update(target_image_family: "ubuntu-2604")
+      refresh_frame(nx, new_values: {"old_primary_id" => fork.representative_server.id, "scan_verdict" => {"msg" => "rebuild", "reindex_jobs" => jobs}})
+      fork
+    end
+
+    # Each look is a new prog, so the fork and its servers are read again.
+    def look
+      expect { described_class.new(nx.strand).wait_migrated }.to nap(5)
+      frame_value(nx, "window")
+    end
+
+    it "naps while the fork converges, and hops once the converge exits and its servers run the target family" do
+      fork = migrating_fork
       fork.representative_server.update(image_family: "ubuntu-2604")
       converge = converge_strand(fork, label: "reindex")
-      expect { nx.wait_migrated }.to nap(60)
+      look
       converge.update(exitval: {"msg" => "postgres resource is converged"})
       expect { described_class.new(nx.strand).wait_migrated }.to hop("audit_after")
     end
 
-    it "naps while the fork still runs the old family" do
-      with_fork.update(target_image_family: "ubuntu-2604")
-      expect { nx.wait_migrated }.to nap(60)
+    it "naps while the fork still runs the old family, and records nothing before the fence" do
+      migrating_fork
+      expect(look).to eq({})
+    end
+
+    it "records when it first sees the fence, the promote, each database's reindex, and the release" do
+      fork = migrating_fork
+      old = fork.representative_server
+      converge = converge_strand(fork, label: "recycle_representative_server")
+      expect(look).to eq({})
+      old.strand.update(label: "fence")
+      fenced = look
+      expect(fenced.keys).to eq(["fenced"])
+      old.strand.update(label: "wait_in_fence")
+      expect(look).to eq(fenced)
+
+      old.update(is_representative: false)
+      create_postgres_server(resource: fork).update(image_family: "ubuntu-2604")
+      converge.update(label: "prune_servers")
+      promoted = look
+      expect(promoted).to eq(fenced.merge("promoted" => promoted["promoted"]))
+      converge.update(label: "reindex", stack: [converge.stack[0].merge("reindex_step" => 0)])
+      expect(look["reindex"].size).to eq(1)
+      converge.update(stack: [converge.stack[0].merge("reindex_step" => 1)])
+      expect(look["reindex"].size).to eq(2)
+      converge.update(label: "wait_lockout_release")
+      expect(look["reindex"].size).to eq(3)
+      expect(look).not_to have_key("released")
+
+      converge.update(exitval: {"msg" => "postgres resource is converged"})
+      window = look
+      expect(window["released"]).to be_within(5).of(Time.now.to_i)
+      expect(window["reindex"]).to eq(window["reindex"].sort)
+    end
+
+    it "gives a part it missed between two looks the time of the next" do
+      fork = migrating_fork
+      fork.representative_server.update(is_representative: false)
+      create_postgres_server(resource: fork).update(image_family: "ubuntu-2604")
+      window = look
+      expect(window.keys).to eq(["fenced", "promoted", "reindex", "released"])
+      expect(window.values.flatten.uniq.size).to eq(1)
+      expect(window["reindex"].size).to eq(3)
     end
 
     it "stops for review when the reindex failed" do
@@ -320,6 +375,20 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     end
   end
 
+  describe "#downtime_seconds" do
+    it "gives the total and each part, from the times in the window" do
+      refresh_frame(nx, new_values: {"scan_verdict" => {"reindex_jobs" => {"app" => [], "shop" => []}},
+                                     "window" => {"fenced" => 100, "promoted" => 130, "reindex" => [140, 200, 260], "released" => 275}})
+      expect(nx.downtime_seconds).to eq({"total" => 175, "failover" => 30, "reindex" => 120, "databases" => {"app" => 60, "shop" => 60}, "precision" => 5})
+    end
+
+    it "is nil before the lockout is released" do
+      expect(nx.downtime_seconds).to be_nil
+      refresh_frame(nx, new_values: {"window" => {"fenced" => 100}})
+      expect(nx.downtime_seconds).to be_nil
+    end
+  end
+
   describe "#report" do
     let(:clean_phase) { {"ok" => 2, "failed" => 0, "unchecked" => 0, "seconds" => 0.5, "failures" => []} }
 
@@ -330,9 +399,11 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
                                      "results" => {"app" => {"script" => "Succeeded", "phases" => {"amcheck" => clean_phase}}}})
     end
 
-    it "passes when both audits agree and every phase succeeded" do
+    it "passes when both audits agree and every phase succeeded, and keeps the downtime" do
+      refresh_frame(nx, new_values: {"window" => {"fenced" => 100, "promoted" => 110, "reindex" => [120, 150], "released" => 160}})
       expect { nx.report }.to hop("wait_review")
       expect(frame_value(nx, "status")).to eq("passed")
+      expect(frame_value(nx, "downtime")).to eq({"total" => 60, "failover" => 10, "reindex" => 30, "databases" => {"app" => 30}, "precision" => 5})
     end
 
     it "needs review when a phase failed" do

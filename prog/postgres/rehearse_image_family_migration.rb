@@ -13,7 +13,8 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   subject_is :postgres_resource
 
   frame_reader :project_id, :target_image_family
-  frame_accessor :fork_id, :databases, :step, :results, :verdict_before, :verdict_after, :scan_verdict, :status
+  frame_accessor :fork_id, :databases, :step, :results, :verdict_before, :verdict_after, :scan_verdict, :status,
+    :old_primary_id, :window, :downtime
 
   AUDIT = Prog::Postgres::AuditResourceCollation
 
@@ -167,6 +168,14 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   # Caps the failures kept per phase and database, so the frame stays small.
   FAILURE_LIMIT = 50
 
+  # The labels of a planned failover's old primary from the start of its
+  # fence, whose CHECKPOINTs come before it locks clients out.
+  FENCE_LABELS = %w[fence wait_fence_stop wait_in_fence].freeze
+
+  # How often wait_migrated looks at the fork, so each time in the window is
+  # late by up to this.
+  POLL_SECONDS = 5
+
   def self.assemble(postgres_resource_id, project_id:, target_image_family: "ubuntu-2604")
     fail "No existing project" unless Project[project_id]
     fail "Unknown image family" unless Option::POSTGRES_IMAGE_FAMILIES.include?(target_image_family)
@@ -235,6 +244,7 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   label def migrate
     finish("fork is gone") unless fork
     finish("scan has no reindex jobs: #{scan_verdict["msg"]}") unless scan_verdict["reindex_jobs"]
+    self.old_primary_id = fork.representative_server.id
     fork.update(target_image_family:)
     hop_wait_converge
   end
@@ -259,9 +269,10 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   label def wait_migrated
     finish("fork is gone") unless fork
     finish("reindex failed") if Page.from_tag_parts("PostgresReindexFailed", fork.id)
-    if fork.needs_convergence? || !fork.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", exitval: nil).empty? ||
-        fork.representative_server.image_family != target_image_family || fork.display_state != "running"
-      nap 60
+    converge = fork.strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource", exitval: nil)
+    record_window(converge)
+    if fork.needs_convergence? || converge || fork.representative_server.image_family != target_image_family || fork.display_state != "running"
+      nap POLL_SECONDS
     end
     hop_audit_after
   end
@@ -367,10 +378,46 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
     %w[clean rebuild].include?(scan_verdict["msg"]) && scan_verdict["by_hand"].empty?
   end
 
+  # Records, as Unix times, when each part of the window in which clients
+  # cannot use the fork is first seen: the old primary's fence, the promote,
+  # the start of each database's reindex jobs and the end of the last, and
+  # the release of the lockout, when the converge exits. A part missed
+  # between two looks gets the time of the next.
+  def record_window(converge)
+    now = Time.now.to_i
+    times = (window || {}).dup
+    promoted = fork.representative_server.id != old_primary_id
+    times["fenced"] ||= now if promoted || FENCE_LABELS.include?(PostgresServer[old_primary_id].strand.label)
+    times["promoted"] ||= now if promoted
+    if promoted
+      reindex = times["reindex"] || []
+      steps = case converge&.label
+      when "reindex" then converge.stack[0]["reindex_step"].to_i + 1
+      when "wait_lockout_release", nil then scan_verdict["reindex_jobs"].size + 1
+      else 0
+      end
+      times["reindex"] = reindex + [now] * (steps - reindex.size) if steps > reindex.size
+      times["released"] ||= now unless converge
+    end
+    self.window = times unless times == window
+  end
+
+  # The seconds clients could not use the fork, in all and by part, once
+  # the lockout is released. The rest of the total is the configure and
+  # restart of the new primary around the reindex.
+  def downtime_seconds
+    return unless window&.key?("released")
+    reindex = window["reindex"]
+    {"total" => window["released"] - window["fenced"], "failover" => window["promoted"] - window["fenced"],
+     "reindex" => reindex.last - reindex.first, "databases" => scan_verdict["reindex_jobs"].keys.zip(reindex.each_cons(2).map { _2 - _1 }).to_h,
+     "precision" => POLL_SECONDS}
+  end
+
   def finish(status)
     self.status = status
+    self.downtime = downtime_seconds
     scan = scan_verdict&.except("databases", "reindex_jobs", "reindex_script")
-    summary = {resource: postgres_resource&.ubid, fork: fork&.ubid, status:, verdict_before:, verdict_after:, scan:, results:}
+    summary = {resource: postgres_resource&.ubid, fork: fork&.ubid, status:, downtime:, verdict_before:, verdict_after:, scan:, results:}
     Clog.emit("postgres image family rehearsal", {postgres_image_family_rehearsal: summary})
     hop_wait_review
   end
