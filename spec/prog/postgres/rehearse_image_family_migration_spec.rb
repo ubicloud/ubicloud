@@ -28,6 +28,10 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     fork
   end
 
+  def converge_strand(fork, label: "wait_reindex_decision", **)
+    Strand.create(parent_id: fork.strand.id, prog: "Postgres::ConvergePostgresResource", label:, stack: [{"subject_id" => fork.id}], **)
+  end
+
   def fork_sshable
     nx.fork.representative_server.vm.sshable
   end
@@ -139,12 +143,12 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
       expect(nx.strand.children.map { [it.prog, it.stack[0]["subject_id"]] }).to eq([["Postgres::AuditResourceCollation", fork.id]])
     end
 
-    it "naps while the first audit runs, then keeps its verdict and hops to migrate" do
+    it "naps while the first audit runs, then keeps its verdict and hops to the scan" do
       with_fork
       expect { nx.audit_before }.to hop("wait_audit_before")
       expect { nx.wait_audit_before }.to nap(120)
       nx.strand.children.first.update(exitval: {"msg" => "clean"}, lease: Time.now - 10)
-      expect { nx.wait_audit_before }.to hop("migrate")
+      expect { nx.wait_audit_before }.to hop("scan")
       expect(frame_value(nx, "verdict_before")).to eq({"msg" => "clean"})
       expect(nx.strand.children_dataset.count).to eq(0)
     end
@@ -158,11 +162,32 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     end
   end
 
+  describe "scan" do
+    it "buds a scan of every table of the fork, then keeps its verdict and hops to migrate" do
+      fork = with_fork
+      expect { nx.scan }.to hop("wait_scan")
+      expect(nx.strand.children.map { [it.prog, it.stack[0]] }).to eq([["Postgres::ScanResourceCtype", {"subject_id" => fork.id, "max_table_gib" => nil}]])
+      expect { nx.wait_scan }.to nap(60)
+      nx.strand.children.first.update(exitval: {"msg" => "clean", "reindex_jobs" => {"app" => ["SELECT 1"]}}, lease: Time.now - 10)
+      expect { nx.wait_scan }.to hop("migrate")
+      expect(frame_value(nx, "scan_verdict")).to eq({"msg" => "clean", "reindex_jobs" => {"app" => ["SELECT 1"]}})
+    end
+  end
+
   describe "#migrate" do
     it "sets the fork's target family" do
       fork = with_fork
-      expect { nx.migrate }.to hop("wait_migrated")
+      refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "clean", "reindex_jobs" => {}}})
+      expect { nx.migrate }.to hop("wait_converge")
       expect(fork.reload.target_image_family).to eq("ubuntu-2604")
+    end
+
+    it "stops for review when the scan has no jobs" do
+      fork = with_fork
+      refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "unreachable"}})
+      expect { nx.migrate }.to hop("wait_review")
+      expect(frame_value(nx, "status")).to eq("scan has no reindex jobs: unreachable")
+      expect(fork.reload.target_image_family).to eq("ubuntu-2204")
     end
 
     it "stops for review when the fork is gone" do
@@ -171,13 +196,57 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     end
   end
 
+  describe "#wait_converge" do
+    let(:jobs) { {"app" => ["REINDEX INDEX users_email_key"]} }
+
+    before { refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "rebuild", "reindex_jobs" => jobs}}) }
+
+    it "writes the jobs into the frame of the fork's converge at its gate, and wakes it" do
+      converge = converge_strand(with_fork, schedule: Time.now + 60)
+      expect { nx.wait_converge }.to hop("wait_migrated")
+      converge.reload
+      expect(Prog::Postgres::ConvergePostgresResource.new(converge).reindex_jobs).to eq(jobs)
+      expect(converge.stack[0]["subject_id"]).to eq(nx.fork.id)
+      expect(converge.schedule).to be <= Time.now
+    end
+
+    it "naps while the converge has not reached its gate, or runs" do
+      fork = with_fork
+      expect { nx.wait_converge }.to nap(30)
+      converge = converge_strand(fork, label: "wait_servers_to_be_ready")
+      expect { nx.wait_converge }.to nap(30)
+      converge.update(label: "wait_reindex_decision", lease: Time.now + 60)
+      expect { nx.wait_converge }.to nap(30)
+      expect(converge.reload.stack[0]).not_to have_key("reindex_jobs")
+    end
+
+    it "stops for review when the fork is gone" do
+      refresh_frame(nx, new_values: {"fork_id" => PostgresResource.generate_uuid})
+      expect { nx.wait_converge }.to hop("wait_review")
+    end
+  end
+
   describe "#wait_migrated" do
-    it "naps while the fork converges, and hops once its servers run the target family" do
+    it "naps while the fork converges, and hops once the converge exits and its servers run the target family" do
       fork = with_fork
       fork.update(target_image_family: "ubuntu-2604")
-      expect { nx.wait_migrated }.to nap(60)
       fork.representative_server.update(image_family: "ubuntu-2604")
+      converge = converge_strand(fork, label: "reindex")
+      expect { nx.wait_migrated }.to nap(60)
+      converge.update(exitval: {"msg" => "postgres resource is converged"})
       expect { described_class.new(nx.strand).wait_migrated }.to hop("audit_after")
+    end
+
+    it "naps while the fork still runs the old family" do
+      with_fork.update(target_image_family: "ubuntu-2604")
+      expect { nx.wait_migrated }.to nap(60)
+    end
+
+    it "stops for review when the reindex failed" do
+      fork = with_fork
+      Prog::PageNexus.assemble("reindex failed", ["PostgresReindexFailed", fork.id], fork.ubid, resource_id: fork.id)
+      expect { nx.wait_migrated }.to hop("wait_review")
+      expect(frame_value(nx, "status")).to eq("reindex failed")
     end
 
     it "stops for review when the fork is gone" do
@@ -257,6 +326,7 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
     before do
       with_fork
       refresh_frame(nx, new_values: {"verdict_before" => {"msg" => "ctype_review", "actions" => ["scan"]}, "verdict_after" => {"msg" => "ctype_review", "actions" => ["scan"]},
+                                     "scan_verdict" => {"msg" => "rebuild", "by_hand" => [], "reindex_jobs" => {"app" => ["REINDEX INDEX i"]}},
                                      "results" => {"app" => {"script" => "Succeeded", "phases" => {"amcheck" => clean_phase}}}})
     end
 
@@ -291,6 +361,24 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
 
     it "needs review when the audit asks for a blocker or a manual review" do
       refresh_frame(nx, new_values: {"verdict_before" => {"msg" => "flagged", "actions" => ["blocker"]}, "verdict_after" => {"msg" => "flagged", "actions" => ["blocker"]}})
+      expect { nx.report }.to hop("wait_review")
+      expect(frame_value(nx, "status")).to eq("review needed")
+    end
+
+    it "needs review when the scan could not scan a table or resolve an object" do
+      refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "review", "by_hand" => []}})
+      expect { nx.report }.to hop("wait_review")
+      expect(frame_value(nx, "status")).to eq("review needed")
+    end
+
+    it "needs review when the scan lists objects for work by hand" do
+      refresh_frame(nx, new_values: {"scan_verdict" => {"msg" => "rebuild", "by_hand" => ["app: stored_column: t.c"]}})
+      expect { nx.report }.to hop("wait_review")
+      expect(frame_value(nx, "status")).to eq("review needed")
+    end
+
+    it "needs review when the scan is missing" do
+      refresh_frame(nx, new_values: {"scan_verdict" => nil})
       expect { nx.report }.to hop("wait_review")
       expect(frame_value(nx, "status")).to eq("review needed")
     end

@@ -3,15 +3,17 @@
 require "csv"
 
 # Rehearses an image family migration of a Postgres resource on a private
-# fork. It forks the resource into an internal project, audits the fork, moves
-# it to the target family, then checks the objects at risk in every database.
-# It ends in wait_review with the results in the frame and the Clog line, and
-# leaves the fork for an operator to review and destroy.
+# fork. It forks the resource into an internal project, audits and scans the
+# fork, and moves it to the target family with the scan's reindex jobs, as
+# the real migration does. Then it checks the objects at risk in every
+# database, which shows whether the jobs rebuilt all of them. It ends in
+# wait_review with the results in the frame and the Clog line, and leaves the
+# fork for an operator to review and destroy.
 class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   subject_is :postgres_resource
 
   frame_reader :project_id, :target_image_family
-  frame_accessor :fork_id, :databases, :step, :results, :verdict_before, :verdict_after, :status
+  frame_accessor :fork_id, :databases, :step, :results, :verdict_before, :verdict_after, :scan_verdict, :status
 
   AUDIT = Prog::Postgres::AuditResourceCollation
 
@@ -196,18 +198,51 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   end
 
   label def wait_audit_before
-    reap(:migrate, nap: 120, reaper: ->(child) { self.verdict_before = child.exitval })
+    reap(:scan, nap: 120, reaper: ->(child) { self.verdict_before = child.exitval })
+  end
+
+  # Nothing else reads the fork, so the scan reads every table, however
+  # large.
+  label def scan
+    bud Prog::Postgres::ScanResourceCtype, {"subject_id" => fork_id, "max_table_gib" => nil}
+    hop_wait_scan
+  end
+
+  label def wait_scan
+    reap(:migrate, nap: 60, reaper: ->(child) { self.scan_verdict = child.exitval })
   end
 
   label def migrate
     finish("fork is gone") unless fork
+    finish("scan has no reindex jobs: #{scan_verdict["msg"]}") unless scan_verdict["reindex_jobs"]
     fork.update(target_image_family:)
+    hop_wait_converge
+  end
+
+  # The fork's converge naps at its gate until its frame has the jobs. One
+  # UPDATE writes them only while no respirate thread holds the strand, which
+  # reloads the stack when it takes the lease, so the write cannot be lost.
+  label def wait_converge
+    finish("fork is gone") unless fork
+    written = fork.strand.children_dataset
+      .where(prog: "Postgres::ConvergePostgresResource", label: "wait_reindex_decision")
+      .where { lease < Sequel::CURRENT_TIMESTAMP }
+      .update(stack: Sequel.pg_jsonb_op(:stack).set(%w[0 reindex_jobs], Sequel.pg_jsonb_wrap(scan_verdict["reindex_jobs"])),
+        schedule: Sequel::CURRENT_TIMESTAMP)
+    nap 30 if written.zero?
     hop_wait_migrated
   end
 
+  # The converge rebuilds the indexes after the failover, so the migration
+  # ends when it exits. A failed rebuild pages and leaves the fork locked
+  # out, for the operator.
   label def wait_migrated
     finish("fork is gone") unless fork
-    nap 60 if fork.needs_convergence? || fork.representative_server.image_family != target_image_family || fork.display_state != "running"
+    finish("reindex failed") if Page.from_tag_parts("PostgresReindexFailed", fork.id)
+    if fork.needs_convergence? || !fork.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", exitval: nil).empty? ||
+        fork.representative_server.image_family != target_image_family || fork.display_state != "running"
+      nap 60
+    end
     hop_audit_after
   end
 
@@ -247,7 +282,7 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   end
 
   label def report
-    passed = audit_passed? && results.each_value.all? do |database|
+    passed = audit_passed? && scan_passed? && results.each_value.all? do |database|
       database["script"] == "Succeeded" && database["phases"].each_value.all? { it["failed"].zero? }
     end
     finish(passed ? "passed" : "review needed")
@@ -305,9 +340,17 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
       verdict_before.slice("msg", "actions") == verdict_after.slice("msg", "actions")
   end
 
+  # The scan must have scanned every table and found every object it lists
+  # to be one that a job rebuilds.
+  def scan_passed?
+    return false unless scan_verdict
+    %w[clean rebuild].include?(scan_verdict["msg"]) && scan_verdict["by_hand"].empty?
+  end
+
   def finish(status)
     self.status = status
-    summary = {resource: postgres_resource&.ubid, fork: fork&.ubid, status:, verdict_before:, verdict_after:, results:}
+    scan = scan_verdict&.except("databases", "reindex_jobs", "reindex_script")
+    summary = {resource: postgres_resource&.ubid, fork: fork&.ubid, status:, verdict_before:, verdict_after:, scan:, results:}
     Clog.emit("postgres image family rehearsal", {postgres_image_family_rehearsal: summary})
     hop_wait_review
   end
