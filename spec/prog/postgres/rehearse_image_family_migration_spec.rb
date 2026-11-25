@@ -440,6 +440,18 @@ RSpec.describe Prog::Postgres::RehearseImageFamilyMigration do
         [["rh_t.rh_check", false, "2 rows do not match"]], [["rh_t.g", false, "2 rows do not match"]], [["rh_part_eu", false, "1 rows do not match"]],
       ])
     end
+
+    it "records each collation version, and one that the library no longer gives as failed" do
+      DB.run("CREATE COLLATION rh_old (provider = icu, locale = 'und', version = '0')")
+      actual = DB.get(Sequel.function(:pg_collation_actual_version, Sequel.cast("rh_old", :regcollation)))
+      DB.run(described_class::SETUP_SQL)
+      DB.run(described_class::VERSIONS_SQL)
+      rows = DB[Sequel[:ubi_collation_rehearsal][:result]].where(phase: "version").select_map([:object, :ok, :detail])
+      stale, current = rows.partition { it[0] == "collation rh_old" }
+      expect(stale).to eq([["collation rh_old", false, "0 recorded, #{actual} in the library"]])
+      expect(current.map { it.drop(1) }.uniq).to eq([[true, nil]])
+      expect(current.map(&:first)).to include("collation \"und-x-icu\"")
+    end
   end
 
   describe "#wait_review" do

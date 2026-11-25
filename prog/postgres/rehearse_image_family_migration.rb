@@ -130,11 +130,31 @@ class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
   # The psql script run in each database, through the daemonizer because
   # amcheck can outlast a strand lease. A setup error stops it, as nothing
   # after it can work; the checks record their own failures.
+  # Records each collation version that the library gives, as the jobs end
+  # by refreshing them: those of the database's collations, of its default,
+  # and of the templates, as CREATE DATABASE fails on a template with a
+  # mismatch. A version left behind means a warning on every connection.
+  VERSIONS_SQL = <<~SQL
+    INSERT INTO ubi_collation_rehearsal.result (phase, object, ok, detail, finished_at)
+    SELECT 'version', 'collation ' || oid::regcollation, ok, CASE WHEN NOT ok THEN format('%s recorded, %s in the library', recorded, actual) END, clock_timestamp()
+    FROM (
+      SELECT oid, collversion, pg_collation_actual_version(oid), collversion IS NOT DISTINCT FROM pg_collation_actual_version(oid)
+      FROM pg_collation WHERE collversion IS NOT NULL
+    ) c(oid, recorded, actual, ok)
+    UNION ALL
+    SELECT 'version', 'database ' || datname, ok, CASE WHEN NOT ok THEN format('%s recorded, %s in the library', recorded, actual) END, clock_timestamp()
+    FROM (
+      SELECT datname, datcollversion, pg_database_collation_actual_version(oid), datcollversion IS NOT DISTINCT FROM pg_database_collation_actual_version(oid)
+      FROM pg_database WHERE datcollversion IS NOT NULL AND (datname = current_database() OR datistemplate)
+    ) d(datname, recorded, actual, ok);
+  SQL
+
   SCRIPT = <<~SQL.freeze
     \\set ON_ERROR_STOP on
     #{SETUP_SQL}
     #{AMCHECK_SQL}
     #{ROW_CHECKS_SQL}
+    #{VERSIONS_SQL}
   SQL
 
   DATABASES_SQL = "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"
