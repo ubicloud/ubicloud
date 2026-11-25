@@ -84,6 +84,12 @@ RSpec.describe BillingInfo do
       expect(billing_info.validate_vat).to be_nil
     end
 
+    it "returns nil if request is rate limited" do
+      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "MS_MAX_CONCURRENT_REQ"}.to_json)
+      expect(billing_info).to receive(:stripe_data).and_return({"country" => "NL", "tax_id" => "123123"}).at_least(:once)
+      expect(billing_info.validate_vat).to be_nil
+    end
+
     it "converts country code to VAT code for Greece" do
       stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/EL/vat/123123").to_return(status: 200, body: {userError: "VALID"}.to_json)
       expect(billing_info).to receive(:stripe_data).and_return({"country" => "GR", "tax_id" => "123123"}).at_least(:once)
@@ -91,9 +97,9 @@ RSpec.describe BillingInfo do
     end
 
     it "fails if unexpected error code received" do
-      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "MS_MAX_CONCURRENT_REQ"}.to_json)
+      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "OTHER_ERROR"}.to_json)
       expect(billing_info).to receive(:stripe_data).and_return({"country" => "NL", "tax_id" => "123123"}).at_least(:once)
-      expect { billing_info.validate_vat }.to raise_error("Unexpected response from VAT service: MS_MAX_CONCURRENT_REQ")
+      expect { billing_info.validate_vat }.to raise_error("Unexpected response from VAT service: OTHER_ERROR")
     end
   end
 end
