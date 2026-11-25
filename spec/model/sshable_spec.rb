@@ -581,7 +581,7 @@ LOCK
 
           expect(chan2).to receive(:on_request).with("exit-signal") do |&blk|
             buf = instance_double(Net::SSH::Buffer)
-            expect(buf).to receive(:read_long).and_return(exit_signal)
+            expect(buf).to receive(:read_string).and_return(exit_signal)
             blk.call(nil, buf)
           end
           expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), stdout)
@@ -640,7 +640,7 @@ LOCK
     end
 
     it "raises an SshError with a non-zero exit status" do
-      simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
+      simulate(cmd: "exit 1", exit_status: 1, exit_signal: nil, stderr: "", stdout: "")
       expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }
         .to raise_error(Sshable::SshError, "command exited with an error: exit 1")
         .and change { ssh_command_count("failure") }.by(1)
@@ -654,7 +654,7 @@ LOCK
 
     it "logs a failing command when log: :on_error" do
       expect(Clog).to receive(:emit).with("ssh cmd execution", instance_of(Hash))
-      simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
+      simulate(cmd: "exit 1", exit_status: 1, exit_signal: nil, stderr: "", stdout: "")
       expect { sa.cmd("exit 1", log: :on_error, timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError
     end
 
@@ -663,6 +663,14 @@ LOCK
       expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }
         .to raise_error(Sshable::SshTimeout, "command timed out: exit 1")
         .and change { ssh_command_count("timeout") }.by(1)
+    end
+
+    it "records a command killed by a signal as signal rather than timeout" do
+      simulate(cmd: "sleep 10", exit_status: nil, exit_signal: "KILL", stderr: "", stdout: "")
+      expect { sa.cmd("sleep 10", timeout: nil, _skip_command_checking: true) }
+        .to raise_error(Sshable::SshTimeout, "command killed by signal KILL: sleep 10") { expect(it.exit_signal).to eq("KILL") }
+        .and change { ssh_command_count("signal") }.by(1)
+        .and not_change { ssh_command_count("timeout") }
     end
 
     it "supports custom timeout" do

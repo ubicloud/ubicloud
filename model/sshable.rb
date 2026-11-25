@@ -58,7 +58,7 @@ class Sshable < Sequel::Model
     private
 
     def message_prefix
-      "command timed out: "
+      exit_signal ? "command killed by signal #{exit_signal}: " : "command timed out: "
     end
   end
 
@@ -139,7 +139,7 @@ class Sshable < Sequel::Model
           end
 
           ch.on_request("exit-signal") do |ch2, data|
-            exit_signal = data.read_long
+            exit_signal = data.read_string
           end
           ch.send_data stdin
           ch.eof!
@@ -163,6 +163,8 @@ class Sshable < Sequel::Model
       "success"
     elsif exit_code
       "failure"
+    elsif exit_signal
+      "signal"
     else
       "timeout"
     end
