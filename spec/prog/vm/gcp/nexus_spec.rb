@@ -274,14 +274,16 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.stack.first.dig("create_vm", "name")).to eq("op-12345")
     end
 
-    it "creates a dual-NIC instance with the management NIC as nic0 and the user NIC as Dynamic NIC" do
+    it "creates a dual-NIC instance with only the management NIC as nic0" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic, static_ip: "35.192.0.1")
       mgmt_nic = add_management_nic
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
 
       expect(compute_client).to receive(:insert) do |args|
-        mgmt_ni, user_ni = args[:instance_resource].network_interfaces.to_a
+        nis = args[:instance_resource].network_interfaces.to_a
+        expect(nis.size).to eq(1)
+        mgmt_ni = nis.first
         expect(mgmt_ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-vpc-#{mgmt_nic.private_subnet.ubid}")
         expect(mgmt_ni.subnetwork).to eq("projects/test-gcp-project/regions/us-central1/subnetworks/ubicloud-#{mgmt_nic.private_subnet.ubid}")
         expect(mgmt_ni.network_i_p).to eq(mgmt_nic.private_ipv4.network.to_s)
@@ -289,21 +291,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(mgmt_ni.access_configs.map(&:nat_i_p)).to eq(["35.212.0.9"])
         expect(mgmt_ni.ipv6_access_configs).to be_empty
         expect(mgmt_ni.parent_nic_name).to eq("")
-
-        expect(user_ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
-        expect(user_ni.network_i_p).to eq(nic.private_ipv4.network.to_s)
-        expect(user_ni.parent_nic_name).to eq("")
-        expect(user_ni.vlan).to eq(2)
-        expect(user_ni.stack_type).to eq("IPV4_IPV6")
-        expect(user_ni.access_configs.map(&:nat_i_p)).to eq(["35.192.0.1"])
-        expect(user_ni.ipv6_access_configs.map(&:type)).to eq(["DIRECT_IPV6"])
+        expect(mgmt_ni.vlan).to eq(0)
 
         user_data = args[:instance_resource].metadata.items.find { it.key == "user-data" }.value
-        netplan = GcpDualNicNetplan.new(
-          mgmt_ip: mgmt_nic.private_ipv4.network.to_s, mgmt_gateway: "100.64.0.1",
-          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s, mgmt_ipv6: false,
-        )
-        expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))["runcmd"]).to eq([netplan.script])
+        expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))).not_to have_key("runcmd")
         instance_double(Gapic::GenericLRO::Operation, name: "op-dual")
       end
 
@@ -313,23 +304,15 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "gives nic0 an external IPv6 address and no IPv4 NAT when the management NIC has no static IPv4" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic, static_ip: "35.192.0.1")
-      mgmt_nic = add_management_nic(static_ip: nil)
+      add_management_nic(static_ip: nil)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
 
       expect(compute_client).to receive(:insert) do |args|
-        mgmt_ni, user_ni = args[:instance_resource].network_interfaces.to_a
-        expect(mgmt_ni.stack_type).to eq("IPV4_IPV6")
-        expect(mgmt_ni.access_configs).to be_empty
-        expect(mgmt_ni.ipv6_access_configs.map { [it.type, it.network_tier] }).to eq([["DIRECT_IPV6", "PREMIUM"]])
-        expect(user_ni.access_configs.map(&:nat_i_p)).to eq(["35.192.0.1"])
-        expect(user_ni.ipv6_access_configs.map(&:type)).to eq(["DIRECT_IPV6"])
-
-        user_data = args[:instance_resource].metadata.items.find { it.key == "user-data" }.value
-        netplan = GcpDualNicNetplan.new(
-          mgmt_ip: mgmt_nic.private_ipv4.network.to_s, mgmt_gateway: "100.64.0.1",
-          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s, mgmt_ipv6: true,
-        )
-        expect(YAML.safe_load(user_data.delete_prefix("#cloud-config\n"))["runcmd"]).to eq([netplan.script])
+        nis = args[:instance_resource].network_interfaces.to_a
+        expect(nis.size).to eq(1)
+        expect(nis.first.stack_type).to eq("IPV4_IPV6")
+        expect(nis.first.access_configs).to be_empty
+        expect(nis.first.ipv6_access_configs.map { [it.type, it.network_tier] }).to eq([["DIRECT_IPV6", "PREMIUM"]])
         instance_double(Gapic::GenericLRO::Operation, name: "op-dual-ipv6")
       end
 
@@ -1089,6 +1072,15 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to hop("wait_instance_created")
     end
 
+    it "hops to add_user_nic without waiting for RUNNING when the VM has a management NIC" do
+      add_management_nic
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
+      expect(zone_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
+
+      expect { nx.wait_create_op }.to hop("add_user_nic")
+      expect(st.stack.first).not_to have_key("create_vm")
+    end
+
     it "raises if the GCE operation fails" do
       refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
 
@@ -1412,14 +1404,23 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(vm.sshable.reload.host).to eq("2600:1900:4000:7::")
       end
 
-      it "fails when the instance has no Dynamic NIC" do
+      it "hops to add_user_nic before recording any address when the instance has no Dynamic NIC yet" do
         instance = Google::Cloud::Compute::V1::Instance.new(
           status: "RUNNING",
-          network_interfaces: [Google::Cloud::Compute::V1::NetworkInterface.new(name: "nic0")],
+          network_interfaces: [
+            Google::Cloud::Compute::V1::NetworkInterface.new(
+              name: "nic0",
+              access_configs: [Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.212.0.9")],
+            ),
+          ],
         )
         expect(compute_client).to receive(:get).and_return(instance)
 
-        expect { nx.wait_instance_created }.to raise_error(RuntimeError, "GCE instance testvm has no NIC nic0.2")
+        expect { nx.wait_instance_created }.to hop("add_user_nic")
+        expect(vm.reload.assigned_vm_address).to be_nil
+        expect(vm.allocated_at).to be_nil
+        expect(vm.sshable.reload.host).not_to eq("35.212.0.9")
+        expect(vm.update_firewall_rules_set?).to be(false)
       end
 
       it "fails when the instance has no nic0" do
@@ -1431,6 +1432,82 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
         expect { nx.wait_instance_created }.to raise_error(RuntimeError, "GCE instance testvm has no NIC nic0")
       end
+    end
+  end
+
+  describe "#add_user_nic" do
+    before do
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+      ensure_nic_gcp_resource(nic, static_ip: "35.192.0.1")
+      add_management_nic
+    end
+
+    it "adds the user NIC as a VLAN Dynamic NIC on nic0 and hops to wait_add_user_nic_op" do
+      expect(compute_client).to receive(:add_network_interface) do |args|
+        expect(args.slice(:project, :zone, :instance)).to eq(project: "test-gcp-project", zone: "us-central1-a", instance: "testvm")
+        ni = args[:network_interface_resource]
+        expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
+        expect(ni.subnetwork).to eq("projects/test-gcp-project/regions/us-central1/subnetworks/ubicloud-#{nic.private_subnet.ubid}")
+        expect(ni.network_i_p).to eq(nic.private_ipv4.network.to_s)
+        expect(ni.parent_nic_name).to eq("nic0")
+        expect(ni.vlan).to eq(2)
+        expect(ni.stack_type).to eq("IPV4_IPV6")
+        expect(ni.access_configs.map(&:nat_i_p)).to eq(["35.192.0.1"])
+        expect(ni.ipv6_access_configs.map(&:type)).to eq(["DIRECT_IPV6"])
+        instance_double(Gapic::GenericLRO::Operation, name: "op-add-nic")
+      end
+
+      expect { nx.add_user_nic }.to hop("wait_add_user_nic_op")
+      expect(st.stack.first["add_user_nic"]).to eq("name" => "op-add-nic", "scope" => "zone", "scope_value" => "us-central1-a")
+    end
+
+    it "hops to wait_instance_created when the Dynamic NIC already exists" do
+      expect(compute_client).to receive(:add_network_interface).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+      expect { nx.add_user_nic }.to hop("wait_instance_created")
+    end
+  end
+
+  describe "#wait_add_user_nic_op" do
+    before do
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a", "add_user_nic" => {"name" => "op-add-nic", "scope" => "zone", "scope_value" => "us-central1-a"}})
+    end
+
+    def add_nic_op(**)
+      expect(zone_ops_client).to receive(:get).with(project: "test-gcp-project", zone: "us-central1-a", operation: "op-add-nic")
+        .and_return(Google::Cloud::Compute::V1::Operation.new(**))
+    end
+
+    def add_nic_error(code, message)
+      Google::Cloud::Compute::V1::Error.new(errors: [Google::Cloud::Compute::V1::Errors.new(code:, message:)])
+    end
+
+    it "naps while the operation is running" do
+      add_nic_op(status: :RUNNING)
+      expect { nx.wait_add_user_nic_op }.to nap(5)
+    end
+
+    it "clears the operation and hops to wait_instance_created when it is done" do
+      add_nic_op(status: :DONE)
+      expect { nx.wait_add_user_nic_op }.to hop("wait_instance_created")
+      expect(st.stack.first).not_to have_key("add_user_nic")
+    end
+
+    it "reallocates only the user NIC IP and retries when GCE reports it in use" do
+      mgmt_nic = add_management_nic
+      old_user_ip = nic.private_ipv4.network.to_s
+      old_mgmt_ip = mgmt_nic.private_ipv4.network.to_s
+      add_nic_op(status: :DONE, error: add_nic_error("IP_IN_USE_BY_ANOTHER_RESOURCE", "IP '#{old_mgmt_ip}' is already being used by another resource."))
+      expect(Clog).to receive(:emit).with("GCE VM private IP is in use by another resource, reallocating", hash_including(:nic_ip_reallocated)).and_call_original
+
+      expect { nx.wait_add_user_nic_op }.to hop("add_user_nic")
+      expect(nic.reload.private_ipv4.network.to_s).not_to eq(old_user_ip)
+      expect(mgmt_nic.reload.private_ipv4.network.to_s).to eq(old_mgmt_ip)
+      expect(st.stack.first).not_to have_key("add_user_nic")
+    end
+
+    it "raises on any other operation error" do
+      add_nic_op(status: :DONE, error: add_nic_error("QUOTA_EXCEEDED", "Quota exceeded"))
+      expect { nx.wait_add_user_nic_op }.to raise_error(RuntimeError, "GCE user NIC attachment failed: Quota exceeded (code: QUOTA_EXCEEDED)")
     end
 
     it "schedules the allocation waiting strand when the vm is allocated" do
@@ -1600,9 +1677,18 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     context "with a management NIC" do
       let(:route_command) { "ip -o route show default; ip -o -6 route show default" }
+      let(:mgmt_nic) { add_management_nic }
+
+      let(:netplan_command) {
+        netplan = GcpDualNicNetplan.new(
+          mgmt_ip: mgmt_nic.private_ipv4.network.to_s, mgmt_gateway: "100.64.0.1",
+          user_ip: nic.private_ipv4.network.to_s, user_gateway: nic.private_subnet.net4.nth(1).to_s, mgmt_ipv6: false,
+        )
+        NetSsh.command("sudo systemd-run --quiet --collect bash -c :script", script: netplan.script)
+      }
 
       before do
-        add_management_nic
+        mgmt_nic
         vm.sshable.update(host: "35.212.0.9")
         expect(Socket).to receive(:tcp).with("35.212.0.9", 22, connect_timeout: 1)
         expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
@@ -1615,28 +1701,47 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect { nx.wait_sshable }.to hop("create_billing_record")
       end
 
-      it "naps while a default route still uses nic0" do
+      it "starts the detached netplan script once and naps while a default route still uses nic0" do
         expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_return(
-          "default via 100.64.0.1 dev enp0s2 proto dhcp src 100.64.0.5 metric 100 \ndefault via fe80::1 dev user-nic proto static metric 1024 pref medium\n",
+          "default via 100.64.0.1 dev enp0s2 proto dhcp src 100.64.0.5 metric 100 \n",
         )
+        expect(nx.vm.sshable).to receive(:_cmd).with(netplan_command).once.and_return("")
         expect { nx.wait_sshable }.to nap(5)
+        expect(st.stack.first["user_nic_netplan_started"]).to be(true)
       end
 
-      it "naps while the IPv6 default route is missing" do
-        expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_return(
-          "default via 10.0.0.1 dev user-nic proto static \n",
-        )
+      it "retries starting the netplan script when SSH drops while starting it" do
+        expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_return("default via 100.64.0.1 dev enp0s2 \n")
+        expect(nx.vm.sshable).to receive(:_cmd).with(netplan_command).and_raise(Errno::ECONNRESET)
         expect { nx.wait_sshable }.to nap(5)
+        expect(st.stack.first).not_to have_key("user_nic_netplan_started")
       end
 
-      it "naps while SSH does not work yet" do
-        expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_raise(Errno::ECONNREFUSED)
-        expect { nx.wait_sshable }.to nap(5)
+      it "raises when starting the netplan script fails" do
+        expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_return("default via 100.64.0.1 dev enp0s2 \n")
+        expect(nx.vm.sshable).to receive(:_cmd).with(netplan_command).and_raise(Sshable::SshError.new("systemd-run", "", "sudo: not found", 1, nil))
+        expect { nx.wait_sshable }.to raise_error(Sshable::SshError, /command exited with an error/)
       end
 
-      it "naps while the route command times out" do
-        expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_raise(Sshable::SshTimeout.new(route_command, "", "", nil, nil))
-        expect { nx.wait_sshable }.to nap(5)
+      context "when the netplan script has been started" do
+        before { refresh_frame(nx, new_values: {"user_nic_netplan_started" => true}) }
+
+        it "naps without restarting it while the IPv6 default route is missing" do
+          expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_return(
+            "default via 10.0.0.1 dev user-nic proto static \n",
+          )
+          expect { nx.wait_sshable }.to nap(5)
+        end
+
+        it "naps while SSH does not work" do
+          expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_raise(Errno::ECONNREFUSED)
+          expect { nx.wait_sshable }.to nap(5)
+        end
+
+        it "naps while the route command times out" do
+          expect(nx.vm.sshable).to receive(:_cmd).with(route_command, timeout: 5).and_raise(Sshable::SshTimeout.new(route_command, "", "", nil, nil))
+          expect { nx.wait_sshable }.to nap(5)
+        end
       end
 
       it "raises when the route command fails" do
