@@ -225,20 +225,16 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
 
     result = {"msg" => msg, "rebuild_databases" => rebuild, "large_databases" => large, "failed_databases" => failed,
               "refresh_databases" => refresh, "unresolved_databases" => unresolved, "databases" => results}
-    if (script = reindex_script)
-      result["reindex_script"] = script
-    end
+    jobs, by_hand = reindex_work
+    result["reindex_jobs"] = jobs unless jobs.empty?
+    result["reindex_script"] = reindex_script(jobs, by_hand) unless jobs.empty? && by_hand.empty?
     Clog.emit("postgres ctype scan", {postgres_ctype_scan: result.merge("resource" => postgres_resource.ubid)})
     pop result
   end
 
-  # A console script that rebuilds the indexes of the tables to rebuild, to
-  # run on the new primary after the move: one daemonizer unit per database,
-  # one psql -c per index, as REINDEX CONCURRENTLY cannot run in a
-  # transaction block. Other objects are listed as comments, for work by
-  # hand. Names come from the customer, so each goes in through inspect, and
-  # the units are numbered, as a database name need not be a valid unit name.
-  def reindex_script
+  # The jobs for ConvergePostgresResource's reindex_jobs, as SQL statements by
+  # database, and the other objects, for work by hand.
+  def reindex_work
     jobs = {}
     by_hand = []
     results.each do |database, result|
@@ -247,8 +243,14 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
       jobs[database] = indexes.map { |_, name| "REINDEX INDEX CONCURRENTLY #{name}" }.uniq unless indexes.empty?
       by_hand.concat(others.map { |kind, name| "#{database}: #{kind}: #{name}" })
     end
-    return if jobs.empty? && by_hand.empty?
+    [jobs, by_hand]
+  end
 
+  # A console script that runs the jobs by hand, one daemonizer unit per
+  # database, with the other objects as comments. Names come from the
+  # customer, so each goes in through inspect, and the units are numbered, as
+  # a database name need not be a valid unit name.
+  def reindex_script(jobs, by_hand)
     script = <<~RUBY
       pg = udec(#{postgres_resource.ubid.inspect})
       sshable = pg.representative_server.vm.sshable

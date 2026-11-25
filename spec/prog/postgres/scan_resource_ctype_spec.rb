@@ -268,6 +268,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
     end
 
     let(:users) { {"relation" => "users", "objects" => ["citext: users_email_key"]} }
+    let(:users_jobs) { {"app" => ["REINDEX INDEX CONCURRENTLY users_email_key"]} }
     let(:users_script) { script(['  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key"],']) }
 
     it "pops clean, with no reindex script, when every table is safe" do
@@ -289,10 +290,11 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
         '  "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"],',
       ], ["# By hand, not indexes:\n", %(#   "app: stored_column: posts.body_tsv"\n)])
       expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app", "shop"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
+        "reindex_jobs" => {"app" => ["REINDEX INDEX CONCURRENTLY users_email_key", "REINDEX INDEX CONCURRENTLY users_name_trgm", "REINDEX INDEX CONCURRENTLY posts_lower_idx"], "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"]},
         "reindex_script" => expected_script})
     end
 
-    it "pops a script with only comments when no object to rebuild is an index" do
+    it "pops a script with only comments, and no jobs, when no object to rebuild is an index" do
       results = {"app" => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["check_constraint: t.t_check"]}])}
       expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
         "reindex_script" => script([""], ["# By hand, not indexes:\n", %(#   "app: check_constraint: t.t_check"\n)])})
@@ -303,10 +305,12 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       index = %("Odd ""i\#{dx}"")
       column = %(t."a\nsystem('x')")
       results = {database => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["pg_trgm: #{index}", "stored_column: #{column}"]}])}
-      script = catch(:prog_return) { report_with(results) }.exitval["reindex_script"]
+      verdict = catch(:prog_return) { report_with(results) }.exitval
+      script = verdict["reindex_script"]
       expect { RubyVM::InstructionSequence.compile(script) }.not_to raise_error
       jobs = eval(script[/^jobs = \{.*?^\}$/m].delete_prefix("jobs = "))  # rubocop:disable Security/Eval
       expect(jobs).to eq(database => ["REINDEX INDEX CONCURRENTLY #{index}"])
+      expect(verdict["reindex_jobs"]).to eq(jobs)
       expect(script.lines.last).to eq("#   #{"#{database}: stored_column: #{column}".inspect}\n")
       expect(script.lines.count { it.start_with?("#") }).to eq(2)
     end
@@ -314,13 +318,13 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
     it "pops fork_scan when a table is over the size limit, before rebuild" do
       results = {"app" => empty_result.merge("rebuild" => [users]), "postgres" => empty_result.merge("large" => [{"relation" => "events"}])}
       expect { report_with(results) }.to exit({"msg" => "fork_scan", "rebuild_databases" => ["app"], "large_databases" => ["postgres"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
-        "reindex_script" => users_script})
+        "reindex_jobs" => users_jobs, "reindex_script" => users_script})
     end
 
     it "pops review when a scan failed or an object is unresolved, before rebuild" do
       results = {"app" => empty_result.merge("rebuild" => [users], "unresolved" => ["partition_key: parted"]), "postgres" => empty_result.merge("failed" => [{"error" => "boom"}])}
       expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results,
-        "reindex_script" => users_script})
+        "reindex_jobs" => users_jobs, "reindex_script" => users_script})
     end
   end
 
