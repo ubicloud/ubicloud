@@ -123,6 +123,13 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("wal_keep_size" => "512MB")
     end
 
+    it "asks for the lockout pg_hba.conf while the server holds the lockout" do
+      expect(postgres_server.configure_hash[:lockout]).to be false
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      postgres_server.incr_hold_lockout
+      expect(postgres_server.reload.configure_hash[:lockout]).to be true
+    end
+
     it "sets configs that are specific to PITR-by-time restore" do
       postgres_server.update(timeline_access: "fetch")
       resource.update(restore_target: Time.now)
@@ -505,6 +512,18 @@ RSpec.describe PostgresServer do
       expect(standby).to receive(:incr_switch_timeline_on_promote)
       expect(standby).to receive(:incr_planned_take_over)
       expect(postgres_server.trigger_failover(mode: "planned", switch_timeline: true)).to be true
+    end
+
+    it "holds the standby in lockout when lockout is set" do
+      standby = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby-lockout").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+      Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
+      expect(postgres_server).to receive(:failover_target).with(mode: "planned").and_return(standby)
+      expect(postgres_server.trigger_failover(mode: "planned", lockout: true)).to be true
+      expect(standby.hold_lockout_set?).to be true
+      expect(standby.planned_take_over_set?).to be true
     end
   end
 
