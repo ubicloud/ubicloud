@@ -14,6 +14,13 @@ class KubernetesBuildNodeImage
     net.ipv4.ip_forward=1
   CONF
 
+  NETWORKD_CONF = <<~CONF
+    [Network]
+    ManageForeignRoutingPolicyRules=no
+    ManageForeignRoutes=no
+    ManageForeignNextHops=no
+  CONF
+
   def initialize(argv)
     fail "expected a single argument, a kubernetes version like v1.35, got #{argv.length}" unless argv.length == 1
     fail "expected a kubernetes version like v1.35, got #{argv[0].inspect}" unless VERSION_PATTERN.match?(argv[0])
@@ -29,6 +36,8 @@ class KubernetesBuildNodeImage
     ENV["DEBIAN_FRONTEND"] = "noninteractive"
 
     r "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null", stdin: SYSCTL_CONF
+    r "mkdir -p /etc/systemd/networkd.conf.d"
+    r "tee /etc/systemd/networkd.conf.d/90-clover-keep-foreign.conf > /dev/null", stdin: NETWORKD_CONF
 
     r "apt-get update"
     r "apt-get full-upgrade -y"
@@ -50,6 +59,5 @@ class KubernetesBuildNodeImage
     r "kubernetes/bin/install-prometheus"
 
     r "apt-mark hold kubelet kubeadm kubectl"
-    r "systemctl disable unattended-upgrades"
   end
 end
