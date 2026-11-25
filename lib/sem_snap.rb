@@ -20,8 +20,10 @@ class SemSnap
 
   def use
     yield self
+  rescue Sequel::DatabaseError => ex
+    raise
   ensure
-    apply
+    apply unless ex
   end
 
   def set_at(name)
