@@ -181,7 +181,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       vm.sshable.d_clean("restart_victoria_metrics")
       pop "victoria_metrics server is restarted"
     when "Failed", "NotStarted"
-      vm.sshable.d_run("restart_victoria_metrics", "/home/ubi/victoria_metrics/bin/restart")
+      vm.sshable.d_run("restart_victoria_metrics", "systemctl", "restart", "victoria_metrics", "vmauth")
     end
     nap 1
   end

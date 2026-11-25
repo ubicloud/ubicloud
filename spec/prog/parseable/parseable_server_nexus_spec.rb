@@ -272,7 +272,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       nx.incr_restart
       expect(sshable).to receive(:d_check).with("restart_parseable").and_return("Succeeded", "NotStarted")
       expect(sshable).to receive(:d_clean).with("restart_parseable")
-      expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_parseable", "systemctl", "restart", "parseable")
 
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
     end
@@ -315,7 +315,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(nx.parseable_server).to receive(:client).and_return(client)
       expect(client).to receive(:healthy?).and_return(false)
       expect(sshable).to receive(:d_check).with("restart_parseable").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_parseable", "systemctl", "restart", "parseable")
       expect { nx.unavailable }.to nap(5)
     end
 
@@ -336,7 +336,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(client).to receive(:healthy?).and_return(false)
       expect(sshable).to receive(:d_check).with("restart_parseable").and_return("Succeeded", "NotStarted")
       expect(sshable).to receive(:d_clean).with("restart_parseable")
-      expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_parseable", "systemctl", "restart", "parseable")
       expect { nx.unavailable }.to nap(5)
       expect(Semaphore.where(strand_id: nx.strand.id, name: "restart").count).to eq(0)
     end
@@ -359,7 +359,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
   describe "#daemonized_restart" do
     it "runs restart_parseable when NotStarted" do
       expect(sshable).to receive(:d_check).with("restart_parseable").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_parseable", "systemctl", "restart", "parseable")
       expect(nx.daemonized_restart).to be false
     end
 
