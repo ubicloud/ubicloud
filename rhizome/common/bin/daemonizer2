@@ -31,17 +31,16 @@ end
 
 def clean(name)
   state = get_state(name)
-  begin
-    case state
-    when "InProgress", "Unknown"
-      fail "Cleanup is only allowed when the service is in a Succeeded, Failed, or NotStarted state"
-    when "Succeeded"
-      r "sudo", "systemctl", "stop", "#{name}.service"
-    when "Failed"
-      r "sudo", "systemctl", "reset-failed", "#{name}.service"
-    end
-  ensure
-    [stdin_path(name), "#{stdin_path(name)}.tmp"].each { |path| rm_if_exists(path) }
+  if %w[InProgress Unknown].include?(state)
+    fail "Cleanup is only allowed when the service is in a Succeeded, Failed, or NotStarted state"
+  end
+
+  [stdin_path(name), "#{stdin_path(name)}.tmp"].each { |path| rm_if_exists(path) }
+  case state
+  when "Succeeded"
+    r "sudo", "systemctl", "stop", "#{name}.service"
+  when "Failed"
+    r "sudo", "systemctl", "reset-failed", "#{name}.service"
   end
 end
 
@@ -67,8 +66,7 @@ when "stop"
   stop(name)
 when "run"
   command_parts = ARGV[2..]
-  state = get_state(name)
-  clean(name) if %w[Succeeded Failed].freeze.include?(state)
+  clean(name)
 
   dir = Dir.pwd
   stdin = $stdin.read.strip
