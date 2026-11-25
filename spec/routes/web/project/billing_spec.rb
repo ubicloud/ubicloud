@@ -598,6 +598,20 @@ RSpec.describe Clover, "billing" do
         expect(find_by_id("invoice-total").text).to eq "€%0.02f" % (content["cost"] * 0.5)
       end
 
+      it "right-aligns the usage and amount headers" do
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        billing_record(Time.utc(2023, 6), nil)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(find("th", text: "Resource")[:class]).to include("text-left")
+        expect(find("th", text: "Description")[:class]).to include("text-left")
+        expect(find("th", text: "Usage")[:class]).to include("text-right")
+        expect(find("th", text: "Usage")[:class]).not_to include("text-left")
+        expect(find("th", text: "Amount")[:class]).to include("text-right")
+        expect(find("th", text: "Amount")[:class]).not_to include("text-left")
+      end
+
       it "shows a named resource discount and credit on the per-item line" do
         expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))

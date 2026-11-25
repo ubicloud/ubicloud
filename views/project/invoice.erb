@@ -26,7 +26,7 @@
   <!-- Invoice Card -->
   <%== part(
       "components/table_card",
-      headers: ["Resource", "Description", "Usage", "Amount"],
+      headers: ["Resource", "Description", ["Usage", {align: "right"}], ["Amount", {align: "right"}]],
       rows: @invoice_data.items.map do |item|
          usage_html = "<div>#{item.usage}</div>"
          amount_html = "<div>#{item.cost_humanized}</div>"
