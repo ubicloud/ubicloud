@@ -391,8 +391,10 @@ class PostgresServer < Sequel::Model
       .reject { it.is_representative }
       .select { it.strand.label == "wait" }
 
-    if mode == "planned"
-      candidates = candidates.reject { it.needs_recycling? }
+    candidates = if mode == "planned"
+      candidates.reject { it.needs_recycling? }
+    else
+      candidates.select { it.image_family == image_family }
     end
 
     if mode == "planned" && !read_replica?
