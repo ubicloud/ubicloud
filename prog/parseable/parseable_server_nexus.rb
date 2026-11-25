@@ -88,7 +88,7 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
       volume = vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).first
       device_path = volume.device_path
       vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat/parseable ext4 defaults 0 0", device_path:)
-      vm.sshable.cmd("sudo mount :device_path /dat/parseable", device_path:)
+      vm.sshable.cmd("mountpoint -q /dat/parseable || sudo mount :device_path /dat/parseable", device_path:)
       vm.sshable.cmd("sudo chown -R parseable:parseable /dat/parseable")
 
       hop_configure

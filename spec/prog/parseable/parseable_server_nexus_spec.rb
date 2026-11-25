@@ -163,7 +163,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(sshable).to receive(:d_check).with("format_parseable_disk").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat/parseable")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab #{path} /dat/parseable ext4 defaults 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount #{path} /dat/parseable")
+      expect(sshable).to receive(:_cmd).with("mountpoint -q /dat/parseable || sudo mount #{path} /dat/parseable")
       expect(sshable).to receive(:_cmd).with("sudo chown -R parseable:parseable /dat/parseable")
       expect { nx.mount_data_disk }.to hop("configure")
     end
