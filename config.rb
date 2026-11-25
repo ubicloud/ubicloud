@@ -188,6 +188,9 @@ module Config
   override :object_growth_report_interval, 0, int
   override :object_growth_report_top, 20, int
 
+  # Puma
+  override :puma_worker_refresh_deadline, 80, float
+
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string
 
