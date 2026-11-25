@@ -222,7 +222,7 @@ RSpec.describe Project do
       expect(project.projected_invoice(now:).subtotal).to eq((vm.vcpus * 1440 * rate["unit_price"]).round(3))
     end
 
-    it "does not project usage billed by amount" do
+    it "projects usage billed by amount proportionally after seven days" do
       rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
       BillingRecord.create(
         project_id: project.id,
@@ -233,9 +233,66 @@ RSpec.describe Project do
         amount: 100,
       )
 
+      expected_cost = (100 * 30.0 / 14 * rate["unit_price"]).round(3)
       projected = project.projected_invoice(now:)
+      expect(projected.subtotal).to eq(expected_cost)
+      expect(projected.amount_billed_usage).to eq(expected_cost)
+    end
+
+    it "does not scale usage billed by amount before seven full days" do
+      rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: GithubRunner.generate_uuid,
+        resource_name: "runner",
+        span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+        billing_rate_id: rate["id"],
+        amount: 100,
+      )
+
+      projected = project.projected_invoice(now: Time.utc(2026, 11, 7, 23, 59, 59))
       expect(projected.subtotal).to eq((100 * rate["unit_price"]).round(3))
-      expect(projected.amount_billed_usage).to eq((100 * rate["unit_price"]).round(3))
+    end
+
+    it "applies discounts and credits to scaled usage billed by amount" do
+      rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: GithubRunner.generate_uuid,
+        resource_name: "runner",
+        span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+        billing_rate_id: rate["id"],
+        amount: 4000,
+      )
+      ResourceDiscount.create(project_id: project.id, discount_percent: 20, active_from: month_start, name: "Launch Discount")
+      ResourceCredit.create(project_id: project.id, amount: 5, active_from: month_start, name: "Trial Credit")
+
+      subtotal = (4000 * 30.0 / 14 * rate["unit_price"]).round(3)
+      discount = (subtotal * 0.2).round(3)
+      projected = project.projected_invoice(now:)
+
+      expect(projected.subtotal).to eq(subtotal)
+      expect(projected.content["discounts"]).to eq([{"name" => "Launch Discount", "amount" => discount}])
+      expect(projected.content["credits"]).to include({"name" => "GitHub Runner Credit", "amount" => 2.5}, {"name" => "Trial Credit", "amount" => 5.0})
+      expect(projected.cost).to eq((subtotal - discount - 2.5 - 5).round(3))
+    end
+
+    it "projects inference tokens proportionally" do
+      rate = BillingRate.from_resource_properties("InferenceTokens", "test-model2", "global", false, BILLING_RATE_ACTIVE_AT)
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: InferenceEndpoint.generate_uuid,
+        resource_name: "inference",
+        span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+        billing_rate_id: rate["id"],
+        amount: 10_000_000,
+      )
+
+      projected = project.projected_invoice(now:)
+      scaled_amount = 10_000_000 * 30.0 / 14
+      expect(projected.content["resources"].first["line_items"].first["amount"]).to be_within(0.01).of(scaled_amount)
+      expect(projected.subtotal).to eq((scaled_amount * rate["unit_price"]).round(3))
+      expect(projected.content["free_inference_tokens_credit"]).to eq(0.1)
     end
 
     it "only includes usage from the current month when the previous invoice is missing" do

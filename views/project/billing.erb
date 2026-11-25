@@ -1,8 +1,15 @@
 <% @page_title = "Project Billing"
 
 if (billing_info = @project.billing_info)
-  @invoices = @project.invoices.prepend(@project.current_invoice(billing_info:))
-  @projected_invoice = @project.projected_invoice(billing_info:)
+  now = Time.now.utc
+  @invoices = @project.invoices.prepend(@project.current_invoice(end_time: now, billing_info:))
+  @projected_invoice = @project.projected_invoice(now:, billing_info:)
+  if (@usage_chart = BillingUsage.new(@project, now:).series)
+    @enable_echarts = true
+    last_invoice = @invoices[1]
+    @usage_chart[:last_month] = last_invoice.subtotal if last_invoice&.end_time == Time.utc(now.year, now.month)
+    @usage_chart[:estimated_bill] = @projected_invoice.cost
+  end
 end
 
 @usage_alerts = @project.usage_alerts_dataset.eager(:user).all
@@ -67,6 +74,15 @@ end
         <% end %>
       </dl>
     </div>
+
+    <% if @usage_chart %>
+      <!-- Usage chart -->
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+        <div class="px-4 py-5 sm:p-6">
+          <div id="billing-usage-chart" class="h-80 w-full" data-usage-chart="<%= JSON.generate(@usage_chart) %>"></div>
+        </div>
+      </div>
+    <% end %>
 
     <!-- Billing Info Update Card -->
     <% stripe_data = billing_info.stripe_data %>

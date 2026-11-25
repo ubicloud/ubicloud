@@ -1,4 +1,4 @@
-<%# locals: (rows:, projected_through:, amount_billed_usage:) %>
+<%# locals: (rows:, projected_through:, amount_billed_usage:, amount_billed_projected:) %>
 <div class="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-2">
   <div></div>
   <div class="text-xs font-semibold text-gray-500">To date</div>
@@ -14,6 +14,13 @@
   <% end %>
 
   <p class="col-span-3 mt-1 text-xs text-gray-500">
-    Projected through <%= projected_through %> if resources running now keep running.<% if amount_billed_usage > 0 %> Includes <%= money(amount_billed_usage) %> of usage-based charges so far (runner minutes, inference tokens). Further usage adds to this.<% end %>
+    Projected through <%= projected_through %> if resources running now keep running.
+    <% if amount_billed_usage > 0 %>
+      <% if amount_billed_projected %>
+        Runner minutes and inference tokens are projected from this month's usage so far.
+      <% else %>
+        Includes <%= money(amount_billed_usage) %> of usage-based charges so far (runner minutes, inference tokens). Further usage adds to this.
+      <% end %>
+    <% end %>
   </p>
 </div>

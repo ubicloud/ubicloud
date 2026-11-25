@@ -6,6 +6,7 @@ $(function () {
   setupFormOptionUpdates();
   setupPlayground();
   setupMetricsCharts();
+  setupBillingUsageChart();
   setupPgConfigCard();
   setupStructuredDataCard();
   setupLogDestinationForm();
@@ -674,6 +675,225 @@ const colorPalette = [
     class: 'orange-500',
   }
 ];
+
+function setupBillingUsageChart() {
+  const chartElement = document.querySelector('#billing-usage-chart');
+  if (!chartElement) {
+    return;
+  }
+
+  const data = JSON.parse(chartElement.dataset.usageChart);
+  const chart = echarts.init(chartElement);
+  const day = 24 * 3600 * 1000;
+  const totalColor = '#1f2937';
+  const mutedColor = '#6b7280';
+  const serviceStyles = {
+    'Compute': {color: '#5470c6', marker: 'bg-[#5470c6]'},
+    'PostgreSQL': {color: '#3ba272', marker: 'bg-[#3ba272]'},
+    'Kubernetes': {color: '#fac858', marker: 'bg-[#fac858]'},
+    'GitHub Runners': {color: '#ee6666', marker: 'bg-[#ee6666]'},
+    'AI Inference': {color: '#73c0de', marker: 'bg-[#73c0de]'},
+    'Machine Images': {color: '#fc8452', marker: 'bg-[#fc8452]'}
+  };
+  const monthName = new Date(data.month_start_ms).toLocaleDateString('en-US', {month: 'long', timeZone: 'UTC'});
+  const shortMonth = new Date(data.month_start_ms).toLocaleDateString('en-US', {month: 'short', timeZone: 'UTC'});
+  const money = (value) => `$${Number(value).toFixed(2)}`;
+  const dayNumber = (timestamp) => (timestamp >= data.month_end_ms) ? data.last_day : new Date(timestamp).getUTCDate();
+  const lastActual = data.actual[data.actual.length - 1];
+  const lastProjected = data.projected[data.projected.length - 1];
+  const nowMs = lastActual[0];
+  const nearMonthStart = nowMs - data.month_start_ms < 0.15 * (data.month_end_ms - data.month_start_ms);
+  const dateLabel = (timestamp) => {
+    if (timestamp === nowMs) {
+      return 'Today';
+    }
+    if (timestamp === data.month_start_ms) {
+      return `Start of ${monthName}`;
+    }
+    return `Through ${monthName} ${new Date(timestamp - day).getUTCDate()}`;
+  };
+  const paceName = `Average pace since ${shortMonth} 1`;
+  const showPace = lastActual[1] > 0 && nowMs > data.month_start_ms;
+  const weekTicks = [1, 8, 15, 22, 29].filter((tick) => tick <= data.last_day).map((tick) => data.month_start_ms + (tick - 1) * day);
+  const pointLabel = (caption, value, align = 'right') => ({
+    formatter: `{muted|${caption}}\n{strong|${money(value)}}`,
+    position: 'top',
+    align,
+    distance: 6,
+    rich: {
+      muted: {color: mutedColor, fontSize: 11, align},
+      strong: {color: '#111827', fontSize: 13, fontWeight: 'bold', align}
+    }
+  });
+
+  const serviceSeries = data.services.flatMap((name) => {
+    const {color} = serviceStyles[name];
+    return [
+      {
+        name,
+        type: 'line',
+        stack: 'actual',
+        data: data.service_points[name].actual,
+        showSymbol: false,
+        lineStyle: {width: 1, color},
+        itemStyle: {color},
+        areaStyle: {color, opacity: 0.55},
+        emphasis: {disabled: true}
+      },
+      {
+        name,
+        type: 'line',
+        stack: 'projected',
+        data: data.service_points[name].projected,
+        showSymbol: false,
+        lineStyle: {width: 1, color, type: 'dashed', opacity: 0.6},
+        itemStyle: {color},
+        areaStyle: {color, opacity: 0.18},
+        emphasis: {disabled: true}
+      }
+    ];
+  });
+
+  const paceSeries = showPace ? [{
+    name: paceName,
+    type: 'line',
+    data: [[data.month_start_ms, 0], [nowMs, lastActual[1]]],
+    symbol: 'none',
+    silent: true,
+    z: 9,
+    lineStyle: {width: 2, type: 'dotted', color: totalColor, opacity: 0.6},
+    itemStyle: {color: totalColor},
+    emphasis: {disabled: true}
+  }] : [];
+
+  const lastMonthSeries = (data.last_month == null) ? [] : [{
+    type: 'line',
+    data: [[data.month_start_ms, data.last_month]],
+    showSymbol: false,
+    silent: true,
+    lineStyle: {opacity: 0},
+    tooltip: {show: false}
+  }];
+
+  const totalSeries = [
+    {
+      name: 'Total',
+      type: 'line',
+      data: data.actual,
+      showSymbol: false,
+      lineStyle: {width: 2, color: totalColor},
+      itemStyle: {color: totalColor},
+      z: 10,
+      markLine: (data.last_month == null) ? undefined : {
+        silent: true,
+        symbol: 'none',
+        lineStyle: {type: 'solid', color: '#9ca3af', width: 1},
+        label: {formatter: `Last month ${money(data.last_month)}`, position: 'insideStartTop', color: mutedColor, fontSize: 11},
+        data: [{yAxis: data.last_month}]
+      },
+      markPoint: {
+        symbol: 'circle',
+        symbolSize: 9,
+        itemStyle: {color: totalColor, borderColor: '#fff', borderWidth: 2},
+        label: pointLabel('Today', lastActual[1], nearMonthStart ? 'left' : 'right'),
+        data: [{coord: lastActual}]
+      }
+    },
+    {
+      name: 'Total',
+      type: 'line',
+      data: data.projected,
+      showSymbol: false,
+      lineStyle: {width: 2, color: totalColor, type: 'dashed', opacity: 0.6},
+      itemStyle: {color: totalColor},
+      z: 10,
+      markArea: {
+        silent: true,
+        itemStyle: {color: 'rgba(148, 163, 184, 0.08)'},
+        data: [[{xAxis: nowMs}, {xAxis: data.month_end_ms}]]
+      },
+      markPoint: {
+        symbol: 'circle',
+        symbolSize: 7,
+        itemStyle: {color: mutedColor},
+        label: {...pointLabel(`${shortMonth} ${data.last_day}`, lastProjected[1]), show: data.month_end_ms - nowMs > 2 * day},
+        data: [{coord: lastProjected}]
+      }
+    }
+  ];
+
+  chart.setOption({
+    title: {
+      right: 0,
+      top: 0,
+      text: `{muted|Estimated bill}  {strong|${money(data.estimated_bill)}}`,
+      textStyle: {
+        rich: {
+          muted: {color: mutedColor, fontSize: 13},
+          strong: {color: '#111827', fontSize: 15, fontWeight: 'bold'}
+        }
+      }
+    },
+    legend: {
+      top: 0,
+      left: 0,
+      width: '75%',
+      selectedMode: false,
+      itemWidth: 18,
+      itemHeight: 8,
+      textStyle: {color: '#4b5563', fontSize: 12},
+      data: [...data.services.map((name) => ({name, icon: 'roundRect'})), ...(showPace ? [{name: paceName, itemStyle: {opacity: 0}}] : [])]
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: function (params) {
+        const timestamp = params[0].value[0];
+        const seen = new Set();
+        let rows = '';
+        let total = null;
+        params.forEach((item) => {
+          if (item.value[1] == null || seen.has(item.seriesName) || item.seriesName === paceName) {
+            return;
+          }
+          seen.add(item.seriesName);
+          if (item.seriesName === 'Total') {
+            total = item.value[1];
+          } else {
+            rows += `<span class="mr-1 inline-block h-2 w-2 rounded-full ${serviceStyles[item.seriesName].marker}"></span>${item.seriesName}: ${money(item.value[1])}<br/>`;
+          }
+        });
+        const projected = (timestamp > nowMs) ? ' <span class="text-gray-500">(projected)</span>' : '';
+        return `<strong>${dateLabel(timestamp)}</strong>${projected}<br/>${rows}<strong>Total: ${money(total)}</strong>`;
+      }
+    },
+    xAxis: {
+      type: 'time',
+      min: data.month_start_ms,
+      max: data.month_end_ms,
+      splitLine: {show: false},
+      axisTick: {customValues: weekTicks},
+      axisLabel: {customValues: weekTicks, formatter: (timestamp) => `${shortMonth} ${dayNumber(timestamp)}`, color: mutedColor},
+      axisLine: {lineStyle: {color: '#d1d5db'}}
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      boundaryGap: [0, '20%'],
+      splitLine: {lineStyle: {color: '#f3f4f6'}},
+      axisLabel: {formatter: (value) => `$${value}`, color: mutedColor}
+    },
+    grid: {
+      containLabel: true,
+      left: 0,
+      right: 16,
+      top: 72,
+      bottom: 0
+    },
+    series: [...serviceSeries, ...paceSeries, ...totalSeries, ...lastMonthSeries]
+  });
+
+  window.addEventListener('resize', debounce(chart.resize, 300));
+}
 
 function setupMetricsCharts() {
   const metricsContainer = document.querySelector('#metrics-container');
