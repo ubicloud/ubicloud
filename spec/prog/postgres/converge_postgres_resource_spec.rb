@@ -456,6 +456,39 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
+    context "when the image family changes" do
+      before do
+        create_server(is_representative: true)
+        pg.update(target_image_family: "ubuntu-2604")
+        create_server.update(image_family: "ubuntu-2604")
+      end
+
+      it "hops to wait_reindex_decision with a deadline until the reindex is decided" do
+        expect { nx.wait_for_maintenance_window }.to hop("wait_reindex_decision")
+        expect(strand.stack.first["deadline_target"]).to eq("wait_for_maintenance_window")
+        expect(Time.new(strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 24 * 60 * 60)
+      end
+
+      it "hops to recycle_representative_server once reindex jobs are set" do
+        refresh_frame(nx, new_values: {"reindex_jobs" => {"app" => ["REINDEX INDEX CONCURRENTLY i"]}})
+        expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+      end
+
+      it "hops to recycle_representative_server if the reindex is skipped" do
+        pg.incr_skip_family_reindex
+        expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+      end
+    end
+
+    it "does not wait for a reindex decision while upgrading the version" do
+      server = create_server(is_representative: true, version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      pg.update(target_image_family: "ubuntu-2604")
+      expect(nx.postgres_resource.representative_server).to receive(:unsynced_logical_failover_slots).with(candidate).and_return([])
+      expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
+      expect(server.fence_set?(cached: false)).to be true
+    end
+
     it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
       server = create_server(is_representative: true, version: "16")
       candidate = create_server(version: "16", upgrade_candidate: true)
@@ -597,6 +630,36 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
   end
 
+  describe "#wait_reindex_decision" do
+    let(:candidate) { create_server.update(image_family: "ubuntu-2604") }
+
+    before do
+      strand.update(label: "wait_reindex_decision")
+      create_server(is_representative: true)
+      pg.update(target_image_family: "ubuntu-2604")
+      candidate
+    end
+
+    it "naps until the reindex is decided" do
+      expect { nx.wait_reindex_decision }.to nap(60)
+    end
+
+    it "hops to wait_for_maintenance_window once reindex jobs are set" do
+      refresh_frame(nx, new_values: {"reindex_jobs" => {"app" => ["REINDEX INDEX CONCURRENTLY i"]}})
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+
+    it "hops to wait_for_maintenance_window if the reindex is skipped" do
+      pg.incr_skip_family_reindex
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+
+    it "hops to wait_for_maintenance_window if the family candidate is gone" do
+      candidate.update(image_family: "ubuntu-2204")
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+  end
+
   describe "#wait_upgrade_candidate" do
     before do
       strand.update(label: "wait_upgrade_candidate")
@@ -701,6 +764,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       pg.incr_bypass_maintenance_window
       expect { nx.prune_servers }.to hop("wait_prune_servers")
       expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
+    end
+
+    it "clears the one-shot family reindex skip" do
+      create_server(is_representative: true)
+      pg.incr_skip_family_reindex
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
+      expect(pg.skip_family_reindex_set?(cached: false)).to be false
     end
 
     it "prefers servers on intended type when picking which standbys to keep" do

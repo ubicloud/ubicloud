@@ -54,6 +54,12 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def wait_for_maintenance_window
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
 
+    if postgres_resource.version == postgres_resource.target_version && postgres_resource.family_migration_in_progress? &&
+        reindex_jobs.nil? && !postgres_resource.skip_family_reindex_set?
+      register_deadline("wait_for_maintenance_window", 24 * 60 * 60, message: "get a reindex decision for the image family migration")
+      hop_wait_reindex_decision
+    end
+
     window_applies = !postgres_resource.project.get_ff_postgres_maintenance_window_platform_only || postgres_resource.pending_platform_maintenance?
     if window_applies && !postgres_resource.in_maintenance_window? && !postgres_resource.bypass_maintenance_window_set?
       ignore_window = begin
@@ -113,6 +119,14 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_upgrade_candidate
   end
 
+  label def wait_reindex_decision
+    if reindex_jobs || postgres_resource.skip_family_reindex_set? || !postgres_resource.has_enough_fresh_servers?
+      hop_wait_for_maintenance_window
+    end
+
+    nap 60
+  end
+
   label def wait_upgrade_candidate
     nap 5 if upgrade_candidate.restart_set? || upgrade_candidate.strand.label != "wait"
 
@@ -151,6 +165,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def prune_servers
     postgres_resource.decr_storage_auto_scale_not_cancellable
     postgres_resource.decr_bypass_maintenance_window
+    postgres_resource.decr_skip_family_reindex
 
     # Below we only keep servers that does not need recycling or are of the
     # current version. If there are more such servers than required, we prefer
