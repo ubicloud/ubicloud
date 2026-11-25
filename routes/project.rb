@@ -16,15 +16,19 @@ class Clover
           fail CloverError.new(400, "InvalidRequest", "Project limit exceeded. You can create up to #{current_account.project_limit} projects. Contact support@ubicloud.com if you need more.")
         end
 
+        notice = nil
         DB.transaction do
           @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
-          if (limit = current_account.default_spending_cutoff_limit)
+          notice = if (limit = current_account.default_spending_cutoff_limit)
             UsageAlert.create(project_id: @project.id, user_id: current_account_id, name: "-", cutoff: true, limit:)
+            "Project created with a $#{limit} spending cutoff"
+          else
+            "Project created"
           end
           audit_log(@project, "create")
         end
 
-        flash["notice"] = "Project created"
+        flash["notice"] = notice
         r.redirect @project
       end
     end
