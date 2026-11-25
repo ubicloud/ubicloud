@@ -14,6 +14,7 @@ object_growth_reporter = nil
 before_fork do
   Sequel::DATABASES.each(&:disconnect)
   Process.warmup
+  PumaWorkerRefresher.run
 end
 before_worker_boot do |index|
   CONNECTION_CHECKOUT_TELEMETRY&.run_thread

@@ -43,6 +43,7 @@ module ThawedMock
   allow_mocking(File, :exist?, :open, :read, :rename, :write)
   allow_mocking(Kernel, :exit, :exit!, :URI)
   allow_mocking(RubyVM::YJIT, :enabled?, :runtime_stats)
+  allow_mocking(Process, :kill)
   allow_mocking(Thread, :new, :list)
   allow_mocking(Time, :now)
 
