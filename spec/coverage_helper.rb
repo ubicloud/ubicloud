@@ -14,6 +14,8 @@ if ENV["UNUSED_ASSOCIATIONS"]
 elsif (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
+  shell_scripts = Set.new
+
   SimpleCov.start do
     coverage :line, minimum: 100 do
       minimum 100, per: :file
@@ -28,10 +30,11 @@ elsif (suite = ENV.delete("COVERAGE"))
     if suite == "rhizome"
       skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
-        !path.start_with?("/rhizome/") || !path.include?("/lib/")
+        !path.start_with?("/rhizome/") || !(path.include?("/lib/") || shell_scripts.include?(file.filename))
       end
 
       cover "rhizome/**/*.rb"
+      cover { |file| shell_scripts.include?(file.filename) }
     else
       skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
@@ -51,5 +54,49 @@ elsif (suite = ENV.delete("COVERAGE"))
 
     group("Missing") { |src| src.covered_percent < 100 }
     group("Covered") { |src| src.covered_percent == 100 }
+  end
+
+  if suite == "rhizome"
+    # Line coverage for rhizome shell scripts run by specs, from bash xtrace.
+    # Debian dash lacks LINENO, so specs run /bin/sh scripts under bash too
+    xtrace_dir = File.join(File.dirname(__dir__), "coverage", "xtrace")
+    FileUtils.mkdir_p(xtrace_dir)
+    xtrace_log = File.join(xtrace_dir, "log")
+    File.write(xtrace_log, "")
+    ENV["BASH_ENV"] = File.join(xtrace_dir, "env")
+    File.write(ENV["BASH_ENV"], <<~SH)
+      exec 222>>#{xtrace_log}
+      BASH_XTRACEFD=222
+      PS4='+@COV@${BASH_SOURCE}:${LINENO}@'
+      set -x
+    SH
+
+    shell_coverage = lambda do
+      hits = Hash.new { |h, path| h[path] = Hash.new(0) }
+      File.read(xtrace_log).scan(%r{^\++@COV@(#{Regexp.escape(File.dirname(__dir__))}/rhizome/[^:\n]+):(\d+)@}) do |path, line|
+        hits[path][Integer(line, 10)] += 1
+      end
+
+      hits.to_h do |path, line_hits|
+        heredoc = nil
+        continued = false
+        lines = File.readlines(path).map.with_index(1) do |source, lineno|
+          line = source.strip
+          code = !heredoc && !continued && !line.empty? && !line.start_with?("#") &&
+            # Keywords, function headers, case patterns
+            !line.sub(/\s+#.*/, "").match?(/\A(then|else|fi|do|done|esac|;;|[{}()]|\w+\(\) *[{(]|[^()]+\))\z/)
+          heredoc = (line == heredoc) ? nil : heredoc || line[/(?<!<)<<(?!<)-?\s*(['"]?)(\w+)\1/, 2]
+          continued = line.end_with?("\\")
+          hit = line_hits[lineno]
+          hit.positive? ? hit : (0 if code)
+        end
+        shell_scripts << path
+        [path, {lines:, branches: {}}]
+      end
+    end
+
+    Coverage.singleton_class.prepend(Module.new do
+      define_method(:result) { |**kwargs| super(**kwargs).merge(shell_coverage.call) }
+    end)
   end
 end

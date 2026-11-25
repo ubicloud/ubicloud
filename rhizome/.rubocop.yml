@@ -6,4 +6,8 @@ AllCops:
 
 RSpec/DescribeClass:
   Exclude:
+    - common/spec/arch_spec.rb
+    - host/spec/reboot_host_spec.rb
     - postgres/spec/disk_full_check_spec.rb
+    - postgres/spec/restart_spec.rb
+    - postgres/spec/take_backup_spec.rb
