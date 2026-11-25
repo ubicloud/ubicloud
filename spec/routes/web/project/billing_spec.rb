@@ -506,6 +506,20 @@ RSpec.describe Clover, "billing" do
       end
     end
 
+    it "does not show the usage chart without usage" do
+      expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).at_least(:once)
+
+      visit "#{project.path}/billing"
+
+      expect(page).to have_no_css "#billing-usage-chart"
+    end
+
+    it "does not show the usage chart without billing info" do
+      visit "#{project.path}/billing"
+
+      expect(page).to have_no_css "#billing-usage-chart"
+    end
+
     describe "invoices" do
       let(:blob_storage_client) { Aws::S3::Client.new(stub_responses: true) }
 
@@ -524,6 +538,63 @@ RSpec.describe Clover, "billing" do
           billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"],
           amount: vm.vcpus,
         )
+      end
+
+      it "shows the usage chart with billing info and usage" do
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        billing_record(Time.utc(2023, 6), nil)
+
+        visit "#{project.path}/billing"
+
+        data = JSON.parse(find_by_id("billing-usage-chart")["data-usage-chart"])
+        expect(data["actual"]).not_to be_empty
+        expect(data["projected"]).not_to be_empty
+        expect(data["services"]).to eq(["Compute"])
+        expect(data["service_points"]["Compute"]["projected"].last).to eq(data["projected"].last)
+        expect(data["last_month"]).to be_nil
+        expect(page).to have_content("Projected: $%0.02f" % data["estimated_bill"])
+        expect(page).to have_no_content("Usage this month")
+        expect(page).to have_no_content("Estimated bill")
+      end
+
+      it "passes last month's subtotal to the usage chart" do
+        now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        billing_record(Time.utc(2026, 10), nil)
+        Invoice.create(
+          project_id: project.id,
+          content: {"invoice_version" => 2, "resources" => [], "subtotal" => 168.4, "discounts" => [], "credits" => [], "discount" => 0.0, "credit" => 0.0, "cost" => 168.4},
+          begin_time: Time.utc(2026, 10),
+          end_time: Time.utc(2026, 11),
+          invoice_number: "1",
+          status: "paid",
+        )
+
+        visit "#{project.path}/billing"
+
+        data = JSON.parse(find_by_id("billing-usage-chart")["data-usage-chart"])
+        expect(data["last_month"]).to eq(168.4)
+      end
+
+      it "does not pass an older invoice to the usage chart as last month" do
+        now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        billing_record(Time.utc(2026, 10), nil)
+        Invoice.create(
+          project_id: project.id,
+          content: {"invoice_version" => 2, "resources" => [], "subtotal" => 111.1, "discounts" => [], "credits" => [], "discount" => 0.0, "credit" => 0.0, "cost" => 111.1},
+          begin_time: Time.utc(2026, 9),
+          end_time: Time.utc(2026, 10),
+          invoice_number: "1",
+          status: "paid",
+        )
+
+        visit "#{project.path}/billing"
+
+        data = JSON.parse(find_by_id("billing-usage-chart")["data-usage-chart"])
+        expect(data).not_to have_key("last_month")
       end
 
       it "fetches billing info from Stripe once per page load" do
