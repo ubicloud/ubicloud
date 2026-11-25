@@ -18,6 +18,7 @@ class MetricsReporter
     @shutdown_queue = Queue.new
     @thread = nil
     @shutdown = false
+    @report_count = 0
   end
 
   # Stop the report loop and shutdown its thread, if it is running.
@@ -53,12 +54,29 @@ class MetricsReporter
   end
 
   def report
+    start = Time.now
     unless (client = VictoriaMetricsResource.client_for_project(@project_id))
       Clog.emit("#{@name} metrics report skipped because VictoriaMetrics is not configured")
       return
     end
 
-    client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: Time.now, samples: @metrics.render), @extra_labels)
+    render_start = Time.now
+    samples = @metrics.render
+    import_start = Time.now
+    client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: import_start, samples:), @extra_labels)
+    finish = Time.now
+
+    @report_count += 1
+    if @report_count % 20 == 1
+      Clog.emit("#{@name} metrics report finished", {metrics_report: {
+        count: @report_count,
+        lookup_duration: render_start - start,
+        render_duration: import_start - render_start,
+        import_duration: finish - import_start,
+        bytes: samples.bytesize,
+        lines: samples.count("\n"),
+      }})
+    end
   rescue VictoriaMetrics::ClientError, Sequel::Error => e
     # Sequel included: the client lookup queries the database.
     Clog.emit("#{@name} metrics report failed", Util.exception_to_hash(e))

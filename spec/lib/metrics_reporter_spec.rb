@@ -66,6 +66,24 @@ RSpec.describe MetricsReporter do
     reporter.report
   end
 
+  it "#report logs its timings and size on the first report and every 20th after" do
+    expect(Config).to receive(:victoria_metrics_endpoint_override).exactly(42).times.and_return("https://vm.example")
+    client = instance_double(VictoriaMetrics::Client)
+    allow(VictoriaMetrics::Client).to receive(:new).with(endpoint: "https://vm.example").and_return(client)
+    allow(client).to receive(:import_prometheus)
+    metrics = Object.new
+    def metrics.render = "a 1\nb 2\n"
+    custom = described_class.new(name: "api", metrics:, project_id: nil)
+    logged = []
+    expect(Clog).to receive(:emit).with("api metrics report finished", Hash).twice do |_, data|
+      logged << data[:metrics_report]
+    end
+    21.times { custom.report }
+    expect(logged.map { it[:count] }).to eq [1, 21]
+    expect(logged.first).to include(bytes: 8, lines: 2)
+    expect(logged.first.values_at(:lookup_duration, :render_duration, :import_duration)).to all(be_a(Float))
+  end
+
   it "#report uses the instance keyword argument for the instance label" do
     custom = described_class.new(name: "api", metrics: ApiMetrics, project_id: nil, instance: "spec-instance")
     expect(Config).to receive(:victoria_metrics_endpoint_override).twice.and_return("https://vm.example")
