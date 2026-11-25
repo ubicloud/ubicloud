@@ -33,6 +33,8 @@ RSpec.describe KubernetesBuildNodeImage do
 
       expect(commands).to eq [
         "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null",
+        "mkdir -p /etc/systemd/networkd.conf.d",
+        "tee /etc/systemd/networkd.conf.d/90-clover-keep-foreign.conf > /dev/null",
         "apt-get update",
         "apt-get full-upgrade -y",
         "apt-get install -y ca-certificates curl gpg",
@@ -49,10 +51,15 @@ RSpec.describe KubernetesBuildNodeImage do
         "kubernetes/bin/install-node-exporter",
         "kubernetes/bin/install-prometheus",
         "apt-mark hold kubelet kubeadm kubectl",
-        "systemctl disable unattended-upgrades",
       ]
       expect(stdins).to eq(
         "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null" => described_class::SYSCTL_CONF,
+        "tee /etc/systemd/networkd.conf.d/90-clover-keep-foreign.conf > /dev/null" => <<~CONF,
+          [Network]
+          ManageForeignRoutingPolicyRules=no
+          ManageForeignRoutes=no
+          ManageForeignNextHops=no
+        CONF
         "tee /etc/containerd/config.toml > /dev/null" => "  SystemdCgroup = true\n",
       )
       expect(ENV["DEBIAN_FRONTEND"]).to eq "noninteractive"
