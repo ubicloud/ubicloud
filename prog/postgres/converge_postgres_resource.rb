@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :reindex_jobs, :reindex_step
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -141,7 +141,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 5 unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key))
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
-      register_deadline(nil, 10 * 60, message: "finish failing over representative server")
+      register_deadline("prune_servers", 10 * 60, message: "finish failing over representative server")
       postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?)
     end
 
@@ -172,7 +172,40 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def wait_prune_servers
     nap 30 unless PostgresServer.where(id: servers_to_destroy).empty?
 
+    if reindex_jobs
+      register_deadline(nil, reindex_jobs.size * 15 * 60, message: "finish rebuilding indexes")
+      hop_reindex
+    end
+
     pop "postgres resource is converged"
+  end
+
+  label def reindex
+    primary = postgres_resource.representative_server
+    nap 5 unless primary.strand.label == "wait"
+
+    step = reindex_step.to_i
+    database, sqls = reindex_jobs.to_a[step]
+    pop "postgres resource is converged" unless database
+
+    sshable = primary.vm.sshable
+    unit = "reindex_#{strand.ubid}_#{step}"
+    case sshable.d_check(unit)
+    when "Succeeded"
+      sshable.d_clean(unit)
+      Page.from_tag_parts("PostgresReindexFailed", postgres_resource.id)&.incr_resolve
+      self.reindex_step = step + 1
+      nap 0
+    when "Failed"
+      Clog.emit("Postgres reindex failed", {postgres_reindex_failed: {ubid: postgres_resource.ubid, unit:, log: sshable.d_logs(unit, lines: 20).lines.map(&:chomp)}})
+      Prog::PageNexus.assemble("#{postgres_resource.ubid} reindex failed", ["PostgresReindexFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
+      nap 60
+    when "NotStarted"
+      sshable.d_run(unit, "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
+        "-d", PostgresServer.conninfo(database), "-v", "ON_ERROR_STOP=1", *sqls.flat_map { ["-c", it] })
+    end
+
+    nap 5
   end
 
   def upgrade_candidate
