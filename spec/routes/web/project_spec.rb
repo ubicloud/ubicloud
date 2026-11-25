@@ -286,7 +286,7 @@ RSpec.describe Clover, "project" do
         visit "/project/create"
         fill_in "Name", with: "new-project"
         click_button "Create"
-        expect(page).to have_flash_notice("Project created")
+        expect(page).to have_flash_notice("Project created with a $500 spending cutoff")
 
         project = Project[name: "new-project"]
         expect(project.usage_alerts_dataset.all.map { [it.user_id, it.name, it.cutoff, it.limit] }).to eq [[user.id, "-", true, 500]]
