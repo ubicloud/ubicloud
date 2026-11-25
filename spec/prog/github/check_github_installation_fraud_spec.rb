@@ -37,14 +37,14 @@ RSpec.describe Prog::Github::CheckGithubInstallationFraud do
     let(:other_project) { Project.create(name: "other-project").tap { it.add_account(account) } }
 
     it "does not suspend the account if the GitHub account is old" do
-      installation.update(github_created_at: installation.created_at - 7 * 60 * 60)
+      installation.update(github_created_at: installation.created_at - 11 * 60)
 
       expect { prog.check_github_account_age }.to exit({"msg" => "fraud check completed"})
       expect(account.reload.suspended_at).to be_nil
     end
 
-    it "suspends the account if the GitHub account was created less than 6 hours before the installation" do
-      github_created_at = installation.created_at - 5 * 60 * 60
+    it "suspends the account if the GitHub account was created less than 10 minutes before the installation" do
+      github_created_at = installation.created_at - 9 * 60
       installation.update(github_created_at:)
       expect(Clog).to receive(:emit).with("Suspended new GitHub installation", {suspended_new_github_installation: {installation_ubid: installation.ubid, account_ubid: account.ubid, github_created_at:}})
 
@@ -54,14 +54,14 @@ RSpec.describe Prog::Github::CheckGithubInstallationFraud do
 
     it "does not suspend a new GitHub account if any project of the account is verified" do
       other_project.update(reputation: "verified")
-      installation.update(github_created_at: installation.created_at - 5 * 60 * 60)
+      installation.update(github_created_at: installation.created_at - 9 * 60)
 
       expect { prog.check_github_account_age }.to exit({"msg" => "fraud check completed"})
       expect(account.reload.suspended_at).to be_nil
     end
 
     it "does not suspend a new GitHub account if any project of the account has an earlier installation" do
-      installation.update(github_created_at: installation.created_at - 5 * 60 * 60)
+      installation.update(github_created_at: installation.created_at - 9 * 60)
       GithubInstallation.create(installation_id: 456, name: "other-user", type: "User", project_id: other_project.id, created_at: installation.created_at - 60)
 
       expect { prog.check_github_account_age }.to exit({"msg" => "fraud check completed"})
@@ -69,7 +69,7 @@ RSpec.describe Prog::Github::CheckGithubInstallationFraud do
     end
 
     it "suspends a new GitHub account if the other installation was created at the same time or later" do
-      installation.update(github_created_at: installation.created_at - 5 * 60 * 60)
+      installation.update(github_created_at: installation.created_at - 9 * 60)
       GithubInstallation.create(installation_id: 456, name: "other-user", type: "User", project_id: project.id, created_at: installation.created_at)
       GithubInstallation.create(installation_id: 789, name: "another-user", type: "User", project_id: other_project.id, created_at: installation.created_at + 60)
 
