@@ -15,17 +15,17 @@
     <div class="px-4 py-5 sm:p-6">
       <div class="max-w-3xl">
         <% gpu_options = [
-                    [
-            "nvidia-rtx-pro-6000",
-            ["NVIDIA RTX PRO 6000", "Blackwell, 96 GB VRAM", "Contact for pricing", ""],
-            "opacity-50 h-full flex",
-            { disabled: "disabled" }
+          [
+            "nvidia-b300-6-month",
+            ["NVIDIA B300, 6-month commit", "US region", "$5.60 / GPU / hr", "50% pre-payment"],
+            "h-full flex",
+            {disabled: "disabled"}
           ],
           [
-            "nvidia-b200",
-            ["NVIDIA B200", "Blackwell, up to 8x GPUs / 1.5TB VRAM per instance", "Contact for pricing", ""],
-            "opacity-50 h-full flex",
-            { disabled: "disabled" }
+            "nvidia-b300-2-year",
+            ["NVIDIA B300, 2-year commit", "US region", "$3.95 / GPU / hr", "100% pre-payment"],
+            "h-full flex",
+            {disabled: "disabled"}
           ]
         ] %>
 
@@ -33,16 +33,17 @@
           <%== part(
             "components/form/radio_small_cards",
             name: "gpu",
-            label: "Select a GPU",
+            label: "B300 pricing",
             options: gpu_options,
             attributes: {}
           ) %>
         </div>
 
         <div class="mt-6 text-sm text-gray-600">
-          GPU virtual machines are not enabled for this project. Email
-          <a href="mailto:support@ubicloud.com" class="font-medium text-orange-600 hover:text-orange-700"> support@ubicloud.com </a>
-          to enable GPU VMs.
+          To request B300 GPUs, please email
+          <a href="mailto:support@ubicloud.com" class="font-medium text-orange-600 hover:text-orange-700"> support@ubicloud.com</a>.
+          The minimum allocation is one machine (8 GPUs). Our current deployments are full, but new machines come online
+          every two months, and we prioritize requests from Y Combinator (YC) companies.
         </div>
       </div>
     </div>

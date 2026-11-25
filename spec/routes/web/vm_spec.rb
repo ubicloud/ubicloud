@@ -481,7 +481,7 @@ RSpec.describe Clover, "vm" do
         click_link "Create GPU Virtual Machine"
 
         expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
-        expect(page).to have_content "GPU virtual machines are not enabled for this project. Email support@ubicloud.com to enable GPU VMs."
+        expect(page).to have_content "To request B300 GPUs, please email support@ubicloud.com. The minimum allocation is one machine (8 GPUs). Our current deployments are full, but new machines come online every two months, and we prioritize requests from Y Combinator (YC) companies."
       end
 
       it "handles case where no gpus are available on create gpu virtual machine page by redirecting" do
