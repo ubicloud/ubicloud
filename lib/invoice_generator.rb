@@ -6,7 +6,7 @@ require "stripe"
 class InvoiceGenerator
   CURRENT_INVOICE_VERSION = 2
 
-  def initialize(begin_time, end_time, save_result: false, project_ids: [], discounts_and_credits_hashes: nil, eur_rate: nil, billing_info: nil)
+  def initialize(begin_time, end_time, save_result: false, project_ids: [], discounts_and_credits_hashes: nil, eur_rate: nil, billing_info: nil, amount_billed_scale: nil)
     @begin_time = begin_time
     @end_time = end_time
     @save_result = save_result
@@ -14,6 +14,7 @@ class InvoiceGenerator
     @discounts_and_credits_hashes = discounts_and_credits_hashes
     @eur_rate = eur_rate
     @billing_info = billing_info
+    @amount_billed_scale = amount_billed_scale
     if @save_result && !@eur_rate
       raise ArgumentError, "eur_rate must be provided when save_result is true"
     end
@@ -303,42 +304,55 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(project: [:invoices, billing_info: :payment_methods])
+    billing_records = BillingRecord.eager(project: [:invoices, billing_info: :payment_methods])
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
-    active_billing_records = active_billing_records.where(project_id: @project_ids) unless @project_ids.empty?
+    billing_records = billing_records.where(project_id: @project_ids) unless @project_ids.empty?
+    billing_records = billing_records.all
+    durations = self.class.billable_durations(billing_records, @begin_time, @end_time)
 
-    # We cap the billable duration at 672 hours. In this way, we can
-    # charge the users same each month no matter the number of days
-    # in that month. When records share a (resource_id, slot) tag — e.g.
-    # a Postgres primary that was scaled mid-month produces two records —
-    # the cap is applied to their combined duration so transitions don't
-    # let a customer exceed 28 days of charges for the same slot.
-    groups = active_billing_records.all.group_by do |br|
+    billing_records.map do |br|
+      rate = br.billing_rate
+      amount = br.amount
+      if @amount_billed_scale && rate["billed_by"] == "amount"
+        amount *= @amount_billed_scale
+      end
+      duration = durations.fetch(br.id)
+      {
+        project: br.project,
+        resource_id: br.resource_id,
+        location: rate["location"],
+        resource_name: br.resource_name,
+        resource_type: rate["resource_type"],
+        resource_family: rate["resource_family"],
+        byoc: rate["byoc"],
+        amount:,
+        cost: (amount * duration * rate["unit_price"]).round(3),
+        duration:,
+        begin_time: br.span.begin,
+        unit_price: rate["unit_price"],
+      }
+    end
+  end
+
+  # We cap the billable duration at 672 hours. In this way, we can
+  # charge the users same each month no matter the number of days
+  # in that month. When records share a (resource_id, slot) tag, e.g.
+  # a Postgres primary that was scaled mid-month produces two records,
+  # the cap is applied to their combined duration so transitions don't
+  # let a customer exceed 28 days of charges for the same slot.
+  def self.billable_durations(billing_records, begin_time, end_time)
+    groups = billing_records.group_by do |br|
       slot = br.resource_tags["slot"]
       slot ? [br.resource_id, slot] : br.id
     end
 
     monthly_cap = 672 * 60
-    groups.flat_map do |_, group|
-      group_raw_durations = group.map { it.duration(@begin_time, @end_time).ceil }
-      group_total_duration = group_raw_durations.sum
+    groups.each_with_object({}) do |(_, group), durations|
+      raw_durations = group.map { it.duration(begin_time, end_time).ceil }
+      group_total_duration = raw_durations.sum
       scale_factor = [monthly_cap.fdiv(group_total_duration), 1.0].min
-      group.zip(group_raw_durations).map do |br, raw_duration|
-        duration = (raw_duration * scale_factor).round
-        {
-          project: br.project,
-          resource_id: br.resource_id,
-          location: br.billing_rate["location"],
-          resource_name: br.resource_name,
-          resource_type: br.billing_rate["resource_type"],
-          resource_family: br.billing_rate["resource_family"],
-          byoc: br.billing_rate["byoc"],
-          amount: br.amount,
-          cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
-          duration:,
-          begin_time: br.span.begin,
-          unit_price: br.billing_rate["unit_price"],
-        }
+      group.zip(raw_durations).each do |br, raw_duration|
+        durations[br.id] = (raw_duration * scale_factor).round
       end
     end
   end

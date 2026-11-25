@@ -14,7 +14,8 @@
   "components/invoice_comparison",
   rows: Serializers::InvoiceComparison.rows(@invoice_data, @projected_data),
   projected_through: (@projected_invoice.end_time - 1).strftime("%B %-d"),
-  amount_billed_usage: @projected_invoice.amount_billed_usage
+  amount_billed_usage: @projected_invoice.amount_billed_usage,
+  amount_billed_projected: @amount_billed_projected
 ) %>
 
 <div class="grid gap-6">

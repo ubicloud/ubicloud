@@ -738,8 +738,34 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_no_content "usage-based charges so far"
       end
 
-      it "shows usage-based charges in the projected totals" do
+      it "projects usage-based charges after seven days" do
         now = Time.utc(2026, 11, 15)
+        allow(Time).to receive(:now).and_return(now)
+        month_start = Time.utc(2026, 11)
+        expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
+        rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: GithubRunner.generate_uuid,
+          resource_name: "runner",
+          span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+          billing_rate_id: rate["id"],
+          amount: 100,
+        )
+        to_date_usage = (100 * rate["unit_price"]).round(3)
+        projected_usage = (100 * 30.0 / 14 * rate["unit_price"]).round(3)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(page).to have_content "Runner minutes and inference tokens are projected from this month's usage so far."
+        expect(page).to have_no_content "Includes"
+        expect(find_by_id("invoice-github-runner-credit").text).to eq("-$%0.02f" % to_date_usage)
+        expect(find_by_id("invoice-github-runner-credit").find(:xpath, "following-sibling::dd").text).to eq("-$%0.02f" % projected_usage)
+        expect(find_by_id("invoice-total").text).to eq("$0.00")
+      end
+
+      it "counts usage-based charges without scaling before seven full days" do
+        now = Time.utc(2026, 11, 5)
         allow(Time).to receive(:now).and_return(now)
         month_start = Time.utc(2026, 11)
         expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {}}).once
@@ -757,6 +783,7 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing/invoice/current"
 
         expect(page).to have_content "Includes $%0.02f of usage-based charges so far (runner minutes, inference tokens). Further usage adds to this." % expected_usage
+        expect(page).to have_no_content "projected from this month's usage so far"
         expect(find_by_id("invoice-github-runner-credit").text).to eq("-$%0.02f" % expected_usage)
         expect(find_by_id("invoice-github-runner-credit").find(:xpath, "following-sibling::dd").text).to eq("-$%0.02f" % expected_usage)
         expect(find_by_id("invoice-total").text).to eq("$0.00")
