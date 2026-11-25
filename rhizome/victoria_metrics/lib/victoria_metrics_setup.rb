@@ -6,14 +6,14 @@ class VictoriaMetricsSetup
   # Upstream publishes a checksums.txt next to each tarball; these are the
   # digests it lists for the linux-amd64 builds.
   CHECKSUMS = {
-    "v1.149.0" => {
-      "victoria-metrics" => "6695fbee54bca58b78162ddf785c387b24641e57dfe4f3f743fb241f41dc3697",
-      "vmutils" => "1ccaa92acf4f2fcba03d8c197f1b1da7194cc4777ecf45ab5b212bd6ed52be58",
+    "v1.157.0" => {
+      "victoria-metrics" => "7b31192da6cf805b8b9244a904b022948e8022a067a822c30cb9f94600d0c387",
+      "vmutils" => "f797ecaa5045a8f8095a813a3b3e2ef697e4086affcc174547cf559768044862",
     },
   }.freeze
 
   def initialize(argv)
-    fail "expected a single argument, a VictoriaMetrics version like v1.149.0, got #{argv.length}" unless argv.length == 1
+    fail "expected a single argument, a VictoriaMetrics version like v1.157.0, got #{argv.length}" unless argv.length == 1
 
     @version = argv[0]
     fail "no VictoriaMetrics checksums for version #{@version.inspect}" unless CHECKSUMS.key?(@version)
