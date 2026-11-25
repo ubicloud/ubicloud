@@ -10,39 +10,72 @@ require "json"
 works = nil
 error = +""
 queue = Queue.new
+expected_restarts = 2
+num_workers = 2
 
-Open3.popen3({"RACK_ENV" => "production", "PORT" => "8081", "WEB_CONCURRENCY" => "1"}, "bundle", "exec", "puma", "-C", "puma_config.rb") do |stdin, stdout, stderr, wait_thr|
+env = {
+  "RACK_ENV" => "production",
+  "PORT" => "8081",
+  "WEB_CONCURRENCY" => num_workers.to_s,
+  "DYNO" => "web.0",
+  "PUMA_WORKER_REFRESH_DEADLINE" => (num_workers / 60.0).to_s,
+}
+
+Open3.popen3(env, "bundle", "exec", "puma", "-C", "puma_config.rb") do |stdin, stdout, stderr, wait_thr|
   pid = wait_thr.pid
 
+  finish = lambda do |result, message = nil|
+    next unless works.nil?
+
+    error << message << "\n" if message
+    works = result
+    queue.push(true)
+    Process.kill(:TERM, pid)
+  end
+
   timer_thread = Thread.new do
-    queue.pop(timeout: 12)
-    if works.nil?
-      error = "Timeout"
-      Process.kill(:KILL, pid)
-    end
+    queue.pop(timeout: 30)
+    finish.call(false, "Timeout")
   end
 
   stdout_thread = Thread.new do
+    login_checked = false
+    retired = []
+    boots = Hash.new(0)
+
     while (line = stdout.gets)
+      puts line
+      next unless works.nil?
+
       case line
-      when /\A\[\d+\] - Worker 0 \(PID: \d+\) booted in \d+.\d+s, phase: 0/
-        puts line
-        response = Net::HTTP.post(URI("http://localhost:8081/login"),
-          {"login" => "foo@example.com", "password" => "bar"}.to_json,
-          {"content-type" => "application/json", "host" => "api.localhost"})
-        works = response.is_a?(Net::HTTPUnauthorized)
-        queue.push(true)
-        Process.kill(:TERM, pid)
-        puts stdout.read
-        break
+      when /\A\[\d+\] - Worker (\d+) \(PID: \d+\) booted in \d+.\d+s, phase: 0/
+        index = Integer($1, 10)
+        boots[index] += 1
+
+        unless login_checked
+          login_checked = true
+          response = Net::HTTP.post(URI("http://localhost:8081/login"),
+            {"login" => "foo@example.com", "password" => "bar"}.to_json,
+            {"content-type" => "application/json", "host" => "api.localhost"})
+          unless response.is_a?(Net::HTTPUnauthorized)
+            finish.call(false, "Unexpected login response: #{response.inspect}")
+            next
+          end
+        end
+
+        # Done once each worker has booted initially and then been
+        # restarted the expected number of times.
+        if num_workers.times.all? { boots[it] > expected_restarts }
+          finish.call(true)
+        end
+      when /"message":"retiring puma worker"/
+        index = JSON.parse(line).dig("puma_worker_refresher", "index")
+        if retired.last == index
+          finish.call(false, "Worker #{index} retired twice in a row, not round-robin (retired: #{retired.inspect})")
+        end
+        retired << index
       when /\A! Unable to load application: /
-        error << line
-        works = false
-        queue.push(true)
-        Process.kill(:TERM, pid)
-        break
-      else
-        puts line
+        finish.call(false, line)
       end
     end
   end
@@ -52,9 +85,7 @@ Open3.popen3({"RACK_ENV" => "production", "PORT" => "8081", "WEB_CONCURRENCY" =>
     if !err.nil?
       error << err << stderr.read_nonblock(100000)
       unless /"POST \/login HTTP\/1\.1*" 401 \d+ \d\.\d+\n\z/.match?(error)
-        works = false
-        queue.push(true)
-        Process.kill(:TERM, pid)
+        finish.call(false)
       end
     end
   end
