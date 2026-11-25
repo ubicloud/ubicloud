@@ -1,6 +1,12 @@
-#!/bin/env ruby
-# frozen_string_literal: true
+#!/bin/sh
+set -eu
 
-require_relative "../../common/lib/arch"
-
-puts Arch.sym
+arch=$(uname -m)
+case "$arch" in
+    aarch64|arm64) echo arm64 ;;
+    x86_64|amd64|x64) echo x64 ;;
+    *)
+        printf 'BUG: could not detect architecture: %s\n' "$arch" >&2
+        exit 1
+        ;;
+esac
