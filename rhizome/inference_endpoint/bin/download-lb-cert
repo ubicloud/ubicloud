@@ -3,23 +3,31 @@ set -ueo pipefail
 
 timestamp=$(date +%s)
 new_ssl_folder="/ie/workdir/ssl_$timestamp"
-rm -rf $new_ssl_folder
+rm -rf "$new_ssl_folder"
 rm -rf /ie/workdir/ssl_latest
-mkdir $new_ssl_folder
+mkdir "$new_ssl_folder"
 
-curl -f -L3 [FD00:0B1C:100D:5afe:CE::]/load-balancer/cert.pem > $new_ssl_folder/ubi_cert.pem
-curl -f -L3 [FD00:0B1C:100D:5afe:CE::]/load-balancer/key.pem > $new_ssl_folder/ubi_key.pem
+# The URL is quoted because [FD00:0B1C:100D:5afe:CE::] is a bracket expression
+# to the shell, not an address: unquoted it is a glob that happens to reach
+# curl unchanged only while no file in the working directory matches it
+# (shellcheck SC2102). One that did would be passed to curl in its place.
+curl -f -L3 "[FD00:0B1C:100D:5afe:CE::]/load-balancer/cert.pem" > "$new_ssl_folder/ubi_cert.pem"
+curl -f -L3 "[FD00:0B1C:100D:5afe:CE::]/load-balancer/key.pem" > "$new_ssl_folder/ubi_key.pem"
 
-chown -R ie:ie $new_ssl_folder
-chmod 640 $new_ssl_folder/ubi_key.pem
-chmod 644 $new_ssl_folder/ubi_cert.pem
+chown -R ie:ie "$new_ssl_folder"
+chmod 640 "$new_ssl_folder/ubi_key.pem"
+chmod 644 "$new_ssl_folder/ubi_cert.pem"
 
-ln -s $new_ssl_folder /ie/workdir/ssl_latest
+ln -s "$new_ssl_folder" /ie/workdir/ssl_latest
 mv -T /ie/workdir/ssl_latest /ie/workdir/ssl
 
 folders=$(find /ie/workdir -type d -name "ssl_*" | sort -r)
 for folder in $folders; do
-    if [[ "$folder" == $new_ssl_folder ]]; then
+    # The right-hand side is quoted so == compares strings. Unquoted it is a
+    # glob pattern (shellcheck SC2053): today it holds only digits and slashes
+    # so the two readings agree, but a folder name that ever carried a glob
+    # character would make the keep-the-new-one guard match the wrong entry.
+    if [[ "$folder" == "$new_ssl_folder" ]]; then
         continue
     fi
     rm -rf "$folder"
