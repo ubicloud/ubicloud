@@ -37,6 +37,27 @@ RSpec.describe Prog::SetupHugepages do
       expect { sh.start }.to exit({"msg" => "hugepages installed"})
     end
 
+    it "caps the hugepage count on arm64 to the memory the non-IO CPUs can sell" do
+      vm_host = Prog::Vm::HostNexus.assemble("::1").subject
+      vm_host.update(total_mem_gib: 512, arch: "arm64", total_cpus: 128, total_cores: 128)
+      sh = described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupHugepages"))
+      expect(sh.sshable).to receive(:_cmd).with("cat /proc/meminfo").and_return("MemAvailable: 520000000 kB\n")
+      expect(sh.sshable).to receive(:_cmd).with("sudo sed -i '/^GRUB_CMDLINE_LINUX=\"/ s/\"$/ hugetlb_free_vmemmap=on default_hugepagesz='1G' hugepagesz='1G' hugepages='397'&/' /etc/default/grub")
+      expect(sh.sshable).to receive(:_cmd).with("sudo update-grub")
+      expect { sh.start }.to exit({"msg" => "hugepages installed"})
+    end
+
+    it "does not count freed vmemmap when clamping on arm64" do
+      vm_host = Prog::Vm::HostNexus.assemble("::1").subject
+      vm_host.update(total_mem_gib: 128, arch: "arm64", total_cpus: 64, total_cores: 64)
+      sh = described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupHugepages"))
+      expect(sh.sshable).to receive(:_cmd).with("cat /proc/meminfo").and_return("MemAvailable: 124780544 kB\n")
+      expect(Clog).to receive(:emit).with("hugepage count clamped to available memory", {hugepage_clamp: {formula_count: 120, clamped_count: 115}}).and_call_original
+      expect(sh.sshable).to receive(:_cmd).with("sudo sed -i '/^GRUB_CMDLINE_LINUX=\"/ s/\"$/ hugetlb_free_vmemmap=on default_hugepagesz='1G' hugepagesz='1G' hugepages='115'&/' /etc/default/grub")
+      expect(sh.sshable).to receive(:_cmd).with("sudo update-grub")
+      expect { sh.start }.to exit({"msg" => "hugepages installed"})
+    end
+
     it "fails if available memory couldn't be extracted" do
       vm_host = Prog::Vm::HostNexus.assemble("::1").subject
       vm_host.update(total_mem_gib: 128)
