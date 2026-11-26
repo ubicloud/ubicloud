@@ -92,8 +92,8 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
         expect(Config).to receive(:allow_unspread_servers).and_return(allow_unspread)
 
         st = described_class.assemble(ds)
-        vm_strand = Strand[st.stack.first["subject_id"]]
-        expect(vm_strand.stack.first["exclude_host_ids"]).to eq expected_ids
+        vm = Strand[st.stack.first["subject_id"]].subject
+        expect(Array(vm.allocation_rules["host_exclusion_filter"])).to eq expected_ids
       end
     end
 
@@ -134,8 +134,8 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect(Config).to receive(:allow_unspread_servers).and_return(false)
 
       st = described_class.assemble(ds)
-      vm_strand = Strand[st.stack.first["subject_id"]]
-      expect(vm_strand.stack.first["exclude_host_ids"]).to eq []
+      vm = Strand[st.stack.first["subject_id"]].subject
+      expect(vm.allocation_rules["host_exclusion_filter"]).to be_nil
     end
 
     it "propagates parameters to the created vm" do

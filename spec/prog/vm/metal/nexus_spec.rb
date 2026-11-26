@@ -99,6 +99,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }.to raise_error RuntimeError, "No existing location in project"
     end
 
+    it "stores the placement rules on the vm and not in the frame" do
+      st = Prog::Vm::Nexus.assemble(
+        "some_ssh key", project.id,
+        force_host_id: vm_host.id, distinct_storage_devices: true,
+        exclude_host_ids: ["vh1"], exclude_data_centers: ["dc1"],
+      )
+
+      expect(st.subject.allocation_rules).to eq(
+        "force_host_id" => vm_host.id,
+        "distinct_storage_devices" => true,
+        "host_exclusion_filter" => ["vh1"],
+        "data_center_exclusion_filter" => ["dc1"],
+      )
+      expect(st.stack.first.keys).not_to include("force_host_id", "distinct_storage_devices", "exclude_host_ids", "exclude_data_centers")
+    end
+
     it "creates Subnet and Nic if not passed" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id)
@@ -932,30 +948,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
           host_exclusion_filter: [],
           data_center_exclusion_filter: [],
           location_filter: [],
-          location_preference: [],
-          gpu_count: 0,
-          gpu_device: nil,
-          os_filter: nil,
-          family_filter: ["standard"],
-        )
-        expect { nx.start }.to hop("create_unix_user")
-      end
-
-      it "ignores placement values left in the frame" do
-        vm.update(allocation_rules: {"host_exclusion_filter" => ["stored-host"]})
-        st.stack = [{
-          "exclude_host_ids" => ["frame-host"],
-          "storage_volumes" => storage_volumes,
-        }]
-
-        expect(Scheduling::Allocator).to receive(:allocate).with(
-          vm, storage_volumes,
-          allocation_state_filter: ["accepting"],
-          distinct_storage_devices: false,
-          host_filter: [],
-          host_exclusion_filter: ["stored-host"],
-          data_center_exclusion_filter: [],
-          location_filter: [Location::HETZNER_FSN1_ID],
           location_preference: [],
           gpu_count: 0,
           gpu_device: nil,
