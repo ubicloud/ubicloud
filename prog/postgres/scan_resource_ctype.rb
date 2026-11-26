@@ -24,6 +24,17 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
     SELECT kind, object FROM (#{AUDIT::CTYPE_SQL.chomp.delete_suffix(";")}) c WHERE source = 'glibc'
   SQL
 
+  # The audit's objects on ICU rules, which a new ICU version can change
+  # whatever the data.
+  ICU_OBJECTS_SQL = <<~SQL
+    SELECT kind, object FROM (#{AUDIT::CTYPE_SQL.chomp.delete_suffix(";")}) c WHERE source = 'icu'
+    UNION
+    SELECT 'sort_order', d.name FROM (#{AUDIT::DETAILS_SQL.chomp.delete_suffix(";")}) d
+    WHERE d.kind = 'index' AND CASE WHEN d.collname = 'default'
+      THEN (SELECT datlocprovider = 'i' FROM pg_database WHERE datname = current_database())
+      ELSE EXISTS (SELECT 1 FROM pg_collation c WHERE c.collname = d.collname AND c.collprovider = 'i') END
+  SQL
+
   # The parts below list the columns each object reads, as (kind, object,
   # relid, attnum), each for one kind of audit row.
   #
@@ -101,6 +112,7 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   # found gets "unresolved", so it is not passed as safe.
   TARGETS_SQL = <<~SQL.freeze
     WITH audit AS (#{AUDIT_OBJECTS_SQL.chomp}),
+    icu AS (#{ICU_OBJECTS_SQL.chomp}),
     cols(kind, object, relid, attnum) AS (
       #{[INDEX_COLUMNS, GENERATED_COLUMNS, TSVECTOR_COLUMNS, CHECK_COLUMNS, PARTITION_KEY_COLUMNS].join("UNION\n").chomp}
     )
@@ -116,7 +128,11 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
       jsonb_build_array(jsonb_build_object('kind', kind, 'object', object))::text, NULL, NULL
     FROM audit a
     WHERE kind = 'materialized_view' OR NOT EXISTS (SELECT 1 FROM cols c WHERE c.kind = a.kind AND c.object = a.object)
-    ORDER BY 1, 2;
+    UNION ALL
+    SELECT CASE WHEN kind = 'materialized_view' THEN 'refresh' ELSE 'reindex' END, object,
+      jsonb_build_array(jsonb_build_object('kind', kind, 'object', object))::text, NULL, NULL
+    FROM icu
+    ORDER BY 1, 2, 3;
   SQL
 
   # The journal line with a scan's counts, after the journal's own prefix.
@@ -128,9 +144,27 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   LOG_READ_LIMIT = 12
 
   # The audit kinds that are indexes, which a REINDEX rebuilds.
-  INDEX_KINDS = %w[expression citext pg_trgm].freeze
+  INDEX_KINDS = %w[expression citext pg_trgm sort_order].freeze
 
-  EMPTY_RESULT = {"safe" => 0, "rebuild" => [], "large" => [], "failed" => [], "refresh" => [], "unresolved" => []}.freeze
+  # template0 is refreshed from here, as nobody can connect to it.
+  REFRESH_VERSIONS_SQL = <<~SQL
+    DO $do$
+    DECLARE
+      c regcollation;
+      d name;
+    BEGIN
+      FOR c IN SELECT oid FROM pg_collation WHERE collversion <> pg_collation_actual_version(oid) LOOP
+        EXECUTE format('ALTER COLLATION %s REFRESH VERSION', c);
+      END LOOP;
+      FOR d IN SELECT datname FROM pg_database
+        WHERE datname IN (current_database(), 'template0') AND datcollversion <> pg_database_collation_actual_version(oid) LOOP
+        EXECUTE format('ALTER DATABASE %I REFRESH COLLATION VERSION', d);
+      END LOOP;
+    END
+    $do$
+  SQL
+
+  EMPTY_RESULT = {"safe" => 0, "rebuild" => [], "reindex" => [], "large" => [], "failed" => [], "refresh" => [], "unresolved" => []}.freeze
 
   frame_reader :max_table_gib
   frame_accessor :databases, :targets, :step, :results, :log_reads
@@ -210,24 +244,23 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
   end
 
   label def report
-    rebuild, large, failed, refresh, unresolved = %w[rebuild large failed refresh unresolved].map do |key|
+    rebuild, reindex, large, failed, refresh, unresolved = %w[rebuild reindex large failed refresh unresolved].map do |key|
       results.select { |_, result| result[key].any? }.keys
     end
     msg = if failed.any? || unresolved.any?
       "review"
     elsif large.any?
       "fork_scan"
-    elsif rebuild.any?
+    elsif rebuild.any? || reindex.any?
       "rebuild"
     else
       "clean"
     end
 
-    result = {"msg" => msg, "rebuild_databases" => rebuild, "large_databases" => large, "failed_databases" => failed,
-              "refresh_databases" => refresh, "unresolved_databases" => unresolved, "databases" => results}
     jobs, by_hand = reindex_work
-    result["reindex_jobs"] = jobs unless jobs.empty?
-    result["reindex_script"] = reindex_script(jobs, by_hand) unless jobs.empty? && by_hand.empty?
+    result = {"msg" => msg, "rebuild_databases" => rebuild, "reindex_databases" => reindex, "large_databases" => large, "failed_databases" => failed,
+              "refresh_databases" => refresh, "unresolved_databases" => unresolved, "databases" => results,
+              "reindex_jobs" => jobs, "by_hand" => by_hand, "reindex_script" => reindex_script(jobs, by_hand)}
     Clog.emit("postgres ctype scan", {postgres_ctype_scan: result.merge("resource" => postgres_resource.ubid)})
     pop result
   end
@@ -238,9 +271,10 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
     jobs = {}
     by_hand = []
     results.each do |database, result|
-      kinds = result["rebuild"].flat_map { it["objects"] }.map { it.split(": ", 2) }
+      kinds = (result["rebuild"].flat_map { it["objects"] } + result["reindex"]).map { it.split(": ", 2) }
       indexes, others = kinds.partition { |kind, _| INDEX_KINDS.include?(kind) }
-      jobs[database] = indexes.map { |_, name| "REINDEX INDEX #{name}" }.uniq unless indexes.empty?
+      jobs[database] = indexes.map { |_, name| "REINDEX INDEX #{name}" }.uniq +
+        result["refresh"].map { "REFRESH MATERIALIZED VIEW #{it.split(": ", 2).last}" } + [REFRESH_VERSIONS_SQL]
       by_hand.concat(others.map { |kind, name| "#{database}: #{kind}: #{name}" })
     end
     [jobs, by_hand]
