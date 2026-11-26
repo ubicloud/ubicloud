@@ -7,6 +7,7 @@ require_relative "../../common/lib/util"
 require_relative "../lib/io_throttle"
 require_relative "../lib/pg_bouncer_setup"
 require_relative "../lib/postgres_config"
+require_relative "../lib/postgres_lockout"
 require_relative "../lib/postgres_setup"
 
 if ARGV.count != 1
@@ -129,6 +130,7 @@ hostssl replication     postgres        all                     scram-sha-256
 # still uses scram-sha-256 for authentication.
 host    all             all             all                     md5
 PG_HBA
+pg_hba_entries = PostgresLockout.lockout_pg_hba if configure_hash["lockout"]
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_hba.conf", pg_hba_entries)
 
 identity = configure_hash["identity"]
