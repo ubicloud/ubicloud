@@ -3,7 +3,7 @@
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
   frame_reader :alternative_families, :nested_virtualization, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface, :swap_size_bytes
-  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open
+  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open, :instance_checked_at
 
   NETWORKD_DROPINS = <<~SCRIPT
     mkdir -p /etc/systemd/network/10-netplan-mgmt-nic.network.d
@@ -289,22 +289,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_instance_created
-    reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first
-    instance_response = reservation&.instances&.first
+    instance_response = describe_instance
     state = instance_response&.dig(:state, :name)
 
-    if state == "terminated" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
-      state_reason = instance_response.dig(:state_reason, :code)
-      message = instance_response.dig(:state_reason, :message)
-      if state_reason == "Server.InternalError"
-        Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message:}})
-      else
-        Clog.emit("aws instance terminated before running", {aws_instance_terminated_before_running: {vm:, state_reason:, message:}})
-      end
-      runner.provision_spare_runner
-      runner.incr_destroy
-      nap 60 * 60
-    end
+    handle_terminated_runner_instance(instance_response) if state == "terminated" && is_runner?
 
     nap 1 unless state == "running"
 
@@ -347,6 +335,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       begin
         Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
       rescue SystemCallError
+        recover_terminated_runner_instance if is_runner?
         nap 1
       end
     end
@@ -358,6 +347,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
         # The port answered, so the next tick can go straight to ssh.
         self.ssh_port_open = true
+        recover_terminated_runner_instance if is_runner?
         nap 1
       end
     end
@@ -499,6 +489,34 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       .where(Sequel[:nic_aws_resource][:create_network_interface] => false)
       .select_all(:nic)
       .first(Sequel[:nic][:private_ipv4] => private_ipv4)
+  end
+
+  def describe_instance
+    client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first&.instances&.first
+  end
+
+  def recover_terminated_runner_instance
+    now = Time.now
+    return if instance_checked_at && now - Time.new(instance_checked_at) < 60
+
+    self.instance_checked_at = now.to_s
+    instance_response = describe_instance
+    handle_terminated_runner_instance(instance_response) if instance_response.nil? || instance_response.dig(:state, :name) == "terminated"
+  end
+
+  def handle_terminated_runner_instance(instance_response)
+    return unless (runner = GithubRunner[vm_id: vm.id])
+
+    state_reason = instance_response&.dig(:state_reason, :code)
+    message = instance_response&.dig(:state_reason, :message)
+    if state_reason == "Server.InternalError"
+      Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message:}})
+    else
+      Clog.emit("aws runner instance terminated", {aws_runner_instance_terminated: {vm:, state_reason:, message:}})
+    end
+    runner.provision_spare_runner
+    runner.incr_destroy
+    nap 60 * 60
   end
 
   def postgres_aws_ssh_ipv6?
