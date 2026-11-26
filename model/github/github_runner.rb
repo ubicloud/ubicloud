@@ -94,7 +94,7 @@ class GithubRunner < Sequel::Model
       return if spare_runner_provisioned_set? || project.cutoff?
     end
     incr_spare_runner_provisioned
-    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
+    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:, actual_label:).subject
   end
 
   def completed?
