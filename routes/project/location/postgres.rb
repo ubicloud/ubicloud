@@ -971,40 +971,62 @@ class Clover
         end
       end
 
-      r.is "upgrade" do
-        r.get api? do
-          # api-only route, web GET upgrade route handled by r.show_object call earlier in route
-          authorize("Postgres:view", pg.id)
+      r.on "upgrade" do
+        r.is do
+          r.get api? do
+            # api-only route, web GET upgrade route handled by r.show_object call earlier in route
+            authorize("Postgres:view", pg.id)
 
-          if pg.target_version == pg.version
-            raise CloverError.new(400, "InvalidRequest", "Database is not upgrading")
+            if pg.target_version == pg.version
+              raise CloverError.new(400, "InvalidRequest", "Database is not upgrading")
+            end
+
+            Serializers::PostgresUpgrade.serialize(pg)
           end
 
-          Serializers::PostgresUpgrade.serialize(pg)
+          r.post do
+            authorize("Postgres:edit", pg.id)
+            handle_validation_failure("postgres/show") { @page = "upgrade" }
+
+            target_version = typecast_params.nonempty_str("target_version") || pg.default_upgrade_target_version
+            Validation.validate_postgres_upgrade(pg, target_version)
+            validate_postgres_config(target_version, pg.user_config, pg.pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
+
+            read_replica_count = DB.transaction do
+              pg.update(target_version:)
+              audit_log(pg, "upgrade")
+
+              pg.read_replicas_dataset.update(target_version: pg.target_version)
+            end
+
+            postgres_action_log(pg, :postgres_upgrade,
+              current_version: pg.version, target_version: pg.target_version, read_replica_count:)
+
+            if api?
+              Serializers::PostgresUpgrade.serialize(pg)
+            else
+              flash["notice"] = "Database upgrade started successfully"
+              r.redirect pg, "/upgrade"
+            end
+          end
         end
 
-        r.post do
+        r.post "cancel" do
           authorize("Postgres:edit", pg.id)
-          handle_validation_failure("postgres/show") { @page = "upgrade" }
 
-          target_version = typecast_params.nonempty_str("target_version") || pg.default_upgrade_target_version
-          Validation.validate_postgres_upgrade(pg, target_version)
-          validate_postgres_config(target_version, pg.user_config, pg.pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
-
-          read_replica_count = DB.transaction do
-            pg.update(target_version:)
-            audit_log(pg, "upgrade")
-
-            pg.read_replicas_dataset.update(target_version: pg.target_version)
+          unless pg.upgrade_status == "failed"
+            raise CloverError.new(400, "InvalidRequest", "Only a failed upgrade can be canceled")
           end
 
-          postgres_action_log(pg, :postgres_upgrade,
-            current_version: pg.version, target_version: pg.target_version, read_replica_count:)
+          DB.transaction do
+            pg.request_upgrade_cancel
+            audit_log(pg, "cancel_upgrade")
+          end
 
           if api?
             Serializers::PostgresUpgrade.serialize(pg)
           else
-            flash["notice"] = "Database upgrade started successfully"
+            flash["notice"] = "The failed upgrade will be canceled in a few seconds"
             r.redirect pg, "/upgrade"
           end
         end

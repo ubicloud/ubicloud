@@ -1767,6 +1767,25 @@ RSpec.describe Clover, "postgres" do
         )
       end
 
+      it "cancels a failed upgrade" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade/cancel"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("upgrade_status" => "failed", "target_version" => "17")
+        expect(Semaphore.where(strand_id: st.id, name: "cancel_upgrade").count).to eq(1)
+      end
+
+      it "does not cancel an upgrade that has not failed" do
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_standby")
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade/cancel"
+
+        expect(last_response).to have_api_error(400, "Only a failed upgrade can be canceled")
+        expect(Semaphore.where(strand_id: st.id, name: "cancel_upgrade").count).to eq(0)
+      end
+
       it "no ongoing upgrade" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
 

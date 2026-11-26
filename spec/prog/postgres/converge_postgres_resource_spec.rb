@@ -699,6 +699,75 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
       expect(primary.unfence_set?(cached: false)).to be false
     end
+
+    it "hops to wait_cancel_upgrade when a cancel is requested" do
+      primary.strand.update(label: "wait")
+      Semaphore.incr(strand.id, :cancel_upgrade)
+
+      expect { nx.upgrade_failed }.to hop("wait_cancel_upgrade")
+    end
+  end
+
+  describe "#wait_cancel_upgrade" do
+    let(:primary) { create_server(is_representative: true, version: "16") }
+    let(:candidate) { create_server(version: "16", upgrade_candidate: true) }
+
+    before do
+      pg.update(target_version: "17")
+      strand.update(label: "wait_cancel_upgrade")
+      Semaphore.incr(strand.id, :cancel_upgrade)
+    end
+
+    it "waits without changes while the primary is fenced" do
+      primary.strand.update(label: "wait_in_fence")
+      candidate
+
+      expect { nx.wait_cancel_upgrade }.to nap(5)
+      expect(Semaphore.where(strand_id: strand.id, name: "cancel_upgrade").count).to eq(1)
+      expect(candidate.destroy_set?(cached: false)).to be false
+      expect(pg.reload.target_version).to eq("17")
+    end
+
+    it "hops to cancel_upgrade once the primary is unfenced" do
+      primary.strand.update(label: "wait")
+
+      expect { nx.wait_cancel_upgrade }.to hop("cancel_upgrade")
+    end
+  end
+
+  describe "#cancel_upgrade" do
+    before do
+      strand.update(label: "cancel_upgrade")
+      Semaphore.incr(strand.id, :cancel_upgrade)
+    end
+
+    it "destroys the candidate, reverts the target version and resolves the page" do
+      primary = create_server(is_representative: true, version: "16")
+      pg.update(target_version: "18")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      replica = create_postgres_resource(project:, location_id:)
+      replica.update(parent_id: pg.id, target_version: "18")
+      Prog::PageNexus.assemble("#{pg.ubid} upgrade failed", ["PostgresUpgradeFailed", pg.id], pg.ubid, resource_id: pg.id)
+
+      expect { nx.cancel_upgrade }.to hop("wait_prune_servers")
+      expect(candidate.destroy_set?(cached: false)).to be true
+      expect(primary.destroy_set?(cached: false)).to be false
+      expect(nx.strand.stack[0]).to include("servers_to_destroy" => [candidate.id], "deadline_target" => nil, "deadline_message" => "destroy the server of the canceled upgrade")
+      expect(nx.strand.stack[0]["deadline_at"]).not_to be_nil
+      expect(pg.reload.target_version).to eq("16")
+      expect(replica.reload.target_version).to eq("16")
+      expect(Page.from_tag_parts("PostgresUpgradeFailed", pg.id).resolve_set?).to be true
+      expect(Semaphore.where(strand_id: strand.id, name: "cancel_upgrade").count).to eq(0)
+    end
+
+    it "reverts the target version when the candidate is already gone" do
+      create_server(is_representative: true, version: "16")
+      pg.update(target_version: "17")
+
+      expect { nx.cancel_upgrade }.to hop("wait_prune_servers")
+      expect(nx.strand.stack[0]["servers_to_destroy"]).to eq([])
+      expect(pg.reload.target_version).to eq("16")
+    end
   end
 
   describe "#prune_servers" do

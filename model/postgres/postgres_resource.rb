@@ -496,6 +496,10 @@ class PostgresResource < Sequel::Model
     upgrade_strand&.label
   end
 
+  def request_upgrade_cancel
+    Semaphore.incr(strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed").select(:id), :cancel_upgrade)
+  end
+
   def upgrade_failed_at(failure: upgrade_failure)
     if (failed_at = failure["upgrade_failed_at"])
       Time.strptime(failed_at, "%F %T.%N %z")

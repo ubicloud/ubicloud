@@ -700,6 +700,7 @@ Post Commands:
     add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
     add-syslog-log-destination         Add a syslog (RFC 5424 over TLS) log destination to a PostgreSQL database
     ca-certificates                    Print CA certificates for a PostgreSQL database (if available)
+    cancel-upgrade                     Cancel a failed major version upgrade of the PostgreSQL database
     create                             Create a PostgreSQL database
     create-backup-credentials          Create temporary, read-only credentials for downloading PostgreSQL backups
     create-client-cert-keypair         Create client certificate keypair with given common name, expiring after a duration of seconds
@@ -807,6 +808,12 @@ Print CA certificates for a PostgreSQL database (if available)
 
 Usage:
     ubi pg (location/pg-name | pg-id) ca-certificates
+
+
+Cancel a failed major version upgrade of the PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) cancel-upgrade
 
 
 Create temporary, read-only credentials for downloading PostgreSQL backups

@@ -1972,6 +1972,30 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_link "upgrade logs", href: "#{project.path}#{pg.path}/logs?stream_name=upgrade&server_role=&max_log_lines=500"
       end
 
+      it "cancels a failed upgrade when user clicks on cancel upgrade button" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "To stay on Postgres 16, or to start again after you fix the cause, cancel the upgrade."
+        click_button "Cancel Upgrade"
+        expect(page).to have_flash_notice "The failed upgrade will be canceled in a few seconds"
+        expect(page).to have_current_path "#{project.path}#{pg.path}/upgrade", ignore_query: true
+        expect(Semaphore.where(strand_id: st.id, name: "cancel_upgrade").count).to eq(1)
+      end
+
+      it "does not show cancel upgrade button when user has read only permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        pg_wo_permission.strand.update(label: "wait")
+        pg_wo_permission.update(target_version: "17")
+        Strand.create(parent_id: pg_wo_permission.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/upgrade"
+        expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_no_button "Cancel Upgrade"
+      end
+
       it "shows latest version message if the database is already on the latest version" do
         pg.strand.update(label: "wait")
         pg.update(target_version: PostgresResource::LATEST_VERSION)

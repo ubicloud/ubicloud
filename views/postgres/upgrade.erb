@@ -62,7 +62,13 @@ end %>
       <p class="mt-4">
         To find the cause, see the
         <a href="<%= path(@pg) %>/logs?<%= to_query_string(@pg.upgrade_failure_logs_params) %>" class="text-orange-600 hover:underline">upgrade logs</a>.
+        To stay on Postgres <%= @pg.version %>, or to start again after you fix the cause, cancel the upgrade. This removes the server of the failed upgrade.
       </p>
+      <% if @edit_perm %>
+        <% form(action: "#{path(@pg)}/upgrade/cancel", method: :post, class: "mt-4") do %>
+          <%== part("components/form/submit_button", text: "Cancel Upgrade") %>
+        <% end %>
+      <% end %>
     <% else %>
       <p>Database upgrade to Postgres <%= @pg.target_version %> is in progress.</p>
       <% upgrade_progress_rows = upgrade_progress

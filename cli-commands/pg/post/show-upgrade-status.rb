@@ -22,6 +22,7 @@ class UbiCli
           logs_cmd << " --start #{logs_start} --end #{upgrade_status[:upgrade_logs_end]}"
         end
         body << "\nTo find the cause of the failure, see the upgrade logs:\n  #{logs_cmd}\n"
+        body << "To stay on the current version, or to start again after you fix the cause, cancel the upgrade:\n  ubi pg #{@location}/#{@name} cancel-upgrade\n"
       end
       response(body)
     end

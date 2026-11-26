@@ -2304,6 +2304,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/upgrade/cancel:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: cancelPostgresDatabaseUpgrade
+      summary: Cancel a failed major version upgrade of a PostgreSQL database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/private-link-service:
     parameters:
       - $ref: '#/components/parameters/project_id'

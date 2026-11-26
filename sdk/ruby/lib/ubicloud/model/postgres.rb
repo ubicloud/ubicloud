@@ -207,6 +207,12 @@ module Ubicloud
       merge_into_values(adapter.post(_path("/upgrade"), params))
     end
 
+    # Cancel a failed major version upgrade of the database. The database
+    # stays on its current version, and a new upgrade can then be started.
+    def cancel_upgrade
+      merge_into_values(adapter.post(_path("/upgrade/cancel")))
+    end
+
     # Show the status of a major version upgrade of the database.
     def upgrade_status
       adapter.get(_path("/upgrade"))

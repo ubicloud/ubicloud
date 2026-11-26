@@ -2,6 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
+  semaphore :cancel_upgrade
   frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_error, :upgrade_error_details, :upgrade_retryable, :upgrade_failed_at
 
   label def start
@@ -134,7 +135,33 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid,
       resource_id: postgres_resource.id, extra_data: {upgrade_error:, upgrade_error_details:}.compact)
 
+    when_cancel_upgrade_set? do
+      hop_wait_cancel_upgrade
+    end
+
     nap 6 * 60 * 60
+  end
+
+  label def wait_cancel_upgrade
+    nap 5 if postgres_resource.representative_server.strand.label == "wait_in_fence"
+    hop_cancel_upgrade
+  end
+
+  # The candidate promoted itself during the failed upgrade, so it cannot
+  # rejoin as a standby. Destroy it and go back to the current version. An
+  # operator may have destroyed the candidate already.
+  label def cancel_upgrade
+    decr_cancel_upgrade
+    register_deadline(nil, 10 * 60, message: "destroy the server of the canceled upgrade")
+    candidate = upgrade_candidate
+    candidate&.incr_destroy
+    self.servers_to_destroy = Array(candidate&.id)
+
+    postgres_resource.update(target_version: postgres_resource.version)
+    postgres_resource.read_replicas_dataset.update(target_version: postgres_resource.version)
+    Page.from_tag_parts("PostgresUpgradeFailed", postgres_resource.id)&.incr_resolve
+
+    hop_wait_prune_servers
   end
 
   label def recycle_representative_server
