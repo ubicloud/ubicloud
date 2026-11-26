@@ -13,16 +13,26 @@ class Prog::SetupHugepages < Prog::Base
     # safety ratio to avoid overcommitting memory for hugepages.
     hugepage_cnt = vm_host.total_mem_gib * 42 / 43 - 5
 
+    # arm64 VMs get 3.2 GiB per vCPU (see Scheduling::Allocator), and the IO
+    # CPUs are not sold to VMs. On hosts with more memory per CPU, hugepages
+    # beyond that stay unused while the host OS runs short of memory. x64 is
+    # not capped, as GPU VMs get more memory per vCPU.
+    if vm_host.arch == "arm64"
+      sellable_cnt = ((vm_host.total_cpus - vm_host.io_cpu_count) * 3.2r).ceil
+      hugepage_cnt = sellable_cnt if sellable_cnt < hugepage_cnt
+    end
+
     # Platforms with large kernel or driver preallocations keep less usable
     # memory than physical memory implies; clamp against measured
     # MemAvailable so the reservation cannot starve the host OS. With
-    # hugetlb_free_vmemmap=on, the kernel returns 16380 KiB of struct page
-    # memory per 1G page once the pages are reserved at boot, so add it back
-    # to the measurement taken before the reservation exists.
+    # hugetlb_free_vmemmap=on, the x64 kernel returns 16380 KiB of struct
+    # page memory per 1G page once the pages are reserved at boot, so add it
+    # back to the measurement taken before the reservation exists. The arm64
+    # kernel does not support it and frees nothing.
     host_meminfo = sshable.cmd("cat /proc/meminfo")
     available_memory_match = host_meminfo.match(/^MemAvailable:\s+(\d+) kB$/)
     fail "Couldn't extract available memory" unless available_memory_match
-    vmemmap_kib = hugepage_cnt * 16380
+    vmemmap_kib = (vm_host.arch == "arm64") ? 0 : hugepage_cnt * 16380
     available_limit = (Integer(available_memory_match.captures.first) + vmemmap_kib) / 1048576 - 4
     if available_limit < hugepage_cnt
       Clog.emit("hugepage count clamped to available memory", {hugepage_clamp: {formula_count: hugepage_cnt, clamped_count: available_limit}})
