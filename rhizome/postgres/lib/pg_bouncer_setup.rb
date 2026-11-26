@@ -113,6 +113,7 @@ user = postgres
 stats_users = postgres
 
 pool_mode = transaction
+ignore_startup_parameters = extra_float_digits
 
 max_client_conn = #{5000 / @num_instances.to_i}
 max_db_connections = #{@max_connections.to_i / @num_instances.to_i}
