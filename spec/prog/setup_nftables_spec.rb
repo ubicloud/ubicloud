@@ -14,7 +14,7 @@ RSpec.describe Prog::SetupNftables do
       Address.create(cidr: "2001:db8::/64", routed_to_host_id: vmh.id)
       Address.create(cidr: "123.123.123.0/24", routed_to_host_id: vmh.id)
 
-      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\]")
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\] \\[\\\"1.1.1.1\\\"\\]")
 
       expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end
@@ -27,7 +27,16 @@ RSpec.describe Prog::SetupNftables do
       AssignedHostAddress.create(host_id: vmh.id, ip: "23.105.176.1", address_id: claimed.id)
       Address.create(cidr: "123.123.123.0/24", routed_to_host_id: vmh.id)
 
-      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\]")
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\] \\[\\\"1.1.1.1\\\",\\\"23.105.176.1\\\"\\]")
+
+      expect { sn.start }.to exit({"msg" => "nftables was setup"})
+    end
+
+    it "allows a host ip inside a blocked subnet" do
+      vmh = Prog::Vm::HostNexus.assemble("146.94.217.2", ipv4_subnets: ["146.94.217.0/28"]).subject
+      sn = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}], prog: "SetupNftables"))
+
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"146.94.217.0/28\\\"\\] \\[\\\"146.94.217.2\\\"\\]")
 
       expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end

@@ -10,6 +10,9 @@ unless (additional_ip_addresses = ARGV.shift)
   additional_ip_addresses = "[]"
 end
 
+# Host IPs that may be inside a blocked range.
+host_ip_addresses = JSON.parse(ARGV.shift || "[]")
+
 # setup blocking unused ip addresses
 NFTABLES_PATH = "/etc/nftables.d/0.conf"
 FileUtils.mkdir_p("/etc/nftables.d")
@@ -23,6 +26,7 @@ delete table inet drop_unused_ip_packets;
 table inet drop_unused_ip_packets {
   set allowed_ipv4_addresses {
     type ipv4_addr;
+#{"elements = {#{host_ip_addresses.join(",")}}" unless host_ip_addresses.empty?}
   }
 
   set blocked_ipv4_addresses {

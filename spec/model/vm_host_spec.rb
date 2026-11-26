@@ -444,7 +444,7 @@ RSpec.describe VmHost do
       expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq(["23.105.176.1", "23.105.176.2", "23.105.176.3"] + (65..126).map { "216.22.15.#{it}" })
 
       sn = Prog::SetupNftables.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupNftables"))
-      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"23.105.176.1/32\\\",\\\"23.105.176.2/32\\\",\\\"23.105.176.3/32\\\",\\\"216.22.15.64/26\\\"\\]")
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"23.105.176.1/32\\\",\\\"23.105.176.2/32\\\",\\\"23.105.176.3/32\\\",\\\"216.22.15.64/26\\\"\\] \\[\\\"23.105.171.112\\\"\\]")
       expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end
   end

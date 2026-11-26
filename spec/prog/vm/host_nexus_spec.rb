@@ -39,6 +39,12 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((160..175).map { "89.117.242.#{it}" } + (8..11).map { "89.117.243.#{it}" })
     end
 
+    it "keeps the host ip, network and broadcast address out of the pool of a subnet holding the host ip" do
+      st = described_class.assemble("146.94.217.2", ipv4_subnets: ["146.94.217.2/28"])
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }).to contain_exactly("146.94.217.2/32", "146.94.217.0/28")
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq(["146.94.217.1"] + (3..14).map { "146.94.217.#{it}" })
+    end
+
     it "creates the provider and the host address for a provider without an api" do
       st = described_class.assemble("127.0.0.1", provider_name: "other", server_identifier: "1")
       expect(st.subject.provider_name).to eq("other")
