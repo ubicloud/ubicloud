@@ -252,6 +252,30 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     nil
   end
 
+  # Find the workflow job the runner is running using the GitHub API.
+  # Returns the job as a hash with string keys, or nil if not found.
+  def find_workflow_job
+    return unless (runner_id = github_runner.runner_id)
+    repository_name = github_runner.repository_name
+
+    rescue_common_github_api_errors do
+      run_ids = if (run_id = github_runner.run_id)
+        [run_id]
+      else
+        client.repository_workflow_runs(repository_name, status: "in_progress")[:workflow_runs].map { it[:id] }
+      end
+
+      run_ids.each do |run_id|
+        if (job = client.workflow_run_jobs(repository_name, run_id, filter: "latest")[:jobs].find { it[:runner_id] == runner_id })
+          # Deep convert to string keys
+          return JSON.parse(JSON.generate(job.to_h))
+        end
+      end
+
+      nil
+    end
+  end
+
   def rescue_common_github_api_errors
     yield
   rescue Octokit::InstallationSuspended
@@ -933,9 +957,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
-        register_deadline(nil, 15 * 60, allow_extension: true, message: "finish destroying while running a job")
-        register_deadline("wait_vm_destroy", 2 * 60 * 60, message: "finish running job before destroying")
-        nap 15
+        if (job = find_workflow_job)
+          github_runner.update_from_workflow_job(job)
+        else
+          Clog.emit("Could not find the workflow job of the busy runner", github_runner)
+        end
+        hop_wait
       when false
         rescue_common_github_api_errors do
           client.delete(runners_path(github_runner.runner_id))

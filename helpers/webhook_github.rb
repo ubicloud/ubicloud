@@ -135,23 +135,6 @@ class Clover
     end
   end
 
-  def update_github_runner_from_workflow_job(runner, job)
-    runner.this.where(conclusion: nil).update(
-      job_id: job["id"],
-      run_id: job["run_id"],
-      run_attempt: job["run_attempt"],
-      head_branch: job["head_branch"],
-      workflow_name: job["workflow_name"],
-      job_name: job["name"],
-      job_created_at: job["created_at"],
-      job_started_at: job["started_at"],
-      job_completed_at: job["completed_at"],
-      status: job["status"],
-      conclusion: job["conclusion"],
-      workflow_job: Sequel.pg_jsonb(job.except("steps")),
-    )
-  end
-
   def handle_webhook_github_workflow_job(data)
     case (action = data["action"])
     when "queued", "completed", "in_progress"
@@ -224,7 +207,7 @@ class Clover
 
     return {error: {message: "Unregistered runner"}} unless runner
 
-    update_github_runner_from_workflow_job(runner, job)
+    runner.update_from_workflow_job(job)
 
     if action == "in_progress"
       runner.log_duration("runner_started", Time.new(job["started_at"]) - Time.new(job["created_at"]))

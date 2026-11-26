@@ -2155,11 +2155,31 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to nap(5)
     end
 
-    it "naps if runner still running a job" do
+    it "determines the workflow job and hops to wait if runner still running a job" do
       runner.update(workflow_job: nil)
       expect(client).to receive(:get).and_return(busy: true)
+      expect(client).to receive(:repository_workflow_runs).with("test-repo", status: "in_progress").and_return({workflow_runs: [{id: 111}, {id: 222}]})
+      expect(client).to receive(:workflow_run_jobs).with("test-repo", 111, filter: "latest").and_return({jobs: [{id: 1, runner_id: 456}]})
+      expect(client).to receive(:workflow_run_jobs).with("test-repo", 222, filter: "latest").and_return({jobs: [{id: 789, run_id: 222, run_attempt: 1, status: "in_progress", runner_id: 123, steps: []}]})
 
-      expect { nx.destroy }.to nap(15)
+      expect { nx.destroy }.to hop("wait")
+      runner.reload
+      expect(runner.job_id).to eq(789)
+      expect(runner.run_id).to eq(222)
+      expect(runner.status).to eq("in_progress")
+      expect(runner.workflow_job).to eq({"id" => 789, "run_id" => 222, "run_attempt" => 1, "status" => "in_progress", "runner_id" => 123})
+    end
+
+    it "hops to wait if runner still running a job even if the workflow job cannot be found" do
+      runner.update(workflow_job: nil)
+      expect(client).to receive(:get).and_return(busy: true)
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [{id: 111}]})
+      expect(client).to receive(:workflow_run_jobs).and_return({jobs: []})
+      expect(Clog).to receive(:emit).with("The runner is still running a job", runner).and_call_original
+      expect(Clog).to receive(:emit).with("Could not find the workflow job of the busy runner", runner).and_call_original
+
+      expect { nx.destroy }.to hop("wait")
+      expect(runner.reload.job_id).to be_nil
     end
 
     it "destroys resources and hops if runner deregistered" do
@@ -2223,10 +2243,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "do not skip deregistration when workflow job status is not completed" do
-      runner.update(workflow_job: {"status" => "in_progress"})
+      runner.update(workflow_job: {"status" => "in_progress", "run_id" => 111})
       expect(client).to receive(:get).and_return(busy: true)
+      expect(client).not_to receive(:repository_workflow_runs)
+      expect(client).to receive(:workflow_run_jobs).with("test-repo", 111, filter: "latest").and_return({jobs: [{id: 789, run_id: 111, status: "in_progress", runner_id: 123}]})
 
-      expect { nx.destroy }.to nap(15)
+      expect { nx.destroy }.to hop("wait")
+      expect(runner.reload.job_id).to eq(789)
     end
 
     it "does not collect telemetry if the vm not allocated" do
@@ -2444,6 +2467,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(completed_jobs.count).to eq(0)
         expect(DeletedRecord.where(model_name: "GithubRunner", record_id: runner.id).count).to eq(1)
       end
+    end
+  end
+
+  describe ".find_workflow_job" do
+    it "returns nil if the runner is not registered" do
+      runner.update(runner_id: nil)
+      expect(client).not_to receive(:workflow_run_jobs)
+      expect(nx.find_workflow_job).to be_nil
+    end
+
+    it "skips deregistration if the installation is suspended" do
+      runner.update(workflow_job: nil)
+      expect(client).to receive(:repository_workflow_runs).and_raise(Octokit::InstallationSuspended)
+      expect { nx.find_workflow_job }.to nap(0)
+      expect(runner.skip_deregistration_set?).to be(true)
     end
   end
 
