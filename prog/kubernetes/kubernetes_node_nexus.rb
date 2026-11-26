@@ -283,13 +283,12 @@ TIMER
   end
 
   label def remove_node_from_cluster
-    # kubeadm reset is necessary for etcd member removal, deleting the node itself
-    # won't remove the node from the etcd cluster, hurting the etcd cluster health
-    kubernetes_node.sshable.cmd("sudo kubeadm reset --force")
-
     if nodepool
       cluster.services_lb.detach_vm(kubernetes_node.vm)
     else
+      # kubeadm reset is necessary for etcd member removal, deleting the node itself
+      # won't remove the node from the etcd cluster, hurting the etcd cluster health
+      kubernetes_node.sshable.cmd("sudo kubeadm reset --force")
       cluster.api_server_lb.detach_vm(kubernetes_node.vm)
     end
 
