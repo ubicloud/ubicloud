@@ -4597,7 +4597,7 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content("internal-service")
   end
 
-  it "lists unpaid invoices by month and supports charging them" do
+  it "lists unpaid invoices by month with the current usage of their projects and supports charging them" do
     rows = -> { page.all(".unpaid-invoice-table tbody tr").map { it.all("td").map(&:text) } }
 
     click_link "Unpaid Invoices"
@@ -4616,17 +4616,30 @@ RSpec.describe CloverAdmin do
     other_sep = create_invoice.call(other, "2609-other", 9, 1250, name: "Other", email: "billing@other.com", failed_charge_attempts: [Time.utc(2026, 10, 1), Time.utc(2026, 10, 3)])
     create_invoice.call(other, "2608-other", 8, 20, status: "paid")
 
+    now = Time.now.utc.round
+    month_begin = Time.utc(now.year, now.month)
+    expect(Time).to receive(:now).and_return([now, month_begin + 3600].max).at_least(:once)
+    vcpu_rate_id = BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1", false, BILLING_RATE_ACTIVE_AT)["id"]
+    runner_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")["id"]
+    create_billing_record = lambda do |project, billing_rate_id, amount, span|
+      BillingRecord.create(project_id: project.id, resource_id: Vm.generate_uuid, resource_name: "usage", billing_rate_id:, amount:, span: Sequel.pg_range(span))
+    end
+    create_billing_record.call(acme, vcpu_rate_id, 4, Time.now - 3600..)
+    create_billing_record.call(acme, vcpu_rate_id, 8, (month_begin - 86400)...(month_begin + 3600))
+    create_billing_record.call(acme, runner_rate_id, 1000, month_begin...(month_begin + 86400))
+    create_billing_record.call(other, vcpu_rate_id, 4, (month_begin - 2 * 86400)...month_begin)
+
     visit "/unpaid-invoices"
     expect(page.all("#unpaid-invoices-search option").map(&:text)).to eq ["2026-09", "2026-08"]
-    expect(page.all(".unpaid-invoice-table thead th").map(&:text)).to eq ["Invoice", "Name", "Email", "Amount", "Unpaid Invoices", "Failed Charges", "Charge"]
+    expect(page.all(".unpaid-invoice-table thead th").map(&:text)).to eq ["Invoice", "Name", "Email", "Amount", "Current Usage", "Unpaid Invoices", "Failed Charges", "Charge"]
     expect(rows.call).to eq [
-      ["2609-other", "Other", "billing@other.com", "$1,250.00", "1", "2", ""],
-      ["2609-acme", "ACME", "billing@acme.com", "$10.50", "2", "0", ""],
+      ["2609-other", "Other", "billing@other.com", "$1,250.00", "$0.00", "1", "2", ""],
+      ["2609-acme", "ACME", "billing@acme.com", "$10.50", "$1.53", "2", "0", ""],
     ]
 
     select "2026-08", from: "Month"
     click_button "Search"
-    expect(rows.call).to eq [["2608-acme", "ACME", "billing@acme.com", "$7.00", "2", "0", ""]]
+    expect(rows.call).to eq [["2608-acme", "ACME", "billing@acme.com", "$7.00", "$1.53", "2", "0", ""]]
 
     # A valid month without unpaid invoices shows no data
     visit "/unpaid-invoices?month=2026-07"

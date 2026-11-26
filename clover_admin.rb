@@ -2661,10 +2661,29 @@ class CloverAdmin < Roda
         @month = @months.first
       end
 
+      month_invoices = Invoice.where(status: "unpaid").where(month => @month)
+
+      now = Time.now.utc
+      month_begin = Time.utc(now.year, now.month)
+      usage_begin = Sequel.function(:greatest, Sequel.function(:lower, :span), month_begin)
+      usage_end = Sequel.function(:coalesce, Sequel.function(:upper, :span), now)
+      usage_minutes = Sequel.extract(:epoch, usage_end - usage_begin) / 60
+      current_usage = Hash.new(0)
+      BillingRecord
+        .where(project_id: month_invoices.select(:project_id))
+        .overlapping(month_begin, now)
+        .select_group(:project_id, :billing_rate_id)
+        .select_append(Sequel.function(:sum, :amount).as(:amount), Sequel.function(:sum, Sequel[:amount] * usage_minutes).as(:amount_minutes))
+        .naked
+        .each do |row|
+          rate = BillingRate.from_id(row[:billing_rate_id])
+          quantity = (rate["billed_by"] == "amount") ? row[:amount] : row[:amount_minutes]
+          current_usage[row[:project_id]] += quantity * rate["unit_price"]
+        end
+
       unpaid_counts = unpaid.group_and_count(:project_id)
       cost = Sequel.cast(Sequel.pg_jsonb_op(:content).get_text("cost"), :numeric)
-      @data = Invoice
-        .where(status: "unpaid").where(month => @month)
+      @data = month_invoices
         .join(unpaid_counts.as(:uc), project_id: :project_id)
         .select_all(:invoice)
         .select_append(Sequel[:uc][:count].as(:unpaid_count))
@@ -2675,6 +2694,7 @@ class CloverAdmin < Roda
             "Name" => invoice.content.dig("billing_info", "name"),
             "Email" => invoice.content.dig("billing_info", "email"),
             "Amount" => table_cost(invoice.cost),
+            "Current Usage" => table_cost(current_usage[invoice.project_id]),
             "Unpaid Invoices" => invoice[:unpaid_count],
             "Failed Charges" => invoice.content["failed_charge_attempts"]&.length || 0,
             "Charge" => table_form_button("Charge", action: "/model/Invoice/#{invoice.ubid}/charge", method: "post"),
