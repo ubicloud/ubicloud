@@ -51,6 +51,7 @@ module Config
   override :clover_database_url_web, clover_database_url, string, clear: true
   override :clover_database_url_respirate, clover_database_url, string, clear: true
   override :clover_database_url_monitor, clover_database_url, string, clear: true
+  override :repartitioner_database_port, 5432, int
   mandatory :clover_column_encryption_key, base64, clear: true
   mandatory :clover_session_secret, base64, clear: true
   mandatory :rack_env, string
