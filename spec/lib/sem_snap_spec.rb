@@ -28,6 +28,34 @@ RSpec.describe SemSnap do
     expect(Semaphore.where(strand_id: st.id).all).to be_empty
   end
 
+  it "applies deferred deletions if block raises a non-database error" do
+    described_class.new(st.id).incr(:test)
+
+    expect {
+      described_class.use(st.id) do |snap|
+        snap.decr(:test)
+        raise "test error"
+      end
+    }.to raise_error(RuntimeError, "test error")
+
+    expect(Semaphore.where(strand_id: st.id).all).to be_empty
+  end
+
+  it "does not apply deferred deletions if block raises a database error" do
+    described_class.new(st.id).incr(:test)
+
+    expect {
+      DB.transaction(savepoint: true) do
+        described_class.use(st.id) do |snap|
+          snap.decr(:test)
+          DB.get(Sequel.lit("1/0"))
+        end
+      end
+    }.to raise_error(Sequel::DatabaseError, /division by zero/)
+
+    expect(Semaphore.where(strand_id: st.id).count).to eq 1
+  end
+
   it "operates immediately by default in non-block form" do
     snap = described_class.new(st.id)
     snap.incr(:test)
