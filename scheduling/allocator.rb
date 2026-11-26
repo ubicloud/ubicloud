@@ -7,7 +7,7 @@ module Scheduling::Allocator
   class HostsBusy < RuntimeError
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
+  def self.build_request(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
@@ -18,7 +18,7 @@ module Scheduling::Allocator
       VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
     end
 
-    request = Request.new(
+    Request.new(
       vm.id,
       vm.vcpus,
       vm.memory_gib,
@@ -47,6 +47,10 @@ module Scheduling::Allocator
       os_filter,
       vm.project_id,
     )
+  end
+
+  def self.allocate(vm, storage_volumes, **kwargs)
+    request = build_request(vm, storage_volumes, **kwargs)
     allocations = Allocation.ranked_allocations(request)
     fail NoSpaceLeft, "#{vm} no space left on any eligible host" if allocations.empty?
 
