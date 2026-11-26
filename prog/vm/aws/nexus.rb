@@ -252,7 +252,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     unless user_nic.nic_aws_resource.create_network_interface
       network_interface = instance.network_interfaces.first
-      user_nic.update(private_ipv4: network_interface.private_ip_address)
+      private_ipv4 = network_interface.private_ip_address
+      # AWS never assigns an address a live interface uses, so the nic holding
+      # this one lost its interface. Free the address for this instance.
+      if (nic = stale_nic(private_ipv4))
+        Clog.emit("private ipv4 is held by a stale nic", {private_ipv4_stale: {vm:, private_ipv4:, nic: nic.ubid, nic_vm_id: nic.vm_id}})
+        nic.update(private_ipv4: nil)
+      end
+      user_nic.update(private_ipv4:)
       user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
@@ -286,11 +293,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     instance_response = reservation&.instances&.first
     state = instance_response&.dig(:state, :name)
 
-    if state == "terminated" && instance_response.dig(:state_reason, :code) == "Server.InternalError" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
-      if runner.provision_spare_runner
-        Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message: instance_response.dig(:state_reason, :message)}})
-        runner.incr_destroy
+    if state == "terminated" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
+      state_reason = instance_response.dig(:state_reason, :code)
+      message = instance_response.dig(:state_reason, :message)
+      if state_reason == "Server.InternalError"
+        Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message:}})
+      else
+        Clog.emit("aws instance terminated before running", {aws_instance_terminated_before_running: {vm:, state_reason:, message:}})
       end
+      runner.provision_spare_runner
+      runner.incr_destroy
       nap 60 * 60
     end
 
@@ -478,6 +490,15 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def user_nic
     @user_nic ||= vm.user_nic
+  end
+
+  def stale_nic(private_ipv4)
+    user_nic.private_subnet.nics_dataset
+      .exclude(Sequel[:nic][:id] => user_nic.id)
+      .association_join(:nic_aws_resource)
+      .where(Sequel[:nic_aws_resource][:create_network_interface] => false)
+      .select_all(:nic)
+      .first(Sequel[:nic][:private_ipv4] => private_ipv4)
   end
 
   def postgres_aws_ssh_ipv6?
