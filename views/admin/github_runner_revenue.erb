@@ -1,10 +1,11 @@
 <% @page_title = "GitHub Runner Revenue" %>
 
-<p>Weekly revenue at list price since <%= @first_day %>, each week starting on the date shown.</p>
+<p>Revenue at list price, each row starting on the date shown. Rows before <%= @first_day %> show only the total, since spilled runners were not recorded separately before then.</p>
 
 <% form(id: "github_runner_revenue_form", class: "form-vertical") do |f| %>
-  <%== f.input(:number, key: "weeks", label: "Weeks", value: @weeks, min: 1, max: 52) %>
+  <%== f.input(:select, key: "period", label: "Period", options: [["Week", "week"], ["Day", "day"]], value: @period) %>
+  <%== f.input(:number, key: "count", label: "Count", value: @count) %>
   <%== f.button("Show Revenue") %>
 <% end %>
 
-<%== part("components/table", title: "By Week", table_class: "github-runner-revenue-table", data: @data, use_admin_label: false) %>
+<%== part("components/table", title: "By #{@period.capitalize}", table_class: "github-runner-revenue-table", data: @data, use_admin_label: false) %>
