@@ -268,8 +268,8 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
     end
 
     let(:users) { {"relation" => "users", "objects" => ["citext: users_email_key"]} }
-    let(:users_jobs) { {"app" => ["REINDEX INDEX CONCURRENTLY users_email_key"]} }
-    let(:users_script) { script(['  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key"],']) }
+    let(:users_jobs) { {"app" => ["REINDEX INDEX users_email_key"]} }
+    let(:users_script) { script(['  "app" => ["REINDEX INDEX users_email_key"],']) }
 
     it "pops clean, with no reindex script, when every table is safe" do
       results = {"app" => empty_result.merge("safe" => 2, "refresh" => ["materialized_view: mv"])}
@@ -286,11 +286,11 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
         "shop" => empty_result.merge("rebuild" => [{"relation" => "items", "objects" => ["pg_trgm: items_name_trgm", "pg_trgm: items_name_trgm"]}]),
       }
       expected_script = script([
-        '  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key", "REINDEX INDEX CONCURRENTLY users_name_trgm", "REINDEX INDEX CONCURRENTLY posts_lower_idx"],',
-        '  "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"],',
+        '  "app" => ["REINDEX INDEX users_email_key", "REINDEX INDEX users_name_trgm", "REINDEX INDEX posts_lower_idx"],',
+        '  "shop" => ["REINDEX INDEX items_name_trgm"],',
       ], ["# By hand, not indexes:\n", %(#   "app: stored_column: posts.body_tsv"\n)])
       expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app", "shop"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
-        "reindex_jobs" => {"app" => ["REINDEX INDEX CONCURRENTLY users_email_key", "REINDEX INDEX CONCURRENTLY users_name_trgm", "REINDEX INDEX CONCURRENTLY posts_lower_idx"], "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"]},
+        "reindex_jobs" => {"app" => ["REINDEX INDEX users_email_key", "REINDEX INDEX users_name_trgm", "REINDEX INDEX posts_lower_idx"], "shop" => ["REINDEX INDEX items_name_trgm"]},
         "reindex_script" => expected_script})
     end
 
@@ -309,7 +309,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       script = verdict["reindex_script"]
       expect { RubyVM::InstructionSequence.compile(script) }.not_to raise_error
       jobs = eval(script[/^jobs = \{.*?^\}$/m].delete_prefix("jobs = "))  # rubocop:disable Security/Eval
-      expect(jobs).to eq(database => ["REINDEX INDEX CONCURRENTLY #{index}"])
+      expect(jobs).to eq(database => ["REINDEX INDEX #{index}"])
       expect(verdict["reindex_jobs"]).to eq(jobs)
       expect(script.lines.last).to eq("#   #{"#{database}: stored_column: #{column}".inspect}\n")
       expect(script.lines.count { it.start_with?("#") }).to eq(2)

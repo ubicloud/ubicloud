@@ -240,7 +240,7 @@ class Prog::Postgres::ScanResourceCtype < Prog::Base
     results.each do |database, result|
       kinds = result["rebuild"].flat_map { it["objects"] }.map { it.split(": ", 2) }
       indexes, others = kinds.partition { |kind, _| INDEX_KINDS.include?(kind) }
-      jobs[database] = indexes.map { |_, name| "REINDEX INDEX CONCURRENTLY #{name}" }.uniq unless indexes.empty?
+      jobs[database] = indexes.map { |_, name| "REINDEX INDEX #{name}" }.uniq unless indexes.empty?
       by_hand.concat(others.map { |kind, name| "#{database}: #{kind}: #{name}" })
     end
     [jobs, by_hand]

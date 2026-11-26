@@ -156,7 +156,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
       register_deadline("prune_servers", 10 * 60, message: "finish failing over representative server")
-      postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?)
+      postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?, lockout: !reindex_jobs.nil?)
     end
 
     nap 60
@@ -201,7 +201,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
     step = reindex_step.to_i
     database, sqls = reindex_jobs.to_a[step]
-    pop "postgres resource is converged" unless database
+    unless database
+      primary.decr_hold_lockout
+      primary.incr_configure
+      hop_wait_lockout_release
+    end
 
     sshable = primary.vm.sshable
     unit = "reindex_#{strand.ubid}_#{step}"
@@ -213,7 +217,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 0
     when "Failed"
       Clog.emit("Postgres reindex failed", {postgres_reindex_failed: {ubid: postgres_resource.ubid, unit:, log: sshable.d_logs(unit, lines: 20).lines.map(&:chomp)}})
-      Prog::PageNexus.assemble("#{postgres_resource.ubid} reindex failed", ["PostgresReindexFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
+      Prog::PageNexus.assemble("#{postgres_resource.ubid} reindex failed, primary locked out", ["PostgresReindexFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id, severity: "critical")
       nap 60
     when "NotStarted"
       sshable.d_run(unit, "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
@@ -221,6 +225,13 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     end
 
     nap 5
+  end
+
+  label def wait_lockout_release
+    primary = postgres_resource.representative_server
+    nap 5 if primary.configure_set? || primary.strand.label != "wait"
+
+    pop "postgres resource is converged"
   end
 
   def upgrade_candidate
