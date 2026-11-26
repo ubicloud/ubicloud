@@ -15,19 +15,30 @@ end
 
 require "json"
 require_relative "../lib/vm_path"
-require_relative "../lib/cloud_hypervisor"
 
 vm_path = VmPath.new(vm_name)
 params = JSON.parse(File.read(vm_path.prep_json))
 
-unless params.fetch("hypervisor", "ch") == "ch"
-  warn "stop-vm is only supported for VMs using cloud-hypervisor"
+case (hypervisor = params.fetch("hypervisor", "ch"))
+when "ch"
+  require_relative "../lib/cloud_hypervisor"
+
+  unless (ch = CloudHypervisor::Version[params["ch_version"]])
+    warn "supported cloud hypervisor version not found"
+    exit 1
+  end
+
+  Process.exec(ch.ch_remote_bin, "--api-socket", vm_path.ch_api_sock, "power-button")
+when "qemu"
+  require_relative "../lib/qmp"
+
+  unless File.socket?(vm_path.qmp_sock)
+    warn "QMP socket not found, VM has to be stopped by stopping its service"
+    exit 0
+  end
+
+  Qmp.new(vm_path.qmp_sock).system_powerdown
+else
+  warn "unsupported hypervisor #{hypervisor}"
   exit 1
 end
-
-unless (ch = CloudHypervisor::Version[params["ch_version"]])
-  warn "supported cloud hypervisor version not found"
-  exit 1
-end
-
-Process.exec(ch.ch_remote_bin, "--api-socket", vm_path.ch_api_sock, "power-button")
