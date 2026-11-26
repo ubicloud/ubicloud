@@ -14,6 +14,8 @@ class VmPool < Sequel::Model
     # and lock it with FOR NO KEY UPDATE SKIP LOCKED.
     vms_dataset
       .where(Sequel[:vm][:display_state] => "running")
+      .exclude(Semaphore.where(strand_id: id, name: %w[destroy destroying]).exists)
+      .exclude(Semaphore.where(strand_id: Sequel[:vm][:id], name: %w[destroy destroying]).exists)
       .exclude(id: DB[:github_runner].exclude(vm_id: nil).select(:vm_id))
       .for_no_key_update
       .skip_locked
