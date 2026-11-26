@@ -34,6 +34,12 @@ RSpec.describe Address do
     expect(DB[:ipv4_address]).to be_empty
   end
 
+  it "keeps the host ip, network and broadcast address of a subnet holding the host ip out of the pool" do
+    vm_host = Prog::Vm::HostNexus.assemble("146.94.217.2").subject
+    described_class.create(cidr: "146.94.217.0/29", vm_host:).populate_ipv4_addresses
+    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[146.94.217.1 146.94.217.3 146.94.217.4 146.94.217.5 146.94.217.6]
+  end
+
   describe "leaseweb" do
     def assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_PROVIDER_NAME)
       allow(Config).to receive_messages(

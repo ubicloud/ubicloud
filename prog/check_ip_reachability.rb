@@ -4,7 +4,18 @@ class Prog::CheckIpReachability < Prog::Base
   subject_is :sshable, :vm_host
   frame_accessor :failed_tries
 
+  # Some providers put the host IP inside a VM subnet. The gateway of the
+  # host is then in the VM pool too, and no VM can use it.
   label def start
+    gateways = sshable.cmd_json("/usr/sbin/ip -j -4 route show default").filter_map { it["gateway"] }
+    DB[:ipv4_address]
+      .where(cidr: vm_host.assigned_subnets_dataset.select(:cidr), ip: gateways)
+      .delete
+
+    hop_check
+  end
+
+  label def check
     vm_ips = DB[:ipv4_address]
       .where(cidr: vm_host.assigned_subnets_dataset.select(:cidr))
       .order(:ip)
