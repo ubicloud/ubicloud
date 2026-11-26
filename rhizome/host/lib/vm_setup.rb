@@ -932,6 +932,10 @@ DNSMASQ_SERVICE
       "-vga none",
     ]
 
+    monitor_parts = [
+      "-qmp unix:#{vp.qmp_sock},server=on,wait=off",
+    ]
+
     kernel_parts = [
       "-bios /opt/fw/QEMU.fd",
     ]
@@ -943,7 +947,7 @@ DNSMASQ_SERVICE
   NetworkNamespacePath=/var/run/netns/#{@vm_name}
 
   ExecStart=qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")} \\
-  #{(kernel_parts + mem_parts + cpu_parts + disk_parts + net_parts + pci_parts + serial_parts).join(" \\\n")}
+  #{(kernel_parts + mem_parts + cpu_parts + disk_parts + net_parts + pci_parts + serial_parts + monitor_parts).join(" \\\n")}
 
   KillSignal=SIGTERM
   TimeoutStopSec=30s
