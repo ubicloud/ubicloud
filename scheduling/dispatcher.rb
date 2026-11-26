@@ -231,7 +231,7 @@ class Scheduling::Dispatcher
       # number of partitions, so no reason to reprepare it.
       @old_strand_pl ||= Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(ds) do |pl, ds|
         ds
-          .exclude(id: Sequel.function(:ANY, Sequel.cast(pl.arg, "uuid[]")))
+          .exclude(id: Sequel.function(:ANY, pl.arg))
           .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast(Sequel.cast(pl.arg, String) + " seconds", :interval))
       end
 
@@ -243,7 +243,7 @@ class Scheduling::Dispatcher
 
     @strand_pl = Sequel::Postgres::AutoParameterize::PlaceholderLiteralizer.loader(ds) do |pl, ds|
       ds
-        .exclude(id: Sequel.function(:ANY, Sequel.cast(pl.arg, "uuid[]")))
+        .exclude(id: Sequel.function(:ANY, pl.arg))
         .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
     end
   end
@@ -438,9 +438,11 @@ class Scheduling::Dispatcher
 
   # A pg_array for the strand ids to skip.  These are the strand
   # ids that have been enqueued or are currently being processed
-  # by strand threads.
+  # by strand threads.  The array type makes the array a single
+  # bound parameter, so the query text does not change with the
+  # number of ids.
   def skip_strands
-    Sequel.pg_array(@mutex.synchronize { @current_strands.keys })
+    Sequel.pg_array(@mutex.synchronize { @current_strands.keys }, :uuid)
   end
 
   # The number of strands the thread pool is currently running.
