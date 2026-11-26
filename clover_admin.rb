@@ -2236,17 +2236,24 @@ class CloverAdmin < Roda
     end
 
     r.get "github-runner-revenue" do
-      @weeks = (typecast_params.pos_int("weeks") || 8).clamp(1, 52)
+      if typecast_params.str("period") == "day"
+        @period = "day"
+        period_days = 1
+      else
+        @period = "week"
+        period_days = 7
+      end
+      runner_rates = BillingRate.from_resource_type("GitHubRunnerMinutes").to_h { [it["id"], it] }
       @first_day = Date.new(2026, 11, 24)
       end_date = Date.today
-      recorded_weeks = ((end_date - @first_day).to_i / 7).clamp(0, nil)
-      week_count = [@weeks, recorded_weeks].min
-      begin_date = end_date - 7 * week_count
+      billed_since = runner_rates.each_value.map { it["active_from"] }.min.to_date
+      max_count = (end_date - billed_since).to_i / period_days
+      @count = [typecast_params.pos_int("count") || 8, max_count].min
+      begin_date = end_date - period_days * @count
       day = Sequel.function(:lower, :span)
       tags = Sequel.pg_jsonb_op(:resource_tags)
       tag_minutes = ->(key) { Sequel.function(:coalesce, tags.get_text(key).cast(:integer), 0) }
       sum_spilled_minutes = ->(family) { Sequel.function(:sum, tag_minutes.call("aws_#{family}_minutes") + tag_minutes.call("gcp_#{family}_minutes")) }
-      runner_rates = BillingRate.from_resource_type("GitHubRunnerMinutes").to_h { [it["id"], it] }
 
       records = DB[:billing_record]
         .where(billing_rate_id: runner_rates.keys)
@@ -2256,33 +2263,35 @@ class CloverAdmin < Roda
         .select_append(sum_spilled_minutes.call("standard").as(:spilled_standard_minutes), sum_spilled_minutes.call("premium").as(:spilled_premium_minutes))
         .all
 
-      weeks = Array.new(week_count) do |i|
-        {begin_date: end_date - 7 * (i + 1), metal_standard: 0, spilled_standard: 0, metal_premium: 0, spilled_premium: 0}
+      buckets = Array.new(@count) do |i|
+        bucket_begin = end_date - period_days * (i + 1)
+        {begin_date: bucket_begin, split_recorded: bucket_begin >= @first_day, metal_standard: 0, spilled_standard: 0, metal_premium: 0, spilled_premium: 0}
       end
       records.each do |row|
-        week = weeks[(end_date - row[:day].to_date - 1).to_i / 7]
+        bucket = buckets[(end_date - row[:day].to_date - 1).to_i / period_days]
         rate = runner_rates[row[:billing_rate_id]]
         price = rate["unit_price"]
-        week[:spilled_standard] += row[:spilled_standard_minutes] * price
-        week[:spilled_premium] += row[:spilled_premium_minutes] * price
+        bucket[:spilled_standard] += row[:spilled_standard_minutes] * price
+        bucket[:spilled_premium] += row[:spilled_premium_minutes] * price
         metal_revenue = (row[:minutes] - row[:spilled_standard_minutes] - row[:spilled_premium_minutes]) * price
         if rate["resource_family"].start_with?("premium")
-          week[:metal_premium] += metal_revenue
+          bucket[:metal_premium] += metal_revenue
         else
-          week[:metal_standard] += metal_revenue
+          bucket[:metal_standard] += metal_revenue
         end
       end
 
-      @data = weeks.map do |week|
-        spilled = week[:spilled_standard] + week[:spilled_premium]
-        total = week[:metal_standard] + week[:metal_premium] + spilled
-        spilled_share = total.zero? ? "-" : format("%.1f%%", spilled * 100 / total)
+      split_cost = ->(bucket, key) { bucket[:split_recorded] ? table_cost(bucket[key]) : "-" }
+      @data = buckets.map do |bucket|
+        spilled = bucket[:spilled_standard] + bucket[:spilled_premium]
+        total = bucket[:metal_standard] + bucket[:metal_premium] + spilled
+        spilled_share = (bucket[:split_recorded] && !total.zero?) ? format("%.1f%%", spilled * 100 / total) : "-"
         {
-          "Week" => week[:begin_date].to_s,
-          "Metal Standard" => table_cost(week[:metal_standard]),
-          "Spilled Standard" => table_cost(week[:spilled_standard]),
-          "Metal Premium" => table_cost(week[:metal_premium]),
-          "Spilled Premium" => table_cost(week[:spilled_premium]),
+          @period.capitalize => bucket[:begin_date].to_s,
+          "Metal Standard" => split_cost.call(bucket, :metal_standard),
+          "Spilled Standard" => split_cost.call(bucket, :spilled_standard),
+          "Metal Premium" => split_cost.call(bucket, :metal_premium),
+          "Spilled Premium" => split_cost.call(bucket, :spilled_premium),
           "Total" => table_cost(total),
           "Spilled Share" => spilled_share,
         }

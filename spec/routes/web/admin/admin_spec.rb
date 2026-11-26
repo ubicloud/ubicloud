@@ -3615,17 +3615,25 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{us_only.ubid}"
   end
 
-  it "shows weekly GitHub runner revenue on metal and spilled to AWS and GCP since the first recorded day" do
+  it "shows weekly and daily GitHub runner revenue on metal and spilled to AWS and GCP, and only the total before the first recorded day" do
     rows = -> { page.all(".github-runner-revenue-table tbody tr").map { it.all("td").map(&:text) } }
 
     today = Date.new(2026, 11, 26)
+    week_label = ->(week) { (today - 7 * week - 7).to_s }
+    day_label = ->(day) { (today - day - 1).to_s }
+    empty_day = ->(day) { [day_label.call(day), "$0.00", "$0.00", "$0.00", "$0.00", "$0.00", "-"] }
+    total_only = ->(label, total = "$0.00") { [label, "-", "-", "-", "-", total, "-"] }
+
     expect(Date).to receive(:today).at_least(:once) { today }
     click_link "GitHub Runner Revenue"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner Revenue"
-    expect(page).to have_content("No data available for By Week table")
+    expect(rows.call).to eq(Array.new(8) { total_only.call(week_label.call(it)) })
+
+    select "Day", from: "Period"
+    click_button "Show Revenue"
+    expect(rows.call).to eq [empty_day.call(0), empty_day.call(1), *(2..7).map { total_only.call(day_label.call(it)) }]
 
     today = Date.new(2026, 12, 26)
-    week_label = ->(week) { (today - 7 * week - 7).to_s }
     project = Project.create(name: "customer")
     resource_id = GithubInstallation.generate_uuid
     runner_rate_id = ->(family) { BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global")["id"] }
@@ -3644,17 +3652,41 @@ RSpec.describe CloverAdmin do
       [week_label.call(0), "$1.75", "$0.50", "$0.80", "$0.45", "$3.50", "27.1%"],
       [week_label.call(1), "$1.50", "$0.00", "$0.00", "$0.00", "$1.50", "0.0%"],
     ]
-    page.refresh
+    visit "/github-runner-revenue"
     expect(page.all(".github-runner-revenue-table thead th").map(&:text)).to eq ["Week", "Metal Standard", "Spilled Standard", "Metal Premium", "Spilled Premium", "Total", "Spilled Share"]
     expect(rows.call).to eq [
       *recent_weeks,
       [week_label.call(2), "$0.00", "$0.00", "$0.00", "$0.00", "$0.00", "-"],
       [week_label.call(3), "$1.00", "$0.00", "$0.00", "$0.00", "$1.00", "0.0%"],
+      total_only.call(week_label.call(4), "$0.50"),
+      *(5..7).map { total_only.call(week_label.call(it)) },
     ]
 
-    fill_in "Weeks", with: "2"
+    fill_in "Count", with: "2"
     click_button "Show Revenue"
     expect(rows.call).to eq recent_weeks
+
+    fill_in "Count", with: "1000000000"
+    click_button "Show Revenue"
+    expect(page).to have_field("Count", with: "207")
+    expect(rows.call.last).to eq total_only.call(week_label.call(206))
+
+    select "Day", from: "Period"
+    fill_in "Count", with: "60"
+    click_button "Show Revenue"
+    expect(page.all(".github-runner-revenue-table thead th").map(&:text)).to eq ["Day", "Metal Standard", "Spilled Standard", "Metal Premium", "Spilled Premium", "Total", "Spilled Share"]
+    expect(rows.call).to eq [
+      [day_label.call(0), "$1.75", "$0.50", "$0.00", "$0.25", "$2.50", "30.0%"],
+      empty_day.call(1),
+      [day_label.call(2), "$0.00", "$0.00", "$0.80", "$0.20", "$1.00", "20.0%"],
+      *(3..6).map { empty_day.call(it) },
+      [day_label.call(7), "$1.50", "$0.00", "$0.00", "$0.00", "$1.50", "0.0%"],
+      *(8..20).map { empty_day.call(it) },
+      [day_label.call(21), "$1.00", "$0.00", "$0.00", "$0.00", "$1.00", "0.0%"],
+      *(22..31).map { empty_day.call(it) },
+      total_only.call(day_label.call(32), "$0.50"),
+      *(33..59).map { total_only.call(day_label.call(it)) },
+    ]
   end
 
   it "shows unavailable VMs" do
