@@ -1,0 +1,424 @@
+# frozen_string_literal: true
+
+require "csv"
+
+# Rehearses an image family migration of a Postgres resource on a private
+# fork. It forks the resource into an internal project, audits and scans the
+# fork, and moves it to the target family with the scan's reindex jobs, as
+# the real migration does. Then it checks the objects at risk in every
+# database, which shows whether the jobs rebuilt all of them. It ends in
+# wait_review with the results in the frame and the Clog line, and leaves the
+# fork for an operator to review and destroy.
+class Prog::Postgres::RehearseImageFamilyMigration < Prog::Base
+  subject_is :postgres_resource
+
+  frame_reader :project_id, :target_image_family
+  frame_accessor :fork_id, :databases, :step, :results, :verdict_before, :verdict_after, :scan_verdict, :status,
+    :old_primary_id, :window, :downtime
+
+  AUDIT = Prog::Postgres::AuditResourceCollation
+
+  # The indexes the collation audit lists in the current database: sort-order
+  # index rows from DETAILS_SQL and index-backed case-mapping rows from
+  # CTYPE_SQL. Reusing the audit's queries keeps the two from drifting.
+  TARGETS_SQL = <<~SQL.freeze
+    WITH listed(name) AS (
+      SELECT name FROM (#{AUDIT::DETAILS_SQL.chomp.delete_suffix(";")}) d WHERE kind = 'index'
+      UNION
+      SELECT object FROM (#{AUDIT::CTYPE_SQL.chomp.delete_suffix(";")}) c WHERE kind IN ('expression', 'citext', 'pg_trgm')
+    )
+    SELECT c.oid, c.oid::regclass::text AS name, am.amname
+    FROM listed l JOIN pg_class c ON c.oid = l.name::regclass JOIN pg_am am ON am.oid = c.relam
+  SQL
+
+  # Every part below records its outcome as rows in
+  # ubi_collation_rehearsal.result, a table that exists only on the fork.
+  # SETUP_SQL creates it, and a temporary table of the indexes the audit
+  # lists.
+  SETUP_SQL = <<~SQL.freeze
+    CREATE SCHEMA IF NOT EXISTS ubi_collation_rehearsal;
+    CREATE TABLE IF NOT EXISTS ubi_collation_rehearsal.result (phase text NOT NULL, object text NOT NULL, ok boolean, detail text,
+      started_at timestamptz NOT NULL DEFAULT clock_timestamp(), finished_at timestamptz);
+    CREATE TEMP TABLE target AS #{TARGETS_SQL.chomp};
+  SQL
+
+  # Runs bt_index_check with heapallindexed, which computes every key again
+  # with the current library, on each listed btree index; checkunique also
+  # checks uniqueness on PG 17+. amcheck checks btree only, so other access
+  # methods are recorded as not checked.
+  AMCHECK_SQL = <<~SQL
+    CREATE EXTENSION IF NOT EXISTS amcheck;
+    ALTER EXTENSION amcheck UPDATE;
+    DO $do$
+    DECLARE
+      t record;
+      started timestamptz;
+    BEGIN
+      FOR t IN SELECT * FROM target WHERE amname = 'btree' ORDER BY oid LOOP
+        started := clock_timestamp();
+        BEGIN
+          IF current_setting('server_version_num')::int >= 170000 THEN
+            PERFORM bt_index_check(t.oid::regclass, true, true);
+          ELSE
+            PERFORM bt_index_check(t.oid::regclass, true);
+          END IF;
+          INSERT INTO ubi_collation_rehearsal.result VALUES ('amcheck', t.name, true, NULL, started, clock_timestamp());
+        EXCEPTION WHEN OTHERS THEN
+          INSERT INTO ubi_collation_rehearsal.result VALUES ('amcheck', t.name, false, SQLERRM, started, clock_timestamp());
+        END;
+      END LOOP;
+      INSERT INTO ubi_collation_rehearsal.result
+        SELECT 'amcheck', name, NULL, amname || ' index: amcheck checks btree only', clock_timestamp(), clock_timestamp()
+        FROM target WHERE amname <> 'btree';
+    END
+    $do$;
+  SQL
+
+  # Each row check lists (phase, object, query), where the query counts the
+  # rows that no longer pass. Validated check constraints, checked once on a
+  # partitioned table's parent:
+  CHECK_CONSTRAINT_CHECKS = <<~SQL
+    SELECT 'check_constraint' AS phase, format('%s.%I', con.conrelid::regclass, con.conname) AS object,
+      format('SELECT count(*) FROM %s WHERE NOT (%s)', con.conrelid::regclass, pg_get_expr(con.conbin, con.conrelid)) AS query
+    FROM pg_constraint con JOIN pg_class r ON r.oid = con.conrelid
+    WHERE con.contype = 'c' AND con.convalidated AND NOT r.relispartition
+      AND r.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Stored generated columns, whose values must equal their expression:
+  GENERATED_COLUMN_CHECKS = <<~SQL
+    SELECT 'generated_column', format('%s.%I', a.attrelid::regclass, a.attname),
+      format('SELECT count(*) FROM %s WHERE %I IS DISTINCT FROM (%s)', a.attrelid::regclass, a.attname, pg_get_expr(d.adbin, d.adrelid))
+    FROM pg_attribute a JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum JOIN pg_class r ON r.oid = a.attrelid
+    WHERE a.attgenerated = 's' AND NOT a.attisdropped AND r.relkind IN ('r', 'p') AND NOT r.relispartition
+      AND r.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Leaf partitions, whose rows must still satisfy their bound:
+  PARTITION_BOUND_CHECKS = <<~SQL
+    SELECT 'partition_bound', c.oid::regclass::text,
+      format('SELECT count(*) FROM ONLY %s WHERE NOT (%s)', c.oid::regclass, pg_get_partition_constraintdef(c.oid))
+    FROM pg_class c
+    WHERE c.relispartition AND c.relkind = 'r' AND pg_get_partition_constraintdef(c.oid) IS NOT NULL
+      AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+  SQL
+
+  # Runs every row check and records the count; an error is a failure too.
+  ROW_CHECKS_SQL = <<~SQL.freeze
+    DO $do$
+    DECLARE
+      o record;
+      n bigint;
+      started timestamptz;
+    BEGIN
+      FOR o IN
+        #{[CHECK_CONSTRAINT_CHECKS, GENERATED_COLUMN_CHECKS, PARTITION_BOUND_CHECKS].join("UNION ALL\n").chomp}
+        ORDER BY 1, 2
+      LOOP
+        started := clock_timestamp();
+        BEGIN
+          EXECUTE o.query INTO n;
+          INSERT INTO ubi_collation_rehearsal.result
+            VALUES (o.phase, o.object, n = 0, CASE WHEN n > 0 THEN n || ' rows do not match' END, started, clock_timestamp());
+        EXCEPTION WHEN OTHERS THEN
+          INSERT INTO ubi_collation_rehearsal.result VALUES (o.phase, o.object, false, SQLERRM, started, clock_timestamp());
+        END;
+      END LOOP;
+    END
+    $do$;
+  SQL
+
+  # The psql script run in each database, through the daemonizer because
+  # amcheck can outlast a strand lease. A setup error stops it, as nothing
+  # after it can work; the checks record their own failures.
+  # Records each collation version that the library gives, as the jobs end
+  # by refreshing them: those of the database's collations, of its default,
+  # and of the templates, as CREATE DATABASE fails on a template with a
+  # mismatch. A version left behind means a warning on every connection.
+  VERSIONS_SQL = <<~SQL
+    INSERT INTO ubi_collation_rehearsal.result (phase, object, ok, detail, finished_at)
+    SELECT 'version', 'collation ' || oid::regcollation, ok, CASE WHEN NOT ok THEN format('%s recorded, %s in the library', recorded, actual) END, clock_timestamp()
+    FROM (
+      SELECT oid, collversion, pg_collation_actual_version(oid), collversion IS NOT DISTINCT FROM pg_collation_actual_version(oid)
+      FROM pg_collation WHERE collversion IS NOT NULL
+    ) c(oid, recorded, actual, ok)
+    UNION ALL
+    SELECT 'version', 'database ' || datname, ok, CASE WHEN NOT ok THEN format('%s recorded, %s in the library', recorded, actual) END, clock_timestamp()
+    FROM (
+      SELECT datname, datcollversion, pg_database_collation_actual_version(oid), datcollversion IS NOT DISTINCT FROM pg_database_collation_actual_version(oid)
+      FROM pg_database WHERE datcollversion IS NOT NULL AND (datname = current_database() OR datistemplate)
+    ) d(datname, recorded, actual, ok);
+  SQL
+
+  SCRIPT = <<~SQL.freeze
+    \\set ON_ERROR_STOP on
+    #{SETUP_SQL}
+    #{AMCHECK_SQL}
+    #{ROW_CHECKS_SQL}
+    #{VERSIONS_SQL}
+  SQL
+
+  DATABASES_SQL = "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"
+
+  RESULTS_SQL = <<~SQL
+    SELECT phase, object, ok, detail, round(extract(epoch FROM finished_at - started_at)::numeric, 1)
+    FROM ubi_collation_rehearsal.result ORDER BY phase, ok NULLS FIRST, object
+  SQL
+
+  # Caps the failures kept per phase and database, so the frame stays small.
+  FAILURE_LIMIT = 50
+
+  # The labels of a planned failover's old primary from the start of its
+  # fence, whose CHECKPOINTs come before it locks clients out.
+  FENCE_LABELS = %w[fence wait_fence_stop wait_in_fence].freeze
+
+  # How often wait_migrated looks at the fork, so each time in the window is
+  # late by up to this.
+  POLL_SECONDS = 5
+
+  def self.assemble(postgres_resource_id, project_id:, target_image_family: "ubuntu-2604")
+    fail "No existing project" unless Project[project_id]
+    fail "Unknown image family" unless Option::POSTGRES_IMAGE_FAMILIES.include?(target_image_family)
+
+    Strand.create(prog: "Postgres::RehearseImageFamilyMigration", label: "start",
+      stack: [{"subject_id" => postgres_resource_id, "project_id" => project_id, "target_image_family" => target_image_family}])
+  end
+
+  label def start
+    register_deadline("wait_review", 2 * 24 * 60 * 60, page: false, message: "finish the rehearsal")
+    hop_create_fork
+  end
+
+  label def create_fork
+    if (reason = unsuitable_reason)
+      finish(reason)
+    end
+
+    begin
+      self.fork_id = Prog::Postgres::PostgresResourceNexus.assemble(
+        project_id:,
+        location_id: postgres_resource.location_id,
+        name: fork_name,
+        target_vm_size: postgres_resource.target_vm_size,
+        target_storage_size_gib: postgres_resource.target_storage_size_gib,
+        target_version: postgres_resource.version,
+        parent_id: postgres_resource.id,
+        restore_target: (Time.now - 5 * 60).utc.iso8601,
+        user_config: postgres_resource.user_config,
+        pgbouncer_user_config: postgres_resource.pgbouncer_user_config,
+        with_firewall_rules: false,
+      ).id
+    rescue Validation::ValidationFailed => e
+      finish("fork failed: #{e.message}")
+    end
+
+    hop_wait_fork
+  end
+
+  label def wait_fork
+    finish("fork is gone") unless fork
+    nap 30 unless fork.display_state == "running"
+    hop_audit_before
+  end
+
+  label def audit_before
+    bud Prog::Postgres::AuditResourceCollation, {"subject_id" => fork_id}
+    hop_wait_audit_before
+  end
+
+  label def wait_audit_before
+    reap(:scan, nap: 120, reaper: ->(child) { self.verdict_before = child.exitval })
+  end
+
+  # Nothing else reads the fork, so the scan reads every table, however
+  # large.
+  label def scan
+    bud Prog::Postgres::ScanResourceCtype, {"subject_id" => fork_id, "max_table_gib" => nil}
+    hop_wait_scan
+  end
+
+  label def wait_scan
+    reap(:migrate, nap: 60, reaper: ->(child) { self.scan_verdict = child.exitval })
+  end
+
+  label def migrate
+    finish("fork is gone") unless fork
+    finish("scan has no reindex jobs: #{scan_verdict["msg"]}") unless scan_verdict["reindex_jobs"]
+    self.old_primary_id = fork.representative_server.id
+    fork.update(target_image_family:)
+    hop_wait_converge
+  end
+
+  # The fork's converge naps at its gate until its frame has the jobs. One
+  # UPDATE writes them only while no respirate thread holds the strand, which
+  # reloads the stack when it takes the lease, so the write cannot be lost.
+  label def wait_converge
+    finish("fork is gone") unless fork
+    written = fork.strand.children_dataset
+      .where(prog: "Postgres::ConvergePostgresResource", label: "wait_reindex_decision")
+      .where { lease < Sequel::CURRENT_TIMESTAMP }
+      .update(stack: Sequel.pg_jsonb_op(:stack).set(%w[0 reindex_jobs], Sequel.pg_jsonb_wrap(scan_verdict["reindex_jobs"])),
+        schedule: Sequel::CURRENT_TIMESTAMP)
+    nap 30 if written.zero?
+    hop_wait_migrated
+  end
+
+  # The converge rebuilds the indexes after the failover, so the migration
+  # ends when it exits. A failed rebuild pages and leaves the fork locked
+  # out, for the operator.
+  label def wait_migrated
+    finish("fork is gone") unless fork
+    finish("reindex failed") if Page.from_tag_parts("PostgresReindexFailed", fork.id)
+    converge = fork.strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource", exitval: nil)
+    record_window(converge)
+    if fork.needs_convergence? || converge || fork.representative_server.image_family != target_image_family || fork.display_state != "running"
+      nap POLL_SECONDS
+    end
+    hop_audit_after
+  end
+
+  label def audit_after
+    bud Prog::Postgres::AuditResourceCollation, {"subject_id" => fork_id}
+    hop_wait_audit_after
+  end
+
+  label def wait_audit_after
+    reap(:list_databases, nap: 120, reaper: ->(child) { self.verdict_after = child.exitval })
+  end
+
+  label def list_databases
+    self.databases = CSV.parse(fork.representative_server.run_query(DATABASES_SQL)).map(&:first)
+    self.step = 0
+    self.results = {}
+    hop_wait_database_script
+  end
+
+  # Runs SCRIPT in one database at a time and records its results.
+  label def wait_database_script
+    hop_report if step == databases.size
+
+    sshable = fork.representative_server.vm.sshable
+    unit = "collation_rehearsal_#{step}"
+    case (state = sshable.d_check(unit))
+    when "NotStarted"
+      sshable.d_run(unit, "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X", "-d", PostgresServer.conninfo(databases[step]), stdin: SCRIPT)
+    when "Succeeded", "Failed"
+      log = sshable.d_logs(unit, lines: 20) if state == "Failed"
+      self.results = results.merge(databases[step] => database_result(databases[step], state, log))
+      sshable.d_clean(unit)
+      self.step = step + 1
+    end
+
+    nap 5
+  end
+
+  label def report
+    passed = audit_passed? && scan_passed? && results.each_value.all? do |database|
+      database["script"] == "Succeeded" && database["phases"].each_value.all? { it["failed"].zero? }
+    end
+    finish(passed ? "passed" : "review needed")
+  end
+
+  # Holds the strand so an operator can review the frame and the fork. To
+  # clean up: fork.incr_destroy, then destroy this strand.
+  label def wait_review
+    hibernate
+  end
+
+  def fork
+    @fork ||= PostgresResource[fork_id] if fork_id
+  end
+
+  def fork_name
+    "collation-fork-#{postgres_resource.ubid}"
+  end
+
+  def unsuitable_reason
+    if postgres_resource.nil?
+      "postgres resource is gone"
+    elsif postgres_resource.location.project_id
+      "location belongs to a project, so the fork would run in that account"
+    elsif postgres_resource.display_state != "running"
+      "postgres resource is not running"
+    elsif postgres_resource.representative_server.image_family == target_image_family
+      "postgres resource already runs #{target_image_family}"
+    elsif !PostgresResource.where(project_id:, location_id: postgres_resource.location_id, name: fork_name).empty?
+      "fork #{fork_name} already exists"
+    end
+  end
+
+  def database_result(database, state, log)
+    result = {"script" => state}
+    result["log"] = log.lines.map(&:chomp) if log
+    rows = CSV.parse(fork.representative_server.run_query(RESULTS_SQL, dbname: PostgresServer.conninfo(database)))
+    result.merge("phases" => rows.group_by(&:first).transform_values { phase_summary(it) })
+  rescue Sshable::SshError => e
+    result.merge("phases" => {}, "results_error" => e.stderr.lines.first.to_s.strip)
+  end
+
+  def phase_summary(rows)
+    failed = rows.select { it[2] == "f" }
+    {"ok" => rows.count { it[2] == "t" }, "failed" => failed.size, "unchecked" => rows.count { it[2].nil? },
+     "seconds" => rows.sum { it[4].to_f }.round(1),
+     "failures" => failed.first(FAILURE_LIMIT).map { |_, object, _, detail| {"object" => object, "detail" => detail} }}
+  end
+
+  # The audit must have run on both sides of the migration and agree, and the
+  # fork must not need a blocker or a manual review.
+  def audit_passed?
+    return false unless verdict_before && verdict_after
+    !%w[skipped unreachable].include?(verdict_after["msg"]) && !(verdict_after["actions"] || []).intersect?(%w[blocker review]) &&
+      verdict_before.slice("msg", "actions") == verdict_after.slice("msg", "actions")
+  end
+
+  # The scan must have scanned every table and found every object it lists
+  # to be one that a job rebuilds.
+  def scan_passed?
+    return false unless scan_verdict
+    %w[clean rebuild].include?(scan_verdict["msg"]) && scan_verdict["by_hand"].empty?
+  end
+
+  # Records, as Unix times, when each part of the window in which clients
+  # cannot use the fork is first seen: the old primary's fence, the promote,
+  # the start of each database's reindex jobs and the end of the last, and
+  # the release of the lockout, when the converge exits. A part missed
+  # between two looks gets the time of the next.
+  def record_window(converge)
+    now = Time.now.to_i
+    times = (window || {}).dup
+    promoted = fork.representative_server.id != old_primary_id
+    times["fenced"] ||= now if promoted || FENCE_LABELS.include?(PostgresServer[old_primary_id].strand.label)
+    times["promoted"] ||= now if promoted
+    if promoted
+      reindex = times["reindex"] || []
+      steps = case converge&.label
+      when "reindex" then converge.stack[0]["reindex_step"].to_i + 1
+      when "wait_lockout_release", nil then scan_verdict["reindex_jobs"].size + 1
+      else 0
+      end
+      times["reindex"] = reindex + [now] * (steps - reindex.size) if steps > reindex.size
+      times["released"] ||= now unless converge
+    end
+    self.window = times unless times == window
+  end
+
+  # The seconds clients could not use the fork, in all and by part, once
+  # the lockout is released. The rest of the total is the configure and
+  # restart of the new primary around the reindex.
+  def downtime_seconds
+    return unless window&.key?("released")
+    reindex = window["reindex"]
+    {"total" => window["released"] - window["fenced"], "failover" => window["promoted"] - window["fenced"],
+     "reindex" => reindex.last - reindex.first, "databases" => scan_verdict["reindex_jobs"].keys.zip(reindex.each_cons(2).map { _2 - _1 }).to_h,
+     "precision" => POLL_SECONDS}
+  end
+
+  def finish(status)
+    self.status = status
+    self.downtime = downtime_seconds
+    scan = scan_verdict&.except("databases", "reindex_jobs", "reindex_script")
+    summary = {resource: postgres_resource&.ubid, fork: fork&.ubid, status:, downtime:, verdict_before:, verdict_after:, scan:, results:}
+    Clog.emit("postgres image family rehearsal", {postgres_image_family_rehearsal: summary})
+    hop_wait_review
+  end
+end
