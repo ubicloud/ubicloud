@@ -164,6 +164,21 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
+      it "in an AWS location that is not visible" do
+        location = Location[name: "us-east-1", project_id: nil]
+        expect(location.visible).to be(false)
+        LocationAz.create(location_id: location.id, az: "a", zone_id: "use1-az6")
+
+        post "/project/#{project.ubid}/location/us-east-1/postgres/test-postgres-aws", {
+          size: "m8gd.large",
+          storage_size: 118,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["location"]).to eq("us-east-1")
+        expect(PostgresResource.first(name: "test-postgres-aws").location_id).to eq(location.id)
+      end
+
       it "ignores submitted flavor" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
           size: "standard-2",
