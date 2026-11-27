@@ -1542,10 +1542,12 @@ NFTABLES_CONF
       expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       expect(vs).to receive(:_run_command).with("groupadd", "-f", "--system", "runner-metrics")
       expect(vs).to receive(:_run_command).with("useradd", "--no-create-home", "--system", "--shell", "/usr/sbin/nologin", "-g", "runner-metrics", "runner-metrics", expect: [0, 9])
-      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/bin")
-      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/lib")
-      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/bin/runner-metrics-agent", File.read(File.expand_path("../bin/runner-metrics-agent", __dir__)), perm: 0o755)
-      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/lib/runner_metrics_agent.rb", File.read(File.expand_path("../lib/runner_metrics_agent.rb", __dir__)), perm: 0o644)
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/host/bin")
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/host/lib")
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/common/lib")
+      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/host/bin/runner-metrics-agent", File.read(File.expand_path("../bin/runner-metrics-agent", __dir__)), perm: 0o755)
+      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/host/lib/runner_metrics_agent.rb", File.read(File.expand_path("../lib/runner_metrics_agent.rb", __dir__)), perm: 0o644)
+      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/common/lib/runner_metrics_entry.rb", File.read(File.expand_path("../../common/lib/runner_metrics_entry.rb", __dir__)), perm: 0o644)
       expect(FileUtils).to receive(:mkdir_p).with("/var/lib/runner-metrics/test")
       expect(FileUtils).to receive(:chown).with("runner-metrics", "rhizome", "/var/lib/runner-metrics/test")
       expect(FileUtils).to receive(:chmod).with(0o2770, "/var/lib/runner-metrics/test")
@@ -1567,7 +1569,7 @@ NFTABLES_CONF
         User=runner-metrics
         Group=runner-metrics
         OpenFile=/vm/test/metrics.raw:metrics-disk:read-only
-        ExecStart=/opt/runner-metrics/bin/runner-metrics-agent /var/lib/runner-metrics/test
+        ExecStart=/opt/runner-metrics/host/bin/runner-metrics-agent /var/lib/runner-metrics/test
         UMask=0027
         MemoryMax=64M
         CPUQuota=10%

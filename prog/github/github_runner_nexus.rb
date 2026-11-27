@@ -676,8 +676,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
-    if vm.location.metal? && project.get_ff_github_runner_metrics
-      command << GithubRunnerMetrics.install_command
+    if project.get_ff_github_runner_metrics
+      command << GithubRunnerMetrics.install_command(metal: vm.location.metal?)
     end
 
     if (cache_proxy_url = project.get_ff_cache_proxy_download_url&.dig(label_data["arch"]))

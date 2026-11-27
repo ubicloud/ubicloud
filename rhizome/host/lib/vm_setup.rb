@@ -826,10 +826,14 @@ DNSMASQ_SERVICE
     r "groupadd", "-f", "--system", RUNNER_METRICS_USER
     r "useradd", "--no-create-home", "--system", "--shell", "/usr/sbin/nologin", "-g", RUNNER_METRICS_USER, RUNNER_METRICS_USER, expect: [0, 9] # 9 is "already exists"
 
-    {"bin/runner-metrics-agent" => 0o755, "lib/runner_metrics_agent.rb" => 0o644}.each do |path, perm|
+    {
+      "host/bin/runner-metrics-agent" => 0o755,
+      "host/lib/runner_metrics_agent.rb" => 0o644,
+      "common/lib/runner_metrics_entry.rb" => 0o644,
+    }.each do |path, perm|
       dest = File.join(RUNNER_METRICS_AGENT_ROOT, path)
       FileUtils.mkdir_p(File.dirname(dest))
-      safe_write_to_file(dest, File.read(File.join(__dir__, "..", path)), perm: perm)
+      safe_write_to_file(dest, File.read(File.join(__dir__, "..", "..", path)), perm: perm)
     end
 
     FileUtils.mkdir_p(vp.runner_metrics_dir)
@@ -847,7 +851,7 @@ PartOf=#{@vm_name}.service
 User=#{RUNNER_METRICS_USER}
 Group=#{RUNNER_METRICS_USER}
 OpenFile=#{vp.metrics_raw}:metrics-disk:read-only
-ExecStart=#{RUNNER_METRICS_AGENT_ROOT}/bin/runner-metrics-agent #{vp.runner_metrics_dir}
+ExecStart=#{RUNNER_METRICS_AGENT_ROOT}/host/bin/runner-metrics-agent #{vp.runner_metrics_dir}
 UMask=0027
 MemoryMax=64M
 CPUQuota=10%

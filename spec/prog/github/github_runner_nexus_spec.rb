@@ -1554,7 +1554,26 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
-        #{GithubRunnerMetrics.install_command.chomp}
+        #{GithubRunnerMetrics.install_command(metal: true).chomp}
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "installs the metrics writer with a ring file on non-metal runners when the project enables runner metrics" do
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      project.set_ff_github_runner_metrics(true)
+      ps = PrivateSubnet.create(name: "runner-subnet", location_id: gcp_location.id, net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64", state: "waiting", project_id: vm.project_id)
+      Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fbb::/79", name: "runner-nic", state: "active", vm_id: vm.id)
+      vm.update(location_id: gcp_location.id, vm_host_id: nil)
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        set -ueo pipefail
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="#{vm.runtime_token}"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "ACTIONS_CACHE_SERVICE_V2=true" | sudo tee -a /etc/environment > /dev/null
+        echo 10.0.0.5" ubicloudhostplaceholder.blob.core.windows.net" | sudo tee -a /etc/hosts > /dev/null
+        #{GithubRunnerMetrics.install_command(metal: false).chomp}
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")

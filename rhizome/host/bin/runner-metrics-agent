@@ -13,7 +13,7 @@ $stdout.sync = true
 agent = RunnerMetricsAgent.new(File.for_fd(3, "rb"), ARGV[0])
 begin
   agent.run
-rescue RunnerMetricsAgent::InvalidData => ex
+rescue RunnerMetricsEntry::Invalid => ex
   warn "Stopping runner metrics: #{ex.message}"
   exit 1
 end

@@ -270,4 +270,88 @@ RSpec.describe GithubRunner do
       expect(columns.map { github_runner.send(it) }).to eq([10, 20, "dev", "Build", "lint", Time.utc(2026, 9, 2, 10), Time.utc(2026, 9, 2, 10, 1), Time.utc(2026, 9, 2, 10, 4), "in_progress", "failure"])
     end
   end
+
+  describe ".alien_metrics_targets" do
+    def create_runner(location_id, installation, ready_at: Time.now)
+      described_class.create(repository_name: "repo", label: "ubicloud", vm_id: create_vm(location_id:).id, location_id:, installation_id: installation.id, ready_at:)
+    end
+
+    it "returns the ready AWS and GCP runners of projects with runner metrics" do
+      provider_project_id = Project.create(name: "providers").id
+      aws_location = Location.create(name: "eu-central-1", provider: "aws", project_id: provider_project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      gcp_location = Location.create(name: "gcp-europe-west3", provider: "gcp", project_id: provider_project_id, display_name: "gcp-europe-west3", ui_name: "GCP Frankfurt", visible: false)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(aws_location.id)
+      expect(Config).to receive(:github_runner_gcp_location_id).and_return(gcp_location.id)
+      metrics_project = Project.create(name: "metrics")
+      metrics_project.set_ff_github_runner_metrics(true)
+      metrics_installation = GithubInstallation.create(installation_id: 1, name: "metrics", type: "User", project_id: metrics_project.id)
+      other_installation = GithubInstallation.create(installation_id: 2, name: "other", type: "User", project_id: Project.create(name: "other").id)
+      aws_target = create_runner(aws_location.id, metrics_installation)
+      gcp_target = create_runner(gcp_location.id, metrics_installation)
+      create_runner(aws_location.id, metrics_installation, ready_at: nil)
+      create_runner(Location::HETZNER_FSN1_ID, metrics_installation)
+      create_runner(aws_location.id, other_installation)
+
+      expect(described_class.alien_metrics_targets.select_order_map(:id)).to eq([aws_target.id, gcp_target.id].sort)
+    end
+  end
+
+  describe "metrics export" do
+    let(:ssh_session) { Net::SSH::Connection::Session.allocate }
+    let(:tsdb_client) { VictoriaMetrics::Client.new(endpoint: "http://victoria-metrics.test") }
+    let(:read_command) { %q(tr -d '\0' < /run/ubicloud-metrics/ring | awk -F '[:,]' -v last=2 '/^\{"seq":/ && $2 > last { sub(/ +$/, ""); print }') }
+
+    def line(seq, time)
+      metrics = RunnerMetricsEntry::METRICS.to_h { |metric| [metric, (metric == "runner_queue_ldavg_1") ? 0.5 : 0] }
+      JSON.generate({"seq" => seq, "time" => time}.merge(metrics))
+    end
+
+    it "exports to the runner metrics project" do
+      project_id = Project.generate_uuid
+      expect(Config).to receive(:github_runner_metrics_project_id).and_return(project_id)
+
+      expect(github_runner.metrics_config).to eq({project_id:})
+    end
+
+    it "starts a session reading the ring from its first seq" do
+      expect(github_runner.vm.sshable).to receive(:start_fresh_session).and_return(ssh_session)
+
+      expect(github_runner.init_metrics_export_session).to eq({ssh_session:, last_seq: 0})
+    end
+
+    it "imports the ring's new samples and remembers the newest seq" do
+      now = Time.at(Time.now.to_i)
+      now_ms = now.to_i * 1000
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("#{line(3, now.to_i)}\n")
+      labels = "ubicloud_resource_id=\"#{github_runner.ubid}\",vm=\"#{github_runner.vm.ubid}\""
+      samples = RunnerMetricsEntry::METRICS.map { |metric| "#{metric}{#{labels}} #{(metric == "runner_queue_ldavg_1") ? 0.5 : 0} #{now_ms}\n" }.join
+      import = stub_request(:post, "http://victoria-metrics.test/api/v1/import/prometheus?timestamp=#{now_ms}")
+        .with { Zlib.gunzip(it.body) == samples }
+        .to_return(status: 204)
+      session = {ssh_session:, last_seq: 2}
+
+      github_runner.export_metrics(session:, tsdb_client:)
+      expect(import).to have_been_requested
+      expect(session[:last_seq]).to eq(3)
+    end
+
+    it "keeps the seq when the ring has no new samples" do
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("")
+      session = {ssh_session:, last_seq: 2}
+
+      github_runner.export_metrics(session:, tsdb_client:)
+      expect(session[:last_seq]).to eq(2)
+    end
+
+    it "stops collecting from a runner whose ring has invalid data" do
+      expect(ssh_session).to receive(:_exec!).with(read_command).and_return("{\"seq\":3}\n")
+      expect(Clog).to receive(:emit).with("Stopped collecting runner metrics", {runner_metrics_invalid: {ubid: github_runner.ubid, reason: "ring line does not have the expected keys"}}).and_call_original
+      session = {ssh_session:, last_seq: 2}
+
+      github_runner.export_metrics(session:, tsdb_client:)
+      expect(session).to eq({ssh_session:, last_seq: 2, invalid: true})
+      expect(github_runner.export_metrics(session:, tsdb_client:)).to be_nil
+    end
+  end
 end
