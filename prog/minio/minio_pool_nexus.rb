@@ -72,6 +72,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
     nap 5 unless minio_pool.servers.empty?
 
     minio_pool.destroy
+    cluster.servers.first&.incr_configure_metrics
     pop "pool destroyed"
   end
 end

@@ -176,6 +176,52 @@ RSpec.describe MinioServer do
     expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name1.minio.ubicloud.com")
   end
 
+  describe "#init_metrics_export_session" do
+    it "returns a session hash with a fresh ssh session" do
+      Sshable.create_with_id(ms.vm, host: "1.2.3.4")
+      session = Net::SSH::Connection::Session.allocate
+      expect(ms.vm.sshable).to receive(:start_fresh_session).and_return(session)
+      expect(ms.init_metrics_export_session).to eq({ssh_session: session})
+    end
+  end
+
+  describe "#metrics_config" do
+    it "scrapes the node and cluster collectors on the first server with a token minio accepts" do
+      config = ms.metrics_config
+
+      expect(config[:endpoints].map { it[:url] }).to eq(%w[
+        https://localhost:9000/minio/metrics/v3/api/requests
+        https://localhost:9000/minio/metrics/v3/system
+        https://localhost:9000/minio/metrics/v3/debug/go
+        https://localhost:9000/minio/metrics/v3/scanner
+        https://localhost:9000/minio/metrics/v3/cluster/health
+        https://localhost:9000/minio/metrics/v3/cluster/usage/objects
+        https://localhost:9000/minio/metrics/v3/cluster/erasure-set
+      ])
+      claims, header = JWT.decode(config[:endpoints].first[:bearer_token], "dummy-password", true, {algorithm: "HS512"})
+      expect(claims).to eq({"sub" => "minio-admin", "iss" => "prometheus"})
+      expect(header["alg"]).to eq("HS512")
+      expect(config[:additional_labels]).to eq({ubicloud_resource_id: ms.cluster.ubid, instance: ms.ubid})
+      expect(config[:metrics_dir]).to eq("/home/ubi/minio/metrics")
+    end
+
+    it "scrapes the cluster collectors on the lowest index server when indexes do not start from 0" do
+      ms.update(index: 4)
+      expect(ms.metrics_config[:endpoints].map { it[:url] }).to include("https://localhost:9000/minio/metrics/v3/cluster/health")
+    end
+
+    it "scrapes only the node collectors on other servers" do
+      ms.update(index: 5)
+      described_class.create(minio_pool_id: ms.pool.id, vm_id: create_vm(project_id: ms.cluster.project_id, name: "test-vm-2").id, index: 4)
+      expect(ms.metrics_config[:endpoints].map { it[:url] }).to eq(%w[
+        https://localhost:9000/minio/metrics/v3/api/requests
+        https://localhost:9000/minio/metrics/v3/system
+        https://localhost:9000/minio/metrics/v3/debug/go
+        https://localhost:9000/minio/metrics/v3/scanner
+      ])
+    end
+  end
+
   describe "#url" do
     before do
       minio_project = Project.create(name: "default")

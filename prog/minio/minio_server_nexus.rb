@@ -53,6 +53,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     minio_server.incr_initial_provisioning
     minio_server.incr_pin_net_threads
+    minio_server.incr_configure_metrics
 
     register_deadline("wait", 10 * 60, message: "finish setup")
 
@@ -147,6 +148,11 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       vm.vm_host.sshable.cmd("sudo host/bin/pin-vm-net-threads install :vm_name :cpus :thread_count", vm_name: vm.inhost_name, cpus: net_pin_allowed_cpus, thread_count: net_pin_thread_count.to_s)
     end
 
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
+    end
+
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
     if minio_server.certificate_last_checked_at < Time.now - refresh_after
       register_deadline("wait", 30 * 60, message: "finish refreshing certificates")
@@ -219,6 +225,50 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def wait_reconfigure
     decr_reconfigure
     reap(:wait)
+  end
+
+  label def configure_metrics
+    metrics_config = minio_server.metrics_config
+    metrics_dir = metrics_config[:metrics_dir]
+    config_path = "#{metrics_dir}/config.json"
+    vm.sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    vm.sshable.write_file(config_path, metrics_config.to_json, user: :current)
+    # config.json embeds the metrics bearer token, which carries the cluster
+    # admin credentials, so keep it readable only by the collector's user.
+    vm.sshable.cmd("chmod 600 :config_path", config_path:)
+
+    metrics_service = <<SERVICE
+[Unit]
+Description=MinIO Metrics Collection
+After=minio.service
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    vm.sshable.write_file("/etc/systemd/system/minio-metrics.service", metrics_service)
+
+    metrics_timer = <<TIMER
+[Unit]
+Description=Run MinIO Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_config[:interval]}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    vm.sshable.write_file("/etc/systemd/system/minio-metrics.timer", metrics_timer)
+
+    vm.sshable.cmd("sudo systemctl daemon-reload")
+    vm.sshable.cmd("sudo systemctl enable --now minio-metrics.timer")
+
+    hop_wait
   end
 
   label def minio_restart

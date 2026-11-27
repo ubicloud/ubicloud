@@ -105,6 +105,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.cert).to eq "cert"
       expect(nx.minio_server.cert_key).to eq "cert_key"
       expect(Semaphore.where(strand_id: nx.minio_server.id, name: "pin_net_threads").count).to eq(1)
+      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "configure_metrics").count).to eq(1)
     end
 
     it "creates server certificate with ip_san and hops to bootstrap_rhizome if dnszone doesn't exist" do
@@ -308,6 +309,21 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
   end
 
+  describe "#configure_metrics" do
+    it "writes the collector config and systemd units, then hops to wait" do
+      sshable = nx.minio_server.vm.sshable
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/minio/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/minio/metrics/config.json > /dev/null", stdin: nx.minio_server.metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("chmod 600 /home/ubi/minio/metrics/config.json")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/minio-metrics.service > /dev/null", stdin: %r{ExecStart=/home/ubi/common/bin/metrics-collector /home/ubi/minio/metrics})
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/minio-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now minio-metrics.timer")
+
+      expect { nx.configure_metrics }.to hop("wait")
+    end
+  end
+
   describe "#minio_restart" do
     it "hops to wait if succeeded" do
       expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
@@ -380,6 +396,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/pin-vm-net-threads install #{vm.inhost_name} 1 #{vm.vcpus}")
       expect { nx.wait }.to nap(10)
       expect(Semaphore.where(strand_id: nx.minio_server.id, name: "pin_net_threads").count).to eq(0)
+    end
+
+    it "hops to configure_metrics if configure_metrics is set" do
+      nx.incr_configure_metrics
+      expect { nx.wait }.to hop("configure_metrics")
+      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "configure_metrics").count).to eq(0)
     end
 
     it "hops to refresh_certificates if certificate is checked more than a month ago" do
