@@ -501,6 +501,9 @@ TIMER
     if available?
       decr_checkup
       check_boot_id
+      # NICs that left a rekey pass while the host was down
+      nic_ids = Nic.where(vm_id: vm_host.vms_dataset.select(:id)).select(:id)
+      Nic.incr_repopulate(Semaphore.where(strand_id: nic_ids, name: "rekey_skipped").select(:strand_id))
       hop_wait
     end
 

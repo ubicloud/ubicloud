@@ -31,6 +31,9 @@ class VmHost < Sequel::Model
   include HealthMonitorMethods
   include MetricsTargetMethods
 
+  # Vm::HostNexus labels in which the host may be down
+  DOWN_STRAND_LABELS = %w[unavailable prep_reboot reboot prep_hardware_reset hardware_reset].freeze
+
   def active_vms_dataset
     vms_dataset.exclude(display_state: "deleting")
   end
