@@ -263,7 +263,7 @@ TIMER
       # Keep the marker and wait instead of restarting every checkup cycle.
       return true
     when "Failed", "NotStarted"
-      vm.sshable.d_run("restart_parseable", "/home/ubi/parseable/bin/restart")
+      vm.sshable.d_run("restart_parseable", "systemctl", "restart", "parseable")
     end
     false
   end

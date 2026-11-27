@@ -274,13 +274,13 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
     it "starts restart and naps if failed" do
       expect(sshable).to receive(:d_check).with("restart_victoria_metrics").and_return("Failed")
-      expect(sshable).to receive(:d_run).with("restart_victoria_metrics", "/home/ubi/victoria_metrics/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_victoria_metrics", "systemctl", "restart", "victoria_metrics", "vmauth")
       expect { nx.restart }.to nap(1)
     end
 
     it "naps if restart is not started" do
       expect(sshable).to receive(:d_check).with("restart_victoria_metrics").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("restart_victoria_metrics", "/home/ubi/victoria_metrics/bin/restart")
+      expect(sshable).to receive(:d_run).with("restart_victoria_metrics", "systemctl", "restart", "victoria_metrics", "vmauth")
       expect { nx.restart }.to nap(1)
     end
 
