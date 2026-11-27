@@ -491,7 +491,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     before do
       expect(cluster.sshable).to receive(:connect).and_return(session)
-      expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm --ignore-not-found").and_return(success_response)
     end
 
@@ -505,8 +504,9 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(cluster.services_lb.vm_ports_by_vm(nx.kubernetes_node.vm).order(:stack).select_map([:stack, :state])).to eq [["ipv4", "detaching"], ["ipv6", "detaching"]]
     end
 
-    it "detaches a control plane node from the api server load balancer" do
+    it "resets a control plane node and detaches it from the api server load balancer" do
       cluster.api_server_lb.add_vm(nx.kubernetes_node.vm)
+      expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
 
       expect { nx.remove_node_from_cluster }.to hop("destroy")
 
