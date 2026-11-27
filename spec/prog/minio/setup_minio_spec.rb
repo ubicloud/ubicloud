@@ -186,7 +186,7 @@ ECHO
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /minio")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /minio/dat1")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab #{data_volume.device_path} /minio/dat1 xfs defaults 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount #{data_volume.device_path} /minio/dat1")
+      expect(sshable).to receive(:_cmd).with("mountpoint -q /minio/dat1 || sudo mount #{data_volume.device_path} /minio/dat1")
       expect(sshable).to receive(:_cmd).with("sudo chown -R minio-user:minio-user /minio")
       expect { nx.mount_data_disks }.to exit({"msg" => "data disks are mounted"})
     end

@@ -151,7 +151,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(sshable).to receive(:d_check).with("format_victoria_metrics_disk").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat/victoria_metrics")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab #{path} /dat/victoria_metrics ext4 defaults 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount #{path} /dat/victoria_metrics")
+      expect(sshable).to receive(:_cmd).with("mountpoint -q /dat/victoria_metrics || sudo mount #{path} /dat/victoria_metrics")
       expect(sshable).to receive(:_cmd).with("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
       expect { nx.mount_data_disk }.to hop("configure")
     end

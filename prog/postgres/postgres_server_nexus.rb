@@ -171,7 +171,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     vm.sshable.cmd("sudo mkdir -p /dat")
     device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
     vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 :options 0 0", device_uuid:, options: data_mount_options)
-    vm.sshable.cmd("sudo mount /dat")
+    vm.sshable.cmd("mountpoint -q /dat || sudo mount /dat")
   end
 
   label def run_init_script

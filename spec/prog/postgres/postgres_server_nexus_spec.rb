@@ -405,7 +405,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo blkid -s UUID -o value /dev/vdb").and_return("11111111-2222-3333-4444-555555555555\n")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab UUID=11111111-2222-3333-4444-555555555555 /dat ext4 defaults,noatime 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount /dat")
+      expect(sshable).to receive(:_cmd).with("mountpoint -q /dat || sudo mount /dat")
       expect { nx.mount_data_disk }.to hop("run_init_script")
     end
 
@@ -419,7 +419,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo blkid -s UUID -o value /dev/md0").and_return("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab UUID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee /dat ext4 defaults,noatime 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount /dat")
+      expect(sshable).to receive(:_cmd).with("mountpoint -q /dat || sudo mount /dat")
       expect { nx.mount_data_disk }.to hop("run_init_script")
     end
 

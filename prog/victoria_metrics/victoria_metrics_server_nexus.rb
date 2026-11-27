@@ -104,7 +104,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       volume = vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).first
       device_path = volume.device_path
       vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat/victoria_metrics ext4 defaults 0 0", device_path:)
-      vm.sshable.cmd("sudo mount :device_path /dat/victoria_metrics", device_path:)
+      vm.sshable.cmd("mountpoint -q /dat/victoria_metrics || sudo mount :device_path /dat/victoria_metrics", device_path:)
       vm.sshable.cmd("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
 
       hop_configure

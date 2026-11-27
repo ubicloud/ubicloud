@@ -70,7 +70,7 @@ ECHO
         minio_server.vm.sshable.cmd("sudo mkdir -p /minio/dat:i1", i1:)
         device_path = volume.device_path
         minio_server.vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /minio/dat:i1 xfs defaults 0 0", device_path:, i1:)
-        minio_server.vm.sshable.cmd("sudo mount :device_path /minio/dat:i1", device_path:, i1:)
+        minio_server.vm.sshable.cmd("mountpoint -q /minio/dat:i1 || sudo mount :device_path /minio/dat:i1", device_path:, i1:)
       end
       minio_server.vm.sshable.cmd("sudo chown -R minio-user:minio-user /minio")
 
