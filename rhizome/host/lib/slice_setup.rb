@@ -33,13 +33,15 @@ class SliceSetup
 
     # Only proceed if the slice has not yet been setup
     unless File.exist? systemd_service
-      safe_write_to_file(systemd_service, <<SLICE_CONFIG)
+      temp_filename = "#{systemd_service}.tmp"
+      File.write(temp_filename, <<SLICE_CONFIG)
 [Unit]
 Description=Restricting resouces for virtual machines
 Before=slices.target
 [Slice]
 AllowedCPUs=#{allowed_cpus}
 SLICE_CONFIG
+      File.rename(temp_filename, systemd_service)
 
       r "systemctl daemon-reload"
     end
