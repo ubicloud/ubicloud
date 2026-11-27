@@ -1029,6 +1029,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
+      it "allocates with upgrade if premium utilization is below 90" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "premium"].update(used_cores: 14)
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+        expect(runner.not_upgrade_premium_set?).to be(false)
+      end
+
       it "allocates without upgrade if premium utilization is high but standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
@@ -1066,6 +1073,15 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+      end
+
+      it "allocates without spilling over if premium utilization is below 90" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        runner.update(created_at: now - 40)
+        project.set_ff_spill_to_alien_runners(true)
+        VmHost[arch: "x64", family: "premium"].update(used_cores: 14)
+        expect { nx.wait_concurrency_limit }.to hop("wait_allocation_slot")
+        expect(runner.spill_over_set?).to be(false)
       end
 
       it "waits if premium utilization is high but standard utilization is low" do
