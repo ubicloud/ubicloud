@@ -93,6 +93,27 @@ RSpec.describe MetricsReporter do
     custom.shutdown!
   end
 
+  it "#report falls back to the VictoriaMetrics service project's resource when the project keyword argument is nil" do
+    service_project = Project.create(name: "victoria-metrics-service")
+    vmr = VictoriaMetricsResource.create(
+      name: "victoria-metrics",
+      admin_user: "victoria-admin",
+      admin_password: "dummy-password",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 128,
+      root_cert_1: "dummy-root-cert-1",
+      root_cert_2: "dummy-root-cert-2",
+      project_id: service_project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+    )
+    VictoriaMetricsServer.create(victoria_metrics_resource_id: vmr.id, vm_id: create_vm.id, is_representative: true)
+    allow(Config).to receive(:victoria_metrics_service_project_id).and_return(service_project.id)
+    client = instance_double(VictoriaMetrics::Client)
+    expect(VictoriaMetrics::Client).to receive(:new).and_return(client)
+    expect(client).to receive(:import_prometheus)
+    reporter.report
+  end
+
   it "#report emits and continues when the client database lookup fails" do
     expect(VictoriaMetricsResource).to receive(:client_for_project).and_raise(Sequel::DatabaseConnectionError)
     expect(Clog).to receive(:emit).with("api metrics report failed", Hash).and_call_original

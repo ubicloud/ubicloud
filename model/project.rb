@@ -30,6 +30,7 @@ class Project < Sequel::Model
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners github_installations]
 
   SERVICE_PROJECT_ID_CONFIGS = %i[
+    api_metrics_service_project_id
     dns_service_project_id
     github_runner_service_project_id
     inference_endpoint_service_project_id
