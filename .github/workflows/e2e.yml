@@ -405,7 +405,9 @@ jobs:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'aws')
     runs-on: ubicloud-standard-2
-    environment: E2E-aws
+    environment:
+      name: E2E-aws
+      deployment: false
     timeout-minutes: 20
     permissions:
       contents: read # actions/checkout
@@ -423,7 +425,9 @@ jobs:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'gcp')
     runs-on: ubicloud-standard-4
-    environment: E2E-gcp
+    environment:
+      name: E2E-gcp
+      deployment: false
     timeout-minutes: 20
     steps:
     - name: Download e2e logs
@@ -440,7 +444,9 @@ jobs:
     needs: [setup, e2e]
     if: always() && needs.setup.outputs.has_github_runner == 'true'
     runs-on: ubicloud-standard-2
-    environment: E2E-metal
+    environment:
+      name: E2E-metal
+      deployment: false
     timeout-minutes: 10
     steps:
     - name: Cleanup GitHub cache resources
@@ -456,7 +462,9 @@ jobs:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'metal') && vars.E2E_PAUSE_METAL != 'true'
     runs-on: ubicloud-standard-2
-    environment: E2E-metal
+    environment:
+      name: E2E-metal
+      deployment: false
     timeout-minutes: 20
     steps:
     - name: Empty e2e machine-image bucket
