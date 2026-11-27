@@ -543,6 +543,31 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect(vm.user_nic.reload.private_ipv4.to_s).to eq("10.0.0.23/32")
     end
 
+    describe "when AWS assigns a private IPv4 that another nic holds" do
+      let(:other_nic) { Prog::Vnet::NicNexus.assemble(vm.user_nic.private_subnet_id, name: "other-nic", ipv4_addr: "10.0.0.23/32", use_eip: false, create_network_interface: false).subject }
+
+      before do
+        client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created", private_ip_address: "10.0.0.23"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+        vm.update(unix_user: "runneradmin")
+        vm.user_nic.update(private_ipv4: nil)
+        vm.user_nic.nic_aws_resource.update(use_eip: false, create_network_interface: false)
+        NicAwsResource.create_with_id(other_nic, use_eip: false, create_network_interface: false)
+      end
+
+      it "frees the stale nic and records the address on the launched nic" do
+        expect(Clog).to receive(:emit).with("private ipv4 is held by a stale nic", {private_ipv4_stale: {vm:, private_ipv4: "10.0.0.23", nic: other_nic.ubid, nic_vm_id: nil}}).and_call_original
+        expect { nx.create_instance }.to hop("wait_instance_created")
+        expect(vm.user_nic.reload.private_ipv4.to_s).to eq("10.0.0.23/32")
+        expect(other_nic.reload.private_ipv4).to be_nil
+        expect(vm.reload.aws_instance).not_to be_nil
+      end
+
+      it "raises when the nic holding the address was not created by AWS" do
+        other_nic.nic_aws_resource.update(create_network_interface: true)
+        expect { nx.create_instance }.to raise_error(Sequel::ValidationFailed, "private_subnet_id and private_ipv4 is already taken")
+      end
+    end
+
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
       expect { nx.create_instance }
@@ -970,7 +995,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
         .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
     end
 
-    it "does not provision another spare runner if one was already provisioned" do
+    it "destroys the runner without provisioning another spare if one was already provisioned" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
@@ -979,16 +1004,19 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
       expect { nx.wait_instance_created }.to nap(60 * 60)
         .and not_change(GithubRunner, :count)
-        .and not_change { runner.destroy_set?(cached: false) }
+        .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
     end
 
-    it "naps without recreating when the instance is terminated due to a non-internal-error reason" do
+    it "provisions a spare runner and destroys the runner when a spot interruption terminates the instance" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
-      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Client.UserInitiatedShutdown", message: "User initiated shutdown"}}]}])
-      expect { nx.wait_instance_created }.to nap(1)
-        .and not_change(GithubRunner, :count)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination", message: "Spot instance terminated"}}]}])
+      expect(Clog).to receive(:emit).with("aws runner instance terminated", {aws_runner_instance_terminated: {vm:, state_reason: "Server.SpotInstanceTermination", message: "Spot instance terminated"}}).and_call_original
+      expect { nx.wait_instance_created }.to nap(60 * 60)
+        .and change(GithubRunner, :count).from(1).to(2)
+        .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
     end
 
     it "naps without recreating when the instance is terminated due to internal error but the vm is not a runner" do
@@ -1182,6 +1210,17 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       expect { nx.wait_sshable }.to nap(1)
     end
 
+    it "checks the instance when the ssh command fails for a runner" do
+      vm.update(unix_user: "runneradmin")
+      aws_instance
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect(nx.vm.sshable).to receive(:_cmd).and_raise Sshable::SshTimeout.new("true", "", "", nil, nil)
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}}]}])
+      expect { nx.wait_sshable }.to nap(1)
+      expect(nx.instance_checked_at).not_to be_nil
+    end
+
     it "probes the management NIC's EIP when use_separate_management_nic is set" do
       refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
       nx.vm.sshable.host = "9.9.9.9"
@@ -1203,6 +1242,50 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       vm.incr_update_firewall_rules
       expect(nx.vm.ip4).to be_nil
       expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    context "when the vm is a runner" do
+      before do
+        vm.update(unix_user: "runneradmin")
+        aws_instance
+        vm.incr_update_firewall_rules
+        expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+      end
+
+      it "checks and keeps a running instance" do
+        client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}}]}])
+        expect { nx.wait_sshable }.to nap(1)
+        expect(nx.instance_checked_at).not_to be_nil
+      end
+
+      it "does not recheck the instance within a minute" do
+        refresh_frame(nx, new_values: {"instance_checked_at" => Time.now.to_s})
+        expect(client).not_to receive(:describe_instances)
+        expect { nx.wait_sshable }.to nap(1)
+      end
+
+      it "replaces the runner when the instance was terminated" do
+        refresh_frame(nx, new_values: {"instance_checked_at" => (Time.now - 120).to_s})
+        client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination", message: "Spot instance terminated"}}]}])
+        installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+        runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+        Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+        expect(Clog).to receive(:emit).with("aws runner instance terminated", {aws_runner_instance_terminated: {vm:, state_reason: "Server.SpotInstanceTermination", message: "Spot instance terminated"}}).and_call_original
+        expect { nx.wait_sshable }.to nap(60 * 60)
+          .and change(GithubRunner, :count).from(1).to(2)
+          .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
+      end
+
+      it "replaces the runner when AWS no longer returns the instance" do
+        client.stub_responses(:describe_instances, reservations: [])
+        installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+        runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
+        Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait_vm")
+        expect(Clog).to receive(:emit).with("aws runner instance terminated", {aws_runner_instance_terminated: {vm:, state_reason: nil, message: nil}}).and_call_original
+        expect { nx.wait_sshable }.to nap(60 * 60)
+          .and change(GithubRunner, :count).from(1).to(2)
+          .and change { runner.destroy_set?(cached: false) }.from(false).to(true)
+      end
     end
   end
 
