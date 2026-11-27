@@ -413,6 +413,15 @@ class VmHost < Sequel::Model
     clock_status
   end
 
+  KERNEL_TAINT_FAILURE_FLAGS = {"D" => 1 << 7, "L" => 1 << 14}.freeze
+
+  def check_kernel_taint(ssh_session)
+    taint = Integer(ssh_session.exec!("cat /proc/sys/kernel/tainted").strip)
+    flags = KERNEL_TAINT_FAILURE_FLAGS.select { |_, bit| taint & bit != 0 }.keys
+    Clog.emit("kernel is tainted", {kernel_tainted: {vm_host_ubid: ubid, taint:, flags:}}) unless flags.empty?
+    flags.empty?
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session,
@@ -438,7 +447,8 @@ class VmHost < Sequel::Model
     check_storage_smart(ssh_session, device_names) &&
       check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
       check_storage_kernel_logs(ssh_session, device_names) &&
-      check_clock_source(ssh_session)
+      check_clock_source(ssh_session) &&
+      check_kernel_taint(ssh_session)
   end
 
   # The same upstream resolvers the per-VM dnsmasq forwards to (see
