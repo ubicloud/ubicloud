@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@redocly/cli": "^2.76.0",
+    "@redocly/cli": "^2.78.0",
     "@stoplight/spectral-cli": "^6.17.1",
     "openapi-format": "^1.34.0",
     "@herb-tools/linter": "^0.11.2",
