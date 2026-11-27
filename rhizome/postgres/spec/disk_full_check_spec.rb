@@ -206,6 +206,16 @@ RSpec.describe "disk-full-check" do
       expect(psql_calls).to include("pg_terminate_backend")
     end
 
+    it "does not reload when pg_log_throttle is already enabled below restart threshold" do
+      fake_df(50, 2_000_000_000)
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      FileUtils.touch(pending_restart)
+      File.symlink(File.join(pg_log_throttle_src, "991-pg-logs-throttle.conf"), pg_log_throttle_conf)
+      run_check
+      expect(psql_calls).to include("pg_terminate_backend")
+      expect(pg_ctl_calls).to eq ""
+    end
+
     it "removes pg_log_throttle and reloads on recovery" do
       fake_df(50, 53_687_091_200) # > 10GB recover threshold
       File.write(auto_conf, "default_transaction_read_only = 'on'\n")

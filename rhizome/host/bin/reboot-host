@@ -1,17 +1,15 @@
-#!/bin/env ruby
-# frozen_string_literal: true
+#!/bin/sh
+set -eu
 
-require_relative "../../common/lib/util"
+if [ "$#" -eq 0 ]; then
+    echo 'expected previous_boot_id as argument'
+    exit 1
+fi
 
-unless (previous_boot_id = ARGV.shift)
-  puts "expected previous_boot_id as argument"
-  exit 1
-end
+boot_id=$(cat /proc/sys/kernel/random/boot_id)
 
-boot_id = File.read("/proc/sys/kernel/random/boot_id").strip
-
-if boot_id == previous_boot_id
-  r("sudo systemctl reboot")
+if [ "$boot_id" = "$1" ]; then
+    exec sudo systemctl reboot
 else
-  $stdout.write(boot_id)
-end
+    printf '%s' "$boot_id"
+fi

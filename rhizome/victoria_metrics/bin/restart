@@ -1,6 +1,5 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
+#!/bin/sh
+set -e
 
-require_relative "../../common/lib/util"
-
-r "systemctl restart victoria_metrics && systemctl restart vmauth"
+systemctl restart victoria_metrics
+exec systemctl restart vmauth
