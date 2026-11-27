@@ -525,6 +525,7 @@ RSpec.describe VmHost do
       expect(ssh_session).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
       expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/tainted").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_raise Sshable::SshError
@@ -590,6 +591,7 @@ RSpec.describe VmHost do
       stub_empty_lsblk
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
       expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/tainted").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
     end
 
     it "checks pulse with nvme errors" do
@@ -759,6 +761,34 @@ RSpec.describe VmHost do
       expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("hpet acpi_pm \n", 0))
       expect(Clog).to receive(:emit).with("unexpected clock source", Hash).and_call_original
       expect(vm_host.check_clock_source(ssh_session)).to be false
+    end
+  end
+
+  describe "#check_kernel_taint" do
+    def stub_taint(value)
+      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/tainted").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("#{value}\n", 0))
+    end
+
+    it "succeeds if the kernel is not tainted" do
+      stub_taint(0)
+      expect(vm_host.check_kernel_taint(ssh_session)).to be true
+    end
+
+    it "succeeds if the kernel has only other taint flags, e.g., an out-of-tree module" do
+      stub_taint(4096)
+      expect(vm_host.check_kernel_taint(ssh_session)).to be true
+    end
+
+    it "fails if the kernel had a soft lockup" do
+      stub_taint(16384 | 4096)
+      expect(Clog).to receive(:emit).with("kernel is tainted", {kernel_tainted: {vm_host_ubid: vm_host.ubid, taint: 20480, flags: ["L"]}}).and_call_original
+      expect(vm_host.check_kernel_taint(ssh_session)).to be false
+    end
+
+    it "fails if the kernel had an oops" do
+      stub_taint(128)
+      expect(Clog).to receive(:emit).with("kernel is tainted", {kernel_tainted: {vm_host_ubid: vm_host.ubid, taint: 128, flags: ["D"]}}).and_call_original
+      expect(vm_host.check_kernel_taint(ssh_session)).to be false
     end
   end
 
