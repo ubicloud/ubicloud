@@ -14,7 +14,7 @@ RSpec.describe RunnerMetricsAgent do
   after { FileUtils.rm_rf([disk_dir, out_dir]) }
 
   def entry(seq, time: now.to_i - 5, **values)
-    metrics = described_class::METRICS.to_h { |metric| [metric, 1.5] }
+    metrics = RunnerMetricsEntry::METRICS.to_h { |metric| [metric, 1.5] }
     {"seq" => seq, "time" => time}.merge(metrics, values.transform_keys(&:to_s))
   end
 
@@ -51,68 +51,25 @@ RSpec.describe RunnerMetricsAgent do
     it "rejects a disk of another size" do
       write_disk({})
 
-      expect { agent.entries("{}") }.to raise_error(described_class::InvalidData, "the metrics disk is 2 bytes, not 16384")
-    end
-
-    it "rejects a slot that is not valid UTF-8" do
-      write_disk(1 => slot("{\"\xff\"}"))
-
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 is not valid UTF-8")
+      expect { agent.entries("{}") }.to raise_error(RunnerMetricsEntry::Invalid, "the metrics disk is 2 bytes, not 16384")
     end
 
     it "rejects a slot that does not end with a newline" do
       write_disk(1 => JSON.generate(entry(1)).ljust(described_class::SLOT_SIZE))
 
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 does not end with a newline")
+      expect { agent.entries(File.binread(disk_path)) }.to raise_error(RunnerMetricsEntry::Invalid, "slot 1 does not end with a newline")
     end
 
-    it "rejects a slot that is not JSON" do
-      write_disk(1 => slot("{\"seq\":"))
+    it "rejects a slot that fails the entry checks" do
+      write_disk(1 => sample(1, runner_cpu_load_user: 100.5))
 
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, /\Aslot 1 is not a JSON object: /)
-    end
-
-    it "rejects a slot with nested values" do
-      write_disk(1 => slot("{\"seq\":[1]}"))
-
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, /\Aslot 1 is not a JSON object: nesting of 2 is too deep/)
-    end
-
-    it "rejects a slot without the expected keys in order" do
-      write_disk(1 => slot(JSON.generate(entry(1).except("time").merge("time" => now.to_i))))
-
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 does not have the expected keys")
+      expect { agent.entries(File.binread(disk_path)) }.to raise_error(RunnerMetricsEntry::Invalid, "slot 1 has runner_cpu_load_user 100.5")
     end
 
     it "rejects a slot whose seq does not belong in it" do
       write_disk(1 => sample(2))
 
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 has seq 2")
-    end
-
-    it "rejects a slot with a time that is not an integer" do
-      write_disk(1 => sample(1, time: 1.5))
-
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 has time 1.5")
-    end
-
-    {
-      runner_cpu_load_user: [100.5, "100.5"],
-      runner_disk_rkb: [-1, "-1"],
-      runner_memory_memused: [2**53 + 1, "9007199254740993"],
-      runner_queue_ldavg_1: ["1", "\"1\""],
-    }.each do |metric, (value, shown)|
-      it "rejects a slot with #{metric} #{shown}" do
-        write_disk(1 => sample(1, metric => value))
-
-        expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 has #{metric} #{shown}")
-      end
-    end
-
-    it "rejects a slot with an infinite value" do
-      write_disk(1 => slot(JSON.generate(entry(1, runner_disk_wkb: 7.25)).sub("7.25", "1e400")))
-
-      expect { agent.entries(File.binread(disk_path)) }.to raise_error(described_class::InvalidData, "slot 1 has runner_disk_wkb Infinity")
+      expect { agent.entries(File.binread(disk_path)) }.to raise_error(RunnerMetricsEntry::Invalid, "slot 1 has seq 2")
     end
   end
 
@@ -128,7 +85,7 @@ RSpec.describe RunnerMetricsAgent do
       write_disk(1 => slot("{"))
       expect(agent).to receive(:sleep).with(1)
 
-      expect { agent.read_entries }.to raise_error(described_class::InvalidData, /\Aslot 1 is not a JSON object: /)
+      expect { agent.read_entries }.to raise_error(RunnerMetricsEntry::Invalid, /\Aslot 1 is not a JSON object: /)
     end
   end
 
@@ -166,13 +123,13 @@ RSpec.describe RunnerMetricsAgent do
       agent.tick(now)
       write_disk(1 => sample(1))
 
-      expect { agent.tick(now) }.to raise_error(described_class::InvalidData, "newest seq went back from 2 to 1")
+      expect { agent.tick(now) }.to raise_error(RunnerMetricsEntry::Invalid, "newest seq went back from 2 to 1")
     end
 
     it "fails for a new sample with a time outside the clock window" do
       write_disk(1 => sample(1, time: now.to_i + 61))
 
-      expect { agent.tick(now) }.to raise_error(described_class::InvalidData, "seq 1 has time #{now.to_i + 61}, outside #{now.to_i - 3600}..#{now.to_i + 60}")
+      expect { agent.tick(now) }.to raise_error(RunnerMetricsEntry::Invalid, "seq 1 has time #{now.to_i + 61}, outside #{now.to_i - 3600}..#{now.to_i + 60}")
     end
   end
 
