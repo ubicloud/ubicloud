@@ -120,6 +120,12 @@ RSpec.describe InvoiceGenerator do
     expect { described_class.new(begin_time, end_time, save_result: true).run }.to raise_error(ArgumentError, "eur_rate must be provided when save_result is true")
   end
 
+  it "fails if billing_info is provided without a single project" do
+    expect {
+      described_class.new(begin_time, end_time, project_ids: [p1.id, "other"], billing_info: BillingInfo.new)
+    }.to raise_error(ArgumentError, "billing_info can only be used when generating an invoice for a single project")
+  end
+
   it "does not generate invoice for billing record that started and terminated before this billing window" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 150 * day, begin_time - 90 * day))
     invoices = described_class.new(begin_time, end_time).run

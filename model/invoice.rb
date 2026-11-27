@@ -48,6 +48,16 @@ class Invoice < Sequel::Model
     "#{usd_to_eur_rate ? "€" : "$"}%0.02f" % (charge_amount_cents / 100.0)
   end
 
+  def amount_billed_usage
+    types = BillingRate.amount_billed_resource_types
+    total = content["resources"].sum do |resource|
+      resource["line_items"].sum do |line_item|
+        types.include?(line_item["resource_type"]) ? line_item["cost"].to_f : 0
+      end
+    end
+    total.round(3)
+  end
+
   def charge_currency
     usd_to_eur_rate ? "eur" : "usd"
   end

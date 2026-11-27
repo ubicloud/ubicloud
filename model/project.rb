@@ -209,11 +209,10 @@ class Project < Sequel::Model
     cutoff_at > Time.utc(now.year, now.month)
   end
 
-  def current_invoice(since: nil, discounts_and_credits_hashes: nil)
-    end_time = Time.now.utc
+  def current_invoice(since: nil, end_time: Time.now.utc, discounts_and_credits_hashes: nil, billing_info: nil)
     begin_time = since || invoices_dataset.where(Sequel[:end_time] < end_time).get(:end_time) || Time.utc(end_time.year, end_time.month)
 
-    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id], discounts_and_credits_hashes:).run.first)
+    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id], discounts_and_credits_hashes:, billing_info:).run.first)
       return invoice
     end
 
@@ -229,6 +228,11 @@ class Project < Sequel::Model
     }
 
     Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: end_time, status: "current")
+  end
+
+  def projected_invoice(now: Time.now.utc, billing_info: nil)
+    month_end = Date.new(now.year, now.month, 1) >> 1
+    current_invoice(since: Time.utc(now.year, now.month), end_time: Time.utc(month_end.year, month_end.month), billing_info:)
   end
 
   def current_resource_usage(resource_type)

@@ -149,10 +149,17 @@ class Clover
       end
 
       r.on "invoice", ["current", :ubid_uuid] do |id|
-        next unless (invoice = (id == "current") ? @project.current_invoice : @project.invoices_dataset.with_pk(id))
+        if id == "current"
+          billing_info = @project.billing_info
+          invoice = @project.current_invoice(billing_info:)
+        else
+          next unless (invoice = @project.invoices_dataset.with_pk(id))
+        end
 
         r.get true do
           if invoice.status == "current"
+            @projected_invoice = @project.projected_invoice(billing_info:)
+            @projected_data = @projected_invoice.serialized
             @invoice_data = invoice.serialized
             view "project/invoice"
           else

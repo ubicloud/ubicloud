@@ -5,6 +5,12 @@ RSpec.describe BillingRate do
     expect(described_class.rates.map { it["id"] }.size).to eq(described_class.rates.map { it["id"] }.uniq.size)
   end
 
+  describe ".amount_billed_resource_types" do
+    it "returns resource types billed by amount" do
+      expect(described_class.amount_billed_resource_types).to contain_exactly("GitHubRunnerMinutes", "InferenceTokens")
+    end
+  end
+
   describe "#unit_price_from_resource_properties" do
     it "returns unit price for VmVCpu" do
       expect(described_class.unit_price_from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")).to be_a(Float)

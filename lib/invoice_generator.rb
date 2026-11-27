@@ -6,15 +6,19 @@ require "stripe"
 class InvoiceGenerator
   CURRENT_INVOICE_VERSION = 2
 
-  def initialize(begin_time, end_time, save_result: false, project_ids: [], discounts_and_credits_hashes: nil, eur_rate: nil)
+  def initialize(begin_time, end_time, save_result: false, project_ids: [], discounts_and_credits_hashes: nil, eur_rate: nil, billing_info: nil)
     @begin_time = begin_time
     @end_time = end_time
     @save_result = save_result
     @project_ids = project_ids
     @discounts_and_credits_hashes = discounts_and_credits_hashes
     @eur_rate = eur_rate
+    @billing_info = billing_info
     if @save_result && !@eur_rate
       raise ArgumentError, "eur_rate must be provided when save_result is true"
+    end
+    if @billing_info && @project_ids.length != 1
+      raise ArgumentError, "billing_info can only be used when generating an invoice for a single project"
     end
   end
 
@@ -35,7 +39,11 @@ class InvoiceGenerator
     billing_records_by_project = active_billing_records.group_by { |br| br[:project] }
     billing_record_project_ids = billing_records_by_project.keys.map!(&:id)
     # Collect and cache stripe information outside of the transaction
-    billing_records_by_project.each_key { it.billing_info&.stripe_data }
+    if @billing_info
+      @billing_info.stripe_data
+    else
+      billing_records_by_project.each_key { it.billing_info&.stripe_data }
+    end
 
     DB.transaction do
       all_resource_discounts, all_resource_credits = @discounts_and_credits_hashes || self.class.discounts_and_credits_hashes(@begin_time, @end_time, billing_record_project_ids)
@@ -44,7 +52,7 @@ class InvoiceGenerator
         project_content = {}
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
-        bi = project.billing_info
+        bi = @billing_info || project.billing_info
         country = bi&.country
         is_eu = country&.in_eu_vat?
         project_content[:billing_info] = bi&.stripe_data&.merge({

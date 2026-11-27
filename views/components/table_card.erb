@@ -28,17 +28,18 @@
         <% unless headers.empty? || rows.empty? %>
           <thead class="bg-gray-50">
             <tr>
-              <% headers.each_with_index do |name, i| %>
-                <th
-                  scope="col"
-                  <% if i == 0 && !consistent_styling %>
-                    class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% elsif i + 1 == headers.length && !consistent_styling %>
-                    class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% else %>
-                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-                  <% end %>
-                >
+              <% headers.each_with_index do |(name, opts), i| %>
+                <% opts ||= {} %>
+                <% cls = if i == 0 && !consistent_styling
+                    "pl-4 pr-3 sm:pl-6 py-3.5 text-sm font-semibold text-gray-900"
+                  elsif i + 1 == headers.length && !consistent_styling
+                    "pl-3 pr-4 sm:pr-6 py-3.5 text-sm font-semibold text-gray-900"
+                  else
+                    "px-3 py-3.5 text-sm font-semibold text-gray-900"
+                  end
+
+                  cls += " text-#{opts[:align] || "left"}" %>
+                <th scope="col" class="<%= cls %>">
                   <%= name %>
                 </th>
               <% end %>

@@ -192,6 +192,67 @@ RSpec.describe Project do
     end
   end
 
+  describe "#projected_invoice" do
+    let(:now) { Time.utc(2026, 11, 15) }
+    let(:month_start) { Time.utc(2026, 11) }
+    let(:month_end) { Time.utc(2026, 12) }
+
+    def create_billing_record(project, vm, span)
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        span:,
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"],
+        amount: vm.vcpus,
+      )
+    end
+
+    it "projects active usage through the end of the current month" do
+      vm = create_vm(project_id: project.id)
+      create_billing_record(project, vm, Sequel::Postgres::PGRange.new(month_start, nil))
+
+      rate = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)
+      projected = project.projected_invoice(now:)
+      expect(projected.end_time).to eq(month_end)
+      expect(projected.subtotal).to eq((vm.vcpus * 672 * 60 * rate["unit_price"]).round(3))
+    end
+
+    it "does not project usage that ended earlier in the month" do
+      vm = create_vm(project_id: project.id)
+      create_billing_record(project, vm, Sequel::Postgres::PGRange.new(month_start, month_start + 86400))
+
+      rate = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)
+      expect(project.projected_invoice(now:).subtotal).to eq((vm.vcpus * 1440 * rate["unit_price"]).round(3))
+    end
+
+    it "does not project usage billed by amount" do
+      rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-4", "global", false, BILLING_RATE_ACTIVE_AT)
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: GithubRunner.generate_uuid,
+        resource_name: "runner",
+        span: Sequel::Postgres::PGRange.new(month_start, month_start + 86400),
+        billing_rate_id: rate["id"],
+        amount: 100,
+      )
+
+      projected = project.projected_invoice(now:)
+      expect(projected.subtotal).to eq((100 * rate["unit_price"]).round(3))
+      expect(projected.amount_billed_usage).to eq((100 * rate["unit_price"]).round(3))
+    end
+
+    it "only includes usage from the current month when the previous invoice is missing" do
+      previous_invoice_end = month_start - (31 * 86400)
+      Invoice.create(project_id: project.id, content: {}, begin_time: previous_invoice_end - 2592000, end_time: previous_invoice_end, status: "unpaid", invoice_number: "1")
+      vm = create_vm(project_id: project.id)
+      create_billing_record(project, vm, Sequel::Postgres::PGRange.new(previous_invoice_end, month_start))
+
+      expect(project.current_invoice(end_time: now).subtotal).to be > 0
+      expect(project.projected_invoice(now:).subtotal).to eq(0)
+    end
+  end
+
   it "sets and gets feature flags" do
     mod = Module.new
     described_class.feature_flag(:dummy_flag1, :dummy_flag2, into: mod)

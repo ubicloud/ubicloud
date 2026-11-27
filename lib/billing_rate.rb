@@ -6,6 +6,7 @@ class BillingRate
   # simplecov:disable
   def self.freeze
     rates
+    amount_billed_resource_types
     super
   end
   # simplecov:enable
@@ -35,6 +36,10 @@ class BillingRate
     rates.select {
       it["resource_type"] == resource_type
     }
+  end
+
+  def self.amount_billed_resource_types
+    @amount_billed_resource_types ||= rates.filter_map { it["resource_type"] if it["billed_by"] == "amount" }.uniq.freeze
   end
 
   def self.from_id(billing_rate_id)
