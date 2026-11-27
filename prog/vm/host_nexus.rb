@@ -415,9 +415,12 @@ TIMER
     case sshable.d_check("apply_patches")
     when "Succeeded"
       sshable.d_clean("apply_patches")
+      delete_from_stack("custom_kernel_version") if custom_kernel_version == false
       hop_prep_reboot
     when "Failed", "NotStarted"
-      if custom_kernel_version
+      if custom_kernel_version == false
+        sshable.d_run("apply_patches", "sudo", "host/bin/remove-custom-kernel")
+      elsif custom_kernel_version
         unless (sha256 = CUSTOM_KERNELS[[vm_host.os_version, vm_host.arch, custom_kernel_version]])
           fail "No custom kernel #{custom_kernel_version} for #{vm_host.os_version} #{vm_host.arch}"
         end

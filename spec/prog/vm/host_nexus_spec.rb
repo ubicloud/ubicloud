@@ -687,6 +687,12 @@ RSpec.describe Prog::Vm::HostNexus do
           end
         end
       end
+
+      it "runs remove-custom-kernel when the version is false" do
+        refresh_frame(nx, new_values: {"custom_kernel_version" => false})
+        expect(nx.vm_host.sshable).to receive(:d_run).with("apply_patches", "sudo", "host/bin/remove-custom-kernel")
+        expect { nx.patch }.to nap(60)
+      end
     end
 
     it "naps if in progress" do
@@ -698,6 +704,27 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("Succeeded")
       expect(nx.vm_host.sshable).to receive(:d_clean).with("apply_patches")
       expect { nx.patch }.to hop("prep_reboot")
+    end
+
+    describe "when apply_patches succeeds with a custom_kernel_version" do
+      before do
+        expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("Succeeded")
+        expect(nx.vm_host.sshable).to receive(:d_clean).with("apply_patches")
+      end
+
+      it "keeps the version if the host installed it" do
+        refresh_frame(nx, new_values: {"custom_kernel_version" => "6.8.0-1.1+ubi1"})
+        frame = nx.strand.stack[0].dup
+        expect { nx.patch }.to hop("prep_reboot")
+        expect(nx.strand.stack).to eq([frame])
+      end
+
+      it "deletes the version if the host went back to the stock kernel" do
+        refresh_frame(nx, new_values: {"custom_kernel_version" => false})
+        frame = nx.strand.stack[0].except("custom_kernel_version")
+        expect { nx.patch }.to hop("prep_reboot")
+        expect(nx.strand.stack).to eq([frame])
+      end
     end
   end
 
