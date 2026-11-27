@@ -23,6 +23,7 @@ class Clover < Roda
         ::GithubCacheEntry => [:presigned_url_expires_in],
         ::GithubInstallation => [:with_github_installation_id],
         ::GithubRepository => [:cache_size_limit],
+        ::GithubRunner => [:victoria_metrics_client],
         ::InferenceEndpoint => [:is_public],
         ::InferenceRouterModel => [:where],
         ::Invoice => [:blob_storage_client],

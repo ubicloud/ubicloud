@@ -322,7 +322,9 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service.d")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-metrics.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      expect(vs).to receive(:rm_if_exists).with("/var/lib/runner-metrics/test")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:purge_prep_stdin)
       expect(vs).to receive(:unmount_hugepages)
@@ -909,7 +911,9 @@ NFTABLES_CONF
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test.service.d")
       expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:rm_if_exists).with("/etc/systemd/system/test-metrics.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      expect(vs).to receive(:rm_if_exists).with("/var/lib/runner-metrics/test")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:purge_prep_stdin)
       expect(vs).to receive(:unmount_hugepages)
@@ -1521,6 +1525,83 @@ NFTABLES_CONF
         expect(content).to include("--device path=/sys/bus/pci/devices/0000:00:01.0/")
         expect(content).not_to include("--device path=\n")
       }
+    end
+  end
+
+  describe "runner metrics" do
+    def install_runner_unit(ch_version, runner_metrics: true)
+      vs.instance_variable_set(:@runner_metrics, runner_metrics)
+      vs.instance_variable_set(:@ch_version, CloudHypervisor::Version.new(ch_version, "sha256_ch_bin", "sha256_ch_remote"))
+      vs.instance_variable_set(:@firmware_version, CloudHypervisor::Firmware.new("202311", "sha256"))
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0, "github-ubuntu-2404")
+    end
+
+    it "gives runner VMs a zeroed metrics disk in a fixed PCI slot and an agent that reads it as its own user" do
+      vps = mock_vm_path.new("test")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+      expect(vs).to receive(:_run_command).with("groupadd", "-f", "--system", "runner-metrics")
+      expect(vs).to receive(:_run_command).with("useradd", "--no-create-home", "--system", "--shell", "/usr/sbin/nologin", "-g", "runner-metrics", "runner-metrics", expect: [0, 9])
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/bin")
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/runner-metrics/lib")
+      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/bin/runner-metrics-agent", File.read(File.expand_path("../bin/runner-metrics-agent", __dir__)), perm: 0o755)
+      expect(vs).to receive(:safe_write_to_file).with("/opt/runner-metrics/lib/runner_metrics_agent.rb", File.read(File.expand_path("../lib/runner_metrics_agent.rb", __dir__)), perm: 0o644)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/lib/runner-metrics/test")
+      expect(FileUtils).to receive(:chown).with("runner-metrics", "rhizome", "/var/lib/runner-metrics/test")
+      expect(FileUtils).to receive(:chmod).with(0o2770, "/var/lib/runner-metrics/test")
+
+      install_runner_unit("53.0")
+
+      service = vps.writes["test.service"]
+      expect(service).to include("Wants=test-metrics.service\n")
+      expect(service).to include("--disk path=/vm/test/cloudinit.img path=/vm/test/metrics.raw,serial=ubicloud-metrics,image_type=raw,pci_device_id=30 \\\n")
+      expect(service).to include("ExecStartPre=/usr/bin/truncate -s 0 /vm/test/metrics.raw\nExecStartPre=/usr/bin/truncate -s 1048576 /vm/test/metrics.raw\nExecStartPre=/usr/bin/rm -f /vm/test/ch-api.sock\n")
+      expect(vps.writes["test-metrics.service"]).to eq(<<~SERVICE)
+        [Unit]
+        Description=Runner metrics agent for test
+        After=test.service
+        BindsTo=test.service
+        PartOf=test.service
+
+        [Service]
+        User=runner-metrics
+        Group=runner-metrics
+        OpenFile=/vm/test/metrics.raw:metrics-disk:read-only
+        ExecStart=/opt/runner-metrics/bin/runner-metrics-agent /var/lib/runner-metrics/test
+        UMask=0027
+        MemoryMax=64M
+        CPUQuota=10%
+        NoNewPrivileges=yes
+        ProtectSystem=strict
+        ProtectHome=yes
+        ReadWritePaths=/var/lib/runner-metrics/test
+        PrivateNetwork=yes
+        PrivateTmp=yes
+        PrivateDevices=yes
+        ProtectKernelTunables=yes
+        ProtectKernelModules=yes
+        ProtectControlGroups=yes
+      SERVICE
+    end
+
+    it "gives runner VMs no metrics disk on versions that can't pin its PCI slot" do
+      vps = mock_vm_path.new("test")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      install_runner_unit("46.0")
+
+      expect(vps.writes["test.service"]).to include("--disk path=/vm/test/cloudinit.img \\\n")
+      expect(vps.writes.keys).to eq(["test-dnsmasq.service", "test.service"])
+    end
+
+    it "gives runner VMs without runner metrics no metrics disk" do
+      vps = mock_vm_path.new("test")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      install_runner_unit("53.0", runner_metrics: false)
+
+      expect(vps.writes["test.service"]).to include("--disk path=/vm/test/cloudinit.img \\\n")
+      expect(vps.writes.keys).to eq(["test-dnsmasq.service", "test.service"])
     end
   end
 

@@ -1,0 +1,19 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/runner_metrics_agent"
+
+# systemd opens the metrics disk read-only and passes it as fd 3 (OpenFile=).
+unless ARGV.length == 1 && ENV["LISTEN_FDS"] == "1"
+  warn "usage: runner-metrics-agent OUT_DIR, with the metrics disk open on fd 3"
+  exit 1
+end
+
+$stdout.sync = true
+agent = RunnerMetricsAgent.new(File.for_fd(3, "rb"), ARGV[0])
+begin
+  agent.run
+rescue RunnerMetricsAgent::InvalidData => ex
+  warn "Stopping runner metrics: #{ex.message}"
+  exit 1
+end

@@ -16,6 +16,10 @@ class GithubRunner < Sequel::Model
 
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
 
+  def self.victoria_metrics_client
+    VictoriaMetricsResource.client_for_project(Config.github_runner_metrics_project_id)
+  end
+
   dataset_module do
     def total_active_runner_vcpus
       left_join(:strand, id: Sequel[:github_runner][:id])
@@ -36,6 +40,16 @@ class GithubRunner < Sequel::Model
       return 0 unless (aws_location_id = Config.github_runner_aws_location_id)
       where(location_id: aws_location_id)
         .total_active_runner_vcpus
+    end
+
+    # Joins from the runners, so only their projects' flags are checked, in a
+    # subquery so filters on this dataset's columns stay unambiguous.
+    def runner_metrics_enabled
+      where(id: GithubRunner
+        .join(:github_installation, id: Sequel[:github_runner][:installation_id])
+        .join(:project, id: Sequel[:github_installation][:project_id])
+        .where(Sequel.pg_jsonb_op(Sequel[:project][:feature_flags]).get_text("github_runner_metrics") => "true")
+        .select(Sequel[:github_runner][:id]))
     end
   end
 
