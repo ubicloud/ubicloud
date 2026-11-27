@@ -1,9 +1,11 @@
-<div class="-mt-6 mb-2 space-y-2">
+<%# locals: (messages: flash, details: [], id_prefix: "flash", extra_class: "-mt-6 mb-2") %>
+
+<div class="<%= extra_class %> space-y-2">
   <% [
     ["notice", "hero-check-circle-mini", "bg-green-50", "text-green-800", "text-green-400"],
     ["error", "hero-x-circle-mini", "bg-red-50", "text-red-800", "text-red-400"]
   ].each do |type, icon, bg_color, text_color, icon_color| %>
-    <% next unless flash[type] %>
+    <% next unless messages[type] %>
 
     <div class="rounded-md <%= bg_color %> p-4">
       <div class="flex">
@@ -12,7 +14,15 @@
         </div>
 
         <div class="ml-3">
-          <h3 id="flash-<%= type %>" class="text-sm font-medium <%= text_color %>"><%= flash[type] %></h3>
+          <h3 id="<%= id_prefix %>-<%= type %>" class="text-sm font-medium <%= text_color %>"><%= messages[type] %></h3>
+
+          <% details.each do |detail| %>
+            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm <%= text_color %>">
+              <% detail.each do |label, value| %>
+                <span><%= label %>: <code class="font-mono font-semibold break-all"><%= value %></code></span>
+              <% end %>
+            </p>
+          <% end %>
         </div>
       </div>
     </div>

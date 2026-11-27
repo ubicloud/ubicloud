@@ -562,6 +562,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "hops to upgrade_failed when upgrade fails" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
       expect { nx.upgrade_standby }.to hop("upgrade_failed")
+      expect(strand.stack.first).to include("upgrade_error" => "Database upgrade failed. We have reverted the database to the previous version, and it is now available again.", "upgrade_error_details" => [], "upgrade_retryable" => false)
     end
 
     it "starts upgrade when not started" do
@@ -620,6 +621,16 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
   end
 
+  describe "#fail_upgrade" do
+    it "saves labelled details and whether the failure can be retried" do
+      details = [{"Setting" => "max_connections", "Expected" => "at least 100"}]
+
+      expect { nx.fail_upgrade("Upgrade validation failed.", details:, retryable: true) }.to hop("upgrade_failed")
+      strand.save_changes
+      expect(strand.reload.stack.first.to_h).to include("upgrade_error" => "Upgrade validation failed.", "upgrade_error_details" => details, "upgrade_retryable" => true)
+    end
+  end
+
   describe "#upgrade_failed" do
     let(:primary) { create_server(is_representative: true) }
 
@@ -638,6 +649,20 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(Page.from_tag_parts("PostgresUpgradeFailed", pg.id).resource_id).to eq(pg.id)
       expect(candidate.destroy_set?(cached: false)).to be false
       expect(primary.unfence_set?(cached: false)).to be true
+    end
+
+    it "pages with the saved failure details while the primary remains online" do
+      primary.strand.update(label: "wait")
+      message = "Upgrade validation failed."
+      details = [{"Setting" => "max_connections", "Expected" => "at least 100"}]
+      strand.update(stack: [{"subject_id" => pg.id, "upgrade_error" => message, "upgrade_error_details" => details}])
+
+      expect { nx.upgrade_failed }.to nap(6 * 60 * 60).and change(Page, :count).by(1)
+      page = Page.from_tag_parts("PostgresUpgradeFailed", pg.id)
+      expect(page.details.to_h).to include("upgrade_error" => message, "upgrade_error_details" => details)
+      expect(primary.unfence_set?(cached: false)).to be false
+
+      expect { nx.upgrade_failed }.to nap(6 * 60 * 60).and not_change(Page, :count)
     end
 
     it "unfences primary if it is fenced" do

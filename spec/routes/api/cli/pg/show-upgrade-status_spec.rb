@@ -48,4 +48,15 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
     expect(output).to include("Status: running")
     expect(output).to include("Stage: N/A")
   end
+
+  it "shows the reason an upgrade was blocked" do
+    @pg.update(target_version: 17)
+    message = "Upgrade validation failed."
+    Strand.create(parent_id: @pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed",
+      stack: [{"upgrade_error" => message, "upgrade_error_details" => [{"Setting" => "max_connections", "Expected" => "at least 100"}]}])
+
+    output = cli(%W[pg #{@ref} show-upgrade-status])
+    expect(output).to include("Status: failed", "Error: #{message}")
+    expect(output).to include("Setting: max_connections", "Expected: at least 100")
+  end
 end

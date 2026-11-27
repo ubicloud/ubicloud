@@ -5423,6 +5423,17 @@ components:
               upgrade_stage:
                 type: string
                 nullable: true
+              upgrade_error:
+                description: The reason the upgrade failed, when available.
+                type: string
+                nullable: true
+              upgrade_error_details:
+                description: Labelled details about the upgrade failure, when available.
+                type: array
+                items:
+                  type: object
+                  additionalProperties:
+                    type: string
             additionalProperties: false
             required:
               - current_version

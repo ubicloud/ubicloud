@@ -1652,6 +1652,23 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#upgrade_failure" do
+    it "returns an empty hash without a failed upgrade" do
+      expect(postgres_resource.upgrade_failure).to eq({})
+    end
+
+    it "handles an upgrade failure without saved details" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id)
+      expect(postgres_resource.upgrade_failure).to eq({})
+    end
+
+    it "returns the saved failure message and details" do
+      failure = {"upgrade_error" => "Upgrade validation failed.", "upgrade_error_details" => [{"Setting" => "max_connections"}], "upgrade_retryable" => true}
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", parent_id: postgres_resource.strand.id, stack: [failure])
+      expect(postgres_resource.upgrade_failure).to eq(failure)
+    end
+  end
+
   describe "#can_upgrade?" do
     it "returns true if the postgres resource can be upgraded" do
       postgres_resource.update(target_version: "16")

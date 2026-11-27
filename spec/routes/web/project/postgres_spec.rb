@@ -1917,6 +1917,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/upgrade"
         click_button "Start Upgrade"
         expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_css("#upgrade-stage-start")
         expect(page).to have_flash_notice "Database upgrade started successfully"
         expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
       end
@@ -1951,6 +1952,8 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_css('[role="alert"]', text: "Database upgrade failed")
+        expect(page).to have_no_css('[id^="upgrade-stage-"]')
       end
 
       it "shows latest version message if the database is already on the latest version" do
@@ -1959,6 +1962,29 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.update(version: PostgresResource::LATEST_VERSION)
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Your database is already on the latest version."
+      end
+
+      it "renders saved failure messages and details as escaped text" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first.update(
+          label: "upgrade_failed",
+          stack: [{"upgrade_error" => "The upgrade check failed: <script>alert(1)</script>.", "upgrade_error_details" => [{"Setting" => "<max_connections>", "Expected" => "at least 100"}]}],
+        )
+
+        visit "#{project.path}#{pg.path}/upgrade"
+
+        within('[role="alert"]') do
+          expect(page).to have_css("#upgrade-error", text: "The upgrade check failed: <script>alert(1)</script>.")
+          expect(page).to have_content("Setting:")
+          expect(page).to have_css("code", text: "<max_connections>", exact_text: true)
+          expect(page).to have_css("code", text: "at least 100", exact_text: true)
+          expect(page).to have_no_css("script")
+          expect(page).to have_no_css("max_connections")
+        end
+        expect(page).to have_no_css("#flash-error")
+        expect(page).to have_no_css('[id^="upgrade-stage-"]')
       end
 
       it "shows correct error page if upgrade validation fails" do

@@ -12,6 +12,10 @@ class UbiCli
       body << "Major version upgrade of PostgreSQL database #{sdk_object.id} to version #{upgrade_status[:target_version]}\n"
       body << "Status: #{upgrade_status[:upgrade_status]}\n"
       body << "Stage: #{upgrade_status[:upgrade_stage] || "N/A"}\n"
+      body << "Error: #{upgrade_status[:upgrade_error]}\n" if upgrade_status[:upgrade_error]
+      (upgrade_status[:upgrade_error_details] || []).each do |detail|
+        body << "#{detail.map { |label, value| "#{label}: #{value}" }.join(", ")}\n"
+      end
       response(body)
     end
   end

@@ -1733,6 +1733,18 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(400)
       end
+
+      it "returns the reason an upgrade was blocked" do
+        pg.update(target_version: "17")
+        message = "Upgrade validation failed."
+        details = [{"Setting" => "max_connections", "Expected" => "at least 100"}]
+        Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed", stack: [{"upgrade_error" => message, "upgrade_error_details" => details}])
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to include("upgrade_status" => "failed", "upgrade_error" => message, "upgrade_error_details" => details)
+      end
     end
 
     describe "server" do
