@@ -69,15 +69,40 @@ RSpec.describe ParseableServer do
     end
   end
 
+  it "returns ip4_url with port 8000" do
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.1.1.1/32")
+    expect(parseable_server.ip4_url).to eq("https://1.1.1.1:8000")
+  end
+
   describe "#client" do
-    it "builds a Parseable::Client with resource credentials" do
-      expect(Parseable::Client).to receive(:new).with(
-        endpoint: parseable_server.endpoint,
-        ssl_ca_data: parseable_resource.root_certs,
-        username: parseable_resource.admin_user,
-        password: parseable_resource.admin_password,
-      )
-      parseable_server.client
+    it "connects to the server's own ipv4 address with the resource credentials" do
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.1.1.1/32")
+      expect(Config).to receive_messages(development?: false, is_e2e: false)
+      stub_request(:get, "https://1.1.1.1:8000/api/v1/liveness").with(basic_auth: ["admin", "dummy-password"]).to_return(status: 200)
+      expect(parseable_server.client.healthy?).to be true
+    end
+
+    it "connects to the server's ipv6 address in development mode" do
+      expect(Config).to receive(:development?).and_return(true)
+      stub_request(:get, "#{parseable_server.ip6_url}/api/v1/liveness").to_return(status: 200)
+      expect(parseable_server.client.healthy?).to be true
+    end
+  end
+
+  describe "#healthy?" do
+    before do
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.1.1.1/32")
+      allow(Config).to receive_messages(development?: false, is_e2e: false)
+    end
+
+    it "returns true when the liveness check passes" do
+      stub_request(:get, "https://1.1.1.1:8000/api/v1/liveness").to_return(status: 200)
+      expect(parseable_server.healthy?).to be true
+    end
+
+    it "returns false when the liveness check fails" do
+      stub_request(:get, "https://1.1.1.1:8000/api/v1/liveness").to_return(status: 503)
+      expect(parseable_server.healthy?).to be false
     end
   end
 
