@@ -209,7 +209,7 @@ PGDATA=/dat/17/data
       expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).exactly(4).times
       expect(sshable).to receive(:_cmd).and_return("NotStarted")
       expect(postgres_timeline.need_backup?).to be(true)
-      postgres_timeline.update(backup_period_hours: 30)
+      postgres_timeline.update(backup_period_hours: 48)
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
@@ -234,6 +234,138 @@ PGDATA=/dat/17/data
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "wait")
       postgres_timeline.incr_take_backup_for_converge
       expect(postgres_timeline.need_backup?).to be(true)
+    end
+  end
+
+  describe "backup window" do
+    let(:now) { Time.utc(2026, 11, 4, 10, 30) }
+
+    before do
+      allow(Time).to receive(:now).and_return(now)
+    end
+
+    it "opens slots every period from the start hour" do
+      postgres_timeline.update(latest_backup_started_at: now, backup_window_start_at: 9, backup_period_hours: 24)
+      expect(postgres_timeline.backup_slot_open_at).to eq(Time.utc(2026, 11, 4, 9))
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 5, 9))
+
+      postgres_timeline.update(backup_window_start_at: 23, backup_period_hours: 24)
+      expect(postgres_timeline.backup_slot_open_at).to eq(Time.utc(2026, 11, 3, 23))
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 4, 23))
+
+      postgres_timeline.update(backup_window_start_at: 0, backup_period_hours: 6, backup_retention_days: 8)
+      expect(postgres_timeline.backup_slot_open_at).to eq(Time.utc(2026, 11, 4, 6))
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 4, 12))
+
+      postgres_timeline.update(backup_window_start_at: 0, backup_period_hours: 168, backup_retention_days: 35)
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 5))
+    end
+
+    it "reports the latest slot as the next one until it has its backup" do
+      postgres_timeline.update(backup_window_start_at: 9, backup_period_hours: 24)
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 4, 9))
+      postgres_timeline.update(latest_backup_started_at: now)
+      expect(postgres_timeline.next_backup_slot_at).to eq(Time.utc(2026, 11, 5, 9))
+    end
+
+    it "has no next slot without a window" do
+      expect(postgres_timeline.next_backup_slot_at).to be_nil
+    end
+
+    it "returns the schedule columns" do
+      postgres_timeline.update(backup_window_start_at: 3, backup_retention_days: 10, backup_period_hours: 12)
+      expect(postgres_timeline.backup_schedule).to eq(backup_window_start_at: 3, backup_retention_days: 10, backup_period_hours: 12)
+    end
+
+    it "is due without a backup or when the last one started before the latest slot opened" do
+      postgres_timeline.update(backup_window_start_at: 9)
+      expect(postgres_timeline.backup_due?).to be(true)
+      postgres_timeline.update(latest_backup_started_at: Time.utc(2026, 11, 3, 12))
+      expect(postgres_timeline.backup_due?).to be(true)
+      postgres_timeline.update(latest_backup_started_at: Time.utc(2026, 11, 4, 9))
+      expect(postgres_timeline.backup_due?).to be(false)
+    end
+
+    describe "validation" do
+      it "accepts every period option and the boundaries" do
+        described_class::BACKUP_PERIOD_HOURS_OPTIONS.each do |period|
+          postgres_timeline.set(backup_window_start_at: 23, backup_period_hours: period, backup_retention_days: 35)
+          expect(postgres_timeline.valid?).to be(true), "period #{period}"
+        end
+        postgres_timeline.set(backup_window_start_at: 0, backup_period_hours: 6, backup_retention_days: 1)
+        expect(postgres_timeline.valid?).to be(true)
+      end
+
+      it "rejects out of range values" do
+        postgres_timeline.set(backup_window_start_at: 24, backup_period_hours: 5, backup_retention_days: 36)
+        expect(postgres_timeline.valid?).to be(false)
+        expect(postgres_timeline.errors).to eq(
+          backup_window_start_at: ["must be between 0 and 23"],
+          backup_period_hours: ["must be one of 6, 12, 24, 48, 72, 168"],
+          backup_retention_days: ["must be between 1 and 35"],
+        )
+      end
+
+      it "accepts a period outside the options on a new row" do
+        expect { described_class.create(location_id: Location::HETZNER_FSN1_ID, backup_period_hours: 36) }.not_to raise_error
+      end
+
+      it "keeps accepting a period outside the options until it is changed" do
+        postgres_timeline.this.update(backup_period_hours: 2)
+        postgres_timeline.refresh
+        expect { postgres_timeline.update(backup_retention_days: 10) }.not_to raise_error
+      end
+    end
+
+    describe "#need_backup?" do
+      let(:sshable) { postgres_timeline.leader.vm.sshable }
+
+      before do
+        create_minio_cluster
+        resource = create_postgres_resource(project: Project.create(name: "test-project"), location_id: postgres_timeline.location_id)
+        create_postgres_server(resource:, timeline: postgres_timeline)
+      end
+
+      it "skips a backup that started in the current slot" do
+        postgres_timeline.update(backup_window_start_at: 9, latest_backup_started_at: Time.utc(2026, 11, 4, 9, 20))
+        expect(postgres_timeline.need_backup?).to be(false)
+      end
+
+      it "backs up in a slot even if the last backup started late in the previous slot" do
+        postgres_timeline.update(backup_window_start_at: 9, latest_backup_started_at: Time.utc(2026, 11, 3, 12, 40))
+        expect(sshable).to receive(:_cmd).and_return("NotStarted")
+        expect(postgres_timeline.need_backup?).to be(true)
+      end
+
+      it "backs up in a slot when none was ever started" do
+        postgres_timeline.update(backup_window_start_at: 9)
+        expect(sshable).to receive(:_cmd).and_return("NotStarted")
+        expect(postgres_timeline.need_backup?).to be(true)
+      end
+
+      it "does not start a second backup while one is in progress" do
+        postgres_timeline.update(backup_window_start_at: 9)
+        expect(sshable).to receive(:_cmd).and_return("InProgress")
+        expect(postgres_timeline.need_backup?).to be(false)
+      end
+
+      it "skips outside the slot once the slot's backup has started" do
+        postgres_timeline.update(backup_window_start_at: 6, latest_backup_started_at: Time.utc(2026, 11, 4, 8))
+        expect(postgres_timeline.need_backup?).to be(false)
+      end
+
+      it "backs up outside the slot when the slot's backup was missed" do
+        postgres_timeline.update(backup_window_start_at: 6, latest_backup_started_at: Time.utc(2026, 11, 3, 8))
+        expect(sshable).to receive(:_cmd).and_return("NotStarted")
+        expect(postgres_timeline.need_backup?).to be(true)
+      end
+
+      it "backs up outside the slot for converge" do
+        postgres_timeline.update(backup_window_start_at: 6, latest_backup_started_at: Time.utc(2026, 11, 4, 8))
+        Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+        postgres_timeline.incr_take_backup_for_converge
+        expect(postgres_timeline.need_backup?).to be(true)
+      end
     end
   end
 
@@ -396,6 +528,26 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
   end
 
+  it "keeps objects for the retention window plus one backup period" do
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+    postgres_timeline.update(backup_period_hours: 12)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(8)
+    postgres_timeline.update(backup_period_hours: 48)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(9)
+    postgres_timeline.update(backup_period_hours: 168, backup_retention_days: 35)
+    expect(postgres_timeline.backup_bucket_expiration_days).to eq(42)
+  end
+
+  it "ignores backups older than the bucket expiration days for earliest restore time" do
+    postgres_timeline.update(backup_retention_days: 5)
+    create_minio_cluster
+    sentinel = ->(name, age) { instance_double(Minio::Client::Blob, key: "basebackups_005/#{name}_backup_stop_sentinel.json", last_modified: Time.now - age) }
+    minio_client = instance_double(Minio::Client)
+    expect(minio_client).to receive(:list_objects).and_return([sentinel.call("0001", 60 * 60 * 24 * 6 + 60), sentinel.call("0002", 60 * 60 * 24 * 5)])
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+    expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
+  end
+
   describe "aws" do
     let(:s3_client) { Aws::S3::Client.new(stub_responses: true) }
 
@@ -463,8 +615,9 @@ PGDATA=/dat/17/data
         s3_client.stub_responses(:put_bucket_lifecycle_configuration)
       end
 
-      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
-        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)).and_return(true)
+      it "defaults to backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
+        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(15)).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy).to be(true)
       end
 
@@ -669,8 +822,9 @@ PGDATA=/dat/17/data
     end
 
     describe "#set_lifecycle_policy" do
-      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
-        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS).and_return(true)
+      it "defaults to backup_bucket_expiration_days" do
+        postgres_timeline.update(backup_retention_days: 14)
+        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 15).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy).to be(true)
       end
 

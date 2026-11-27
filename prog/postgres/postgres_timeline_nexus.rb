@@ -5,7 +5,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   BACKUP_CPU_WEIGHT = 25
 
-  def self.assemble(location_id:, parent_id: nil)
+  def self.assemble(location_id:, parent_id: nil, backup_schedule: nil)
     if parent_id && (parent = PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
@@ -15,7 +15,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
 
     DB.transaction do
-      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, backup_period_hours: parent&.backup_period_hours || 24)
+      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, **(backup_schedule || parent&.backup_schedule || {}))
       if postgres_timeline.generate_blob_storage_credentials?
         postgres_timeline.update(access_key: SecureRandom.hex(16), secret_key: SecureRandom.hex(32))
       end
@@ -28,9 +28,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
     return if postgres_timeline.created_at > Time.now - 6 * 60 * 60
 
+    warning_after = (postgres_timeline.backup_period_hours + 24) * 60 * 60
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
-    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
-      severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - 3 * 24 * 60 * 60) ? "error" : "warning"
+    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - warning_after)
+      severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - warning_after - 24 * 60 * 60) ? "error" : "warning"
       Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, resource_id: postgres_timeline.id, severity:)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
@@ -66,6 +67,12 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     when_refresh_blob_storage_policy_set? do
       decr_refresh_blob_storage_policy
       postgres_timeline.refresh_blob_storage_policy
+    end
+
+    when_refresh_lifecycle_policy_set? do
+      decr_refresh_lifecycle_policy
+      postgres_timeline.set_lifecycle_policy if postgres_timeline.blob_storage
+      postgres_timeline.update(cached_earliest_backup_at: nil)
     end
 
     dependent = PostgresServer[timeline_id: postgres_timeline.id]
