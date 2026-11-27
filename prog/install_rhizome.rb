@@ -12,6 +12,26 @@ class Prog::InstallRhizome < Prog::Base
 
   SKIP_VALIDATION = ["Gemfile.lock"]
 
+  EXTRACT = <<~'SH'
+    set -ueo pipefail
+    dest=$PWD
+    stage=$(mktemp -d "$dest/.rhizome-install.XXXXXX")
+    trap 'rm -rf "$stage"' EXIT
+    cd "$stage"
+    tar xf -
+    common/bin/validate
+    find . -type f -print0 | xargs -0 sync
+    find . -mindepth 1 -type d | while read -r d; do
+      mkdir -p "$dest/$d"
+      chmod --reference="$d" "$dest/$d"
+    done
+    find . -type f ! -path ./hashes.json | while read -r f; do
+      mv -fT "$f" "$dest/$f"
+    done
+    mv -fT hashes.json "$dest/hashes.json"
+    find . -type d -printf "$dest/%P\0" | xargs -0 sync
+  SH
+
   label def start
     tar = StringIO.new
     tar.binmode
@@ -48,7 +68,7 @@ class Prog::InstallRhizome < Prog::Base
     end
 
     payload = tar.string.freeze
-    sshable.cmd("tar xf -", stdin: payload)
+    sshable.cmd(EXTRACT, stdin: payload)
 
     hop_install_gems
   end
