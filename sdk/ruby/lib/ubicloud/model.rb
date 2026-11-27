@@ -26,6 +26,7 @@ module Ubicloud
 
       # Return an array of all model instances you have access to in Ubicloud. If the
       # +location+ keyword argument is given, only return model instances for that location.
+      # Retrieves all pages of results from the API.
       def list(adapter, location: nil)
         path = if location
           raise Error, "invalid location: #{location.inspect}" if location.include?("/")
@@ -35,7 +36,7 @@ module Ubicloud
           fragment
         end
 
-        adapter.get(path)[:items].map { new(adapter, it) }
+        _list_items(adapter, path).map { new(adapter, it) }
       end
     end
 
