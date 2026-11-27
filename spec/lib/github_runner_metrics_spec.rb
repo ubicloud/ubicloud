@@ -6,14 +6,22 @@ RSpec.describe GithubRunnerMetrics do
     described_class.parse(lines.map { "#{it}\n" }.join, labels_by_vm_name)
   end
 
-  it "installs the guest writer as a service" do
-    expect(described_class.install_command).to eq(<<~COMMAND)
+  def install_command(unit)
+    <<~COMMAND
       echo #{Base64.strict_encode64(described_class::GUEST_WRITER).shellescape} | base64 -d | sudo tee /usr/local/bin/ubicloud-metrics-writer > /dev/null
       sudo chmod 755 /usr/local/bin/ubicloud-metrics-writer
-      echo #{Base64.strict_encode64(described_class::DISK_UNIT).shellescape} | base64 -d | sudo tee /etc/systemd/system/ubicloud-metrics-writer.service > /dev/null
+      echo #{Base64.strict_encode64(unit).shellescape} | base64 -d | sudo tee /etc/systemd/system/ubicloud-metrics-writer.service > /dev/null
       sudo systemctl daemon-reload
       sudo systemctl start ubicloud-metrics-writer.service
     COMMAND
+  end
+
+  it "installs the guest writer as a service writing to the metrics disk on metal" do
+    expect(described_class.install_command(metal: true)).to eq(install_command(described_class::DISK_UNIT))
+  end
+
+  it "installs the guest writer as a service writing to a ring file elsewhere" do
+    expect(described_class.install_command(metal: false)).to eq(install_command(described_class::FILE_UNIT))
   end
 
   describe ".parse" do
