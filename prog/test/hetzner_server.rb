@@ -74,6 +74,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       default_boot_images:,
       install_os: true,
     ).subject
+    # InstallOs installs Ubuntu 24.04. Test the last custom kernel for it.
+    if (version = Prog::Vm::HostNexus::CUSTOM_KERNELS.keys.filter_map { |os_version, _, version| version if os_version == "ubuntu-24.04" }.last)
+      Prog::Vm::HostNexus.set_custom_kernel_version(vm_host.id, version)
+    end
     self.vm_host_id = vm_host.id
 
     hop_wait_setup_host
@@ -93,6 +97,15 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     sshable = vm_host.sshable
     swap_device = sshable.cmd("sudo swapon --show=NAME --noheadings").strip
     fail_test "swap is not on a dm-crypt device: #{swap_device}" unless swap_device.start_with?("/dev/dm-")
+    hop_verify_custom_kernel
+  end
+
+  label def verify_custom_kernel
+    if setup_host? && (version = Prog::Vm::HostNexus.custom_kernel_version(vm_host_id))
+      signature = vm_host.sshable.cmd("cat /proc/version_signature").strip
+      fail_test "host does not run the custom kernel #{version}: #{signature}" unless signature.include?("#{version}-generic")
+    end
+
     hop_wait
   end
 

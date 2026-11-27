@@ -91,13 +91,37 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#setup_host" do
-    it "assembles the vm host with install_os and hops to wait_setup_host" do
+    before do
       expect(Prog::Vm::HostNexus).to receive(:assemble) do |_hostname, **kwargs|
         expect(kwargs[:install_os]).to be(true)
         expect(kwargs[:provider_name]).to eq(HostProvider::HETZNER_PROVIDER_NAME)
         vm_host.strand
       end
+    end
+
+    it "assembles the vm host with install_os and hops to wait_setup_host" do
       expect { hs_test.setup_host }.to hop("wait_setup_host")
+    end
+
+    # stub_const does not work on frozen classes.
+    if Config.unfrozen_test?
+      it "sets the last custom kernel for Ubuntu 24.04" do
+        stub_const("Prog::Vm::HostNexus::CUSTOM_KERNELS", {
+          ["ubuntu-24.04", "x64", "6.8.0-1.1+ubi1"] => "abc",
+          ["ubuntu-24.04", "x64", "6.8.0-2.2+ubi1"] => "def",
+          ["ubuntu-26.04", "x64", "7.0.0-1.1+ubi1"] => "ghi",
+        })
+        frame = vm_host.strand.stack.last
+        expect { hs_test.setup_host }.to hop("wait_setup_host")
+        expect(vm_host.strand.reload.stack).to eq([frame.merge("custom_kernel_version" => "6.8.0-2.2+ubi1")])
+      end
+
+      it "does not set a custom kernel when there is none for Ubuntu 24.04" do
+        stub_const("Prog::Vm::HostNexus::CUSTOM_KERNELS", {})
+        stack = vm_host.strand.stack
+        expect { hs_test.setup_host }.to hop("wait_setup_host")
+        expect(vm_host.strand.reload.stack).to eq(stack)
+      end
     end
   end
 
@@ -123,13 +147,40 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#verify_encrypted_swap" do
     it "hops to wait if swap is on dm-crypt" do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo swapon --show=NAME --noheadings").and_return("/dev/dm-0\n")
-      expect { hs_test.verify_encrypted_swap }.to hop("wait")
+      expect { hs_test.verify_encrypted_swap }.to hop("verify_custom_kernel")
     end
 
     it "fails if swap is not on dm-crypt" do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo swapon --show=NAME --noheadings").and_return("/dev/nvme0n1p2\n")
       expect(hs_test.strand).to receive(:update).with(hash_including(exitval: {msg: "swap is not on a dm-crypt device: /dev/nvme0n1p2"}))
       expect { hs_test.verify_encrypted_swap }.to hop("failed")
+    end
+  end
+
+  describe "#verify_custom_kernel" do
+    before do
+      Prog::Vm::HostNexus.set_custom_kernel_version(vm_host.id, "6.8.0-1.1+ubi1")
+    end
+
+    it "hops to wait if the host runs the custom kernel" do
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("cat /proc/version_signature").and_return("Ubuntu 6.8.0-1.1+ubi1-generic 6.8.12\n")
+      expect { hs_test.verify_custom_kernel }.to hop("wait")
+    end
+
+    it "fails if the host does not run the custom kernel" do
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("cat /proc/version_signature").and_return("Ubuntu 6.8.0-1.1-generic 6.8.12\n")
+      expect(hs_test.strand).to receive(:update).with(hash_including(exitval: {msg: "host does not run the custom kernel 6.8.0-1.1+ubi1: Ubuntu 6.8.0-1.1-generic 6.8.12"}))
+      expect { hs_test.verify_custom_kernel }.to hop("failed")
+    end
+
+    it "hops to wait if the host has no custom kernel version" do
+      vm_host.strand.update(stack: [{}])
+      expect { hs_test.verify_custom_kernel }.to hop("wait")
+    end
+
+    it "hops to wait if the test did not set up the host" do
+      refresh_frame(hs_test, new_values: {"setup_host?" => false})
+      expect { hs_test.verify_custom_kernel }.to hop("wait")
     end
   end
 
