@@ -50,9 +50,8 @@ class Prog::Postgres::PostgresLockout < Prog::Base
     credential = vm.location.location_credential_gcp
     client = credential.compute_client
     request = {project: credential.project_id, zone: "#{vm.location.name.delete_prefix("gcp-")}-#{vm.vm_gcp_resource.location_az.az}", instance: vm.name}
-    nic_name = "nic0.#{GcpDualNicNetplan::VLAN}"
-    return if client.get(**request).network_interfaces.none? { it.name == nic_name }
+    return if client.get(**request).network_interfaces.none? { it.name == GcpDualNicNetplan::USER_NIC_NAME }
 
-    client.delete_network_interface(**request, network_interface_name: nic_name, request_id: strand.id)
+    client.delete_network_interface(**request, network_interface_name: GcpDualNicNetplan::USER_NIC_NAME, request_id: strand.id)
   end
 end

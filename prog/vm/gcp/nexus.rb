@@ -5,7 +5,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   subject_is :vm
   frame_reader :unsupported_azs, :swap_size_bytes, :alternative_families
-  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open
+  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones, :ssh_port_open, :user_nic_netplan_started
 
   def before_destroy
     register_deadline(nil, 5 * 60, message: "finish destroying")
@@ -47,7 +47,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         },
       ],
     }
-    cloud_config["runcmd"] = [dual_nic_netplan(mgmt_nic).script] if mgmt_nic
 
     if swap_size_bytes
       cloud_config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
@@ -86,12 +85,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
     end
 
+    # The user NIC of a dual-NIC VM is added as a Dynamic NIC once the
+    # insert operation completes, see add_user_nic.
     network_interfaces = if mgmt_nic
       mgmt_ipv6 = management_ipv6?(mgmt_nic)
-      [
-        network_interface(mgmt_nic, stack_type: mgmt_ipv6 ? "IPV4_IPV6" : "IPV4_ONLY", ipv4_nat: !mgmt_ipv6),
-        network_interface(user_nic, stack_type: "IPV4_IPV6", vlan: GcpDualNicNetplan::VLAN),
-      ]
+      [network_interface(mgmt_nic, stack_type: mgmt_ipv6 ? "IPV4_IPV6" : "IPV4_ONLY", ipv4_nat: !mgmt_ipv6)]
     else
       [network_interface(user_nic, stack_type: "IPV4_IPV6")]
     end
@@ -180,6 +178,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
     end
+    hop_add_user_nic if vm.management_nic
     hop_wait_instance_created
   end
 
@@ -216,7 +215,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nis = instance.network_interfaces
     mgmt_nic = vm.management_nic
     ssh_ni, user_ni = if mgmt_nic
-      ["nic0", "nic0.#{GcpDualNicNetplan::VLAN}"].map { |name| nis.find { it.name == name } || fail("GCE instance #{vm.name} has no NIC #{name}") }
+      hop_add_user_nic if nis.none? { it.name == GcpDualNicNetplan::USER_NIC_NAME }
+      ["nic0", GcpDualNicNetplan::USER_NIC_NAME].map { |name| nis.find { it.name == name } || fail("GCE instance #{vm.name} has no NIC #{name}") }
     else
       [nis.first, nis.first]
     end
@@ -237,6 +237,31 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     vm.incr_update_firewall_rules unless runner_subnet?
     hop_wait_sshable
+  end
+
+  label def add_user_nic
+    op = compute_client.add_network_interface(
+      project: gcp_project_id,
+      zone: gcp_zone,
+      instance: vm.name,
+      network_interface_resource: network_interface(user_nic, stack_type: "IPV4_IPV6", vlan: GcpDualNicNetplan::VLAN, parent_nic_name: "nic0"),
+    )
+    save_gcp_op("add_user_nic", op_name: op.name, scope: "zone", scope_value: gcp_zone)
+    hop_wait_add_user_nic_op
+  rescue Google::Cloud::AlreadyExistsError
+    hop_wait_instance_created
+  end
+
+  label def wait_add_user_nic_op
+    poll_and_clear_gcp_op("add_user_nic") do |op|
+      if op_error_code(op) == "IP_IN_USE_BY_ANOTHER_RESOURCE"
+        clear_gcp_op("add_user_nic")
+        reallocate_private_ipv4(op_error_message(op), [user_nic])
+        hop_add_user_nic
+      end
+      raise "GCE user NIC attachment failed: #{op_error_message(op)}"
+    end
+    hop_wait_instance_created
   end
 
   label def wait_sshable
@@ -264,7 +289,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       nap 1
     end
 
-    nap 5 if vm.management_nic && !user_nic_default_routes?
+    if (mgmt_nic = vm.management_nic) && !user_nic_default_routes?
+      start_user_nic_netplan(mgmt_nic) unless user_nic_netplan_started
+      nap 5
+    end
 
     hop_create_billing_record
   end
@@ -370,7 +398,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @user_nic ||= vm.user_nic
   end
 
-  def network_interface(nic, stack_type:, vlan: nil, ipv4_nat: true)
+  def network_interface(nic, stack_type:, vlan: nil, parent_nic_name: nil, ipv4_nat: true)
     gcp_res = nic.nic_gcp_resource
     interface = Google::Cloud::Compute::V1::NetworkInterface.new(
       network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
@@ -378,6 +406,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       **({network_i_p: nic.private_ipv4.network.to_s} if nic.private_ipv4),
       stack_type:,
       vlan:,
+      parent_nic_name:,
     )
     if ipv4_nat
       interface.access_configs << Google::Cloud::Compute::V1::AccessConfig.new(
@@ -409,6 +438,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def management_ipv6?(mgmt_nic)
     mgmt_nic.nic_gcp_resource.static_ip.nil?
+  end
+
+  # netplan apply renames nic0 and drops the SSH session that started it,
+  # so the script runs detached and user_nic_default_routes? confirms it.
+  def start_user_nic_netplan(mgmt_nic)
+    vm.sshable.cmd("sudo systemd-run --quiet --collect bash -c :script", script: dual_nic_netplan(mgmt_nic).script)
+    self.user_nic_netplan_started = true
+  rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+    nil
   end
 
   def user_nic_default_routes?
@@ -531,9 +569,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     email
   end
 
-  def reallocate_private_ipv4(error_message)
-    nics = vm.nics.select { error_message.include?("'#{it.private_ipv4.network}'") }
-    nics = vm.nics if nics.empty?
+  def reallocate_private_ipv4(error_message, candidates = vm.nics)
+    nics = candidates.select { error_message.include?("'#{it.private_ipv4.network}'") }
+    nics = candidates if nics.empty?
     nics.each do |nic|
       subnet = nic.private_subnet
       new_ip = subnet.gcp_management? ? subnet.random_host_ipv4 : subnet.random_private_ipv4

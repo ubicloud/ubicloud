@@ -4,6 +4,7 @@ GcpDualNicNetplan = Data.define(:mgmt_ip, :mgmt_gateway, :user_ip, :user_gateway
 
 class GcpDualNicNetplan
   VLAN = 2
+  USER_NIC_NAME = "nic0.#{VLAN}"
   MGMT_TABLE = 100
   USER_TABLE = 200
   MTU = 1460
