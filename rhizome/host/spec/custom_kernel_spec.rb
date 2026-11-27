@@ -38,6 +38,11 @@ RSpec.describe CustomKernel do
     let(:kernels) { {["linux-version", "list"] => "list", ["linux-version", "sort"] => "6.8.0-149-generic\n6.8.0-151-generic\n"} }
     let(:check_commands) { [["linux-version", "list"], ["linux-version", "sort", {stdin: "list"}]] }
 
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(described_class::SECURE_BOOT_VAR).and_return(false)
+    end
+
     it "installs and holds the kernel before full-upgrade" do
       stub_commands(kernels)
       expect(Dir).to receive(:mktmpdir).with("custom-kernel").and_yield(dir)
@@ -77,6 +82,28 @@ RSpec.describe CustomKernel do
 
       expect { ck.apply_patches }.to raise_error(RuntimeError, "Invalid SHA-256 digest")
       expect(commands).to eq([apt_get("update"), [*status_query, {expect: [0, 1]}]])
+    end
+
+    it "fails before any change when Secure Boot is on" do
+      stub_commands({})
+      expect(File).to receive(:exist?).with(described_class::SECURE_BOOT_VAR).and_return(true)
+      expect(File).to receive(:binread).with(described_class::SECURE_BOOT_VAR).and_return("\x06\x00\x00\x00\x01".b)
+
+      expect { ck.apply_patches }.to raise_error(RuntimeError, "Secure Boot is enabled, the unsigned custom kernel cannot boot")
+      expect(commands).to eq([])
+    end
+  end
+
+  describe "#check_secure_boot" do
+    it "passes when the firmware has no Secure Boot variable" do
+      expect(File).to receive(:exist?).with(described_class::SECURE_BOOT_VAR).and_return(false)
+      expect(ck.check_secure_boot).to be_nil
+    end
+
+    it "passes when Secure Boot is off" do
+      expect(File).to receive(:exist?).with(described_class::SECURE_BOOT_VAR).and_return(true)
+      expect(File).to receive(:binread).with(described_class::SECURE_BOOT_VAR).and_return("\x06\x00\x00\x00\x00".b)
+      expect(ck.check_secure_boot).to be_nil
     end
   end
 

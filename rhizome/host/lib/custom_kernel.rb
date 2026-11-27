@@ -19,11 +19,14 @@ class CustomKernel
     @release = "#{abi}-generic"
   end
 
+  SECURE_BOOT_VAR = "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d0-aa39-00e098032b8c"
+
   def packages
     ["linux-image-unsigned", "linux-modules", "linux-modules-extra"].map { |name| "#{name}-#{@release}" }
   end
 
   def apply_patches
+    check_secure_boot
     apt_get("update")
     install unless installed?
     r "apt-mark", "hold", *packages
@@ -46,6 +49,14 @@ class CustomKernel
       arch = Arch.render(x64: "amd64", arm64: "arm64")
       apt_get("install", "--allow-change-held-packages", *packages.map { |package| File.join(dir, "#{package}_#{@version}_#{arch}.deb") })
     end
+  end
+
+  # Secure Boot does not boot the unsigned image. The first 4 bytes of the
+  # variable are its attributes, and byte 4 is 1 when Secure Boot is on.
+  def check_secure_boot
+    return unless File.exist?(SECURE_BOOT_VAR) && File.binread(SECURE_BOOT_VAR).getbyte(4) == 1
+
+    fail "Secure Boot is enabled, the unsigned custom kernel cannot boot"
   end
 
   # GRUB boots the newest installed kernel.
