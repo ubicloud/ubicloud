@@ -56,7 +56,7 @@ class Prog::DownloadBootImage < Prog::Base
         suffix = suffixes.fetch(image_family, nil)
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         key = "#{image_name}#{arch}#{version}.#{suffix}"
-        download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
+        download_from_r2? ? self.class.r2_signed_url(key) : minio_signed_url(key)
       else
         self.class.upstream_url(image_name, version, vm_host.arch)
       end
@@ -343,7 +343,7 @@ class Prog::DownloadBootImage < Prog::Base
     sum
   end
 
-  def r2_signed_url(key)
+  def self.r2_signed_url(key)
     client = Aws::S3::Client.new(
       endpoint: Config.ubicloud_images_r2_endpoint,
       access_key_id: Config.ubicloud_images_r2_access_key,
