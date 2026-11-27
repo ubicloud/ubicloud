@@ -422,6 +422,22 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(representative.vm.sshable).to receive(:_cmd).and_return("")
       expect { nx.recycle_representative_server }.to nap(60)
       expect(standby.planned_take_over_set?(cached: false)).to be true
+      expect(standby.hold_lockout_set?(cached: false)).to be false
+      expect(strand.stack.first["deadline_target"]).to eq("prune_servers")
+    end
+
+    it "holds the new primary in lockout if there are reindex jobs" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      standby = create_server(is_representative: false)
+      standby.update(physical_slot_ready_id: server.id)
+      refresh_frame(nx, new_values: {"reindex_jobs" => {"app" => ["REINDEX INDEX i"]}})
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
+      representative = nx.postgres_resource.representative_server
+      expect(representative.vm.sshable).to receive(:_cmd).and_return("")
+      expect { nx.recycle_representative_server }.to nap(60)
+      expect(standby.hold_lockout_set?(cached: false)).to be true
     end
 
     it "requests a timeline switch on promote during a family migration" do
@@ -453,6 +469,39 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "hops to recycle_representative_server if in maintenance window and not upgrading" do
       create_server(is_representative: true)
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+    end
+
+    context "when the image family changes" do
+      before do
+        create_server(is_representative: true)
+        pg.update(target_image_family: "ubuntu-2604")
+        create_server.update(image_family: "ubuntu-2604")
+      end
+
+      it "hops to wait_reindex_decision with a deadline until the reindex is decided" do
+        expect { nx.wait_for_maintenance_window }.to hop("wait_reindex_decision")
+        expect(strand.stack.first["deadline_target"]).to eq("wait_for_maintenance_window")
+        expect(Time.new(strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 24 * 60 * 60)
+      end
+
+      it "hops to recycle_representative_server once reindex jobs are set" do
+        refresh_frame(nx, new_values: {"reindex_jobs" => {"app" => ["REINDEX INDEX i"]}})
+        expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+      end
+
+      it "hops to recycle_representative_server if the reindex is skipped" do
+        pg.incr_skip_family_reindex
+        expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+      end
+    end
+
+    it "does not wait for a reindex decision while upgrading the version" do
+      server = create_server(is_representative: true, version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      pg.update(target_image_family: "ubuntu-2604")
+      expect(nx.postgres_resource.representative_server).to receive(:unsynced_logical_failover_slots).with(candidate).and_return([])
+      expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
+      expect(server.fence_set?(cached: false)).to be true
     end
 
     it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
@@ -596,6 +645,36 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
   end
 
+  describe "#wait_reindex_decision" do
+    let(:candidate) { create_server.update(image_family: "ubuntu-2604") }
+
+    before do
+      strand.update(label: "wait_reindex_decision")
+      create_server(is_representative: true)
+      pg.update(target_image_family: "ubuntu-2604")
+      candidate
+    end
+
+    it "naps until the reindex is decided" do
+      expect { nx.wait_reindex_decision }.to nap(60)
+    end
+
+    it "hops to wait_for_maintenance_window once reindex jobs are set" do
+      refresh_frame(nx, new_values: {"reindex_jobs" => {"app" => ["REINDEX INDEX i"]}})
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+
+    it "hops to wait_for_maintenance_window if the reindex is skipped" do
+      pg.incr_skip_family_reindex
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+
+    it "hops to wait_for_maintenance_window if the family candidate is gone" do
+      candidate.update(image_family: "ubuntu-2204")
+      expect { nx.wait_reindex_decision }.to hop("wait_for_maintenance_window")
+    end
+  end
+
   describe "#wait_upgrade_candidate" do
     before do
       strand.update(label: "wait_upgrade_candidate")
@@ -702,6 +781,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
     end
 
+    it "clears the one-shot family reindex skip" do
+      create_server(is_representative: true)
+      pg.incr_skip_family_reindex
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
+      expect(pg.skip_family_reindex_set?(cached: false)).to be false
+    end
+
     it "prefers servers on intended type when picking which standbys to keep" do
       create_server(is_representative: true)
       on_intended = create_server
@@ -767,6 +853,120 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       strand.save_changes
 
       expect { nx.wait_prune_servers }.to exit({"msg" => "postgres resource is converged"})
+    end
+
+    it "registers a deadline of 15 minutes per database and hops to reindex if there are reindex jobs" do
+      refresh_frame(nx, new_values: {"servers_to_destroy" => [], "reindex_jobs" => {"app" => ["REINDEX INDEX i"], "postgres" => []}})
+
+      expect { nx.wait_prune_servers }.to hop("reindex")
+      expect(Time.new(strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 30 * 60)
+      expect(strand.stack.first["deadline_message"]).to eq("finish rebuilding indexes")
+      expect(strand.stack.first["deadline_target"]).to be_nil
+    end
+  end
+
+  describe "#reindex" do
+    let(:primary) { create_server(is_representative: true) }
+    let(:sshable) { nx.postgres_resource.representative_server.vm.sshable }
+    let(:jobs) { {"app" => ["REINDEX INDEX i1", "REINDEX INDEX i2"], "it's" => ["REINDEX INDEX i3"]} }
+
+    def unit(step) = "reindex_#{strand.ubid}_#{step}"
+
+    before do
+      strand.update(label: "reindex")
+      primary
+      refresh_frame(nx, new_values: {"reindex_jobs" => jobs})
+    end
+
+    it "naps until the primary is ready" do
+      primary.strand.update(label: "configure")
+
+      expect { nx.reindex }.to nap(5)
+    end
+
+    it "starts the first database" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(0)}").and_return("NotStarted")
+      command = ["sudo", "-u", "postgres", "psql", "-U", "postgres", "-X", "-d", "dbname='app'", "-v", "ON_ERROR_STOP=1",
+        "-c", "REINDEX INDEX i1", "-c", "REINDEX INDEX i2"]
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run #{unit(0)} #{command.shelljoin}", stdin: nil, log: true)
+
+      expect { nx.reindex }.to nap(5)
+    end
+
+    it "quotes the database name for the next step" do
+      refresh_frame(nx, new_values: {"reindex_step" => 1})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(1)}").and_return("NotStarted")
+      command = ["sudo", "-u", "postgres", "psql", "-U", "postgres", "-X", "-d", "dbname='it\\'s'", "-v", "ON_ERROR_STOP=1",
+        "-c", "REINDEX INDEX i3"]
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run #{unit(1)} #{command.shelljoin}", stdin: nil, log: true)
+
+      expect { nx.reindex }.to nap(5)
+    end
+
+    it "naps while a database is in progress" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(0)}").and_return("InProgress")
+
+      expect { nx.reindex }.to nap(5)
+    end
+
+    it "cleans up a finished database and moves to the next one" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(0)}").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{unit(0)}")
+
+      expect { nx.reindex }.to nap(0)
+      expect(strand.stack.first["reindex_step"]).to eq(1)
+    end
+
+    it "resolves a failure page when a database finishes" do
+      page = Prog::PageNexus.assemble("reindex failed", ["PostgresReindexFailed", pg.id], pg.ubid, resource_id: pg.id).subject
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(0)}").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{unit(0)}")
+
+      expect { nx.reindex }.to nap(0)
+      expect(page.resolve_set?).to be true
+    end
+
+    it "pages with the end of the log when a database fails" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{unit(0)}").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("sudo journalctl -u #{unit(0)} -n 20 --no-pager").and_return("ERROR: could not create unique index\n")
+
+      expect { nx.reindex }.to nap(60).and change(Page, :count).from(0).to(1)
+      page = Page.from_tag_parts("PostgresReindexFailed", pg.id)
+      expect(page.resource_id).to eq(pg.id)
+      expect(page.severity).to eq("critical")
+      expect(strand.stack.first["reindex_step"]).to be_nil
+    end
+
+    it "releases the lockout when every database is done" do
+      primary.incr_hold_lockout
+      refresh_frame(nx, new_values: {"reindex_step" => 2})
+
+      expect { nx.reindex }.to hop("wait_lockout_release")
+      expect(primary.hold_lockout_set?(cached: false)).to be false
+      expect(primary.configure_set?(cached: false)).to be true
+    end
+  end
+
+  describe "#wait_lockout_release" do
+    let(:primary) { create_server(is_representative: true) }
+
+    before do
+      strand.update(label: "wait_lockout_release")
+    end
+
+    it "naps until the primary is configured" do
+      primary.incr_configure
+      expect { nx.wait_lockout_release }.to nap(5)
+    end
+
+    it "naps while the primary configures" do
+      primary.strand.update(label: "configure")
+      expect { nx.wait_lockout_release }.to nap(5)
+    end
+
+    it "pops once the primary is configured" do
+      primary
+      expect { nx.wait_lockout_release }.to exit({"msg" => "postgres resource is converged"})
     end
   end
 

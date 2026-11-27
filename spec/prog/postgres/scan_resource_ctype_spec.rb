@@ -118,6 +118,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
     def stub_targets(sshable)
       expect(sshable).to receive(:_cmd).with(psql_cmd("dbname\\=\\'app\\'"), stdin: described_class::TARGETS_SQL).and_return(<<~CSV)
         refresh,mv,"[{""kind"": ""materialized_view"", ""object"": ""mv""}]",,
+        reindex,users_name_idx,"[{""kind"": ""sort_order"", ""object"": ""users_name_idx""}]",,
         scan,events,"[{""kind"": ""pg_trgm"", ""object"": ""events_body_trgm""}]",#{11 * 2**30},"#{large_query}"
         scan,users,"[{""kind"": ""citext"", ""object"": ""users_email_key""}]",8192,"#{target["query"]}"
         unresolved,parted,"[{""kind"": ""partition_key"", ""object"": ""parted""}]",,
@@ -129,7 +130,7 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       expect { nx.list_targets }.to hop("wait_table_scan")
       expect(frame_value(nx, "targets")).to eq([target])
       expect(frame_value(nx, "results")).to eq({"app" => empty_result.merge("refresh" => ["materialized_view: mv"], "unresolved" => ["partition_key: parted"],
-        "large" => [{"relation" => "events", "objects" => ["pg_trgm: events_body_trgm"], "size_bytes" => 11 * 2**30}])})
+        "reindex" => ["sort_order: users_name_idx"], "large" => [{"relation" => "events", "objects" => ["pg_trgm: events_body_trgm"], "size_bytes" => 11 * 2**30}])})
     end
 
     it "scans every table when there is no size limit" do
@@ -251,14 +252,19 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       nx.report
     end
 
-    # The reindex script for the given lines of the jobs hash, followed by the
-    # given comment lines.
-    def script(job_lines, by_hand = [])
-      <<~RUBY + by_hand.join
+    def job(*sqls)
+      sqls + [described_class::REFRESH_VERSIONS_SQL]
+    end
+
+    # The reindex script for the given jobs, followed by the by-hand list as
+    # comment lines.
+    def script(jobs, by_hand = [])
+      comments = by_hand.empty? ? "" : "# By hand, not indexes:\n" + by_hand.map { "#   #{it.inspect}\n" }.join
+      <<~RUBY + comments
         pg = udec("#{postgres_resource.ubid}")
         sshable = pg.representative_server.vm.sshable
         jobs = {
-        #{job_lines.join("\n")}
+        #{jobs.map { |database, sqls| "  #{database.inspect} => [#{sqls.map(&:inspect).join(", ")}]," }.join("\n")}
         }
         jobs.each_with_index do |(db, sqls), i|
           sshable.d_run("ctype_reindex_\#{i}", "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
@@ -267,15 +273,21 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       RUBY
     end
 
-    let(:users) { {"relation" => "users", "objects" => ["citext: users_email_key"]} }
-    let(:users_script) { script(['  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key"],']) }
-
-    it "pops clean, with no reindex script, when every table is safe" do
-      results = {"app" => empty_result.merge("safe" => 2, "refresh" => ["materialized_view: mv"])}
-      expect { report_with(results) }.to exit({"msg" => "clean", "rebuild_databases" => [], "large_databases" => [], "failed_databases" => [], "refresh_databases" => ["app"], "unresolved_databases" => [], "databases" => results})
+    def verdict(msg, results, jobs, by_hand = [], **databases)
+      {"msg" => msg, "rebuild_databases" => [], "reindex_databases" => [], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [],
+       "unresolved_databases" => [], **databases.transform_keys { "#{it}_databases" }, "databases" => results,
+       "reindex_jobs" => jobs, "by_hand" => by_hand, "reindex_script" => script(jobs, by_hand)}
     end
 
-    it "pops rebuild with a script that reindexes each index once per database, and lists other objects for work by hand" do
+    let(:users) { {"relation" => "users", "objects" => ["citext: users_email_key"]} }
+    let(:users_jobs) { {"app" => job("REINDEX INDEX users_email_key")} }
+
+    it "pops clean, with jobs that refresh the materialized views and the versions, when every table is safe" do
+      results = {"app" => empty_result.merge("safe" => 2, "refresh" => ["materialized_view: mv"]), "postgres" => empty_result}
+      expect { report_with(results) }.to exit(verdict("clean", results, {"app" => job("REFRESH MATERIALIZED VIEW mv"), "postgres" => job}, refresh: ["app"]))
+    end
+
+    it "pops rebuild with jobs that reindex each index once per database, and lists other objects for work by hand" do
       results = {
         "app" => empty_result.merge("rebuild" => [
           {"relation" => "users", "objects" => ["citext: users_email_key", "pg_trgm: users_name_trgm"]},
@@ -284,18 +296,20 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
         "postgres" => empty_result,
         "shop" => empty_result.merge("rebuild" => [{"relation" => "items", "objects" => ["pg_trgm: items_name_trgm", "pg_trgm: items_name_trgm"]}]),
       }
-      expected_script = script([
-        '  "app" => ["REINDEX INDEX CONCURRENTLY users_email_key", "REINDEX INDEX CONCURRENTLY users_name_trgm", "REINDEX INDEX CONCURRENTLY posts_lower_idx"],',
-        '  "shop" => ["REINDEX INDEX CONCURRENTLY items_name_trgm"],',
-      ], ["# By hand, not indexes:\n", %(#   "app: stored_column: posts.body_tsv"\n)])
-      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app", "shop"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
-        "reindex_script" => expected_script})
+      jobs = {
+        "app" => job("REINDEX INDEX users_email_key", "REINDEX INDEX users_name_trgm", "REINDEX INDEX posts_lower_idx"),
+        "postgres" => job,
+        "shop" => job("REINDEX INDEX items_name_trgm"),
+      }
+      expect { report_with(results) }.to exit(verdict("rebuild", results, jobs, ["app: stored_column: posts.body_tsv"], rebuild: ["app", "shop"]))
     end
 
-    it "pops a script with only comments when no object to rebuild is an index" do
-      results = {"app" => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["check_constraint: t.t_check"]}])}
-      expect { report_with(results) }.to exit({"msg" => "rebuild", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
-        "reindex_script" => script([""], ["# By hand, not indexes:\n", %(#   "app: check_constraint: t.t_check"\n)])})
+    it "pops rebuild for objects on ICU rules, and reindexes their indexes before refreshing the materialized views" do
+      results = {"app" => empty_result.merge("reindex" => ["sort_order: users_name_idx", "expression: users_name_idx", "check_constraint: users.name_check"],
+        "refresh" => ["materialized_view: mv"])}
+      jobs = {"app" => job("REINDEX INDEX users_name_idx", "REFRESH MATERIALIZED VIEW mv")}
+      expect { report_with(results) }.to exit(verdict("rebuild", results, jobs, ["app: check_constraint: users.name_check"],
+        reindex: ["app"], refresh: ["app"]))
     end
 
     it "puts customer names into the script only as Ruby string literals" do
@@ -303,24 +317,25 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       index = %("Odd ""i\#{dx}"")
       column = %(t."a\nsystem('x')")
       results = {database => empty_result.merge("rebuild" => [{"relation" => "t", "objects" => ["pg_trgm: #{index}", "stored_column: #{column}"]}])}
-      script = catch(:prog_return) { report_with(results) }.exitval["reindex_script"]
+      verdict = catch(:prog_return) { report_with(results) }.exitval
+      script = verdict["reindex_script"]
       expect { RubyVM::InstructionSequence.compile(script) }.not_to raise_error
       jobs = eval(script[/^jobs = \{.*?^\}$/m].delete_prefix("jobs = "))  # rubocop:disable Security/Eval
-      expect(jobs).to eq(database => ["REINDEX INDEX CONCURRENTLY #{index}"])
+      expect(jobs).to eq(database => job("REINDEX INDEX #{index}"))
+      expect(verdict["reindex_jobs"]).to eq(jobs)
+      expect(verdict["by_hand"]).to eq(["#{database}: stored_column: #{column}"])
       expect(script.lines.last).to eq("#   #{"#{database}: stored_column: #{column}".inspect}\n")
       expect(script.lines.count { it.start_with?("#") }).to eq(2)
     end
 
     it "pops fork_scan when a table is over the size limit, before rebuild" do
       results = {"app" => empty_result.merge("rebuild" => [users]), "postgres" => empty_result.merge("large" => [{"relation" => "events"}])}
-      expect { report_with(results) }.to exit({"msg" => "fork_scan", "rebuild_databases" => ["app"], "large_databases" => ["postgres"], "failed_databases" => [], "refresh_databases" => [], "unresolved_databases" => [], "databases" => results,
-        "reindex_script" => users_script})
+      expect { report_with(results) }.to exit(verdict("fork_scan", results, users_jobs.merge("postgres" => job), rebuild: ["app"], large: ["postgres"]))
     end
 
     it "pops review when a scan failed or an object is unresolved, before rebuild" do
       results = {"app" => empty_result.merge("rebuild" => [users], "unresolved" => ["partition_key: parted"]), "postgres" => empty_result.merge("failed" => [{"error" => "boom"}])}
-      expect { report_with(results) }.to exit({"msg" => "review", "rebuild_databases" => ["app"], "large_databases" => [], "failed_databases" => ["postgres"], "refresh_databases" => [], "unresolved_databases" => ["app"], "databases" => results,
-        "reindex_script" => users_script})
+      expect { report_with(results) }.to exit(verdict("review", results, users_jobs.merge("postgres" => job), rebuild: ["app"], failed: ["postgres"], unresolved: ["app"]))
     end
   end
 
@@ -376,6 +391,32 @@ RSpec.describe Prog::Postgres::ScanResourceCtype do
       expect(DB.fetch(targets.first[:query].freeze).single_record.values).to eq(["ctype_scan_counts", 2, 4])
       sizes = %w[scan_We.ird_a scan_We.ird_b].sum { DB.get(Sequel.function(:pg_table_size, Sequel.cast(DB.literal(Sequel.identifier(it)), :regclass))) }
       expect(targets.first[:size_bytes]).to eq(sizes).and be > 0
+    end
+
+    it "lists the objects on ICU rules for a rebuild without a scan" do
+      skip "Postgres is built without ICU" if DB[:pg_collation].where(collprovider: "i").empty?
+      DB.run(<<~SQL)
+        CREATE COLLATION scan_icu (provider = icu, locale = 'und');
+        CREATE TABLE scan_icu_t (name text COLLATE scan_icu, code text COLLATE scan_c_utf8);
+        CREATE INDEX scan_icu_sort ON scan_icu_t (name);
+        CREATE INDEX scan_icu_lower ON scan_icu_t (lower(name));
+        CREATE INDEX scan_icu_expr ON scan_icu_t ((code COLLATE scan_icu));
+        CREATE MATERIALIZED VIEW scan_icu_mv AS SELECT upper(name) AS u FROM scan_icu_t;
+      SQL
+      expect(targets.map { it.values_at(:action, :relation, :objects) }).to eq([
+        ["refresh", "scan_icu_mv", %([{"kind": "materialized_view", "object": "scan_icu_mv"}])],
+        ["reindex", "scan_icu_expr", %([{"kind": "sort_order", "object": "scan_icu_expr"}])],
+        ["reindex", "scan_icu_lower", %([{"kind": "expression", "object": "scan_icu_lower"}])],
+        ["reindex", "scan_icu_lower", %([{"kind": "sort_order", "object": "scan_icu_lower"}])],
+        ["reindex", "scan_icu_sort", %([{"kind": "sort_order", "object": "scan_icu_sort"}])],
+      ])
+    end
+  end
+
+  # Faking a version mismatch needs a superuser, so only the syntax is checked.
+  describe "REFRESH_VERSIONS_SQL" do
+    it "runs in a database whose versions match" do
+      expect { DB.run(described_class::REFRESH_VERSIONS_SQL) }.not_to raise_error
     end
   end
 end

@@ -2,7 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :reindex_jobs, :reindex_step
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -53,6 +53,12 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
   label def wait_for_maintenance_window
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
+
+    if postgres_resource.version == postgres_resource.target_version && postgres_resource.family_migration_in_progress? &&
+        reindex_jobs.nil? && !postgres_resource.skip_family_reindex_set?
+      register_deadline("wait_for_maintenance_window", 24 * 60 * 60, message: "get a reindex decision for the image family migration")
+      hop_wait_reindex_decision
+    end
 
     window_applies = !postgres_resource.project.get_ff_postgres_maintenance_window_platform_only || postgres_resource.pending_platform_maintenance?
     if window_applies && !postgres_resource.in_maintenance_window? && !postgres_resource.bypass_maintenance_window_set?
@@ -113,6 +119,14 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_upgrade_candidate
   end
 
+  label def wait_reindex_decision
+    if reindex_jobs || postgres_resource.skip_family_reindex_set? || !postgres_resource.has_enough_fresh_servers?
+      hop_wait_for_maintenance_window
+    end
+
+    nap 60
+  end
+
   label def wait_upgrade_candidate
     nap 5 if upgrade_candidate.restart_set? || upgrade_candidate.strand.label != "wait"
 
@@ -141,8 +155,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 5 unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key))
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
-      register_deadline(nil, 10 * 60, message: "finish failing over representative server")
-      postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?)
+      register_deadline("prune_servers", 10 * 60, message: "finish failing over representative server")
+      postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?, lockout: !reindex_jobs.nil?)
     end
 
     nap 60
@@ -151,6 +165,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def prune_servers
     postgres_resource.decr_storage_auto_scale_not_cancellable
     postgres_resource.decr_bypass_maintenance_window
+    postgres_resource.decr_skip_family_reindex
 
     # Below we only keep servers that does not need recycling or are of the
     # current version. If there are more such servers than required, we prefer
@@ -171,6 +186,50 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
   label def wait_prune_servers
     nap 30 unless PostgresServer.where(id: servers_to_destroy).empty?
+
+    if reindex_jobs
+      register_deadline(nil, reindex_jobs.size * 15 * 60, message: "finish rebuilding indexes")
+      hop_reindex
+    end
+
+    pop "postgres resource is converged"
+  end
+
+  label def reindex
+    primary = postgres_resource.representative_server
+    nap 5 unless primary.strand.label == "wait"
+
+    step = reindex_step.to_i
+    database, sqls = reindex_jobs.to_a[step]
+    unless database
+      primary.decr_hold_lockout
+      primary.incr_configure
+      hop_wait_lockout_release
+    end
+
+    sshable = primary.vm.sshable
+    unit = "reindex_#{strand.ubid}_#{step}"
+    case sshable.d_check(unit)
+    when "Succeeded"
+      sshable.d_clean(unit)
+      Page.from_tag_parts("PostgresReindexFailed", postgres_resource.id)&.incr_resolve
+      self.reindex_step = step + 1
+      nap 0
+    when "Failed"
+      Clog.emit("Postgres reindex failed", {postgres_reindex_failed: {ubid: postgres_resource.ubid, unit:, log: sshable.d_logs(unit, lines: 20).lines.map(&:chomp)}})
+      Prog::PageNexus.assemble("#{postgres_resource.ubid} reindex failed, primary locked out", ["PostgresReindexFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id, severity: "critical")
+      nap 60
+    when "NotStarted"
+      sshable.d_run(unit, "sudo", "-u", "postgres", "psql", "-U", "postgres", "-X",
+        "-d", PostgresServer.conninfo(database), "-v", "ON_ERROR_STOP=1", *sqls.flat_map { ["-c", it] })
+    end
+
+    nap 5
+  end
+
+  label def wait_lockout_release
+    primary = postgres_resource.representative_server
+    nap 5 if primary.configure_set? || primary.strand.label != "wait"
 
     pop "postgres resource is converged"
   end

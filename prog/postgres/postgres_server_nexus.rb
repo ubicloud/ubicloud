@@ -948,6 +948,8 @@ SQL
   # Pre-promote step, run once after the old primary is fenced/locked-out and before
   # pg_promote. Allows forks to override pre-promote behavior.
   label def prepare_taking_over
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout :version", version:) if postgres_server.hold_lockout_set?
+
     hop_taking_over
   end
 

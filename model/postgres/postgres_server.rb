@@ -19,7 +19,7 @@ class PostgresServer < Sequel::Model
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
     :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive, :send_failover_notification,
-    :switch_timeline_on_promote
+    :switch_timeline_on_promote, :hold_lockout
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -178,6 +178,7 @@ class PostgresServer < Sequel::Model
       metrics_config:,
       disk_throughput_baseline_mbps:,
       strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
+      lockout: hold_lockout_set?,
     }
   end
 
@@ -257,7 +258,7 @@ class PostgresServer < Sequel::Model
     true
   end
 
-  def trigger_failover(mode:, switch_timeline: false)
+  def trigger_failover(mode:, switch_timeline: false, lockout: false)
     unless is_representative
       Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
@@ -269,6 +270,7 @@ class PostgresServer < Sequel::Model
     end
 
     standby.incr_switch_timeline_on_promote if switch_timeline
+    standby.incr_hold_lockout if lockout
     standby.send(:"incr_#{mode}_take_over")
     true
   end
@@ -391,8 +393,10 @@ class PostgresServer < Sequel::Model
       .reject { it.is_representative }
       .select { it.strand.label == "wait" }
 
-    if mode == "planned"
-      candidates = candidates.reject { it.needs_recycling? }
+    candidates = if mode == "planned"
+      candidates.reject { it.needs_recycling? }
+    else
+      candidates.select { it.image_family == image_family }
     end
 
     if mode == "planned" && !read_replica?

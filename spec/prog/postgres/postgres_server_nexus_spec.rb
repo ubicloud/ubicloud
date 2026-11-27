@@ -1932,6 +1932,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to taking_over" do
       expect { nx.prepare_taking_over }.to hop("taking_over")
     end
+
+    it "locks out clients before taking over if the server holds the lockout" do
+      nx.incr_hold_lockout
+      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 18")
+      expect { nx.prepare_taking_over }.to hop("taking_over")
+    end
   end
 
   describe "#backfill_wal_archive" do
