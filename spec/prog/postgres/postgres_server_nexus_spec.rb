@@ -1256,6 +1256,34 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait_catch_up }.to nap(30)
     end
 
+    context "when the representative server disk is almost full" do
+      let(:standby_nx) { create_standby_nexus }
+
+      before do
+        server.update_last_known_lsn("1/0")
+        standby_nx.postgres_server.update_last_known_lsn("0/0")
+        server.disk_usage_monitor_ds.delete
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: server.id, data_disk_usage_percent: 95, observed_at: Time.now)
+      end
+
+      it "stops extending the deadline after 2 hours" do
+        refresh_frame(standby_nx, new_values: {"deadline_start" => (Time.now - 2 * 60 * 60 - 1).to_s})
+        expect { standby_nx.wait_catch_up }.to nap(30)
+        frame = standby_nx.strand.stack.first
+        expect(Time.new(frame["deadline_at"])).to be < Time.now
+        expect(frame["deadline_message"]).to eq("finish catching up (representative server disk 95% full)")
+      end
+
+      it "extends the deadline for up to a day when the disk has room" do
+        server.disk_usage_monitor_ds.update(data_disk_usage_percent: 94)
+        refresh_frame(standby_nx, new_values: {"deadline_start" => (Time.now - 2 * 60 * 60 - 1).to_s})
+        expect { standby_nx.wait_catch_up }.to nap(30)
+        frame = standby_nx.strand.stack.first
+        expect(Time.new(frame["deadline_at"])).to be > Time.now + 9 * 60
+        expect(frame["deadline_message"]).to eq("finish catching up")
+      end
+    end
+
     it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
       expect(server).to receive(:lsn_caught_up).and_return(true)
       postgres_resource.update(ha_type: PostgresResource::HaType::SYNC)

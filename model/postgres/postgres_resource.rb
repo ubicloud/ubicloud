@@ -307,6 +307,15 @@ class PostgresResource < Sequel::Model
     effective_timeline.latest_backup_size_in_gib > limit
   end
 
+  # Whether a server restored from the latest backup must replay more WAL
+  # than the backup holds, in which case restoring a fresh backup is faster.
+  def wal_since_latest_backup_too_large?
+    timeline = effective_timeline
+    return false unless (backup_lsn = timeline.latest_backup_lsn)
+    return false unless (leader = timeline.leader) && (current_lsn = leader.last_known_lsn)
+    leader.lsn_diff(current_lsn, backup_lsn) > timeline.latest_backup_size_in_gib * 1024**3
+  end
+
   # A scale down is only allowed if the current disk usage stays below this
   # fraction of the requested storage size.
   STORAGE_SCALE_DOWN_MAX_USAGE_RATIO = 0.8
