@@ -127,6 +127,24 @@ RSpec.describe MonitorableResource do
         expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).to be_nil
       end
 
+      it "resolves a page raised by a previous monitor process on the first successful open" do
+        Prog::PageNexus.assemble("unreachable", ["SshableUnreachable", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id)
+        page = Page.from_tag_parts("SshableUnreachable", postgres_server.id)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return("session")
+        r_w_event_loop.open_resource_session
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
+
+      it "checks for a page from a previous monitor process only once" do
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return("session").twice
+        r_w_event_loop.open_resource_session
+        Prog::PageNexus.assemble("unreachable", ["SshableUnreachable", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id)
+        page = Page.from_tag_parts("SshableUnreachable", postgres_server.id)
+        r_w_event_loop.instance_variable_set(:@session, nil)
+        r_w_event_loop.open_resource_session
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(0)
+      end
+
       it "waits for the resource's own threshold before paging" do
         allow(postgres_server).to receive(:open_session_failure_page_threshold).and_return(described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD * 2)
         expect(postgres_server).to receive(:init_health_monitor_session).and_raise(IOError).exactly(3).times

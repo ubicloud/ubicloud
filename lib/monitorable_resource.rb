@@ -18,6 +18,7 @@ class MonitorableResource
     @deleted = false
     @open_session_failure_started_at = nil
     @open_session_failure_paged = false
+    @orphaned_page_checked = false
     if resource.is_a?(VmHost)
       @attached_resources = {}
       @attached_resources_mutex = Mutex.new
@@ -167,8 +168,10 @@ class MonitorableResource
   end
 
   def clear_open_session_failure
-    return unless @open_session_failure_started_at
-    Page.from_tag_parts("SshableUnreachable", @resource.id)&.incr_resolve if @open_session_failure_paged
+    if @open_session_failure_paged || !@orphaned_page_checked
+      Page.from_tag_parts("SshableUnreachable", @resource.id)&.incr_resolve
+    end
+    @orphaned_page_checked = true
     @open_session_failure_started_at = nil
     @open_session_failure_paged = false
   end
