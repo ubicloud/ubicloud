@@ -13,6 +13,31 @@ RSpec.describe Prog::Vm::HostNexus do
     allow(sshable).to receive(:start_fresh_session).and_return(Net::SSH::Connection::Session.allocate)
   end
 
+  describe ".set_custom_kernel_version" do
+    it "sets the version in the frame of the host nexus" do
+      frame = st.stack.first
+      st.update(stack: [{"subject_id" => st.id}, frame])
+
+      described_class.set_custom_kernel_version([st.id], "6.8.0-1.1+ubi1")
+      expect(st.reload.stack).to eq([{"subject_id" => st.id}, frame.merge("custom_kernel_version" => "6.8.0-1.1+ubi1")])
+      expect(described_class.custom_kernel_version(st.id)).to eq("6.8.0-1.1+ubi1")
+
+      described_class.set_custom_kernel_version(st.id, false)
+      expect(described_class.custom_kernel_version(st.id)).to be(false)
+    end
+  end
+
+  describe ".custom_kernel_strands" do
+    it "returns the host nexus strands with the version" do
+      other = described_class.assemble("192.168.0.2")
+      described_class.set_custom_kernel_version([st.id, other.id], "6.8.0-1.1+ubi1")
+      described_class.set_custom_kernel_version(other.id, "6.8.0-2.2+ubi1")
+      described_class.assemble("192.168.0.3")
+
+      expect(described_class.custom_kernel_strands("6.8.0-1.1+ubi1").select_map(:id)).to eq([st.id])
+    end
+  end
+
   describe ".assemble" do
     it "fails if location doesn't exist" do
       expect {
@@ -626,6 +651,42 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("Failed")
       expect(nx.vm_host.sshable).to receive(:d_run).with("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
       expect { nx.patch }.to nap(60)
+    end
+
+    describe "with a custom_kernel_version" do
+      before do
+        vm_host.update(os_version: "ubuntu-24.04", arch: "x64")
+        expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("NotStarted")
+      end
+
+      it "fails without a change on the host when the version is unknown" do
+        refresh_frame(nx, new_values: {"custom_kernel_version" => "6.8.0-1.1+ubi0"})
+        expect(nx.vm_host.sshable).not_to receive(:d_run)
+        expect { nx.patch }.to raise_error(RuntimeError, "No custom kernel 6.8.0-1.1+ubi0 for ubuntu-24.04 x64")
+      end
+
+      # stub_const does not work on frozen classes.
+      if Config.unfrozen_test?
+        describe "in CUSTOM_KERNELS" do
+          before do
+            stub_const("#{described_class}::CUSTOM_KERNELS", {["ubuntu-24.04", "x64", "6.8.0-1.1+ubi1"] => "abc"})
+            refresh_frame(nx, new_values: {"custom_kernel_version" => "6.8.0-1.1+ubi1"})
+          end
+
+          it "runs apply_patches with an R2 URL of the kernel" do
+            expect(Prog::DownloadBootImage).to receive(:r2_signed_url).with("kernel-ubuntu-24.04-x64-6.8.0-1.1-ubi1.tar.gz").and_return("https://r2.example.com/k")
+            expect(nx.vm_host.sshable).to receive(:d_run).with("apply_patches", "sudo", "host/bin/apply-patches",
+              stdin: JSON.generate({url: "https://r2.example.com/k", version: "6.8.0-1.1+ubi1", sha256: "abc"}))
+            expect { nx.patch }.to nap(60)
+          end
+
+          it "fails without a change on the host when the version is not for the host" do
+            vm_host.update(arch: "arm64")
+            expect(nx.vm_host.sshable).not_to receive(:d_run)
+            expect { nx.patch }.to raise_error(RuntimeError, "No custom kernel 6.8.0-1.1+ubi1 for ubuntu-24.04 arm64")
+          end
+        end
+      end
     end
 
     it "naps if in progress" do

@@ -1,0 +1,8 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/custom_kernel"
+
+params = JSON.parse($stdin.read)
+CustomKernel.new(params.fetch("version"), params.fetch("url"), params.fetch("sha256")).apply_patches

@@ -2,8 +2,33 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
-  frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
+  frame_reader :vhost_block_backend_version, :default_boot_images, :install_os, :custom_kernel_version
   frame_accessor :accepting_before_patch
+
+  # Kernels from https://github.com/ubicloud/ubuntu-kernel-build, with the
+  # SHA-256 digest of the tarball in the R2 images bucket.
+  CUSTOM_KERNELS = {
+    ["ubuntu-24.04", "x64", "6.8.0-151.151+ubi1"] => "829c338f147934268716946a81e256d2910aff6e017f589c063fed54170ce534",
+  }.freeze
+
+  def self.custom_kernel_key(os_version, arch, version)
+    "kernel-#{os_version}-#{arch}-#{version.tr("+", "-")}.tar.gz"
+  end
+
+  # The version is in the bottom frame, because a child prog can be on top.
+  def self.set_custom_kernel_version(vm_host_ids, version)
+    Strand.where(id: vm_host_ids, prog: "Vm::HostNexus")
+      .update(stack: Sequel.pg_jsonb_op(:stack).set(["-1", "custom_kernel_version"], Sequel.pg_jsonb_wrap(version)))
+  end
+
+  def self.custom_kernel_version(vm_host_id)
+    Strand.with_pk!(vm_host_id).stack.last["custom_kernel_version"]
+  end
+
+  def self.custom_kernel_strands(version)
+    Strand.where(prog: "Vm::HostNexus")
+      .where(Sequel.pg_jsonb_op(:stack).get(-1).get_text("custom_kernel_version") => version.to_s)
+  end
 
   def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, ipv6_disabled: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false, id: VmHost.generate_uuid, set_server_name: true, ipv4_subnets: [])
     DB.transaction do
@@ -392,7 +417,17 @@ TIMER
       sshable.d_clean("apply_patches")
       hop_prep_reboot
     when "Failed", "NotStarted"
-      sshable.d_run("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
+      if custom_kernel_version
+        unless (sha256 = CUSTOM_KERNELS[[vm_host.os_version, vm_host.arch, custom_kernel_version]])
+          fail "No custom kernel #{custom_kernel_version} for #{vm_host.os_version} #{vm_host.arch}"
+        end
+
+        key = self.class.custom_kernel_key(vm_host.os_version, vm_host.arch, custom_kernel_version)
+        url = Prog::DownloadBootImage.r2_signed_url(key)
+        sshable.d_run("apply_patches", "sudo", "host/bin/apply-patches", stdin: JSON.generate({url:, version: custom_kernel_version, sha256:}))
+      else
+        sshable.d_run("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
+      end
     end
 
     nap 60
