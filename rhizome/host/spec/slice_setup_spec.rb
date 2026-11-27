@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../lib/slice_setup"
+require "tmpdir"
 
 RSpec.describe SliceSetup do
   subject(:slice_setup) { described_class.new(slice_name) }
@@ -36,11 +37,22 @@ RSpec.describe SliceSetup do
   end
 
   describe "#install_systemd_unit" do
-    it "writes the slice configuration to the systemd service file" do
-      expect(File).to receive(:exist?).with(slice_setup.systemd_service).and_return(false)
-      expect(slice_setup).to receive(:safe_write_to_file)
-      expect(slice_setup).to receive(:_run_command).with("systemctl daemon-reload")
-      slice_setup.install_systemd_unit("3-4")
+    it "writes the slice configuration to the systemd service file and leaves no other file behind" do
+      Dir.mktmpdir do |dir|
+        unit_path = File.join(dir, slice_name)
+        expect(slice_setup).to receive(:systemd_service).at_least(:once).and_return(unit_path)
+        expect(slice_setup).to receive(:_run_command).with("systemctl daemon-reload")
+        slice_setup.install_systemd_unit("3-4")
+
+        expect(File.read(unit_path)).to eq(<<SLICE_CONFIG)
+[Unit]
+Description=Restricting resouces for virtual machines
+Before=slices.target
+[Slice]
+AllowedCPUs=3-4
+SLICE_CONFIG
+        expect(Dir.children(dir)).to eq([slice_name])
+      end
     end
 
     it "does nothing if the systemd service file already exists" do
