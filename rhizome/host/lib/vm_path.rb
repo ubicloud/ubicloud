@@ -55,6 +55,7 @@ class VmPath
     user-data
     cloudinit.img
     ch-api.sock
+    qmp.sock
     serial.log
     hugepages
     public_ipv4

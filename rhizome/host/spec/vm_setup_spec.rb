@@ -514,7 +514,8 @@ RSpec.describe VmSetup do
 
       vps = instance_spy(VmPath,
         serial_log: "/vm/test/serial.log",
-        cloudinit_img: "/vm/test/cloudinit.img")
+        cloudinit_img: "/vm/test/cloudinit.img",
+        qmp_sock: "/vm/test/qmp.sock")
       expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@firmware_version,
@@ -546,6 +547,7 @@ RSpec.describe VmSetup do
           -serial file:/vm/test/serial.log
           -display none
           -vga none
+          -qmp unix:/vm/test/qmp.sock,server=on,wait=off
         ].freeze.each { |frag| expect(content).to include(frag) }
 
         expect(content).to include("KillSignal=SIGTERM")
