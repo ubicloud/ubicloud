@@ -285,13 +285,80 @@ RSpec.describe Strand do
     end
   end
 
+  describe "timeline" do
+    it "records label durations through push and pop and logs the timeline on exit" do
+      st = described_class.create(prog: "Test", label: "hop_pusher")
+      expect(st).to receive(:timeline_prog?).with("Test").and_return(true).exactly(3).times
+      expect(Clog).to receive(:emit).with("strand timeline", instance_of(Hash)) do |_, data|
+        timeline = data[:strand_timeline]
+        expect(timeline[:strand]).to eq st.ubid
+        expect(timeline[:prog]).to eq "Test"
+        expect(timeline[:timeline].map(&:first)).to contain_exactly("hop_pusher", "pusher3", "hop_pushed")
+        expect(timeline[:timeline].map { it[3] }).to eq timeline[:timeline].map { it[3] }.sort
+        expect(timeline[:timeline].map { it[1] }).to eq [1, 1, 1]
+        expect(timeline[:started_at]).to match(/\.\d{6} /)
+        expect(timeline[:total]).to be_a Float
+      end
+
+      expect(st.unsynchronized_run).to be_a Prog::Base::Hop
+      expect(st.stack.last["timeline"].keys).to eq ["hop_pusher"]
+      expect(st.reload.stack.last["timeline"].keys).to eq ["hop_pusher"]
+      expect(st.unsynchronized_run).to be_a Prog::Base::Hop
+      expect(st.reload.unsynchronized_run).to be_a Prog::Base::Exit
+      expect(st).not_to exist
+    end
+
+    it "totals the time since the timeline started rather than adding up labels that include pushed ones" do
+      now = Time.now
+      root_frame = {
+        "last_label_changed_at" => st.send(:time_string, now - 10),
+        "timeline_started_at" => st.send(:time_string, now - 100),
+        "timeline" => {"hop_pusher" => [1, 90.0, 0.0], "pusher3" => [1, 80.0, 5.0]},
+      }
+      exiting = described_class.create(prog: "Test", label: "hop_exit", stack: [root_frame])
+      expect(exiting).to receive(:timeline_prog?).with("Test").and_return(true)
+      expect(Clog).to receive(:emit).with("strand timeline", instance_of(Hash)) do |_, data|
+        expect(data[:strand_timeline][:total]).to be_within(1).of(100)
+      end
+      expect(exiting.unsynchronized_run).to be_a Prog::Base::Exit
+    end
+
+    it "starts the timeline when the first label is left" do
+      now = Time.at(1_800_000_000)
+      allow(Time).to receive(:now).and_return(now)
+      st = described_class.new(prog: "Vm::Metal::Nexus", label: "start", stack: [{}])
+      timeline = st.send(:record_timeline, 2.0)
+      expect(timeline).to eq("start" => [1, 2.0, 0.0])
+      expect(Time.new(st.stack.last["timeline_started_at"])).to eq now - 2
+    end
+
+    it "counts and sums repeated labels of pushed progs under a prefix" do
+      now = Time.at(1_800_000_000)
+      allow(Time).to receive(:now).and_return(now)
+      root_frame = {"timeline_started_at" => st.send(:time_string, now - 100), "timeline" => {"Test.pusher3" => [2, 3.0, 1.0]}}
+      st = described_class.new(prog: "Test", label: "pusher3", stack: [{"link" => ["Github::GithubRunnerNexus", "wait"]}, root_frame])
+      timeline = st.send(:record_timeline, 2.0)
+      expect(timeline).to eq("Test.pusher3" => [3, 5.0, 98.0])
+      expect(st.stack.last["timeline"]).to be timeline
+    end
+
+    it "only lists existing progs" do
+      described_class::TIMELINE_PROGS.each { expect(described_class.prog_verify(Object.const_get("Prog::#{it}"))).to eq it }
+    end
+
+    it "does not record a timeline without a stack frame" do
+      st = described_class.new(prog: "Vm::Metal::Nexus", label: "wait", stack: [])
+      expect(st.send(:record_timeline, 1)).to be_nil
+    end
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now - 11)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
     expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
-    expect { st.unsynchronized_run }.to change { control_plane_metric(:strand_run_duration_seconds, prog: "Test", label: "napper").fetch("sum") }.by(a_value_within(0.001).of(10))
+    expect { st.unsynchronized_run }.to change { control_plane_metric(:strand_run_duration_seconds, prog: "Test", label: "napper").fetch("sum") }.by(a_value_within(0.001).of(11))
   end
 end

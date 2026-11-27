@@ -10,14 +10,14 @@ RSpec.describe Prog::Base do
     Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
 
     messages = []
-    expect(Clog).to receive(:emit).twice.and_wrap_original do |method, message, metadata = {}|
+    expect(Clog).to receive(:emit).once.and_wrap_original do |method, message, metadata = {}|
       messages << [message, metadata.dig(:strand_exited, :strand)]
       method.call(message, metadata)
     end
 
     expect(Sshable).to receive(:repl?).and_return(true).at_least(:once)
     expect { parent.run(10) }.to raise_error(RuntimeError)
-    expect(messages).to eq [["exited", popper.ubid], ["child exit", ["popped", popper.ubid]]]
+    expect(messages).to eq [["child exit", ["popped", popper.ubid]]]
     expect(popper).not_to exist
     expect(failer.this.get(:exitval)).to be_nil
   end
@@ -251,6 +251,18 @@ RSpec.describe Prog::Base do
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
   end
 
+  describe "#seconds_in_label" do
+    it "returns the time since the strand entered its current label" do
+      st = Strand.create(prog: "Test", label: "napper", stack: [{"last_label_changed_at" => (Time.now - 90).to_s}])
+      expect(Prog::Test.new(st).seconds_in_label).to be_within(5).of(90)
+    end
+
+    it "returns 0 if the label change time is not recorded" do
+      st = Strand.create(prog: "Test", label: "napper")
+      expect(Prog::Test.new(st).seconds_in_label).to eq 0
+    end
+  end
+
   describe "deferred transaction start" do
     let(:events) { [] }
 
@@ -289,7 +301,6 @@ RSpec.describe Prog::Base do
         "deferred_transaction_hopper outside transaction",
         :transaction_start,
         "deferred_transaction_hopper inside transaction",
-        "hopped",
       ]
       expect(st.reload.label).to eq "hop_exit"
     end
@@ -305,7 +316,7 @@ RSpec.describe Prog::Base do
       hop = st.unsynchronized_run
       expect(hop).to be_a Prog::Base::Hop
       expect(hop.new_label).to eq "destroy"
-      expect(events).to eq [:transaction_start, "hopped"]
+      expect(events).to eq [:transaction_start]
     end
 
     it "applies semaphore decrements inside the transaction" do

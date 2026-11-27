@@ -9,7 +9,6 @@ class MetricsTargetResource
     @session = nil
     @last_export_success = false
     @export_started_at = Time.now
-    @export_success_streak = 0
     @deleted = false
     @tsdb_client = VictoriaMetricsResource.client_for_project(resource.metrics_config[:project_id])
   end
@@ -30,13 +29,9 @@ class MetricsTargetResource
     stale_retry = false
     @export_started_at = Time.now
     begin
-      count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
+      @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
       @session[:last_export] = Time.now
-      @export_success_streak += 1
       ControlPlaneMetrics.observe_metrics_export(resource_type: @resource.class.name, outcome: "success", duration: Time.now - @export_started_at)
-      if @export_success_streak % 20 == 1
-        Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:, bytes: @session[:last_export_bytes], streak: @export_success_streak}})
-      end
       @last_export_success = true
     rescue => ex
       if !stale_retry &&
@@ -65,7 +60,6 @@ class MetricsTargetResource
         end
       end
 
-      @export_success_streak = 0
       @last_export_success = false
       ControlPlaneMetrics.observe_metrics_export(resource_type: @resource.class.name, outcome: "failure", duration: Time.now - @export_started_at)
       close_resource_session
