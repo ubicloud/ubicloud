@@ -70,6 +70,7 @@ else
     ParseableServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: ParseableServer.select(:id)).select(:strand_id)),
     KubernetesNode.eager(:vm, :kubernetes_cluster, :kubernetes_nodepool),
   ]
+  metric_export_models << GithubRunner.alien_metrics_targets.eager(vm: :sshable) if Config.github_runner_metrics_project_id
 end
 
 # Handle both monitored resources and metric export resources.

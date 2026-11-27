@@ -20,6 +20,10 @@ class GithubRunner < Sequel::Model
     VictoriaMetricsResource.client_for_project(Config.github_runner_metrics_project_id)
   end
 
+  def self.alien_location_ids
+    [Config.github_runner_aws_location_id, Config.github_runner_gcp_location_id].compact
+  end
+
   dataset_module do
     def total_active_runner_vcpus
       left_join(:strand, id: Sequel[:github_runner][:id])
@@ -30,7 +34,7 @@ class GithubRunner < Sequel::Model
 
     def metal_active_runner_vcpus
       ds = self
-      unless (alien_location_ids = [Config.github_runner_aws_location_id, Config.github_runner_gcp_location_id].compact).empty?
+      unless (alien_location_ids = GithubRunner.alien_location_ids).empty?
         ds = ds.where(Sequel.~(location_id: alien_location_ids) | {location_id: nil})
       end
       ds.total_active_runner_vcpus
@@ -50,6 +54,12 @@ class GithubRunner < Sequel::Model
         .join(:project, id: Sequel[:github_installation][:project_id])
         .where(Sequel.pg_jsonb_op(Sequel[:project][:feature_flags]).get_text("github_runner_metrics") => "true")
         .select(Sequel[:github_runner][:id]))
+    end
+
+    # Ready alien runners of projects with runner metrics. Without a host
+    # agent, monitor exports their metrics directly.
+    def alien_metrics_targets
+      exclude(ready_at: nil).where(location_id: GithubRunner.alien_location_ids).runner_metrics_enabled
     end
   end
 
@@ -121,6 +131,29 @@ class GithubRunner < Sequel::Model
 
   def strand_label
     strand&.label
+  end
+
+  # Metrics export of alien runners, which have no host agent.
+  def metrics_config
+    {project_id: Config.github_runner_metrics_project_id}
+  end
+
+  def init_metrics_export_session
+    {ssh_session: vm.sshable.start_fresh_session, last_seq: 0}
+  end
+
+  # The guest controls the ring file, so invalid data stops collection from it.
+  def export_metrics(session:, tsdb_client:)
+    return if session[:invalid]
+
+    last_seq = session[:last_seq]
+    output = session[:ssh_session].exec!(GithubRunnerMetrics::RING_FILE_READ_COMMAND, last_seq:)
+    samples, newest_seq = GithubRunnerMetrics.parse_ring(output, {"ubicloud_resource_id" => ubid, "vm" => vm.ubid}, after: last_seq)
+    tsdb_client.import_prometheus(VictoriaMetrics::Client::Scrape.new(time: Time.now, samples:)) unless samples.empty?
+    session[:last_seq] = newest_seq
+  rescue RunnerMetricsEntry::Invalid => ex
+    Clog.emit("Stopped collecting runner metrics", {runner_metrics_invalid: {ubid:, reason: ex.message}})
+    session[:invalid] = true
   end
 
   def has_workflow_job_info?

@@ -61,4 +61,48 @@ RSpec.describe GithubRunnerMetrics do
       end
     end
   end
+
+  describe ".parse_ring" do
+    let(:now) { Time.utc(2026, 11, 2, 14, 0, 0) }
+    let(:labels) { {"ubicloud_resource_id" => "gr1", "vm" => "vm1"} }
+
+    def entry(seq, time: now.to_i - 5)
+      {"seq" => seq, "time" => time}.merge(RunnerMetricsEntry::METRICS.to_h { |metric| [metric, seq] })
+    end
+
+    def parse_ring(*entries)
+      described_class.parse_ring(entries.map { "#{JSON.generate(it)}\n" }.join, labels, after: 3, now:)
+    end
+
+    def samples(entry)
+      RunnerMetricsEntry::METRICS.map { |metric| "#{metric}{ubicloud_resource_id=\"gr1\",vm=\"vm1\"} #{entry[metric]} #{entry["time"] * 1000}\n" }.join
+    end
+
+    it "returns the samples of the lines newer than the given seq, and the newest seq" do
+      newer = entry(5)
+      new = entry(4, time: now.to_i - 10)
+
+      expect(parse_ring(newer, new)).to eq([samples(newer) + samples(new), 5])
+    end
+
+    it "returns the given seq when there are no new lines" do
+      expect(parse_ring).to eq(["", 3])
+    end
+
+    it "rejects a line that fails the entry checks" do
+      expect { parse_ring({"seq" => 4}) }.to raise_error(RunnerMetricsEntry::Invalid, "ring line does not have the expected keys")
+    end
+
+    it "rejects a line that is not newer than the given seq" do
+      expect { parse_ring(entry(3)) }.to raise_error(RunnerMetricsEntry::Invalid, "ring line has seq 3, not newer than 3")
+    end
+
+    it "rejects a line with a time outside the clock window" do
+      expect { parse_ring(entry(4, time: now.to_i + 61)) }.to raise_error(RunnerMetricsEntry::Invalid, "seq 4 has time #{now.to_i + 61}, outside #{now.to_i - 3600}..#{now.to_i + 60}")
+    end
+
+    it "rejects output larger than the ring" do
+      expect { described_class.parse_ring("x" * (1024 * 1024 + 1), labels, after: 3, now:) }.to raise_error(RunnerMetricsEntry::Invalid, "the ring output is 1048577 bytes")
+    end
+  end
 end
