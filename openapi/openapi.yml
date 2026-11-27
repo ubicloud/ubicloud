@@ -2267,7 +2267,22 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: upgradePostgresDatabase
-      summary: Upgrade a PostgreSQL database to the next major version
+      summary: Upgrade a PostgreSQL database to a later major version
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_version:
+                  description: Major version to upgrade to. Defaults to the version that new databases get, or to the next major version if the database is already at that version.
+                  type: string
+                  enum:
+                    - '17'
+                    - '18'
+                    - '19'
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
@@ -2282,6 +2297,21 @@ paths:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
         - $ref: '#/components/parameters/postgres_database_reference'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/upgrade/cancel:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: cancelPostgresDatabaseUpgrade
+      summary: Cancel a failed major version upgrade of a PostgreSQL database
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
@@ -5422,6 +5452,32 @@ components:
                 type: string
               upgrade_stage:
                 type: string
+                nullable: true
+              upgrade_error:
+                description: The reason the upgrade failed, when available.
+                type: string
+                nullable: true
+              upgrade_error_details:
+                description: Labelled details about the upgrade failure, when available.
+                type: array
+                items:
+                  type: object
+                  additionalProperties:
+                    type: string
+              upgrade_failed_at:
+                description: Time of the upgrade failure, if the upgrade failed
+                type: string
+                format: date-time
+                nullable: true
+              upgrade_logs_start:
+                description: Start of the time range that holds the logs of the failed upgrade
+                type: string
+                format: date-time
+                nullable: true
+              upgrade_logs_end:
+                description: End of the time range that holds the logs of the failed upgrade
+                type: string
+                format: date-time
                 nullable: true
             additionalProperties: false
             required:

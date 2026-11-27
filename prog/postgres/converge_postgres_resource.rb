@@ -2,7 +2,8 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
-  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
+  semaphore :cancel_upgrade
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy, :upgrade_error, :upgrade_error_details, :upgrade_retryable, :upgrade_failed_at
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -96,9 +97,13 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       upgrade_candidate.vm.sshable.d_clean("upgrade_postgres")
       hop_update_metadata
     when "Failed"
-      hop_upgrade_failed
+      fail_upgrade("Database upgrade failed. We have reverted the database to the previous version, and it is now available again.")
     when "NotStarted"
-      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version, stdin: JSON.generate(upgrade_candidate.configure_hash))
+      args = [postgres_resource.target_version]
+      # Pass the source version only when skipping versions, so a candidate
+      # with older rhizome that takes a single argument can still upgrade.
+      args << postgres_resource.version if postgres_resource.target_version.to_i - postgres_resource.version.to_i > 1
+      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", *args, stdin: JSON.generate(upgrade_candidate.configure_hash))
     end
 
     nap 5
@@ -123,12 +128,40 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     if postgres_resource.representative_server.strand.label == "wait_in_fence" && !postgres_resource.representative_server.unfence_set?
       logs = upgrade_candidate.vm.sshable.cmd("sudo journalctl -u upgrade_postgres")
       logs.split("\n").each { |line| Clog.emit("Postgres resource upgrade failed", {resource_id: postgres_resource.id, log: line}) }
-      Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
 
       postgres_resource.representative_server.incr_unfence
     end
 
+    Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid,
+      resource_id: postgres_resource.id, extra_data: {upgrade_error:, upgrade_error_details:}.compact)
+
+    when_cancel_upgrade_set? do
+      hop_wait_cancel_upgrade
+    end
+
     nap 6 * 60 * 60
+  end
+
+  label def wait_cancel_upgrade
+    nap 5 if postgres_resource.representative_server.strand.label == "wait_in_fence"
+    hop_cancel_upgrade
+  end
+
+  # The candidate promoted itself during the failed upgrade, so it cannot
+  # rejoin as a standby. Destroy it and go back to the current version. An
+  # operator may have destroyed the candidate already.
+  label def cancel_upgrade
+    decr_cancel_upgrade
+    register_deadline(nil, 10 * 60, message: "destroy the server of the canceled upgrade")
+    candidate = upgrade_candidate
+    candidate&.incr_destroy
+    self.servers_to_destroy = Array(candidate&.id)
+
+    postgres_resource.update(target_version: postgres_resource.version)
+    postgres_resource.read_replicas_dataset.update(target_version: postgres_resource.version)
+    Page.from_tag_parts("PostgresUpgradeFailed", postgres_resource.id)&.incr_resolve
+
+    hop_wait_prune_servers
   end
 
   label def recycle_representative_server
@@ -177,5 +210,13 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
   def upgrade_candidate
     @upgrade_candidate ||= postgres_resource.upgrade_candidate_server
+  end
+
+  def fail_upgrade(message, details: [], retryable: false)
+    self.upgrade_error = message
+    self.upgrade_error_details = details
+    self.upgrade_retryable = retryable
+    self.upgrade_failed_at = time_string(Time.now)
+    hop_upgrade_failed
   end
 end

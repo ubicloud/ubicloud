@@ -488,8 +488,33 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def upgrade_strand
+    strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource")
+  end
+
   def upgrade_stage
-    strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource")&.label
+    upgrade_strand&.label
+  end
+
+  def request_upgrade_cancel
+    Semaphore.incr(strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed").select(:id), :cancel_upgrade)
+  end
+
+  def upgrade_failed_at(failure: upgrade_failure)
+    if (failed_at = failure["upgrade_failed_at"])
+      Time.strptime(failed_at, "%F %T.%N %z")
+    end
+  end
+
+  # Parameters for the logs endpoint covering the upgrade run that failed.
+  # Logs come from the upgrade candidate, which is not the primary.
+  def upgrade_failure_logs_params(failure: upgrade_failure)
+    params = {stream_name: "upgrade", server_role: "", max_log_lines: 500}
+    if (failed_at = upgrade_failed_at(failure:))
+      params[:start] = (failed_at - 60 * 60).utc.iso8601
+      params[:end] = (failed_at + 60).utc.iso8601
+    end
+    params
   end
 
   def upgrade_status
@@ -502,8 +527,24 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def upgrade_failure
+    strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+      .get(:stack)&.first || {}
+  end
+
   def can_upgrade?
     target_version.to_i < Option::POSTGRES_VERSION_OPTIONS.map(&:to_i).max
+  end
+
+  def upgrade_target_versions
+    Option::POSTGRES_VERSION_OPTIONS.select { it.to_i > version.to_i }.reverse
+  end
+
+  # Offer the version new databases get, so upgrades do not move ahead of
+  # provisioning. Past it, offer the next version.
+  def default_upgrade_target_version
+    targets = upgrade_target_versions
+    targets.include?(DEFAULT_VERSION) ? DEFAULT_VERSION : targets.first
   end
 
   def ready_for_read_replica?

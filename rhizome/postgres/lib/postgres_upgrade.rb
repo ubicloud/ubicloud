@@ -8,9 +8,9 @@ require "logger"
 require "timeout"
 
 class PostgresUpgrade
-  def initialize(version, logger)
+  def initialize(version, logger, prev_version: nil)
     @version = Integer(version)
-    @prev_version = @version - 1
+    @prev_version = prev_version ? Integer(prev_version) : @version - 1
     @logger = logger
   end
 
@@ -93,7 +93,7 @@ class PostgresUpgrade
   def run_post_upgrade_extension_update
     databases = r("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").split("\n").map(&:strip)
 
-    scripts = EXTENSION_UPGRADE_SCRIPTS[@version]
+    scripts = EXTENSION_UPGRADE_SCRIPTS.values_at(*(@prev_version + 1..@version)).compact.reduce({}, :merge)
     scripts.each do |extension, script|
       @logger.info("Running post upgrade extension update for #{extension}")
       databases.each do |database|

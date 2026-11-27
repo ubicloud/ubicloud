@@ -12,6 +12,18 @@ class UbiCli
       body << "Major version upgrade of PostgreSQL database #{sdk_object.id} to version #{upgrade_status[:target_version]}\n"
       body << "Status: #{upgrade_status[:upgrade_status]}\n"
       body << "Stage: #{upgrade_status[:upgrade_stage] || "N/A"}\n"
+      body << "Error: #{upgrade_status[:upgrade_error]}\n" if upgrade_status[:upgrade_error]
+      (upgrade_status[:upgrade_error_details] || []).each do |detail|
+        body << "#{detail.map { |label, value| "#{label}: #{value}" }.join(", ")}\n"
+      end
+      if upgrade_status[:upgrade_status] == "failed"
+        logs_cmd = "ubi pg #{@location}/#{@name} get-logs --stream-name upgrade -l 500"
+        if (logs_start = upgrade_status[:upgrade_logs_start])
+          logs_cmd << " --start #{logs_start} --end #{upgrade_status[:upgrade_logs_end]}"
+        end
+        body << "\nTo find the cause of the failure, see the upgrade logs:\n  #{logs_cmd}\n"
+        body << "To stay on the current version, or to start again after you fix the cause, cancel the upgrade:\n  ubi pg #{@location}/#{@name} cancel-upgrade\n"
+      end
       response(body)
     end
   end

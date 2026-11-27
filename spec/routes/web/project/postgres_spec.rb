@@ -1911,14 +1911,24 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Upgrade the read replicas"
       end
 
-      it "starts the upgrade when user clicks on start upgrade button" do
-        old_version_int = pg.version.to_i
+      it "starts the upgrade to the default version for new databases by default" do
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Your database can be upgraded to Postgres 17, 18, 19."
         click_button "Start Upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres #{PostgresResource::DEFAULT_VERSION} is in progress"
+        expect(page).to have_css("#upgrade-stage-start")
         expect(page).to have_flash_notice "Database upgrade started successfully"
-        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+        expect(pg.reload.target_version).to eq(PostgresResource::DEFAULT_VERSION)
+      end
+
+      it "starts the upgrade to the selected version" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        select "Postgres 17", from: "target_version"
+        click_button "Start Upgrade"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
+        expect(pg.reload.target_version).to eq("17")
       end
 
       it "shows upgrade progress when upgrade is in progress" do
@@ -1928,7 +1938,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "wait_for_maintenance_window")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows database unavailability when upgrade is in progress" do
@@ -1939,7 +1949,7 @@ RSpec.describe Clover, "postgres" do
         pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_standby")
 
         visit "#{project.path}#{pg.path}/upgrade"
-        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_content "Database upgrade to Postgres 17 is in progress"
       end
 
       it "shows failed upgrade indication when upgrade fails" do
@@ -1951,6 +1961,33 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_css('[role="alert"]', text: "Database upgrade failed")
+        expect(page).to have_no_css('[id^="upgrade-stage-"]')
+        expect(page).to have_link "upgrade logs", href: "#{project.path}#{pg.path}/logs?stream_name=upgrade&server_role=&max_log_lines=500"
+      end
+
+      it "cancels a failed upgrade when user clicks on cancel upgrade button" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        st = Strand.create(parent_id: pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "To stay on Postgres 16, or to start again after you fix the cause, cancel the upgrade."
+        click_button "Cancel Upgrade"
+        expect(page).to have_flash_notice "The failed upgrade will be canceled in a few seconds"
+        expect(page).to have_current_path "#{project.path}#{pg.path}/upgrade", ignore_query: true
+        expect(Semaphore.where(strand_id: st.id, name: "cancel_upgrade").count).to eq(1)
+      end
+
+      it "does not show cancel upgrade button when user has read only permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        pg_wo_permission.strand.update(label: "wait")
+        pg_wo_permission.update(target_version: "17")
+        Strand.create(parent_id: pg_wo_permission.strand.id, prog: "Postgres::ConvergePostgresResource", label: "upgrade_failed")
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/upgrade"
+        expect(page).to have_content "Database upgrade failed"
+        expect(page).to have_no_button "Cancel Upgrade"
       end
 
       it "shows latest version message if the database is already on the latest version" do
@@ -1959,6 +1996,29 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.update(version: PostgresResource::LATEST_VERSION)
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Your database is already on the latest version."
+      end
+
+      it "renders saved failure messages and details as escaped text" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first.update(
+          label: "upgrade_failed",
+          stack: [{"upgrade_error" => "The upgrade check failed: <script>alert(1)</script>.", "upgrade_error_details" => [{"Setting" => "<max_connections>", "Expected" => "at least 100"}]}],
+        )
+
+        visit "#{project.path}#{pg.path}/upgrade"
+
+        within('[role="alert"]') do
+          expect(page).to have_css("#upgrade-error", text: "The upgrade check failed: <script>alert(1)</script>.")
+          expect(page).to have_content("Setting:")
+          expect(page).to have_css("code", text: "<max_connections>", exact_text: true)
+          expect(page).to have_css("code", text: "at least 100", exact_text: true)
+          expect(page).to have_no_css("script")
+          expect(page).to have_no_css("max_connections")
+        end
+        expect(page).to have_no_css("#flash-error")
+        expect(page).to have_no_css('[id^="upgrade-stage-"]')
       end
 
       it "shows correct error page if upgrade validation fails" do
